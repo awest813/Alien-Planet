@@ -53,6 +53,15 @@ describe('defences', () => {
     expect(coverFactor(w, w.idx(9, 4), target)).toBe(1);
   });
 
+  it('trains the Animals skill like any other', () => {
+    const sim = Simulation.newColony(13);
+    const c = sim.colonists[0];
+    const before = c.skills.animals;
+    learn(sim, c, 'animals', 1e5);
+    expect(Number.isFinite(c.skillXp.animals)).toBe(true);
+    expect(c.skills.animals).toBeGreaterThan(before);
+  });
+
   it('has a colonist trade up to a clearly better-made bow', () => {
     const sim = Simulation.newColony(12);
     for (const c of sim.colonists) {

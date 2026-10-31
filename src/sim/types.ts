@@ -70,6 +70,7 @@ export const SKILL_KEYS: SkillKey[] = [
   'medicine',
   'combat',
   'research',
+  'animals',
 ];
 
 // 0: no passion, 1: interested, 2: burning. Passions speed up learning.

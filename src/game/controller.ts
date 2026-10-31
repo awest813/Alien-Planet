@@ -102,6 +102,44 @@ const build = (key: string, label: string, hotkey: string, group: ToolDef['group
   };
 };
 
+// For each goal: how to get it done, plus the tool to pick or the screen to open.
+const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: ObjectiveView['screen'] }> = {
+  wood: { how: 'Pick Chop and drag over trees: colonists cut them down for wood.', tool: 'chop' },
+  stockpile: { how: 'Drag out a stockpile zone on open ground near your colonists.', tool: 'stockpile' },
+  haul: { how: 'Haulers carry loose items into stockpiles on their own. Give them time.' },
+  shelter: { how: 'Drag a rectangle of wood walls, then click a door into one side.', tool: 'woodWall' },
+  bed: { how: 'Click beds inside the shelter, one per colonist.', tool: 'bed' },
+  night: { how: 'Have walls, a door and beds up before 22:00, when colonists go to sleep.' },
+  grow: { how: 'Drag a potato field over soil or grass.', tool: 'growPotatoes' },
+  harvest: { how: 'Potatoes take a few days to ripen; growers harvest them on their own.' },
+  meals: { how: 'Build a stove from granite (mine rock for it); cooks turn raw food into meals.', tool: 'stove' },
+  rec: { how: 'Build a horseshoe pin so colonists have something to do for fun.', tool: 'horseshoePin' },
+  heat: { how: 'Build a campfire inside a bedroom.', tool: 'campfire' },
+  cloth: { how: 'Grow cotton, build a crafting bench to weave it, then build an armchair.', tool: 'craftingBench' },
+  medicine: { how: 'Drag a healroot field; growers harvest herbal medicine from it.', tool: 'growHealroot' },
+  tend: { how: 'Doctors tend wounds and illness on their own. Keep someone on Doctor work.', screen: 'work' },
+  friends: { how: 'Colonists chat while they work and relax together; a table and recreation help.' },
+  raid: { how: 'When raiders come, press Q to draft everyone and fight from cover.' },
+  hunt: { how: 'Pick Hunt and drag over animals; hunters track and shoot them.', tool: 'hunt' },
+  researchBench: { how: 'Build a research bench, then pick a project in Research.', tool: 'researchBench' },
+  research3: { how: 'Pick projects in Research; colonists with Research work study them.', screen: 'research' },
+  hearth: { how: 'Research Hearths, then build a stone hearth in your bedrooms.', screen: 'research' },
+  bow: { how: 'Research Archery; crafters then make recurve bows (see Production).', screen: 'research' },
+  sandbags: { how: 'Research Fortifications, then build sandbags where you will fight.', screen: 'research' },
+  winter: { how: 'Stock food, keep rooms heated and get parkas made before winter.' },
+  survive: { how: 'Keep everyone fed, warm, rested and patched up.' },
+  power: { how: 'Research Electricity, then build a wood generator.', screen: 'research' },
+  coldStore: { how: 'Research Refrigeration and build an icebox, or a freezer in a sealed room.', screen: 'research' },
+  tame: { how: 'Pick Tame and drag over animals; colonists with Handle work win them over.', tool: 'tame' },
+  fineMeals: {
+    how: 'A cook with skill 6 makes fine meals from meat and vegetables; set a target in Production.',
+    screen: 'production',
+  },
+  parkas: { how: 'Research Tailoring; crafters then make parkas from leather (see Production).', screen: 'research' },
+  population: { how: 'Wanderers ask to join now and then; keep the colony comfortable and fed.' },
+  secondWinter: { how: 'Everything from the first winter, with a bigger colony.' },
+};
+
 export const TOOLS: ToolDef[] = [
   {
     id: 'select',
@@ -417,9 +455,25 @@ export interface TradeView {
   ours: TradeLine[];
 }
 
+export interface ObjectiveView {
+  id: string;
+  label: string;
+  phase: number;
+  done: boolean;
+  failed: boolean;
+  progress?: string;
+  // A line on how to get it done, and the tool or screen that does it.
+  how: string;
+  tool?: string;
+  screen?: 'work' | 'production' | 'research' | 'schedule';
+}
+
 export interface Alert {
   text: string;
   tone: 'warn' | 'danger';
+  // Who or where it's about: clicking the alert takes the camera there.
+  colonist?: number;
+  tile?: number;
 }
 
 export interface ResearchView {
@@ -450,8 +504,10 @@ export interface UiState {
   toolId: string;
   colonists: ColonistView[];
   selectedColonist: number | null;
-  resources: { name: string; stored: number; total: number }[];
-  objectives: { id: string; label: string; phase: number; done: boolean; failed: boolean; progress?: string }[];
+  resources: { item: number; name: string; stored: number; total: number }[];
+  // Days the colony's food would last at the current headcount.
+  foodDays: number;
+  objectives: ObjectiveView[];
   bills: BillView[];
   alerts: Alert[];
   log: LogEntry[];
@@ -788,6 +844,27 @@ export class GameController {
     this.selectColonist(living[(at + 1) % living.length].id, true);
   }
 
+  // Takes the camera to whoever or wherever an alert is about (and selects them).
+  public focusAlert(alert: Alert): void {
+    if (alert.colonist !== undefined) {
+      this.selectColonist(alert.colonist, true);
+    } else if (alert.tile !== undefined) {
+      this.focusRequest = alert.tile;
+      this.selectTile(alert.tile);
+    }
+  }
+
+  // Picks a tool by its id (goals use this); returns false if it's locked or unknown.
+  public selectToolById(id: string): boolean {
+    const tool = TOOLS.find((t) => t.id === id);
+    if (!tool) {
+      return false;
+    }
+    const before = this.tool;
+    this.setTool(tool.tool);
+    return this.tool !== before;
+  }
+
   public selectColonist(id: number | null, focus = false): void {
     this.selectedColonist = id;
     if (id !== null) {
@@ -1122,7 +1199,10 @@ export class GameController {
         ].filter((condition) => condition.value > 0.02),
       })),
       selectedColonist: this.selectedColonist,
-      resources: totals.map((r) => ({ name: itemDef(r.item).name, stored: r.stored, total: r.total })),
+      resources: totals.map((r) => ({ item: r.item, name: itemDef(r.item).name, stored: r.stored, total: r.total })),
+      foodDays:
+        totals.reduce((sum, t) => sum + itemDef(t.item).nutrition * t.total, 0) /
+        (Math.max(1, sim.living().length) * DAILY_NUTRITION),
       objectives: OBJECTIVES.filter((o) => !o.hidden?.(sim)).map((o) => ({
         id: o.id,
         label: o.label,
@@ -1130,6 +1210,7 @@ export class GameController {
         done: !!sim.objectivesDone[o.id],
         failed: sim.objectiveFailed(o.id),
         progress: o.progress?.(sim),
+        ...(GOAL_HELP[o.id] ?? { how: '' }),
       })),
       bills: sim.bills.map((bill) => {
         const recipe = RECIPES[bill.recipe];
@@ -1240,19 +1321,21 @@ export class GameController {
       alerts.push({
         text: `Fire! ${n} tile${n > 1 ? 's' : ''} burning. Colonists who haul or build will fight fires near home.`,
         tone: 'danger',
+        tile: sim.burning.values().next().value,
       });
     }
     if (raiders > 0) {
       alerts.push({
         text: `Raid: ${raiders} raider${raiders > 1 ? 's' : ''} from ${FACTIONS[sim.enemies[0].faction].name}. Draft with Q.`,
         tone: 'danger',
+        tile: sim.enemies.find((e) => !e.fleeing)?.tile,
       });
     }
     for (const c of sim.living()) {
       if (c.health.downed) {
-        alerts.push({ text: `${c.name} has collapsed and needs a doctor`, tone: 'danger' });
+        alerts.push({ text: `${c.name} has collapsed and needs a doctor`, tone: 'danger', colonist: c.id });
       } else if (bleedingOf(c) > 0) {
-        alerts.push({ text: `${c.name} is bleeding`, tone: 'danger' });
+        alerts.push({ text: `${c.name} is bleeding`, tone: 'danger', colonist: c.id });
       }
       const disease = c.health.disease;
       if (disease) {
@@ -1261,13 +1344,18 @@ export class GameController {
         alerts.push({
           text: `${c.name} has ${disease.label.toLowerCase()} (severity ${sev}%, immunity ${imm}%)`,
           tone: disease.severity > disease.immunity ? 'danger' : 'warn',
+          colonist: c.id,
         });
       }
     }
     for (const a of sim.animals) {
       const victim = a.revengeOn >= 0 ? sim.colonists[a.revengeOn] : undefined;
       if (victim && !victim.health.dead) {
-        alerts.push({ text: `A ${animalName(a).toLowerCase()} is attacking ${victim.name}`, tone: 'danger' });
+        alerts.push({
+          text: `A ${animalName(a).toLowerCase()} is attacking ${victim.name}`,
+          tone: 'danger',
+          colonist: victim.id,
+        });
       }
     }
     const hurt = sim.living().some((c) => c.health.injuries.length > 0 || c.health.disease || painOf(c) > 0);
@@ -1294,17 +1382,18 @@ export class GameController {
     }
     for (const c of sim.living()) {
       if (sim.inMentalBreak(c)) {
-        alerts.push({ text: `${c.name} is having a mental break`, tone: 'danger' });
+        alerts.push({ text: `${c.name} is having a mental break`, tone: 'danger', colonist: c.id });
       } else if (c.health.hypothermia > 0.4 || c.health.heatstroke > 0.4) {
         const what = c.health.hypothermia > c.health.heatstroke ? 'hypothermia' : 'heatstroke';
         alerts.push({
           text: `${c.name} has ${what}: get them somewhere ${what === 'hypothermia' ? 'warm' : 'cool'}`,
           tone: 'danger',
+          colonist: c.id,
         });
       } else if (c.needs.food <= 0) {
-        alerts.push({ text: `${c.name} is starving`, tone: 'danger' });
+        alerts.push({ text: `${c.name} is starving`, tone: 'danger', colonist: c.id });
       } else if (c.mood < 25) {
-        alerts.push({ text: `${c.name} is unhappy (mood ${Math.round(c.mood)})`, tone: 'warn' });
+        alerts.push({ text: `${c.name} is unhappy (mood ${Math.round(c.mood)})`, tone: 'warn', colonist: c.id });
       }
     }
     if (!sim.hasShelter() && sim.hour >= 16 && sim.hour < NIGHT_START) {

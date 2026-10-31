@@ -25,6 +25,15 @@ export interface Settings {
   newMapSize: number;
 }
 
+function defaultScale(): number {
+  try {
+    const { innerWidth: w, innerHeight: h } = window;
+    return w >= 2400 && h >= 1300 ? 1.3 : w >= 1800 && h >= 1000 ? 1.15 : 1;
+  } catch {
+    return 1;
+  }
+}
+
 function prefersReducedMotion(): boolean {
   try {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -37,7 +46,8 @@ export const DEFAULT_SETTINGS: Settings = {
   autosave: true,
   pauseOnRaid: true,
   pauseOnEmergency: true,
-  uiScale: 1,
+  // Bigger screens start with a bigger interface.
+  uiScale: defaultScale(),
   showNames: true,
   showMinimap: true,
   // Off for anyone whose system asks for less motion.

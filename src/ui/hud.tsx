@@ -1,7 +1,18 @@
-import type { Stance } from '../sim/types';
 import { useEffect, useState } from 'react';
-import { ColonistView, TOOLS, TOOL_GROUPS, TileView, ToolGroup, UiState, controller } from '../game/controller';
+import {
+  Alert,
+  ColonistView,
+  ObjectiveView,
+  TOOLS,
+  TOOL_GROUPS,
+  TileView,
+  ToolGroup,
+  UiState,
+  controller,
+} from '../game/controller';
+import { itemIconStyle } from '../render/icons';
 import { PHASE_NAMES } from '../sim/simulation';
+import type { Stance } from '../sim/types';
 import { Bar, moodColor } from './common';
 
 // The always-on game HUD: top bar, colonist bar, inspector, side panel, and architect menu.
@@ -61,13 +72,16 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
         {state.speed === 0 && <span className="paused">Paused</span>}
       </div>
       <div className="tb-resources">
+        <FoodDays days={state.foodDays} />
         {state.resources
-          .filter((r) => r.total > 0)
+          .filter((r) => r.total > 0 && KEY_RESOURCES.includes(r.name))
           .map((r) => (
             <span key={r.name} className="res" title={`${r.name}: ${r.stored} stored, ${r.total} in total`}>
-              <b>{r.total}</b> {r.name.toLowerCase()}
+              <i className="icon" style={itemIconStyle(r.item)} />
+              <b>{r.total}</b>
             </span>
           ))}
+        <AllResources state={state} />
         {p.hasGrid && (
           <span
             className={`res power ${p.powered ? '' : 'bad'}`}
@@ -110,6 +124,47 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
         <button onClick={() => onOpen('menu')}>Menu</button>
       </nav>
     </header>
+  );
+}
+
+// The materials worth watching at a glance; everything else is one click away.
+const KEY_RESOURCES = ['Wood', 'Granite chunks', 'Granite blocks', 'Cloth', 'Leather', 'Herbal medicine', 'Silver'];
+
+function FoodDays({ days }: { days: number }) {
+  const shown = days >= 99 ? '99+' : days < 10 ? days.toFixed(1) : Math.round(days).toString();
+  const tone = days < 1 ? 'bad' : days < 3 ? 'low' : '';
+  return (
+    <span className={`res food ${tone}`} title="How long the colony's food would last at the current headcount">
+      🍲 <b>{shown}</b> days of food
+    </span>
+  );
+}
+
+// Every item the colony has, in a dropdown from the top bar.
+function AllResources({ state }: { state: UiState }) {
+  const [open, setOpen] = useState(false);
+  const items = state.resources.filter((r) => r.total > 0);
+  if (items.length === 0) {
+    return null;
+  }
+  return (
+    <span className="res-more">
+      <button className={open ? 'active' : ''} onClick={() => setOpen(!open)} aria-expanded={open}>
+        All items ▾
+      </button>
+      {open && (
+        <div className="panel res-list" role="list">
+          {items.map((r) => (
+            <div key={r.name} className="res-row" role="listitem">
+              <i className="icon" style={itemIconStyle(r.item)} />
+              <span>{r.name}</span>
+              <b>{r.total}</b>
+              <span className="muted">{r.stored < r.total ? `${r.stored} stored` : 'all stored'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -285,12 +340,18 @@ function OverviewTab({ c }: { c: ColonistView }) {
   return (
     <>
       {c.carrying && <div className="muted">Carrying {c.carrying}</div>}
-      <div className="muted">
-        Weapon: {c.weapon} · armor: {c.armor} · tools: {c.tool}
-      </div>
-      <div className="muted">
-        Wearing: {c.apparel} · comfortable {c.comfort}
-      </div>
+      <dl className="gear">
+        <dt>Weapon</dt>
+        <dd>{c.weapon}</dd>
+        <dt>Armor</dt>
+        <dd>{c.armor}</dd>
+        <dt>Clothes</dt>
+        <dd>{c.apparel}</dd>
+        <dt>Tools</dt>
+        <dd>{c.tool}</dd>
+        <dt>Comfy at</dt>
+        <dd>{c.comfort}</dd>
+      </dl>
       <h4>Needs</h4>
       {needs.map((n) => (
         <div key={n.label} className="stat">
@@ -462,12 +523,15 @@ export function HoverCard({ state }: { state: UiState }) {
   );
 }
 
-type SideTab = 'alerts' | 'goals' | 'log';
+type SideTab = 'goals' | 'log';
+// Alerts shown before the rest fold behind "more".
+const ALERTS_SHOWN = 4;
 
-export function SidePanel({ state }: { state: UiState }) {
+export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: Screen) => void }) {
   const [tab, setTab] = useState<SideTab>('goals');
   // Starts folded away on small screens, where it would cover the map.
   const [open, setOpen] = useState(() => window.innerWidth > 720);
+  const [allAlerts, setAllAlerts] = useState(false);
   // Phases the player has unfolded; the current one is always open.
   const [unfolded, setUnfolded] = useState<Set<string>>(new Set());
   const danger = state.alerts.filter((a) => a.tone === 'danger').length;
@@ -477,6 +541,8 @@ export function SidePanel({ state }: { state: UiState }) {
   }))
     // A phase stays on the list while it has goals still to reach (a failed one doesn't count).
     .filter((p) => p.objectives.some((o) => !o.done && !o.failed));
+  // The goal to work on next: the first one still open in the current phase.
+  const next = phases[0]?.objectives.find((o) => !o.done && !o.failed);
   if (!open) {
     return (
       <button className="panel side-toggle" onClick={() => setOpen(true)} title="Show alerts and goals">
@@ -484,18 +550,25 @@ export function SidePanel({ state }: { state: UiState }) {
       </button>
     );
   }
+  const alerts = [...state.alerts].sort((a, b) => (a.tone === b.tone ? 0 : a.tone === 'danger' ? -1 : 1));
+  const shown = allAlerts ? alerts : alerts.slice(0, ALERTS_SHOWN);
   return (
     <aside className="panel side">
+      {alerts.length > 0 && (
+        <ul className="alerts" aria-label="Alerts">
+          {shown.map((alert, index) => (
+            <AlertLine key={`${index}-${alert.text}`} alert={alert} />
+          ))}
+          {alerts.length > ALERTS_SHOWN && (
+            <li className="more">
+              <button className="link" onClick={() => setAllAlerts(!allAlerts)}>
+                {allAlerts ? 'Show fewer' : `${alerts.length - ALERTS_SHOWN} more alerts`}
+              </button>
+            </li>
+          )}
+        </ul>
+      )}
       <div className="tabs" role="tablist">
-        <button
-          role="tab"
-          aria-selected={tab === 'alerts'}
-          className={tab === 'alerts' ? 'active' : ''}
-          onClick={() => setTab('alerts')}
-        >
-          Alerts{' '}
-          {state.alerts.length > 0 && <span className={`badge ${danger ? 'danger' : ''}`}>{state.alerts.length}</span>}
-        </button>
         <button
           role="tab"
           aria-selected={tab === 'goals'}
@@ -518,71 +591,69 @@ export function SidePanel({ state }: { state: UiState }) {
         </button>
       </div>
       <div className="side-body">
-        {tab === 'alerts' && (
-          <ul className="alerts">
-            {state.alerts.length === 0 && <li className="calm">All quiet.</li>}
-            {[...state.alerts]
-              .sort((a, b) => (a.tone === b.tone ? 0 : a.tone === 'danger' ? -1 : 1))
-              .map((alert, index) => (
-                <li key={`${index}-${alert.text}`} className={alert.tone}>
-                  {alert.text}
-                </li>
-              ))}
-          </ul>
-        )}
         {tab === 'goals' &&
           (phases.length === 0 ? (
             <div className="muted">Every objective is complete. The colony is yours.</div>
           ) : (
-            phases.map((p, index) => {
-              const shown = index === 0 || unfolded.has(p.name);
-              const toggle = () =>
-                setUnfolded((old) => {
-                  const next = new Set(old);
-                  if (!next.delete(p.name)) {
-                    next.add(p.name);
-                  }
-                  return next;
-                });
-              return (
-                <div key={p.name}>
-                  <h4>
-                    {index === 0 ? (
-                      p.name
-                    ) : (
-                      <button
-                        className="link"
-                        aria-expanded={shown}
-                        onClick={(e) => {
-                          toggle();
-                          // Bring the unfolded goals into view in the scrolling panel.
-                          const phase = e.currentTarget.closest('div');
-                          requestAnimationFrame(() => phase?.scrollIntoView({ block: 'nearest' }));
-                        }}
-                      >
-                        {shown ? '▾' : '▸'} {p.name}
-                      </button>
-                    )}{' '}
-                    <span className="muted">
-                      {p.objectives.filter((o) => o.done).length}/{p.objectives.length}
-                    </span>
-                  </h4>
-                  {shown && (
-                    <ul className="objectives">
-                      {p.objectives
-                        .filter((o) => !o.done)
-                        .map((o) => (
-                          <li key={o.id} className={o.failed ? 'failed' : ''}>
-                            <span className="check">{o.failed ? '✖' : '○'}</span>
-                            {o.label}
-                            {o.progress && <span className="muted"> {o.progress}</span>}
-                          </li>
-                        ))}
-                    </ul>
-                  )}
-                </div>
-              );
-            })
+            <>
+              {next && <NextGoal goal={next} onOpen={onOpen} />}
+              {phases.map((p, index) => {
+                const shownPhase = index === 0 || unfolded.has(p.name);
+                const toggle = () =>
+                  setUnfolded((old) => {
+                    const copy = new Set(old);
+                    if (!copy.delete(p.name)) {
+                      copy.add(p.name);
+                    }
+                    return copy;
+                  });
+                return (
+                  <div key={p.name}>
+                    <h4>
+                      {index === 0 ? (
+                        p.name
+                      ) : (
+                        <button
+                          className="link"
+                          aria-expanded={shownPhase}
+                          onClick={(e) => {
+                            toggle();
+                            // Bring the unfolded goals into view in the scrolling panel.
+                            const phase = e.currentTarget.closest('div');
+                            requestAnimationFrame(() => phase?.scrollIntoView({ block: 'nearest' }));
+                          }}
+                        >
+                          {shownPhase ? '▾' : '▸'} {p.name}
+                        </button>
+                      )}{' '}
+                      <span className="muted">
+                        {p.objectives.filter((o) => o.done).length}/{p.objectives.length}
+                      </span>
+                    </h4>
+                    {shownPhase && (
+                      <ul className="objectives">
+                        {p.objectives
+                          .filter((o) => !o.done)
+                          .map((o) => (
+                            <li key={o.id} className={`${o.failed ? 'failed' : ''} ${o === next ? 'next' : ''}`}>
+                              <button
+                                className="goal"
+                                title={o.how || undefined}
+                                onClick={() => startGoal(o, onOpen)}
+                                disabled={!o.tool && !o.screen}
+                              >
+                                <span className="check">{o.failed ? '✖' : '○'}</span>
+                                {o.label}
+                                {o.progress && <span className="muted"> {o.progress}</span>}
+                              </button>
+                            </li>
+                          ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </>
           ))}
         {tab === 'log' && (
           <ul className="log">
@@ -598,10 +669,58 @@ export function SidePanel({ state }: { state: UiState }) {
   );
 }
 
+// An alert; the ones about someone or somewhere take the camera there when clicked.
+function AlertLine({ alert }: { alert: Alert }) {
+  const target = alert.colonist !== undefined || alert.tile !== undefined;
+  return (
+    <li className={alert.tone}>
+      {target ? (
+        <button className="alert-jump" onClick={() => controller.focusAlert(alert)} title="Show me">
+          {alert.text} <span className="go">›</span>
+        </button>
+      ) : (
+        alert.text
+      )}
+    </li>
+  );
+}
+
+// Picks the goal's tool, or opens the screen it's done from.
+function startGoal(goal: ObjectiveView, onOpen: (screen: Screen) => void): void {
+  if (goal.tool) {
+    controller.selectToolById(goal.tool);
+  } else if (goal.screen) {
+    onOpen(goal.screen);
+  }
+}
+
+// The goal to work on next, with how to do it and a button that gets it started.
+function NextGoal({ goal, onOpen }: { goal: ObjectiveView; onOpen: (screen: Screen) => void }) {
+  const tool = goal.tool ? TOOLS.find((t) => t.id === goal.tool) : undefined;
+  return (
+    <div className="next-goal">
+      <div className="next-label">Next goal</div>
+      <b>{goal.label}</b>
+      {goal.progress && <span className="muted"> {goal.progress}</span>}
+      {goal.how && <p>{goal.how}</p>}
+      {(tool || goal.screen) && (
+        <button className="primary" onClick={() => startGoal(goal, onOpen)}>
+          {tool ? `Use ${tool.label}` : `Open ${goal.screen![0].toUpperCase()}${goal.screen!.slice(1)}`}
+          {tool?.hotkey && <kbd>{tool.hotkey.toUpperCase()}</kbd>}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // Build and order tools, grouped into tabs.
 export function Architect({ state }: { state: UiState }) {
   const current = TOOLS.find((t) => t.id === state.toolId);
   const [group, setGroup] = useState<ToolGroup>('orders');
+  // The tool under the mouse: its description shows in the hint line until the mouse leaves.
+  const [hovered, setHovered] = useState<string | null>(null);
+  const shown = TOOLS.find((t) => t.id === hovered) ?? current;
+  const lockedShown = shown ? state.lockedTools[shown.id] : undefined;
   // Follow hotkeys: picking a tool shows its tab.
   useEffect(() => {
     if (current && current.id !== 'select') {
@@ -640,7 +759,10 @@ export function Architect({ state }: { state: UiState }) {
               key={t.id}
               className={`${state.toolId === t.id ? 'active' : ''} ${locked ? 'locked' : ''}`}
               onClick={() => controller.setTool(t.tool)}
-              title={locked ? `${t.hint} · needs research: ${locked}` : t.hint}
+              onMouseEnter={() => setHovered(t.id)}
+              onMouseLeave={() => setHovered(null)}
+              onFocus={() => setHovered(t.id)}
+              onBlur={() => setHovered(null)}
             >
               {locked && '🔒 '}
               {t.label}
@@ -649,14 +771,29 @@ export function Architect({ state }: { state: UiState }) {
           );
         })}
       </div>
-      <div className="hint">{current?.hint}. Right-drag or WASD pans, the wheel zooms, right-click drops the tool.</div>
+      <div className="hint">
+        {shown && (
+          <>
+            <b>{shown.label}:</b> {shown.hint}
+            {lockedShown && <span className="locked-note"> · needs research: {lockedShown}</span>}
+          </>
+        )}
+        {(!shown || shown.id === 'select') && (
+          <span className="muted"> · Right-drag or WASD pans, the wheel zooms, right-click drops the tool.</span>
+        )}
+      </div>
     </section>
   );
 }
 
-export function Notices({ state }: { state: UiState }) {
+export function Notices({ state, paused = false }: { state: UiState; paused?: boolean }) {
   return (
     <div className="notices" aria-live="polite">
+      {paused && (
+        <button className="pause-banner" onClick={() => controller.togglePause()} title="Resume (Space)">
+          ❚❚ Paused · click or Space to resume
+        </button>
+      )}
       {state.toast && <div className="toast">{state.toast}</div>}
       {state.notifications.map((n) => (
         <button

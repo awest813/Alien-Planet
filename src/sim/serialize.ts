@@ -24,6 +24,7 @@ import {
   Stats,
   TimedThought,
   WornApparel,
+  SKILL_KEYS,
 } from './types';
 import { Caravan } from './trade';
 import { WeatherState } from './weather';
@@ -257,6 +258,15 @@ export function deserialize(data: SaveData): Simulation {
     reserved: [],
     practicedAt: saved.practicedAt ?? {},
   }));
+  // Saves from before the Animals skill was tracked properly have no (or broken) progress for it.
+  for (const c of colonists) {
+    for (const key of SKILL_KEYS) {
+      if (!Number.isFinite(c.skillXp[key])) {
+        c.skillXp[key] = 0;
+      }
+      c.passions[key] ??= 0;
+    }
+  }
 
   const sim = new Simulation(world, colonists, data.seed, new Rng(data.rngState));
   sim.tick = data.tick;

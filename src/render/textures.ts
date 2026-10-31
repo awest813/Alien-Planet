@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { FEATURES, ITEMS, TERRAIN } from '../sim/defs';
 import { hash2 } from '../sim/rng';
+import { setTilesetImage } from './icons';
 
 export const TILE = 16;
 export const TILESET_KEY = 'tiles';
@@ -92,6 +93,8 @@ export function createTextures(scene: Phaser.Scene): void {
     c.fillRect(0, 0, TILE, TILE);
   });
   texture.refresh();
+  // The UI cuts item icons from the same art.
+  setTilesetImage(texture.canvas.toDataURL());
 
   // Named frames for sprites that reuse tileset art.
   for (let frame = 0; frame < COLUMNS * ROWS; frame++) {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { UiState, controller } from '../game/controller';
-import { ScheduleSlot, WORK_TYPES } from '../sim/types';
+import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey } from '../sim/types';
 import { Bar, SLOT_LABELS, WORK_LABELS } from './common';
 
 // Full-screen dialogs opened from the top bar.
@@ -49,14 +49,32 @@ export function Modal({
   );
 }
 
+// The skill each kind of work draws on (hauling needs none).
+const WORK_SKILL: Partial<Record<WorkTypeKey, SkillKey>> = {
+  doctor: 'medicine',
+  cooking: 'cooking',
+  construction: 'construction',
+  growing: 'plants',
+  plantCutting: 'plants',
+  mining: 'mining',
+  hunting: 'combat',
+  handling: 'animals',
+  crafting: 'crafting',
+  research: 'research',
+};
+
 export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
-  const cycle = (value: number) => (value === 0 ? 1 : value === 4 ? 0 : value + 1);
+  // Left click raises the number (1 → 4 → off → 1); right click goes the other way.
+  const forward = (value: number) => (value === 0 ? 1 : value === 4 ? 0 : value + 1);
+  const back = (value: number) => (value === 0 ? 4 : value === 1 ? 0 : value - 1);
   return (
     <Modal title="Work priorities" onClose={onClose} wide>
       <p className="muted">
-        Click to cycle 1 (highest) → 4 (lowest) → off. At equal priority, colonists work left to right.
+        Click a cell to cycle 1 (do first) → 4 (do last) → off; right-click goes back. At equal priority, colonists work
+        left to right. The small number is the colonist's skill (★ a passion: they learn faster and enjoy it); brighter
+        cells are better at it.
       </p>
-      <table className="grid">
+      <table className="grid work-grid">
         <thead>
           <tr>
             <th />
@@ -66,29 +84,54 @@ export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => 
           </tr>
         </thead>
         <tbody>
-          {state.colonists.map((c) => (
-            <tr key={c.id}>
-              <td className="row-label">
-                <span className="swatch" style={{ background: c.color }} /> {c.name}
-              </td>
-              {WORK_TYPES.map((work) => {
-                const value = c.priorities[work];
-                return (
-                  <td key={work}>
-                    <button
-                      className={`priority p${value}`}
-                      aria-label={`${c.name}, ${WORK_LABELS[work]}: ${value === 0 ? 'off' : `priority ${value}`}`}
-                      onClick={() =>
-                        controller.command({ type: 'priority', colonist: c.id, work, value: cycle(value) })
-                      }
-                    >
-                      {value === 0 ? '' : value}
-                    </button>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+          {state.colonists
+            .filter((c) => !c.dead)
+            .map((c) => (
+              <tr key={c.id}>
+                <td className="row-label">
+                  <span className="swatch" style={{ background: c.color }} /> {c.name}
+                </td>
+                {WORK_TYPES.map((work) => {
+                  const value = c.priorities[work];
+                  const key = WORK_SKILL[work];
+                  const skill = key ? c.skillList.find((sk) => sk.key === key) : undefined;
+                  const set = (next: number) =>
+                    controller.command({ type: 'priority', colonist: c.id, work, value: next });
+                  const stars = skill?.passion ? '★'.repeat(skill.passion) : '';
+                  return (
+                    <td key={work}>
+                      <button
+                        className={`priority p${value}`}
+                        style={
+                          skill
+                            ? { background: `rgba(143, 195, 255, ${(0.03 + (skill.level / 20) * 0.32).toFixed(2)})` }
+                            : undefined
+                        }
+                        title={
+                          skill
+                            ? `${c.name}: ${skill.label} ${skill.level}${skill.passion === 2 ? ', burning passion' : skill.passion === 1 ? ', interested' : ''}`
+                            : `${c.name}: ${WORK_LABELS[work]}`
+                        }
+                        aria-label={`${c.name}, ${WORK_LABELS[work]}: ${value === 0 ? 'off' : `priority ${value}`}`}
+                        onClick={() => set(forward(value))}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          set(back(value));
+                        }}
+                      >
+                        <span className="prio">{value === 0 ? '–' : value}</span>
+                        {skill && (
+                          <span className="skill">
+                            {skill.level}
+                            {stars && <span className="passion">{stars}</span>}
+                          </span>
+                        )}
+                      </button>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
         </tbody>
       </table>
     </Modal>
@@ -199,67 +242,85 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Welcome to Colony Alpha" onClose={onClose}>
       <p>
-        Five colonists have crash-landed. You can't control them directly: you give orders, and they decide who does
-        what, between eating, sleeping and taking breaks.
+        Five colonists have crash-landed. You don't steer them directly: you give orders, and they decide who does what
+        between eating, sleeping and taking breaks.
       </p>
-      <ol className="help-steps">
+      <ol className="help-steps big">
         <li>
-          <b>Chop</b> (C) some trees and drag out a <b>Stockpile</b> (Z) so the wood has somewhere to go.
+          <b>Follow the goals</b> on the right. Each one says how, and its button picks the right tool for you.
         </li>
         <li>
-          Drag a small rectangle (about 5×4) of <b>Wood wall</b> (B), click a <b>Door</b> (O) into it, and add{' '}
-          <b>Beds</b> (E) inside before night falls at 22:00.
+          <b>Drag on the map</b> to give orders: chop trees, mark a stockpile, outline walls. Right-click drops the
+          tool.
         </li>
         <li>
-          Plant <b>Grow potatoes</b> (P), <b>Mine</b> (M) granite for a <b>Stove</b> (K), and set meal targets in{' '}
-          <b>Production</b>.
-        </li>
-        <li>
-          Watch moods. Build a <b>Table</b>, a <b>Campfire</b> for warmth and a <b>Horseshoe pin</b> for fun. The alerts
-          panel says what's missing.
+          <b>Watch the alerts</b> above the goals. Click one to jump to whoever or whatever it's about.
         </li>
       </ol>
-      <h3>The screen</h3>
-      <ul className="help-steps">
-        <li>
-          <b>Colonist bar</b> (top): click a colonist to inspect them on the left, with tabs for needs, health, social
-          life and skills. Icons show who is bleeding, sick, drafted or asleep.
-        </li>
-        <li>
-          <b>Architect</b> (bottom): orders, zones and buildings, grouped into tabs. Hover a button for what it does and
-          costs. 🔒 means it needs research first.
-        </li>
-        <li>
-          <b>Alerts, Goals and Log</b> (right): what needs attention, what to aim for next, and what just happened.
-          Click any building or tile in Select mode to see its details; 🌡 shows temperatures on the map.
-        </li>
-      </ul>
-      <p className="muted">
-        Space pauses, 1–3 change speed, Esc opens the menu (saves, settings), Tab jumps from colonist to colonist, and
-        the minimap (bottom right) moves the view. WASD or right-drag pans, the wheel zooms, and right-click drops the
-        current tool.
-      </p>
-      <p className="muted">
-        Later, raiders come. The game pauses: press <b>Q</b> to draft everyone (or a selected colonist), pick a stance
-        (take cover, hold, charge) in the inspector, right-click the map to move a drafted colonist, and right-click a
-        raider to concentrate fire on them. Better weapons, armor, embrasures and spike traps come with research. Grow{' '}
-        <b>healroot</b> (Y) for medicine and hunt (V) for meat and leather, or forage berry bushes (G) for quick food.
-        Winter comes every 24 days: crops stop and food rots unless it's cold, so research <b>electricity</b> and{' '}
-        <b>refrigeration</b> for generators, iceboxes and freezers, and <b>sun lamps</b> for indoor farming. Skills
-        improve with practice, fastest where a colonist has a passion (★). Build <b>bridges</b> over water and{' '}
-        <b>fishing spots</b> on the shore (hunters fish while food is short, and all winter); in hard frost the shallows
-        freeze and can be walked across. Research <b>tailoring</b> for parkas before winter: cold beyond what colonists
-        wear builds into hypothermia, and a skilled cook makes fine meals that rarely make anyone sick. <b>Tame</b> deer
-        for milk and boars as guards (Handle work type); tame pairs breed.
-      </p>
-      <p className="muted">
-        Watch the weather in the top bar: rain chills anyone outside, droughts stunt crops, and storms bring lightning
-        that can start fires (haulers and builders put them out). When traders arrive, <b>Trade</b> lights up in the top
-        bar: sell surplus from your stockpiles for silver and buy what you're short of. A stonecutter's table makes
-        blocks for block walls, and a crafting bench mends worn clothes once you know tailoring. Lay <b>floors</b> for
-        faster walking and prettier rooms, put a <b>roof</b> over an open shelter to keep the rain off, and make{' '}
-        <b>tool kits</b> at the crafting bench: workers who carry one mine, build and farm faster.
-      </p>
+      <p className="muted">First night: walls, a door and a bed for everyone before 22:00.</p>
+      <details>
+        <summary>Controls</summary>
+        <ul className="help-steps">
+          <li>
+            <kbd>Space</kbd> pauses, <kbd>1</kbd>–<kbd>3</kbd> set the speed, <kbd>Esc</kbd> backs out (and opens the
+            menu for saves and settings).
+          </li>
+          <li>
+            <kbd>W</kbd>
+            <kbd>A</kbd>
+            <kbd>S</kbd>
+            <kbd>D</kbd> or right-drag pans, the wheel zooms, the minimap moves the view, <kbd>Tab</kbd> jumps from
+            colonist to colonist.
+          </li>
+          <li>Tool hotkeys are shown on their buttons; hover a button to see what it does and costs.</li>
+        </ul>
+      </details>
+      <details>
+        <summary>The screen</summary>
+        <ul className="help-steps">
+          <li>
+            <b>Colonist bar</b> (top): click a colonist to inspect their needs, health, social life and skills.
+          </li>
+          <li>
+            <b>Architect</b> (bottom): orders, zones and buildings in tabs. 🔒 means research comes first.
+          </li>
+          <li>
+            <b>Work, Schedule, Production, Research</b> (top bar): who does what, when they sleep, what gets made, and
+            what to learn next.
+          </li>
+          <li>Click any tile in Select mode for its details; 🌡 shows temperatures on the map.</li>
+        </ul>
+      </details>
+      <details>
+        <summary>Raids and combat</summary>
+        <ul className="help-steps">
+          <li>
+            Raiders pause the game. Press <kbd>Q</kbd> to draft everyone (or a selected colonist).
+          </li>
+          <li>
+            Pick a stance in the inspector: take cover, hold or charge. Right-click the map to move a drafted colonist,
+            or a raider to focus fire on them.
+          </li>
+          <li>Research better bows, armor, sandbags, embrasures and spike traps.</li>
+        </ul>
+      </details>
+      <details>
+        <summary>Food, seasons and the rest</summary>
+        <ul className="help-steps">
+          <li>
+            Winter comes every 24 days: crops stop, so stock food. Cold storage (research refrigeration) keeps it from
+            rotting; parkas (tailoring) and hearths keep colonists warm.
+          </li>
+          <li>
+            Grow <b>healroot</b> for medicine, hunt and fish for meat and leather, forage berries for quick food.
+          </li>
+          <li>
+            Weather matters: rain chills, droughts stunt crops, storms start fires. Traders visit now and then: open{' '}
+            <b>Trade</b> in the top bar.
+          </li>
+          <li>Floors make rooms nicer, roofs keep the rain off open shelters, tool kits make workers faster.</li>
+        </ul>
+      </details>
     </Modal>
   );
 }

@@ -44,6 +44,7 @@ function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: ()
   };
   return (
     <>
+      <h3>Difficulty</h3>
       <div className="difficulties">
         {DIFFICULTIES.map((d) => (
           <button key={d.key} className={difficulty === d.key ? 'active' : ''} onClick={() => setDifficulty(d.key)}>
@@ -52,6 +53,7 @@ function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: ()
           </button>
         ))}
       </div>
+      <h3>Map size</h3>
       <div className="difficulties">
         {MAP_SIZES.map((m) => (
           <button key={m.size} className={mapSize === m.size ? 'active' : ''} onClick={() => setMapSize(m.size)}>
@@ -60,13 +62,18 @@ function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: ()
           </button>
         ))}
       </div>
-      <div className="row">
-        <input placeholder="Seed (blank for random)" value={seed} onChange={(e) => setSeed(e.target.value)} />
+      <div className="row start-row">
+        <input
+          placeholder="Seed (optional)"
+          title="The same seed gives the same map; leave blank for a random one"
+          value={seed}
+          onChange={(e) => setSeed(e.target.value)}
+        />
         {confirm ? (
-          <ConfirmButton label="Start" confirm="Lose current?" onConfirm={start} />
+          <ConfirmButton label="Start colony" confirm="Lose current?" onConfirm={start} />
         ) : (
-          <button className="primary" onClick={start}>
-            Start
+          <button className="primary big" onClick={start}>
+            Start colony
           </button>
         )}
       </div>

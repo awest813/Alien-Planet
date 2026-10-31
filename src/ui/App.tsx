@@ -110,14 +110,14 @@ export function App() {
             <Inspector state={state} />
           </div>
           <div className="right-column">
-            <SidePanel state={state} />
+            <SidePanel state={state} onOpen={setScreen} />
             {state.settings.showMinimap && <Minimap />}
           </div>
           <div className="bottom">
             <HoverCard state={state} />
             <Architect state={state} />
           </div>
-          <Notices state={state} />
+          <Notices state={state} paused={state.speed === 0 && !screen && !state.fallen} />
           {state.fallen && !screen && <FallenScreen state={state} actions={actions} />}
           {screen === 'menu' && <PauseMenu state={state} onClose={close} actions={actions} />}
           {screen === 'work' && <WorkScreen state={state} onClose={close} />}

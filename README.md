@@ -60,9 +60,14 @@ How the living simulation works:
 - **Farming and production:** growing zones are sown and harvested automatically; crops grow by day, faster on
   rich soil, and not below 5°C. Stoves turn raw food into meals and crafting benches turn cotton into cloth until
   the production target is met.
-- **Work:** each colonist has a 1–4 priority per work type; within a priority, work types run left to right.
-- **Alerts:** the side panel warns about low food, missing beds, no shelter before nightfall, no stockpile,
-  and unhappy, starving or breaking colonists.
+- **Work:** each colonist has a 1–4 priority per work type; within a priority, work types run left to right. The
+  Work screen shows each colonist's skill and passions in every cell (right-click lowers a priority).
+- **Alerts and goals:** the side panel keeps alerts in view (low food, missing beds, no shelter before nightfall,
+  hurt, starving or breaking colonists, fires, raids); clicking one takes the camera to whoever or wherever it's
+  about. Below them, the next goal says how to reach it and its button picks the right tool or opens the right
+  screen; every goal in the list is clickable the same way.
+- **Top bar:** days of food at the current headcount, icons for key materials, and every item under "All items".
+  Hovering a build tool shows what it does, what it costs and any research it needs.
 - **Rooms and temperature:** enclosed rooms get a role (bedroom, barracks, kitchen, …) and an impressiveness
   score from furniture beauty and size. Outdoor temperature follows a day/night cycle; rooms drift towards it
   and campfires heat them.
