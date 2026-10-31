@@ -1,5 +1,19 @@
 import { impressivenessLabel } from '../sim/climate';
-import { FACTIONS, NONE, RECIPES, TRAITS, featureDef, featureId, itemDef, itemId, terrainDef } from '../sim/defs';
+import {
+  FACTIONS,
+  NONE,
+  RECIPES,
+  RESEARCH,
+  TRAITS,
+  featureDef,
+  featureId,
+  itemDef,
+  itemId,
+  researchDef,
+  terrainDef,
+} from '../sim/defs';
+import { availableProjects, isAvailable } from '../sim/research';
+import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, yearOf } from '../sim/seasons';
 import { animalName } from '../sim/animals';
 import { COLONIST_WEAPONS } from '../sim/combat';
 import { bleedingOf, needsBedRest, painOf } from '../sim/health';
@@ -26,9 +40,31 @@ export interface ToolDef {
   label: string;
   hotkey: string;
   tool: Tool;
-  group: 'orders' | 'zones' | 'build' | 'furniture';
+  group: ToolGroup;
   hint: string;
 }
+
+export type ToolGroup =
+  | 'orders'
+  | 'zones'
+  | 'structure'
+  | 'furniture'
+  | 'production'
+  | 'power'
+  | 'climate'
+  | 'security';
+
+// Architect menu categories, in display order.
+export const TOOL_GROUPS: { key: ToolGroup; label: string }[] = [
+  { key: 'orders', label: 'Orders' },
+  { key: 'zones', label: 'Zones' },
+  { key: 'structure', label: 'Structure' },
+  { key: 'furniture', label: 'Furniture' },
+  { key: 'production', label: 'Production' },
+  { key: 'power', label: 'Power' },
+  { key: 'climate', label: 'Climate' },
+  { key: 'security', label: 'Security' },
+];
 
 const build = (key: string, label: string, hotkey: string, group: ToolDef['group'], hint: string): ToolDef => ({
   id: key,
@@ -136,17 +172,30 @@ export const TOOLS: ToolDef[] = [
     group: 'zones',
     hint: 'Drag to remove stockpile and growing zones',
   },
-  build('woodWall', 'Wood wall', 'b', 'build', 'Drag a rectangle outline of walls (5 wood each)'),
-  build('stoneWall', 'Granite wall', 'n', 'build', 'Drag a rectangle outline of walls (5 granite each)'),
-  build('door', 'Door', 'o', 'build', 'Click a wall gap to place a door (10 wood)'),
-  build('campfire', 'Campfire', 'f', 'build', 'Heats the room it is in (15 wood)'),
-  build('sandbags', 'Sandbags', '', 'build', 'Cover: halves the chance of being hit from that side (4 granite)'),
+  build('woodWall', 'Wood wall', 'b', 'structure', 'Drag a rectangle outline of walls (5 wood each)'),
+  build('stoneWall', 'Granite wall', 'n', 'structure', 'Drag a rectangle outline of walls (5 granite each)'),
+  build('door', 'Door', 'o', 'structure', 'Click a wall gap to place a door (10 wood)'),
+  build('bridge', 'Bridge', '', 'structure', 'Walkway over shallow or deep water (8 wood)'),
   build('bed', 'Bed', 'e', 'furniture', 'Colonists sleep better in beds (20 wood)'),
+  build('fineBed', 'Fine bed', '', 'furniture', 'Prettier, and colonists rest 25% faster (20 wood, 10 cloth)'),
   build('table', 'Table', 'l', 'furniture', 'Colonists dislike eating without a table (20 wood)'),
-  build('stove', 'Stove', 'k', 'furniture', 'Cooks meals from raw food (20 granite)'),
-  build('craftingBench', 'Crafting bench', 'j', 'furniture', 'Weaves cotton into cloth (30 wood)'),
-  build('horseshoePin', 'Horseshoe pin', 'i', 'furniture', 'Recreation spot (15 granite)'),
   build('armchair', 'Armchair', 'h', 'furniture', 'Comfortable recreation and decor (10 wood, 6 cloth)'),
+  build('horseshoePin', 'Horseshoe pin', 'i', 'furniture', 'Recreation spot (15 granite)'),
+  build('stove', 'Stove', 'k', 'production', 'Cooks meals from raw food (20 granite)'),
+  build('craftingBench', 'Crafting bench', 'j', 'production', 'Weaves cloth and crafts bows (30 wood)'),
+  build('researchBench', 'Research bench', '', 'production', 'Where colonists research new technology (30 wood)'),
+  build('fishingSpot', 'Fishing spot', '', 'production', 'Build on the shore; hunters catch fish here (10 wood)'),
+  build('icebox', 'Icebox', '', 'production', 'Food storage that keeps food fresh while powered (50 W)'),
+  build('sunLamp', 'Sun lamp', '', 'production', 'Crops nearby grow day and night, all year (300 W)'),
+  build('woodGenerator', 'Wood generator', '', 'power', '1000 W while fuelled; haulers refuel it with wood'),
+  build('solarPanel', 'Solar panel', '', 'power', 'Up to 1200 W in daylight, less in winter'),
+  build('battery', 'Battery', '', 'power', 'Stores 8 kWh of spare power for the night'),
+  build('campfire', 'Campfire', 'f', 'climate', 'Heats the room it is in (15 wood)'),
+  build('hearth', 'Stone hearth', '', 'climate', 'A strong heater for cold winters (25 granite)'),
+  build('electricHeater', 'Electric heater', '', 'climate', 'Strong heater, keeps rooms at 21°C (175 W)'),
+  build('airConditioner', 'Air conditioner', '', 'climate', 'Cools a room to 20°C in hot weather (200 W)'),
+  build('freezer', 'Freezer unit', '', 'climate', 'Chills a room to −6°C: a walk-in freezer for food (300 W)'),
+  build('sandbags', 'Sandbags', '', 'security', 'Cover: halves the chance of being hit from that side (4 granite)'),
 ];
 
 export const SPEEDS = [0, 1, 2, 4];
@@ -172,6 +221,8 @@ export interface ColonistView {
   schedule: ScheduleSlot[];
   traits: { label: string; description: string }[];
   status: 'Healthy' | 'Injured' | 'Sick' | 'Downed' | 'Dead';
+  bleeding: boolean;
+  sleeping: boolean;
   injuries: { label: string; severity: number; tended: boolean }[];
   bloodLoss: number;
   disease: { label: string; severity: number; immunity: number } | null;
@@ -204,7 +255,20 @@ export interface TileView {
   temperature: number;
   room: string | null;
   animal: string | null;
+  // Extra lines about the building or items (fuel, power, freshness…).
+  details: string[];
 }
+
+export interface PowerView {
+  hasGrid: boolean;
+  supply: number;
+  demand: number;
+  stored: number;
+  capacity: number;
+  powered: boolean;
+}
+
+export type Overlay = 'none' | 'temperature';
 
 export interface BillView {
   recipe: number;
@@ -216,6 +280,8 @@ export interface BillView {
   recipeText: string;
   bench: string;
   hasBench: boolean;
+  // Research project that must be finished first, if any.
+  locked: string | null;
   step: number;
 }
 
@@ -224,7 +290,26 @@ export interface Alert {
   tone: 'warn' | 'danger';
 }
 
+export interface ResearchView {
+  key: string;
+  name: string;
+  description: string;
+  cost: number;
+  progress: number;
+  done: boolean;
+  available: boolean;
+  current: boolean;
+  requires: string[];
+}
+
 export interface UiState {
+  season: string;
+  year: number;
+  daysUntilWinter: number;
+  research: ResearchView[];
+  researchBench: boolean;
+  // Tool id → name of the research project it still needs.
+  lockedTools: Record<string, string>;
   day: number;
   time: string;
   night: boolean;
@@ -242,6 +327,9 @@ export interface UiState {
   raid: RaidView | null;
   hover: TileView | null;
   hoverColonist: number | null;
+  selectedTile: TileView | null;
+  power: PowerView;
+  overlay: Overlay;
   saves: SaveMeta[];
   toast: string | null;
   notifications: Notification[];
@@ -259,6 +347,8 @@ export class GameController {
   public selectedColonist: number | null = null;
   public hoverTile: number | null = null;
   public hoverColonist: number | null = null;
+  public selectedTile: number | null = null;
+  public overlay: Overlay = 'none';
   // Incremented whenever `sim` is replaced, so the renderer knows to rebuild.
   public simVersion = 0;
   public focusRequest: number | null = null;
@@ -347,7 +437,16 @@ export class GameController {
     this.publish();
   }
 
+  public setResearch(project: string | null): void {
+    this.command({ type: 'research', project });
+  }
+
   public setTool(tool: Tool): void {
+    const needs = tool.kind === 'build' ? featureDef(tool.feature).research : undefined;
+    if (needs && !this.sim.isResearched(needs)) {
+      this.notify(`Requires research: ${researchDef(needs)?.name ?? needs}.`);
+      return;
+    }
     this.tool = tool;
     this.publish();
   }
@@ -391,8 +490,24 @@ export class GameController {
     return true;
   }
 
+  public selectTile(tile: number | null): void {
+    this.selectedTile = tile;
+    if (tile !== null) {
+      this.selectedColonist = null;
+    }
+    this.publish();
+  }
+
+  public setOverlay(overlay: Overlay): void {
+    this.overlay = overlay;
+    this.publish();
+  }
+
   public selectColonist(id: number | null, focus = false): void {
     this.selectedColonist = id;
+    if (id !== null) {
+      this.selectedTile = null;
+    }
     if (id !== null && focus) {
       this.focusRequest = this.sim.colonists[id].tile;
     }
@@ -491,6 +606,7 @@ export class GameController {
     this.simVersion++;
     this.idleSince.clear();
     this.selectedColonist = null;
+    this.selectedTile = null;
     this.accumulator = 0;
     this.focusRequest = sim.colonists[0].tile;
     // Don't replay a loaded colony's history as notifications.
@@ -523,6 +639,27 @@ export class GameController {
     const mm = Math.floor((hour - hh) * 60);
     const totals = sim.resourceTotals();
     return {
+      season: `${sim.season} ${seasonDay(sim.totalHours)}/${DAYS_PER_SEASON}`,
+      year: yearOf(sim.totalHours),
+      daysUntilWinter: Math.ceil(daysUntilWinter(sim.totalHours)),
+      research: RESEARCH.map((p) => ({
+        key: p.key,
+        name: p.name,
+        description: p.description,
+        cost: p.cost,
+        progress: Math.min(1, (sim.research.progress[p.key] ?? 0) / p.cost),
+        done: sim.research.done.includes(p.key),
+        available: isAvailable(sim.research, p),
+        current: sim.research.current === p.key,
+        requires: p.requires.map((r) => researchDef(r)?.name ?? r),
+      })),
+      researchBench: sim.countFeature((f) => featureDef(f).researchStation) > 0,
+      lockedTools: Object.fromEntries(
+        TOOLS.flatMap((t) => {
+          const needs = t.tool.kind === 'build' ? featureDef(t.tool.feature).research : undefined;
+          return needs && !sim.isResearched(needs) ? [[t.id, researchDef(needs)?.name ?? needs]] : [];
+        }),
+      ),
       day: sim.day,
       time: `${String(hh).padStart(2, '0')}:${String(mm - (mm % 10)).padStart(2, '0')}`,
       night: sim.isNight(),
@@ -543,6 +680,8 @@ export class GameController {
         priorities: { ...c.priorities },
         schedule: [...c.schedule],
         traits: c.traits.map((key) => ({ label: TRAITS[key].label, description: TRAITS[key].description })),
+        bleeding: !c.health.dead && bleedingOf(c) > 0,
+        sleeping: c.sleeping,
         status: c.health.dead
           ? 'Dead'
           : c.health.downed
@@ -603,6 +742,10 @@ export class GameController {
           recipeText: `${recipe.ingredient.count} ${input} → ${recipe.product.count} ${product.name.toLowerCase()}`,
           bench: recipe.bench === 'cooking' ? 'stove' : 'crafting bench',
           hasBench: sim.countFeature((f) => featureDef(f).workbench === recipe.bench) > 0,
+          locked:
+            recipe.research && !sim.isResearched(recipe.research)
+              ? (researchDef(recipe.research)?.name ?? recipe.research)
+              : null,
           // Single items (bows) step by one; stackable goods by five.
           step: product.stackLimit === 1 ? 1 : 5,
         };
@@ -616,6 +759,16 @@ export class GameController {
           : null,
       hover: this.hoverTile === null ? null : this.describeTile(this.hoverTile),
       hoverColonist: this.hoverColonist,
+      selectedTile: this.selectedTile === null ? null : this.describeTile(this.selectedTile),
+      power: {
+        hasGrid: sim.power.supply > 0 || sim.power.demand > 0 || sim.power.capacity > 0,
+        supply: Math.round(sim.power.supply),
+        demand: Math.round(sim.power.demand),
+        stored: Math.round(sim.power.stored),
+        capacity: sim.power.capacity,
+        powered: sim.power.powered,
+      },
+      overlay: this.overlay,
       saves: this.saves,
       toast: this.toast,
       notifications: this.notifications.map(({ id, text, tone }) => ({ id, text, tone })),
@@ -627,6 +780,7 @@ export class GameController {
   // Problems worth the player's attention right now, most urgent first.
   private buildAlerts(totals: ReturnType<Simulation['resourceTotals']>): Alert[] {
     const sim = this.sim;
+    const w = sim.world;
     const alerts: Alert[] = [];
     const raiders = sim.enemies.filter((e) => !e.fleeing).length;
     if (raiders > 0) {
@@ -661,6 +815,21 @@ export class GameController {
     if (hurt && sim.stockOf(itemId('herbalMedicine')) === 0) {
       alerts.push({ text: 'No medicine: grow healroot for better treatment', tone: 'warn' });
     }
+    const untilWinter = daysUntilWinter(sim.totalHours);
+    if (untilWinter > 0 && untilWinter <= 3) {
+      alerts.push({
+        text: `Winter in ${Math.ceil(untilWinter)} day${untilWinter > 1 ? 's' : ''}: harvest crops and stock food`,
+        tone: 'warn',
+      });
+    }
+    const researching = sim.research.current !== null;
+    if (
+      !researching &&
+      sim.countFeature((f) => featureDef(f).researchStation) > 0 &&
+      availableProjects(sim.research).length > 0
+    ) {
+      alerts.push({ text: 'No research project selected', tone: 'warn' });
+    }
     if (sim.tick < sim.story.coldSnapUntil) {
       alerts.push({ text: 'Cold snap: keep colonists warm indoors', tone: 'warn' });
     }
@@ -680,7 +849,7 @@ export class GameController {
     const days = nutrition / (Math.max(1, sim.living().length) * DAILY_NUTRITION);
     if (days < 2) {
       alerts.push({
-        text: `Food is running low (about ${days.toFixed(1)} days left)`,
+        text: `Food is running low (about ${days.toFixed(1)} days left): forage berries (G), hunt or fish`,
         tone: days < 1 ? 'danger' : 'warn',
       });
     }
@@ -691,6 +860,36 @@ export class GameController {
     }
     if (!sim.world.zone.some((z) => z === STOCKPILE_ZONE) && totals.some((t) => t.total > 0)) {
       alerts.push({ text: 'No stockpile: items are left where they fall', tone: 'warn' });
+    }
+    // Blueprints waiting on materials the colony doesn't have.
+    const outstanding = new Map<number, number>();
+    for (let i = 0; i < w.size; i++) {
+      for (const need of w.blueprintNeeds(i)) {
+        outstanding.set(need.item, (outstanding.get(need.item) ?? 0) + need.count);
+      }
+    }
+    const source: Record<string, string> = { wood: 'chop trees (C)', stone: 'mine rock (M)' };
+    for (const [item, count] of outstanding) {
+      const short = count - totals[item - 1].total;
+      if (short > 0) {
+        const def = itemDef(item);
+        const how = source[def.key] ? `: ${source[def.key]}` : '';
+        alerts.push({ text: `Blueprints need ${short} more ${def.name.toLowerCase()}${how}`, tone: 'warn' });
+      }
+    }
+    let freeSpots = 0;
+    let loose = 0;
+    for (let i = 0; i < w.size; i++) {
+      if (sim.isStockpile(i)) {
+        if (w.itemType[i] === NONE && !sim.isIcebox(i)) {
+          freeSpots++;
+        }
+      } else if (w.itemType[i] !== NONE) {
+        loose++;
+      }
+    }
+    if (freeSpots === 0 && loose > 0 && w.zone.some((z) => z === STOCKPILE_ZONE)) {
+      alerts.push({ text: `Stockpiles are full: ${loose} stacks lying outside. Zone more storage (Z).`, tone: 'warn' });
     }
     const ateRaw = sim.colonists.some((c) => c.thoughts.some((t) => t.key === 'ateRaw'));
     if (ateRaw && sim.countFeature((f) => featureDef(f).workbench === 'cooking') === 0) {
@@ -749,9 +948,52 @@ export class GameController {
       orders.push('Stockpile');
     }
     const f = w.feature[i];
-    let feature = f !== NONE ? featureDef(f).name : null;
-    if (f !== NONE && featureDef(f).crop) {
-      feature += ` (${Math.floor(w.growth[i] * 100)}% grown)`;
+    const feature = f !== NONE ? featureDef(f).name : null;
+    const details: string[] = [];
+    const def = f !== NONE ? featureDef(f) : undefined;
+    if (def?.power) {
+      const running = sim.power.powered;
+      if (def.power.fuel) {
+        details.push(
+          `Fuel ${Math.floor(w.fuel[i])}/${def.power.fuel.capacity} ${itemDef(def.power.fuel.item).name.toLowerCase()}`,
+        );
+        details.push(w.fuel[i] > 0 ? `Producing ${def.power.output} W` : 'Out of fuel');
+      } else if (def.power.solar) {
+        details.push(`Producing up to ${def.power.output} W in daylight`);
+      }
+      if (def.power.storage) {
+        details.push(`Grid storage ${Math.round(sim.power.stored)}/${sim.power.capacity} Wh`);
+      }
+      if (def.power.draw) {
+        details.push(running ? `Running (${def.power.draw} W)` : 'No power: not running');
+      }
+    }
+    if (def?.icebox) {
+      details.push(sim.power.powered ? 'Keeping food fresh' : 'Unpowered: food will spoil');
+    }
+    if (def?.cooler) {
+      details.push(`Cools its room towards ${def.cooler.target}°C`);
+    }
+    if (def && def.heater > 0) {
+      details.push(def.power?.draw && !sim.power.powered ? 'Unpowered' : 'Heats its room towards 21°C');
+    }
+    if (def?.fishing) {
+      details.push(
+        w.neighbors(i).some((n) => w.isFishable(n)) ? 'Hunters fish here when food runs short' : 'The water is frozen',
+      );
+    }
+    if (def?.growLight) {
+      details.push(`Grow light, ${def.growLight * 2 + 1}×${def.growLight * 2 + 1} tiles`);
+    }
+    if (def?.crop) {
+      details.push(w.growth[i] >= 1 ? 'Ready to harvest' : `${Math.floor(w.growth[i] * 100)}% grown`);
+    }
+    const item = w.itemType[i];
+    if (item !== NONE && itemDef(item).shelfLife !== undefined) {
+      const frozen = sim.temperatureAt(i) <= 0 || (sim.isIcebox(i) && sim.power.powered);
+      details.push(
+        frozen ? `Fresh for ${w.fresh[i].toFixed(1)} days (not spoiling)` : `Fresh for ${w.fresh[i].toFixed(1)} days`,
+      );
     }
     const room = sim.roomAt(i);
     const beast = sim.animals.find((a) => a.tile === i);
@@ -767,6 +1009,7 @@ export class GameController {
       orders,
       temperature: Math.round(sim.temperatureAt(i)),
       animal,
+      details,
       room:
         room && room.enclosed
           ? `${room.role} · ${impressivenessLabel(room.impressiveness)} (${room.impressiveness}) · ${room.size} tiles`

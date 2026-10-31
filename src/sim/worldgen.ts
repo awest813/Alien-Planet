@@ -96,9 +96,49 @@ export function generateWorld(width: number, height: number, seed: number): Gene
     }
   }
 
-  // Clear a small landing area around the spawn point.
   const sx = world.xOf(spawn);
   const sy = world.yOf(spawn);
+
+  // Every colony needs granite: if there's little rock nearby, raise a small outcrop.
+  let nearbyRock = 0;
+  for (let i = 0; i < world.size; i++) {
+    if (world.feature[i] === ROCK && Math.hypot(world.xOf(i) - sx, world.yOf(i) - sy) <= 16) {
+      nearbyRock++;
+    }
+  }
+  if (nearbyRock < 40) {
+    const dry = (x: number, y: number) =>
+      world.inBounds(x, y) && world.terrain[world.idx(x, y)] !== DEEP && world.terrain[world.idx(x, y)] !== SHALLOW;
+    for (let k = 0; k < 16; k++) {
+      const angle = (k / 16) * Math.PI * 2 + hash2(seed, 7, seed);
+      const ox = Math.round(sx + Math.cos(angle) * 10);
+      const oy = Math.round(sy + Math.sin(angle) * 10);
+      let fits = true;
+      for (let y = oy - 3; y <= oy + 3 && fits; y++) {
+        for (let x = ox - 3; x <= ox + 3; x++) {
+          if (!dry(x, y)) {
+            fits = false;
+            break;
+          }
+        }
+      }
+      if (!fits) {
+        continue;
+      }
+      for (let y = oy - 3; y <= oy + 3; y++) {
+        for (let x = ox - 3; x <= ox + 3; x++) {
+          if (Math.hypot(x - ox, y - oy) <= 3.2) {
+            const i = world.idx(x, y);
+            world.terrain[i] = STONE;
+            world.feature[i] = ROCK;
+          }
+        }
+      }
+      break;
+    }
+  }
+
+  // Clear a small landing area around the spawn point.
   for (let y = sy - 2; y <= sy + 2; y++) {
     for (let x = sx - 2; x <= sx + 2; x++) {
       if (!world.inBounds(x, y)) {

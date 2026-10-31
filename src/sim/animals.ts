@@ -56,12 +56,11 @@ export function populateWildlife(sim: Simulation, count: number, avoid: number):
 
 // A small herd wanders in from the map edge. Returns how many arrived.
 export function herdArrives(sim: Simulation): number {
-  const anchor = sim.living()[0];
-  if (!anchor || sim.animals.length >= MAX_ANIMALS) {
+  const region = sim.outsideRegion();
+  if (region === undefined || sim.animals.length >= MAX_ANIMALS) {
     return 0;
   }
   const w = sim.world;
-  const region = sim.regionOf(anchor.tile);
   const edge = sim.nearest(
     w.idx(sim.rng.int(0, w.width - 1), sim.rng.pick([0, w.height - 1])),
     (i) => {
@@ -92,6 +91,7 @@ function move(sim: Simulation, a: Animal): void {
   const next = a.path[0];
   if (!w.isPassable(next)) {
     a.path = [];
+    a.moveProgress = 0;
     return;
   }
   const diagonal = w.xOf(next) !== w.xOf(a.tile) && w.yOf(next) !== w.yOf(a.tile);

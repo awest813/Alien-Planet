@@ -252,6 +252,279 @@
         }
       ],
       "work": 60
+    },
+    "research": "fortifications"
+  },
+  {
+    "key": "researchBench",
+    "name": "Research bench",
+    "beauty": 1,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 30
+        }
+      ],
+      "work": 150
+    },
+    "researchStation": true
+  },
+  {
+    "key": "hearth",
+    "name": "Stone hearth",
+    "heater": 22,
+    "research": "hearths",
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 25
+        }
+      ],
+      "work": 200
+    }
+  },
+  {
+    "key": "fineBed",
+    "name": "Fine bed",
+    "passable": true,
+    "moveCost": 1.5,
+    "bed": true,
+    "beauty": 3,
+    "restGain": 1.25,
+    "research": "bedding",
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 20
+        },
+        {
+          "item": "cloth",
+          "count": 10
+        }
+      ],
+      "work": 220
+    }
+  },
+  {
+    "key": "woodGenerator",
+    "name": "Wood-fired generator",
+    "power": {
+      "output": 1000,
+      "fuel": {
+        "item": "wood",
+        "capacity": 75,
+        "perDay": 24
+      }
+    },
+    "research": "electricity",
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 30
+        },
+        {
+          "item": "stone",
+          "count": 20
+        }
+      ],
+      "work": 250
+    }
+  },
+  {
+    "key": "solarPanel",
+    "name": "Solar panel",
+    "power": {
+      "output": 1200,
+      "solar": true
+    },
+    "research": "solarPower",
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 20
+        },
+        {
+          "item": "cloth",
+          "count": 10
+        }
+      ],
+      "work": 250
+    }
+  },
+  {
+    "key": "battery",
+    "name": "Battery",
+    "power": {
+      "storage": 8000
+    },
+    "research": "solarPower",
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 25
+        },
+        {
+          "item": "wood",
+          "count": 10
+        }
+      ],
+      "work": 200
+    }
+  },
+  {
+    "key": "electricHeater",
+    "name": "Electric heater",
+    "power": {
+      "draw": 175
+    },
+    "heater": 32,
+    "research": "electricity",
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 15
+        },
+        {
+          "item": "wood",
+          "count": 10
+        }
+      ],
+      "work": 150
+    }
+  },
+  {
+    "key": "airConditioner",
+    "name": "Air conditioner",
+    "power": {
+      "draw": 200
+    },
+    "cooler": {
+      "amount": 30,
+      "target": 20
+    },
+    "research": "refrigeration",
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 20
+        },
+        {
+          "item": "cloth",
+          "count": 5
+        }
+      ],
+      "work": 180
+    }
+  },
+  {
+    "key": "freezer",
+    "name": "Freezer unit",
+    "power": {
+      "draw": 300
+    },
+    "cooler": {
+      "amount": 40,
+      "target": -6
+    },
+    "research": "refrigeration",
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 25
+        },
+        {
+          "item": "cloth",
+          "count": 5
+        }
+      ],
+      "work": 200
+    }
+  },
+  {
+    "key": "icebox",
+    "name": "Icebox",
+    "passable": true,
+    "moveCost": 1.2,
+    "power": {
+      "draw": 50
+    },
+    "icebox": true,
+    "research": "refrigeration",
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 15
+        },
+        {
+          "item": "stone",
+          "count": 5
+        }
+      ],
+      "work": 120
+    }
+  },
+  {
+    "key": "sunLamp",
+    "name": "Sun lamp",
+    "power": {
+      "draw": 300
+    },
+    "growLight": 4,
+    "research": "sunLamps",
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 10
+        },
+        {
+          "item": "wood",
+          "count": 10
+        }
+      ],
+      "work": 150
+    }
+  },
+  {
+    "key": "bridge",
+    "name": "Bridge",
+    "passable": true,
+    "moveCost": 1,
+    "bridge": true,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 8
+        }
+      ],
+      "work": 80
+    }
+  },
+  {
+    "key": "fishingSpot",
+    "name": "Fishing spot",
+    "passable": true,
+    "moveCost": 1,
+    "fishing": true,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 10
+        }
+      ],
+      "work": 60
     }
   }
 ]

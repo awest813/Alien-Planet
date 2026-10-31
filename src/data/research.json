@@ -1,0 +1,73 @@
+[
+  {
+    "key": "archery",
+    "name": "Archery",
+    "cost": 1200,
+    "description": "Unlocks crafting recurve bows from leather."
+  },
+  {
+    "key": "fortifications",
+    "name": "Fortifications",
+    "cost": 1600,
+    "requires": ["archery"],
+    "description": "Unlocks sandbags for cover."
+  },
+  {
+    "key": "hearths",
+    "name": "Hearths",
+    "cost": 1200,
+    "description": "Unlocks the stone hearth, a much stronger heater than a campfire."
+  },
+  {
+    "key": "insulation",
+    "name": "Insulation",
+    "cost": 2000,
+    "requires": ["hearths"],
+    "description": "Rooms lose heat half as fast."
+  },
+  {
+    "key": "bedding",
+    "name": "Comfortable bedding",
+    "cost": 1400,
+    "description": "Unlocks the fine bed: prettier, and colonists rest 25% faster in it."
+  },
+  {
+    "key": "cropRotation",
+    "name": "Crop rotation",
+    "cost": 1800,
+    "description": "Crops grow 25% faster."
+  },
+  {
+    "key": "fieldMedicine",
+    "name": "Field medicine",
+    "cost": 1600,
+    "description": "Doctors tend wounds and illness noticeably better."
+  },
+  {
+    "key": "electricity",
+    "name": "Electricity",
+    "cost": 2000,
+    "description": "Unlocks the wood-fired generator and the electric heater."
+  },
+  {
+    "key": "solarPower",
+    "name": "Solar power",
+    "cost": 2400,
+    "requires": ["electricity"],
+    "description": "Unlocks solar panels and batteries."
+  },
+  {
+    "key": "refrigeration",
+    "name": "Refrigeration",
+    "cost": 2200,
+    "requires": ["electricity"],
+    "description": "Unlocks iceboxes, freezer units and air conditioners."
+  },
+  {
+    "key": "sunLamps",
+    "name": "Sun lamps",
+    "cost": 2400,
+    "requires": ["electricity"],
+    "description": "Unlocks sun lamps: crops beneath them grow day and night, all year."
+  }
+]

@@ -3,6 +3,7 @@ import { spawnRaid } from './combat';
 import { TICKS_PER_HOUR } from './constants';
 import { ANIMALS, FACTIONS, NONE, featureDef, itemId } from './defs';
 import { infect } from './health';
+import { Season } from './seasons';
 import type { Simulation } from './simulation';
 
 export type Difficulty = 'peaceful' | 'standard' | 'harsh';
@@ -177,8 +178,17 @@ const EVENTS: EventDef[] = [
   },
 ];
 
+// Seasonal leanings: cold snaps in the cold months, no herds or blight in winter, more illness.
+const SEASON_WEIGHT: Record<string, Partial<Record<Season, number>>> = {
+  coldSnap: { Spring: 0.3, Summer: 0, Autumn: 1.2, Winter: 1.5 },
+  herd: { Winter: 0, Spring: 1.3 },
+  blight: { Winter: 0, Spring: 0.5 },
+  disease: { Autumn: 1.3, Winter: 1.3 },
+};
+
 function weightOf(sim: Simulation, event: EventDef): number {
-  return event.weight(sim) * (isThreat(event.key) ? THREAT_WEIGHT[sim.story.difficulty ?? 'standard'] : 1);
+  const seasonal = SEASON_WEIGHT[event.key]?.[sim.season] ?? 1;
+  return event.weight(sim) * seasonal * (isThreat(event.key) ? THREAT_WEIGHT[sim.story.difficulty ?? 'standard'] : 1);
 }
 
 // Called every tick; at most rolls once per in-game hour.

@@ -7,7 +7,7 @@
 // storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies.
 import { FEATURES, NONE, featureId, terrainDef } from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
-import { Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
+import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { mutualOpinion } from '../src/sim/social';
 import { Difficulty } from '../src/sim/storyteller';
 import { GROW_ZONE, STOCKPILE_ZONE } from '../src/sim/world';
@@ -23,6 +23,15 @@ const difficulty: Difficulty = process.argv.includes('harsh')
     : 'standard';
 
 const crop = (key: string) => GROW_ZONE + featureId(key);
+const RESEARCH_ORDER = [
+  'hearths',
+  'cropRotation',
+  'archery',
+  'fieldMedicine',
+  'insulation',
+  'bedding',
+  'fortifications',
+];
 
 // Finds the nearest w×h rectangle to the colonists where every tile can take a blueprint.
 function findSite(sim: Simulation, w: number, h: number, avoid: Set<number>): { x: number; y: number } | null {
@@ -85,6 +94,8 @@ interface Result {
   starvingHours: number;
   starvingByDay: Record<number, number>;
   objectives: number;
+  research: number;
+  frost: number;
   events: Record<string, number>;
 }
 
@@ -132,6 +143,8 @@ function play(seed: number): Result {
 
   let builtDay2 = false;
   let secondFarm = false;
+  let hearthPlaced = false;
+  let fishingPlaced = false;
   let extraBeds = 0;
   let friendDay = -1;
   let starvingHours = 0;
@@ -202,13 +215,36 @@ function play(seed: number): Result {
       if (hut) {
         sim.apply({ type: 'build', feature: featureId('armchair'), tiles: [at(hut.x + 1, hut.y + 5)] });
       }
+      const lab = findSite(sim, 1, 1, avoid);
+      if (lab) {
+        claim(avoid, sim, lab.x, lab.y, 1, 1);
+        sim.apply({ type: 'build', feature: featureId('researchBench'), tiles: [at(lab.x, lab.y)] });
+      }
+    }
+    // Keep research going, in a sensible order, and use what it unlocks.
+    if (!sim.research.current) {
+      const next = RESEARCH_ORDER.find((key) => !sim.research.done.includes(key));
+      if (next) {
+        sim.apply({ type: 'research', project: next });
+      }
+    }
+    if (hut && !hearthPlaced && sim.isResearched('hearths')) {
+      hearthPlaced = true;
+      sim.apply({ type: 'build', feature: featureId('hearth'), tiles: [at(hut.x + 7, hut.y + 4)] });
     }
     // Hunt whatever wildlife is around once the colony is settled (leather becomes recurve bows).
     if (sim.day >= 3) {
       sim.apply({ type: 'hunt', rect: { x0: 0, y0: 0, x1: w.width - 1, y1: w.height - 1 }, add: true });
     }
-    // A second field once the colony grows, as a player would.
-    if (!secondFarm && sim.living().length >= 7) {
+    // A couple of fishing spots on the nearest shore, for food through the winter.
+    if (!fishingPlaced && sim.day >= 4) {
+      fishingPlaced = true;
+      const start = sim.colonists[0].tile;
+      const spots = sim.nearest(start, (i) => sim.canPlaceBlueprint(i, featureId('fishingSpot')), 2);
+      sim.apply({ type: 'build', feature: featureId('fishingSpot'), tiles: spots });
+    }
+    // A second field early enough to stock up for winter, as a player would.
+    if (!secondFarm && (sim.living().length >= 7 || sim.day >= 5)) {
       secondFarm = true;
       const field = findSite(sim, 7, 5, avoid);
       if (field) {
@@ -276,6 +312,8 @@ function play(seed: number): Result {
     starvingHours,
     starvingByDay,
     objectives: Object.values(sim.objectivesDone).filter(Boolean).length,
+    research: sim.research.done.length,
+    frost: story.filter((s) => s.startsWith('Frost killed')).length,
     events,
   };
 }
@@ -313,7 +351,7 @@ for (let s = 1; s <= seeds; s++) {
   console.log(
     `seed ${String(r.seed).padStart(6)}  alive ${r.living}/${r.total}  raids ${r.raids} (kills ${r.raidKills})  ` +
       `fever ${r.diseaseCases} (deaths ${r.diseaseDeaths})  breaks ${r.breaks}  mood avg ${r.avgMood.toFixed(0)} min ${r.minMood.toFixed(0)}  ` +
-      `friends day ${r.friendDay}  rivals ${r.rivals} lovers ${r.lovers}  starving h ${r.starvingHours}  objectives ${r.objectives}/17`,
+      `friends day ${r.friendDay}  rivals ${r.rivals} lovers ${r.lovers}  starving h ${r.starvingHours}  objectives ${r.objectives}/${OBJECTIVES.length}  research ${r.research}  frost ${r.frost}`,
   );
   for (const d of r.deaths) {
     console.log(`    ${d}`);

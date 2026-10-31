@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TOOLS, Tool, controller } from '../game/controller';
-import { NONE, featureDef } from '../sim/defs';
+import { NONE, featureDef, terrainId } from '../sim/defs';
 import { hash2 } from '../sim/rng';
 import { NIGHT_END, NIGHT_START } from '../sim/simulation';
 import { Animal, Colonist, Enemy } from '../sim/types';
@@ -25,7 +25,11 @@ interface Layers {
   designation: Phaser.Tilemaps.TilemapLayer;
 }
 
-const Depth = { OVERLAY: 20, NIGHT: 30, PAWNS: 40, LABELS: 41, PREVIEW: 50 };
+const SHALLOW = terrainId('shallowWater');
+const DEEP = terrainId('deepWater');
+const isWater = (t: number) => t === SHALLOW || t === DEEP;
+
+const Depth = { WATER: 0.5, OVERLAY: 20, NIGHT: 30, PAWNS: 40, LABELS: 41, PREVIEW: 50 };
 const PAN_SPEED = 700;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 5;
@@ -52,6 +56,10 @@ export class ColonyScene extends Phaser.Scene {
   private preview: Phaser.GameObjects.Graphics;
   private night: Phaser.GameObjects.Rectangle;
   private glow: Phaser.GameObjects.Graphics;
+  private heatmap: Phaser.GameObjects.Graphics;
+  private water!: Phaser.GameObjects.Graphics;
+  private waterAt = 0;
+  private heatmapAt = 0;
   // Tiles holding a heat/light source, refreshed when features change.
   private glowSources: number[] = [];
   private glowVersion = -1;
@@ -74,6 +82,9 @@ export class ColonyScene extends Phaser.Scene {
       .graphics()
       .setDepth(Depth.NIGHT + 1)
       .setBlendMode(Phaser.BlendModes.ADD);
+    // Above the tiles and night shading, below colonists.
+    this.heatmap = this.add.graphics().setDepth(Depth.NIGHT + 2);
+    this.water = this.add.graphics().setDepth(Depth.WATER);
     this.cameras.main.setZoom(2);
     this.setupPointer();
     this.setupKeyboard();
@@ -97,6 +108,50 @@ export class ColonyScene extends Phaser.Scene {
     this.drawOverlay();
     this.updateCamera(delta);
     this.updateNight();
+    this.drawHeatmap();
+    this.drawWater();
+  }
+
+  // Drifting glints on open water, and foam where it meets the shore.
+  private drawWater(): void {
+    const now = this.time.now;
+    if (now - this.waterAt < 120) {
+      return;
+    }
+    this.waterAt = now;
+    const g = this.water;
+    g.clear();
+    const world = controller.sim.world;
+    for (let i = 0; i < world.size; i++) {
+      const t = world.terrain[i];
+      if (!isWater(t)) {
+        continue;
+      }
+      const x = world.xOf(i);
+      const y = world.yOf(i);
+      const px = x * TILE;
+      const py = y * TILE;
+      g.fillStyle(0xffffff, 0.35);
+      if (y > 0 && !isWater(world.terrain[i - world.width])) {
+        g.fillRect(px, py, TILE, 1);
+      }
+      if (y < world.height - 1 && !isWater(world.terrain[i + world.width])) {
+        g.fillRect(px, py + TILE - 1, TILE, 1);
+      }
+      if (x > 0 && !isWater(world.terrain[i - 1])) {
+        g.fillRect(px, py, 1, TILE);
+      }
+      if (x < world.width - 1 && !isWater(world.terrain[i + 1])) {
+        g.fillRect(px + TILE - 1, py, 1, TILE);
+      }
+      const seed = hash2(x, y, 5);
+      const shine = Math.sin(now / 700 + seed * 12);
+      if (shine > 0.4) {
+        const drift = Math.floor((now / 160 + seed * 16) % 12);
+        g.fillStyle(0xffffff, (shine - 0.4) * (t === DEEP ? 0.35 : 0.5));
+        g.fillRect(px + 1 + drift, py + 3 + Math.floor(seed * 9), 3, 1);
+      }
+    }
   }
 
   // ---- World tiles ----
@@ -225,7 +280,7 @@ export class ColonyScene extends Phaser.Scene {
     const body = this.add.image(0, 0, 'pawn-body').setTint(color);
     const head = this.add.image(0, 0, 'pawn-head');
     const figure = this.add.container(0, 0, [body, head]);
-    const carry = this.add.image(5, 3, TILESET_KEY, 64).setScale(0.55).setVisible(false);
+    const carry = this.add.image(5, 3, TILESET_KEY, Frames.item(1)).setScale(0.55).setVisible(false);
     const label = this.add
       .text(0, -11, c.name, {
         fontFamily: 'system-ui, sans-serif',
@@ -464,6 +519,32 @@ export class ColonyScene extends Phaser.Scene {
     this.drawGlow(dark);
   }
 
+  // Temperature overlay: blue for freezing through green for comfortable to red for hot.
+  private drawHeatmap(): void {
+    const g = this.heatmap;
+    if (controller.overlay !== 'temperature') {
+      g.setVisible(false);
+      return;
+    }
+    g.setVisible(true);
+    const now = this.time.now;
+    if (now - this.heatmapAt < 500) {
+      return;
+    }
+    this.heatmapAt = now;
+    g.clear();
+    const sim = controller.sim;
+    const world = sim.world;
+    for (let i = 0; i < world.size; i++) {
+      if (world.blocksRoom(i)) {
+        continue;
+      }
+      const t = sim.temperatureAt(i);
+      const color = t <= 0 ? 0x4f7cff : t < 10 ? 0x7fc8ff : t <= 26 ? 0x8fe36b : t <= 32 ? 0xffb347 : 0xff5c5c;
+      g.fillStyle(color, 0.28).fillRect(world.xOf(i) * TILE, world.yOf(i) * TILE, TILE, TILE);
+    }
+  }
+
   private drawGlow(dark: number): void {
     const world = controller.sim.world;
     if (world.featureVersion !== this.glowVersion) {
@@ -584,7 +665,13 @@ export class ColonyScene extends Phaser.Scene {
         return;
       }
       if (controller.tool.kind === 'select') {
-        controller.selectColonist(this.pickColonist(pointer));
+        // Clicking a colonist selects them; clicking anything else inspects that tile.
+        const colonist = this.pickColonist(pointer);
+        if (colonist !== null) {
+          controller.selectColonist(colonist);
+        } else {
+          controller.selectTile(this.tileAt(pointer));
+        }
         return;
       }
       const tile = this.tileAt(pointer);

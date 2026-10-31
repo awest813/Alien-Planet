@@ -16,6 +16,10 @@ export type JobType =
   | 'rest'
   | 'hunt'
   | 'equip'
+  | 'research'
+  | 'refuel'
+  | 'fish'
+  | 'feed'
   | 'wander';
 
 export interface Job {
@@ -46,11 +50,21 @@ export interface Skills {
   medicine: number;
   combat: number;
   crafting: number;
+  research: number;
 }
 
 export type SkillKey = keyof Skills;
 
-export const SKILL_KEYS: SkillKey[] = ['mining', 'construction', 'plants', 'cooking', 'crafting', 'medicine', 'combat'];
+export const SKILL_KEYS: SkillKey[] = [
+  'mining',
+  'construction',
+  'plants',
+  'cooking',
+  'crafting',
+  'medicine',
+  'combat',
+  'research',
+];
 
 // 0: no passion, 1: interested, 2: burning. Passions speed up learning.
 export type Passion = 0 | 1 | 2;
@@ -61,10 +75,11 @@ export const WORK_TYPES = [
   'cooking',
   'construction',
   'growing',
-  'mining',
   'plantCutting',
+  'mining',
   'hunting',
   'crafting',
+  'research',
   'hauling',
 ] as const;
 export type WorkTypeKey = (typeof WORK_TYPES)[number];
@@ -89,6 +104,8 @@ export interface TimedThought {
 export interface Carried {
   item: number;
   count: number;
+  // Days of freshness left, for perishable food.
+  fresh?: number;
 }
 
 export interface Colonist {
@@ -245,7 +262,8 @@ export type Command =
   | { type: 'bill'; recipe: number; target: number }
   | { type: 'draft'; colonist: number; drafted: boolean }
   | { type: 'move'; colonist: number; tile: number }
-  | { type: 'hunt'; rect: Rect; add: boolean };
+  | { type: 'hunt'; rect: Rect; add: boolean }
+  | { type: 'research'; project: string | null };
 
 export interface LogEntry {
   tick: number;
@@ -261,6 +279,7 @@ export interface Stats {
   raidsRepelled: number;
   kills: number;
   hunted: number;
+  wintersSurvived: number;
 }
 
 export type NightResult = 'pending' | 'success' | 'failed';

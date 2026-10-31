@@ -1,4 +1,6 @@
 import { RaidState } from './combat';
+import { PowerState } from './power';
+import { ResearchState } from './research';
 import { Rng } from './rng';
 import { Simulation, StoryEntry } from './simulation';
 import { StoryState } from './storyteller';
@@ -23,7 +25,7 @@ import {
 } from './types';
 import { World } from './world';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 6;
 
 interface SavedColonist {
   id: number;
@@ -72,6 +74,8 @@ export interface SaveData {
     itemCount: Uint16Array;
     progress: Float32Array;
     growth: Float32Array;
+    fresh: Float32Array;
+    fuel: Float32Array;
     temperature: Float32Array;
   };
   colonists: SavedColonist[];
@@ -84,6 +88,8 @@ export interface SaveData {
   nextEnemyId: number;
   animals: Animal[];
   nextAnimalId: number;
+  research: ResearchState;
+  power: PowerState;
   raid: RaidState | null;
   firstNight: NightResult;
   objectivesDone: Record<string, boolean>;
@@ -109,6 +115,8 @@ export function serialize(sim: Simulation): SaveData {
       itemCount: w.itemCount.slice(),
       progress: w.progress.slice(),
       growth: w.growth.slice(),
+      fresh: w.fresh.slice(),
+      fuel: w.fuel.slice(),
       temperature: sim.tileTemperatures(),
     },
     colonists: sim.colonists.map((c) =>
@@ -148,6 +156,8 @@ export function serialize(sim: Simulation): SaveData {
     nextEnemyId: sim.nextEnemyId,
     animals: structuredClone(sim.animals),
     nextAnimalId: sim.nextAnimalId,
+    research: structuredClone(sim.research),
+    power: structuredClone(sim.power),
     raid: structuredClone(sim.raid),
     firstNight: sim.firstNight,
     objectivesDone: { ...sim.objectivesDone },
@@ -170,6 +180,8 @@ export function deserialize(data: SaveData): Simulation {
   world.itemCount.set(layers.itemCount);
   world.progress.set(layers.progress);
   world.growth.set(layers.growth);
+  world.fresh.set(layers.fresh);
+  world.fuel.set(layers.fuel);
   world.structureVersion++;
 
   const colonists: Colonist[] = data.colonists.map((saved) => ({
@@ -200,6 +212,8 @@ export function deserialize(data: SaveData): Simulation {
   sim.nextEnemyId = data.nextEnemyId;
   sim.animals = structuredClone(data.animals);
   sim.nextAnimalId = data.nextAnimalId;
+  sim.research = structuredClone(data.research);
+  sim.power = structuredClone(data.power);
   sim.raid = structuredClone(data.raid);
   sim.firstNight = data.firstNight;
   sim.objectivesDone = { ...data.objectivesDone };

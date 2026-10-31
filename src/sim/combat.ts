@@ -109,11 +109,10 @@ function recordShot(sim: Simulation, from: number, to: number, hit: boolean, ran
 
 export function spawnRaid(sim: Simulation, faction: number, count: number): boolean {
   const w = sim.world;
-  const anchor = sim.living()[0];
-  if (!anchor) {
+  const region = sim.outsideRegion();
+  if (region === undefined) {
     return false;
   }
-  const region = sim.regionOf(anchor.tile);
   const sides = ['north', 'south', 'west', 'east'];
   const start = sim.rng.int(0, 3);
   for (let s = 0; s < 4; s++) {
@@ -178,11 +177,58 @@ function targetFor(sim: Simulation, e: Enemy): Colonist | undefined {
   return best;
 }
 
+// Raiders who can't reach anyone head for the colonist nearest them and smash through whatever
+// wall or door is in the way. Returns false if there's nobody to go after.
+function breach(sim: Simulation, e: Enemy): boolean {
+  const w = sim.world;
+  const goal = sim
+    .living()
+    .filter((c) => !c.health.downed)
+    .sort((a, b) => w.distance(e.tile, a.tile) - w.distance(e.tile, b.tile))[0];
+  if (!goal) {
+    return false;
+  }
+  const breakable = (i: number) => w.feature[i] !== NONE && !!featureDef(w.feature[i]).build && w.blocksRoom(i);
+  const wall = w
+    .neighbors(e.tile, false)
+    .filter(breakable)
+    .sort((a, b) => w.distance(a, goal.tile) - w.distance(b, goal.tile))[0];
+  if (wall !== undefined && w.distance(wall, goal.tile) < w.distance(e.tile, goal.tile)) {
+    e.path = [];
+    e.moveProgress = 0;
+    if (e.cooldown <= 0) {
+      e.cooldown = WEAPONS[e.weapon].cooldown;
+      w.progress[wall] += 10;
+      const def = featureDef(w.feature[wall]);
+      if (w.progress[wall] >= def.build!.work) {
+        w.setFeature(wall, NONE);
+        sim.addLog(`Raiders broke through a ${def.name.toLowerCase()}!`, 'danger');
+      }
+    }
+    return true;
+  }
+  // Get as close as possible on this side of the walls.
+  if (e.path.length === 0 || e.repathAt <= sim.tick) {
+    const region = sim.regionOf(e.tile);
+    const spot = sim.nearest(goal.tile, (i) => w.isPassable(i) && sim.regionOf(i) === region, 1)[0];
+    e.path = spot !== undefined && spot !== e.tile ? (sim.pathfinder.find(e.tile, [spot]) ?? []) : [];
+    e.repathAt = sim.tick + 30;
+    if (e.path.length === 0 && wall === undefined) {
+      return false;
+    }
+  }
+  if (e.path.length > 0) {
+    moveEnemy(sim, e);
+  }
+  return true;
+}
+
 function moveEnemy(sim: Simulation, e: Enemy): void {
   const w = sim.world;
   const next = e.path[0];
   if (!w.isPassable(next)) {
     e.path = [];
+    e.moveProgress = 0;
     return;
   }
   const diagonal = w.xOf(next) !== w.xOf(e.tile) && w.yOf(next) !== w.yOf(e.tile);
@@ -252,8 +298,11 @@ export function updateEnemies(sim: Simulation): void {
       continue;
     }
     const target = targetFor(sim, e);
+    if (!target && breach(sim, e)) {
+      continue;
+    }
     if (!target) {
-      // Nobody left to fight (or nobody reachable): leave.
+      // Nobody left to fight: leave.
       e.fleeing = true;
       e.path = [];
       continue;

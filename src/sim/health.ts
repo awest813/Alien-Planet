@@ -73,7 +73,11 @@ export function tend(sim: Simulation, doctor: Colonist, patient: Colonist, medic
   const selfTreatment = doctor === patient ? 0.7 : 1;
   const quality = Math.max(
     0.1,
-    Math.min(1, (0.3 + doctor.skills.medicine * 0.05 + (medicine ? 0.25 : 0)) * selfTreatment),
+    Math.min(
+      1,
+      (0.3 + doctor.skills.medicine * 0.04 + (medicine ? 0.25 : 0) + (sim.isResearched('fieldMedicine') ? 0.15 : 0)) *
+        selfTreatment,
+    ),
   );
   for (const injury of patient.health.injuries) {
     if (injury.tended === 0) {

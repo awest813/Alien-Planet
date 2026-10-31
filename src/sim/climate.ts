@@ -1,6 +1,7 @@
 import { NONE, featureDef } from './defs';
 import { Rooms } from './regions';
 import { hash2 } from './rng';
+import { seasonalOffset } from './seasons';
 import { RoomInfo } from './types';
 import { World } from './world';
 
@@ -19,7 +20,7 @@ export function outdoorTemperature(totalHours: number, seed: number): number {
   const t = (totalHours % 24) / 24;
   const drift = hash2(day, 0, seed) * (1 - t) + hash2(day + 1, 0, seed) * t;
   const daily = Math.sin((((totalHours % 24) - 9) / 24) * Math.PI * 2);
-  return 12 + daily * 8 + (drift - 0.5) * 6;
+  return 12 + daily * 8 + (drift - 0.5) * 6 + seasonalOffset(totalHours);
 }
 
 // Furniture-derived stats for one room.
@@ -28,6 +29,9 @@ interface RoomContents {
   beds: number;
   tables: number;
   heat: number;
+  // Heat from electric heaters, only while the grid is powered.
+  electricHeat: number;
+  coolers: { amount: number; target: number }[];
   stoves: number;
   benches: number;
   joy: number;
@@ -39,6 +43,8 @@ export function measureRooms(world: World, rooms: Rooms): RoomContents[] {
     beds: 0,
     tables: 0,
     heat: 0,
+    electricHeat: 0,
+    coolers: [],
     stoves: 0,
     benches: 0,
     joy: 0,
@@ -54,7 +60,14 @@ export function measureRooms(world: World, rooms: Rooms): RoomContents[] {
     c.beauty += def.beauty;
     c.beds += def.bed ? 1 : 0;
     c.tables += def.table ? 1 : 0;
-    c.heat += def.heater;
+    if (def.power?.draw) {
+      c.electricHeat += def.heater;
+    } else {
+      c.heat += def.heater;
+    }
+    if (def.cooler) {
+      c.coolers.push(def.cooler);
+    }
     c.stoves += def.workbench === 'cooking' ? 1 : 0;
     c.benches += def.workbench === 'crafting' ? 1 : 0;
     c.joy += def.joy ? 1 : 0;
@@ -95,21 +108,35 @@ export function describeRoom(id: number, rooms: Rooms, contents: RoomContents, t
     impressiveness,
     beds: contents.beds,
     tables: contents.tables,
-    heaters: contents.heat > 0 ? 1 : 0,
+    heaters: contents.heat + contents.electricHeat > 0 ? 1 : 0,
   };
 }
 
 // One climate update for every enclosed room: leak towards outdoors, then heat.
-export function updateRoomTemperatures(temps: number[], rooms: Rooms, contents: RoomContents[], outdoor: number): void {
+// `leak` scales how quickly rooms lose heat to the outdoors (insulation halves it).
+export function updateRoomTemperatures(
+  temps: number[],
+  rooms: Rooms,
+  contents: RoomContents[],
+  outdoor: number,
+  leak = 1,
+  powered = true,
+): void {
   for (let r = 0; r < temps.length; r++) {
     if (!rooms.enclosed[r]) {
       temps[r] = outdoor;
       continue;
     }
-    let t = temps[r] + (outdoor - temps[r]) * ROOM_LEAK;
-    const heat = contents[r].heat / Math.max(rooms.sizes[r], 4);
+    let t = temps[r] + (outdoor - temps[r]) * ROOM_LEAK * leak;
+    const size = Math.max(rooms.sizes[r], 4);
+    const heat = (contents[r].heat + (powered ? contents[r].electricHeat : 0)) / size;
     if (heat > 0) {
       t += Math.min(heat, Math.max(0, HEATER_TARGET - t));
+    }
+    if (powered) {
+      for (const cooler of contents[r].coolers) {
+        t -= Math.min(cooler.amount / size, Math.max(0, t - cooler.target));
+      }
     }
     temps[r] = t;
   }

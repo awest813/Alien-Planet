@@ -35,6 +35,8 @@ Objectives:
 - **Phase 3 – Story:** stock 5 herbal medicine, have a doctor tend someone, see two colonists become friends,
   repel a raid, hunt an animal, equip a recurve bow, build sandbags, and reach day 12 with at least 4 colonists
   alive.
+- **Phase 4 – Seasons:** build a research bench and pick a project, complete three research projects, research
+  hearths and build a stone hearth, and survive your first winter.
 
 How the living simulation works:
 
@@ -60,10 +62,11 @@ How the storytelling layer works:
 - **Health:** wounds bleed until a doctor tends them (better with herbal medicine from healroot). Too much pain
   or blood loss and a colonist collapses; too much and they die, and everyone grieves. Marsh fever is a race
   between severity and immunity that bed rest and tending tilt in the patient's favour. Doctors get out of bed
-  for emergencies.
+  for emergencies, and bring food to colonists too hurt to get up.
 - **Combat and raids:** raiders from hostile factions arrive at the map edge with bows or knives. The game
   pauses; drafted colonists shoot anything within range and line of sight, undrafted ones defend themselves at
-  close range. Raiders flee once half of them fall.
+  close range. Raiders flee once half of them fall. Walling yourself in doesn't stop them: raiders who
+  can't reach anyone smash through the nearest wall or door.
 - **Skills:** every skill (mining, construction, plants, cooking, crafting, medicine, combat) improves with
   practice, up to 20. Each colonist has a couple of passions (★ interested, ★★ burning) that speed learning and
   lift their mood while doing that work. Expert skills slowly rust without practice.
@@ -73,6 +76,26 @@ How the storytelling layer works:
 - **Gear and cover:** a crafting bench turns leather into recurve bows (longer range, harder hits), which
   colonists pick up from storage. Sandbags halve the chance of being hit from the side they face, for
   colonists and raiders alike.
+- **Seasons:** a year is four six-day seasons, starting in early spring. Temperatures follow the year (warm
+  summers, freezing winter nights). Crops don't grow in winter and hard frost kills anything left in the field,
+  so plant enough in spring and summer and harvest before winter.
+- **Research:** build a research bench, pick a project in the Research screen, and colonists with the Research
+  work type study it (training the Intellectual skill). Eleven projects unlock the recurve bow, sandbags, the
+  stone hearth, the fine bed and all the electrical tech below, or improve insulation, crop growth and
+  doctoring.
+- **Power:** the colony shares one grid. Wood-fired generators (kept fuelled by haulers) and solar panels (daytime
+  only, weaker in winter) supply it; batteries store the surplus. If demand outstrips supply and storage,
+  everything electric switches off. Generators idle to save fuel while the batteries are full and nothing
+  else needs them, and haulers refuel a generator that's running low before anything else.
+- **Climate control and cold storage:** electric heaters, air conditioners (cool to 20°C) and freezer units
+  (chill a sealed room to −6°C). Food rots over days — faster when warm, not at all when frozen or in a running
+  icebox — so a freezer room or iceboxes keep the harvest through winter. Haulers move perishable food into
+  either automatically.
+- **Water:** shallow water is slow to wade through and leaves colonists soaked (a small mood hit); deep water
+  is impassable until you build a bridge over it. Fishing spots on the shore let hunters catch raw fish while
+  the colony is short of food. In hard frost the shallows freeze from the shore inwards and can be walked
+  across; frozen water can't be fished, and the ice melts again when it warms up.
+- **Sun lamps:** crops beneath them grow day and night, all year, so a heated greenhouse can farm in winter.
 - **Storyteller:** roughly once or twice a day it may send a raid, an illness, a wanderer who joins, a cold
   snap, a gift of supplies from the friendly Meadow Kin, or crop blight. Each event pops up as a short
   notification card and goes into the Story screen. Pick the difficulty when founding a colony: Peaceful (no
@@ -86,7 +109,7 @@ world is a set of flat typed arrays, so the simulation can later move into a Web
 ```
 src/
   data/       JSON definitions: terrain, items, features/buildings, recipes, thoughts, traits, factions,
-              diseases, animals, colonist names
+              diseases, animals, research projects, colonist names
   sim/        Pure TypeScript simulation (no Phaser, no DOM)
     world.ts        Tile layers as typed arrays, item stacks, dirty-tile tracking
     worldgen.ts     Seeded fractal-noise terrain, rock, trees, berry bushes
@@ -98,6 +121,9 @@ src/
     combat.ts       Raiders, line of sight, ranged and melee attacks, morale
     storyteller.ts  Random events with cooldowns and difficulty
     skills.ts       Skill experience, passions, level-ups and rust
+    seasons.ts      The calendar and seasonal temperature
+    research.ts     Research state, availability and unlocks
+    power.ts        The colony power grid: generators, solar, batteries
     animals.ts      Wildlife: wandering, fleeing, revenge, herds, and hunting yields
     simulation.ts   Fixed-tick loop, needs and mood, colonist AI, job system, reservations, objectives
     serialize.ts    Save format
@@ -105,7 +131,10 @@ src/
     controller.ts   Owns the sim, time controls, tools, UI snapshots
     save-store.ts   IndexedDB save slots
   render/     Phaser 4 scene: tilemap layers, colonist sprites, camera, input
-  ui/         React management UI (colonists, objectives, log, toolbar, menus)
+  ui/         React management UI
+    App.tsx         Layout: top bar, colonist bar, inspector, side panel, architect menu
+    hud.tsx         The always-on HUD components
+    screens.tsx     Dialogs: work, schedule, production, research, story, help, menu
 ```
 
 - **Fixed-step simulation:** 20 ticks per second at 1× speed, driven from real elapsed time.
@@ -129,21 +158,25 @@ npm test
 `src/sim/simulation.test.ts` covers world generation, pathfinding, room detection, item conservation, construction,
 farming and cooking, heating, save/load, and regression tests for fixed AI bugs. `src/sim/phase3.test.ts`
 covers traits, line of sight, raids, bleeding and tending, disease, relationships, and events, and
-`src/sim/depth.test.ts` covers skills, cover, bows, hunting and wildlife.
+`src/sim/depth.test.ts` covers skills, cover, bows, hunting and wildlife, and `src/sim/seasons.test.ts` covers
+the calendar, winter cold, frost and research. `src/sim/tech.test.ts` covers power, spoilage, cold storage and
+sun lamps, `src/sim/water.test.ts` covers bridges, fishing, ice, wading and battery charging, and
+`src/sim/playtest.test.ts` covers fixes from persona playtests (feeding the downed, raiders breaching walls,
+idle generators).
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,
 drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation:
 
 ```
-npx tsx scripts/balance.ts 20 8                # 20 days on 8 seeds, standard difficulty
+npx tsx scripts/balance.ts 26 8                # 26 days (through winter) on 8 seeds, standard difficulty
 npx tsx scripts/balance.ts 20 8 passive        # never draft during raids
 npx tsx scripts/balance.ts 20 8 harsh          # or peaceful
 npx tsx scripts/balance.ts 20 4 trace          # print the colony state whenever someone dies
 ```
 
-With the current tuning (8 seeds × 20 days), a defended Standard colony keeps everyone alive, an undefended
-one loses the odd colonist late on, and Harsh costs around one colonist in eight, with no colony wiped out.
-First friendships appear around day 6–7, with a few rivalries and couples over 20 days.
+With the current tuning (8 seeds × 26 days, through the first winter), a Standard colony that farms enough
+keeps everyone alive but goes hungry for a while late in winter; Harsh costs around one colonist in six, with
+no colony wiped out. First friendships appear around day 6–7, with a few rivalries and couples.
 
 ## Roadmap
 

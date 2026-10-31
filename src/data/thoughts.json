@@ -149,5 +149,30 @@
     "label": "Doing work I love",
     "mood": 3,
     "hours": 4
+  },
+  "researchDone": {
+    "label": "We made a breakthrough",
+    "mood": 3,
+    "hours": 24
+  },
+  "winterSurvived": {
+    "label": "We made it through winter",
+    "mood": 6,
+    "hours": 48
+  },
+  "ateSpoiled": {
+    "label": "Ate food that was turning",
+    "mood": -4,
+    "hours": 8
+  },
+  "soaked": {
+    "label": "Got soaked wading",
+    "mood": -2,
+    "hours": 3
+  },
+  "fishedPeacefully": {
+    "label": "A quiet afternoon fishing",
+    "mood": 2,
+    "hours": 6
   }
 }

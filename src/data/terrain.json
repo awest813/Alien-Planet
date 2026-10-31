@@ -1,8 +1,51 @@
 [
-  { "key": "deepWater", "name": "Deep water", "moveCost": 0, "buildable": false, "fertility": 0 },
-  { "key": "shallowWater", "name": "Shallow water", "moveCost": 3, "buildable": false, "fertility": 0 },
-  { "key": "sand", "name": "Sand", "moveCost": 1.3, "buildable": true, "fertility": 0.6 },
-  { "key": "grass", "name": "Grass", "moveCost": 1, "buildable": true, "fertility": 1 },
-  { "key": "soil", "name": "Rich soil", "moveCost": 1, "buildable": true, "fertility": 1.4 },
-  { "key": "stoneFloor", "name": "Rough granite", "moveCost": 1, "buildable": true, "fertility": 0 }
+  {
+    "key": "deepWater",
+    "name": "Deep water",
+    "moveCost": 0,
+    "buildable": false,
+    "fertility": 0
+  },
+  {
+    "key": "shallowWater",
+    "name": "Shallow water",
+    "moveCost": 3,
+    "buildable": false,
+    "fertility": 0
+  },
+  {
+    "key": "sand",
+    "name": "Sand",
+    "moveCost": 1.3,
+    "buildable": true,
+    "fertility": 0.6
+  },
+  {
+    "key": "grass",
+    "name": "Grass",
+    "moveCost": 1,
+    "buildable": true,
+    "fertility": 1
+  },
+  {
+    "key": "soil",
+    "name": "Rich soil",
+    "moveCost": 1,
+    "buildable": true,
+    "fertility": 1.4
+  },
+  {
+    "key": "stoneFloor",
+    "name": "Rough granite",
+    "moveCost": 1,
+    "buildable": true,
+    "fertility": 0
+  },
+  {
+    "key": "ice",
+    "name": "Ice",
+    "moveCost": 1.5,
+    "buildable": false,
+    "fertility": 0
+  }
 ]

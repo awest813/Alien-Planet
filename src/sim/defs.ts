@@ -4,6 +4,7 @@ import factionsJson from '../data/factions.json';
 import featuresJson from '../data/features.json';
 import itemsJson from '../data/items.json';
 import recipesJson from '../data/recipes.json';
+import researchJson from '../data/research.json';
 import terrainJson from '../data/terrain.json';
 import thoughtsJson from '../data/thoughts.json';
 import traitsJson from '../data/traits.json';
@@ -33,11 +34,29 @@ export interface ItemDef {
   nutrition: number;
   // Eating it uncooked upsets colonists.
   rawPenalty: boolean;
+  // Days until it rots at room temperature (undefined: never rots).
+  shelfLife?: number;
 }
 
 export interface Cost {
   item: number;
   count: number;
+}
+
+// Power: generators have `output` watts (solar panels only by day, fuelled ones while fuelled),
+// consumers `draw` watts, batteries `storage` watt-hours.
+export interface PowerSpec {
+  output: number;
+  draw: number;
+  storage: number;
+  solar: boolean;
+  fuel?: { item: number; capacity: number; perDay: number };
+}
+
+interface RawFuel {
+  item: string;
+  capacity: number;
+  perDay: number;
 }
 
 export interface FeatureDef {
@@ -57,6 +76,22 @@ export interface FeatureDef {
   heater: number;
   // Hit-chance multiplier for someone sheltering behind it (sandbags).
   cover: number;
+  // Research project that must be finished before it can be built.
+  research?: string;
+  researchStation: boolean;
+  // Rest gain multiplier for beds.
+  restGain: number;
+  power?: PowerSpec;
+  // Cools its room towards `target` (air conditioners, freezers).
+  cooler?: { amount: number; target: number };
+  // Storage tile that keeps food from rotting while powered.
+  icebox: boolean;
+  // Radius of a sun lamp's light (crops grow beneath it day and night).
+  growLight: number;
+  // Built over water and makes it walkable.
+  bridge: boolean;
+  // A colonist standing here can fish the open water next to it.
+  fishing: boolean;
   joy?: { kind: string; hoursToFull: number };
   harvest?: { work: WorkType; amount: number; item: number; count: number };
   crop?: { item: number; count: number; growDays: number; sowWork: number; harvestWork: number };
@@ -72,6 +107,7 @@ export interface RecipeDef {
   product: Cost;
   work: number;
   defaultTarget: number;
+  research?: string;
 }
 
 export interface ThoughtDef {
@@ -96,6 +132,15 @@ interface RawFeature {
   workbench?: string;
   heater?: number;
   cover?: number;
+  research?: string;
+  researchStation?: boolean;
+  restGain?: number;
+  power?: { output?: number; draw?: number; storage?: number; solar?: boolean; fuel?: RawFuel };
+  cooler?: { amount: number; target: number };
+  icebox?: boolean;
+  growLight?: number;
+  bridge?: boolean;
+  fishing?: boolean;
   joy?: { kind: string; hoursToFull: number };
   harvest?: { work: string; amount: number; item: string; count: number };
   crop?: { item: string; count: number; growDays: number; sowWork: number; harvestWork: number };
@@ -109,6 +154,7 @@ interface RawItem {
   category?: string;
   nutrition?: number;
   rawPenalty?: boolean;
+  shelfLife?: number;
 }
 
 // Id 0 is reserved for "none" for items and features.
@@ -123,6 +169,7 @@ export const ITEMS: ItemDef[] = (itemsJson as RawItem[]).map((t, i) => ({
   category: t.category,
   nutrition: t.nutrition ?? 0,
   rawPenalty: !!t.rawPenalty,
+  shelfLife: t.shelfLife,
 }));
 
 const itemIdByKey = new Map(ITEMS.map((item) => [item.key, item.id]));
@@ -150,6 +197,21 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   workbench: f.workbench as BenchType | undefined,
   heater: f.heater ?? 0,
   cover: f.cover ?? 1,
+  research: f.research,
+  researchStation: !!f.researchStation,
+  restGain: f.restGain ?? 1,
+  power: f.power && {
+    output: f.power.output ?? 0,
+    draw: f.power.draw ?? 0,
+    storage: f.power.storage ?? 0,
+    solar: !!f.power.solar,
+    fuel: f.power.fuel && { ...f.power.fuel, item: resolveItem(f.power.fuel.item) },
+  },
+  cooler: f.cooler,
+  icebox: !!f.icebox,
+  growLight: f.growLight ?? 0,
+  bridge: !!f.bridge,
+  fishing: !!f.fishing,
   joy: f.joy,
   harvest: f.harvest && {
     work: f.harvest.work as WorkType,
@@ -180,6 +242,7 @@ export const RECIPES: RecipeDef[] = recipesJson.map((r, i) => ({
   product: { item: resolveItem(r.product.item), count: r.product.count },
   work: r.work,
   defaultTarget: r.defaultTarget,
+  research: 'research' in r ? (r.research as string) : undefined,
 }));
 
 export const THOUGHTS: Record<string, ThoughtDef> = Object.fromEntries(
@@ -235,6 +298,17 @@ export interface FactionDef {
 }
 
 export const FACTIONS: FactionDef[] = factionsJson.map((f, i) => ({ ...f, id: i }));
+
+export interface ResearchDef {
+  key: string;
+  name: string;
+  cost: number;
+  description: string;
+  requires: string[];
+}
+
+export const RESEARCH: ResearchDef[] = researchJson.map((r) => ({ requires: [], ...r }));
+export const researchDef = (key: string): ResearchDef | undefined => RESEARCH.find((r) => r.key === key);
 
 export interface AnimalDef {
   key: string;

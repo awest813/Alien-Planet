@@ -39,6 +39,10 @@ export class World {
   public readonly delivered: Uint16Array;
   // Crop growth, 0..1.
   public readonly growth: Float32Array;
+  // Days of freshness left for a perishable stack.
+  public readonly fresh: Float32Array;
+  // Fuel held by a fuelled building (generators).
+  public readonly fuel: Float32Array;
   // One item stack per tile.
   public readonly itemType: Uint8Array;
   public readonly itemCount: Uint16Array;
@@ -64,6 +68,8 @@ export class World {
     this.blueprint = new Uint8Array(this.size);
     this.delivered = new Uint16Array(this.size * MAX_COST_LINES);
     this.growth = new Float32Array(this.size);
+    this.fresh = new Float32Array(this.size);
+    this.fuel = new Float32Array(this.size);
     this.itemType = new Uint8Array(this.size);
     this.itemCount = new Uint16Array(this.size);
     this.progress = new Float32Array(this.size);
@@ -90,17 +96,55 @@ export class World {
   }
 
   public isPassable(i: number): boolean {
+    const f = this.feature[i];
+    if (f !== NONE && featureDef(f).bridge) {
+      return true;
+    }
     if (terrainDef(this.terrain[i]).moveCost === 0) {
       return false;
     }
-    const f = this.feature[i];
     return f === NONE || featureDef(f).passable;
   }
 
   public moveCost(i: number): number {
-    const base = terrainDef(this.terrain[i]).moveCost;
     const f = this.feature[i];
+    if (f !== NONE && featureDef(f).bridge) {
+      return featureDef(f).moveCost;
+    }
+    const base = terrainDef(this.terrain[i]).moveCost;
     return f === NONE ? base : base * featureDef(f).moveCost;
+  }
+
+  // The nearest tile that can be walked on and leads somewhere (not an isolated scrap of bridge).
+  public nearestPassable(from: number): number | undefined {
+    let best: number | undefined;
+    let bestDistance = Infinity;
+    for (let i = 0; i < this.size; i++) {
+      const d = this.distance(from, i);
+      if (d < bestDistance && this.isPassable(i) && this.neighbors(i).some((n) => this.isPassable(n))) {
+        best = i;
+        bestDistance = d;
+      }
+    }
+    return best;
+  }
+
+  // Unfrozen water with nothing built over it.
+  public isOpenWater(i: number): boolean {
+    const key = terrainDef(this.terrain[i]).key;
+    return (key === 'shallowWater' || key === 'deepWater') && this.feature[i] === NONE;
+  }
+
+  // Unfrozen water that can be fished, bridged over or not.
+  public isFishable(i: number): boolean {
+    const key = terrainDef(this.terrain[i]).key;
+    const f = this.feature[i];
+    return (key === 'shallowWater' || key === 'deepWater') && (f === NONE || featureDef(f).bridge);
+  }
+
+  // Whether walking through this tile means wading.
+  public isWading(i: number): boolean {
+    return terrainDef(this.terrain[i]).key === 'shallowWater' && this.feature[i] === NONE;
   }
 
   public blocksRoom(i: number): boolean {
@@ -118,6 +162,7 @@ export class World {
     this.feature[i] = f;
     this.progress[i] = 0;
     this.growth[i] = 0;
+    this.fuel[i] = 0;
     this.featureVersion++;
     if (before !== this.isPassable(i) || roomBefore !== this.blocksRoom(i)) {
       this.structureVersion++;
@@ -184,17 +229,28 @@ export class World {
     if (!this.isPassable(i) || this.blueprint[i] !== NONE) {
       return false;
     }
+    // Iceboxes only take food.
+    if (this.feature[i] !== NONE && featureDef(this.feature[i]).icebox && !itemDef(item).nutrition) {
+      return false;
+    }
     const type = this.itemType[i];
     return type === NONE || (type === item && this.itemCount[i] < itemDef(item).stackLimit);
   }
 
-  // Adds to the tile's stack and returns whatever did not fit.
-  public addItem(i: number, item: number, count: number): number {
+  // Adds to the tile's stack and returns whatever did not fit. `fresh` is how many days the
+  // incoming items have left (new items are perfectly fresh); a merged stack averages the two.
+  public addItem(i: number, item: number, count: number, fresh?: number): number {
     if (!this.canHoldItem(i, item)) {
       return count;
     }
     const space = itemDef(item).stackLimit - (this.itemType[i] === item ? this.itemCount[i] : 0);
     const added = Math.min(space, count);
+    const life = itemDef(item).shelfLife;
+    if (life !== undefined && added > 0) {
+      const incoming = fresh ?? life;
+      const existing = this.itemType[i] === item ? this.itemCount[i] : 0;
+      this.fresh[i] = (this.fresh[i] * existing + incoming * added) / (existing + added);
+    }
     this.itemType[i] = item;
     this.itemCount[i] += added;
     this.markDirty(i);
@@ -214,7 +270,11 @@ export class World {
   // Spreads items onto the nearest tiles that can hold them (breadth-first from `start`, including
   // diagonals so a walled-in corner still reaches open ground). Items are never destroyed: if
   // nothing can hold the rest, the nearest walkable tile takes it over its stack limit.
-  public dropItemNear(start: number, item: number, count: number): void {
+  public dropItemNear(start: number, item: number, count: number, fresh?: number): void {
+    // From the middle of deep water (a cancelled bridge), start from the nearest dry ground instead.
+    if (!this.isPassable(start) && !this.neighbors(start).some((n) => this.isPassable(n))) {
+      start = this.nearestPassable(start) ?? start;
+    }
     let remaining = count;
     const seen = new Uint8Array(this.size);
     const queue = [start];
@@ -222,8 +282,14 @@ export class World {
     let fallback = -1;
     for (let q = 0; q < queue.length && remaining > 0; q++) {
       const i = queue[q];
-      remaining = this.addItem(i, item, remaining);
-      if (fallback < 0 && this.isPassable(i) && (this.itemType[i] === NONE || this.itemType[i] === item)) {
+      remaining = this.addItem(i, item, remaining, fresh);
+      if (
+        fallback < 0 &&
+        this.isPassable(i) &&
+        this.blueprint[i] === NONE &&
+        (this.feature[i] === NONE || !featureDef(this.feature[i]).icebox || !!itemDef(item).nutrition) &&
+        (this.itemType[i] === NONE || this.itemType[i] === item)
+      ) {
         fallback = i;
       }
       for (const n of this.neighbors(i)) {
@@ -234,8 +300,11 @@ export class World {
       }
     }
     if (remaining > 0 && fallback >= 0) {
+      const existing = this.itemType[fallback] === item ? this.itemCount[fallback] : 0;
+      const incoming = fresh ?? itemDef(item).shelfLife ?? 0;
+      this.fresh[fallback] = (this.fresh[fallback] * existing + incoming * remaining) / (existing + remaining);
       this.itemType[fallback] = item;
-      this.itemCount[fallback] += remaining;
+      this.itemCount[fallback] = existing + remaining;
       this.markDirty(fallback);
     }
   }

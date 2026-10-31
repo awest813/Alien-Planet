@@ -5,23 +5,30 @@ import { hash2 } from '../sim/rng';
 export const TILE = 16;
 export const TILESET_KEY = 'tiles';
 const COLUMNS = 16;
-const ROWS = 8;
+// Room for 48 buildings, 48 blueprints and 32 items before the layout needs to grow again.
+const ROWS = 13;
+const MAX_FEATURES = 48;
+const MAX_ITEMS = 32;
 
 const CROPS = FEATURES.filter((f) => f.crop);
+
+if (FEATURES.length > MAX_FEATURES || ITEMS.length > MAX_ITEMS) {
+  throw new Error('Too many features or items for the tileset layout');
+}
 
 // Frame indices in the generated tileset.
 export const Frames = {
   terrain: (terrain: number, variant: number) => terrain * 2 + variant,
   feature: (feature: number) => 16 + feature - 1,
-  blueprint: (feature: number) => 32 + feature - 1,
-  designation: (designation: number) => 48 + designation,
-  item: (item: number) => 64 + item - 1,
-  ZONE: 80,
-  INDOOR: 81,
-  GROW_ZONE: 82,
+  blueprint: (feature: number) => 64 + feature - 1,
+  designation: (designation: number) => 112 + designation,
+  item: (item: number) => 128 + item - 1,
+  ZONE: 160,
+  INDOOR: 161,
+  GROW_ZONE: 162,
   // Three growth stages per crop.
   crop: (feature: number, growth: number) =>
-    96 + CROPS.findIndex((f) => f.id === feature) * 3 + Math.min(2, Math.floor(growth * 3)),
+    176 + CROPS.findIndex((f) => f.id === feature) * 3 + Math.min(2, Math.floor(growth * 3)),
 };
 
 type Ctx = CanvasRenderingContext2D;
@@ -115,6 +122,7 @@ function drawTerrain(c: Ctx, key: string, variant: number): void {
     grass: ['#5a8a38', ['#4e7c30', '#679a42', '#72a34a'], 0.22],
     soil: ['#5f4a2f', ['#544128', '#6c553a'], 0.25],
     stoneFloor: ['#77746f', ['#6a6762', '#85827c'], 0.25],
+    ice: ['#cfe4ef', ['#bcd6e6', '#e6f3fa'], 0.2],
   };
   const [base, specks, density] = palette[key];
   c.fillStyle = base;
@@ -125,6 +133,17 @@ function drawTerrain(c: Ctx, key: string, variant: number): void {
     const y = variant ? 4 : 10;
     c.fillRect(3, y, 4, 1);
     c.fillRect(9, y + 3, 4, 1);
+  }
+  if (key === 'ice') {
+    c.fillStyle = 'rgba(80,120,150,0.35)';
+    if (variant) {
+      c.fillRect(2, 5, 5, 1);
+      c.fillRect(7, 6, 4, 1);
+      c.fillRect(11, 7, 1, 4);
+    } else {
+      c.fillRect(4, 10, 6, 1);
+      c.fillRect(9, 11, 1, 3);
+    }
   }
 }
 
@@ -276,6 +295,33 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillRect(10, 9, 1, 2);
       c.fillRect(13, 9, 1, 2);
       break;
+    case 'bridge':
+      c.fillStyle = 'rgba(0,0,0,0.25)';
+      c.fillRect(0, 14, 16, 2);
+      for (let x = 0; x < 16; x += 4) {
+        c.fillStyle = x % 8 ? '#8a6038' : '#9b6d42';
+        c.fillRect(x, 0, 3, 15);
+        c.fillStyle = '#6b4423';
+        c.fillRect(x + 3, 0, 1, 15);
+      }
+      c.fillStyle = '#5a3a1f';
+      c.fillRect(0, 2, 16, 1);
+      c.fillRect(0, 12, 16, 1);
+      break;
+    case 'fishingSpot':
+      c.fillStyle = '#9b6d42';
+      c.fillRect(2, 6, 12, 8);
+      c.fillStyle = '#6b4423';
+      c.fillRect(2, 9, 12, 1);
+      c.fillRect(2, 13, 12, 1);
+      c.fillStyle = '#4a2e18';
+      c.fillRect(3, 1, 1, 6);
+      c.fillStyle = '#d8d8de';
+      c.fillRect(4, 1, 8, 1);
+      c.fillRect(12, 1, 1, 4);
+      c.fillStyle = '#ff5c5c';
+      c.fillRect(12, 5, 1, 1);
+      break;
     case 'sandbags':
       c.fillStyle = 'rgba(0,0,0,0.25)';
       c.fillRect(1, 12, 14, 3);
@@ -293,6 +339,124 @@ function drawFeature(c: Ctx, key: string): void {
         c.fillStyle = '#7d6a4a';
         c.fillRect(x + 4, y + 1, 1, 3);
       }
+      break;
+    case 'researchBench':
+      c.fillStyle = '#5a3818';
+      c.fillRect(1, 9, 2, 6);
+      c.fillRect(13, 9, 2, 6);
+      c.fillStyle = '#8d5d31';
+      c.fillRect(0, 4, 16, 6);
+      c.fillStyle = '#e8e4da';
+      c.fillRect(2, 2, 5, 4);
+      c.fillStyle = '#5c86b8';
+      c.fillRect(9, 1, 2, 4);
+      c.fillStyle = '#c94040';
+      c.fillRect(11, 2, 2, 3);
+      break;
+    case 'hearth':
+      c.fillStyle = '#5c5b60';
+      c.fillRect(1, 2, 14, 13);
+      c.fillStyle = '#8a8990';
+      c.fillRect(1, 2, 14, 2);
+      c.fillRect(1, 2, 2, 13);
+      c.fillRect(13, 2, 2, 13);
+      c.fillStyle = '#2a1a10';
+      c.fillRect(4, 6, 8, 8);
+      c.fillStyle = '#ff6b2d';
+      c.fillRect(5, 9, 6, 5);
+      c.fillStyle = '#ffd166';
+      c.fillRect(6, 11, 4, 3);
+      break;
+    case 'fineBed':
+      c.fillStyle = '#4a2f16';
+      c.fillRect(1, 1, 14, 14);
+      c.fillStyle = '#f4f1e8';
+      c.fillRect(2, 2, 12, 3);
+      c.fillStyle = '#7a2e3a';
+      c.fillRect(2, 6, 12, 8);
+      c.fillStyle = '#a3404f';
+      c.fillRect(2, 6, 12, 2);
+      c.fillStyle = '#e8c35a';
+      c.fillRect(2, 10, 12, 1);
+      break;
+    case 'woodGenerator':
+      c.fillStyle = '#3c3b40';
+      c.fillRect(1, 3, 14, 12);
+      c.fillStyle = '#6d6c73';
+      c.fillRect(1, 3, 14, 2);
+      c.fillStyle = '#2a1a10';
+      c.fillRect(3, 7, 5, 6);
+      c.fillStyle = '#ff8a3d';
+      c.fillRect(4, 10, 3, 3);
+      c.fillStyle = '#ffd166';
+      c.fillRect(10, 7, 3, 5);
+      c.fillStyle = '#1e1d21';
+      c.fillRect(11, 0, 2, 3);
+      break;
+    case 'solarPanel':
+      c.fillStyle = '#5c5b60';
+      c.fillRect(7, 12, 2, 3);
+      c.fillStyle = '#1f3d6b';
+      c.fillRect(1, 2, 14, 10);
+      c.fillStyle = '#3f6fb5';
+      for (let y = 3; y < 11; y += 3) {
+        for (let x = 2; x < 14; x += 4) {
+          c.fillRect(x, y, 3, 2);
+        }
+      }
+      break;
+    case 'battery':
+      c.fillStyle = '#4a4a52';
+      c.fillRect(2, 3, 12, 12);
+      c.fillStyle = '#6d6c73';
+      c.fillRect(5, 1, 2, 2);
+      c.fillRect(9, 1, 2, 2);
+      c.fillStyle = '#8fe36b';
+      c.fillRect(4, 6, 8, 2);
+      c.fillRect(4, 9, 8, 2);
+      c.fillStyle = '#2e2e34';
+      c.fillRect(4, 12, 8, 1);
+      break;
+    case 'electricHeater':
+      c.fillStyle = '#6d6c73';
+      c.fillRect(2, 2, 12, 12);
+      c.fillStyle = '#ff6b2d';
+      for (let y = 4; y < 13; y += 3) {
+        c.fillRect(4, y, 8, 1);
+      }
+      c.fillStyle = '#ffd166';
+      c.fillRect(12, 3, 1, 1);
+      break;
+    case 'airConditioner':
+    case 'freezer':
+      c.fillStyle = key === 'freezer' ? '#cfe3ff' : '#d8d8de';
+      c.fillRect(2, 2, 12, 12);
+      c.fillStyle = key === 'freezer' ? '#5585cc' : '#7fa8e0';
+      for (let x = 4; x < 13; x += 2) {
+        c.fillRect(x, 4, 1, 8);
+      }
+      c.fillStyle = '#2e2e34';
+      c.fillRect(2, 13, 12, 1);
+      break;
+    case 'icebox':
+      c.fillStyle = '#9ad1ff';
+      c.fillRect(1, 1, 14, 14);
+      c.fillStyle = '#cfe8ff';
+      c.fillRect(2, 2, 12, 2);
+      c.fillStyle = '#5585cc';
+      c.fillRect(1, 1, 14, 1);
+      c.fillRect(1, 14, 14, 1);
+      c.fillRect(7, 5, 2, 8);
+      c.fillRect(4, 8, 8, 2);
+      break;
+    case 'sunLamp':
+      c.fillStyle = '#5c5b60';
+      c.fillRect(7, 7, 2, 8);
+      c.fillRect(5, 14, 6, 1);
+      c.fillStyle = '#ffe680';
+      c.fillRect(4, 2, 8, 5);
+      c.fillStyle = '#fff6c0';
+      c.fillRect(5, 3, 6, 3);
       break;
     case 'campfire':
       c.fillStyle = '#5c5b60';
@@ -476,6 +640,19 @@ function drawItem(c: Ctx, key: string): void {
       c.fillRect(4, 8, 7, 3);
       c.fillStyle = '#f0e0d0';
       c.fillRect(11, 9, 3, 2);
+      break;
+    case 'rawFish':
+      c.fillStyle = '#6f8fa8';
+      c.fillRect(3, 8, 8, 4);
+      c.fillRect(2, 9, 1, 2);
+      c.fillStyle = '#9cb8cc';
+      c.fillRect(4, 8, 6, 1);
+      c.fillStyle = '#56738a';
+      c.fillRect(11, 7, 1, 2);
+      c.fillRect(11, 11, 1, 2);
+      c.fillRect(12, 6, 1, 8);
+      c.fillStyle = '#1e1d21';
+      c.fillRect(4, 9, 1, 1);
       break;
     case 'leather':
       c.fillStyle = '#7a4e2a';

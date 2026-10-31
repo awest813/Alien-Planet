@@ -14,7 +14,8 @@
     "name": "Berries",
     "stackLimit": 50,
     "category": "rawFood",
-    "nutrition": 0.1
+    "nutrition": 0.1,
+    "shelfLife": 7
   },
   {
     "key": "potatoes",
@@ -22,14 +23,16 @@
     "stackLimit": 50,
     "category": "rawFood",
     "nutrition": 0.1,
-    "rawPenalty": true
+    "rawPenalty": true,
+    "shelfLife": 25
   },
   {
     "key": "meal",
     "name": "Simple meal",
     "stackLimit": 10,
     "category": "meal",
-    "nutrition": 0.9
+    "nutrition": 0.9,
+    "shelfLife": 5
   },
   {
     "key": "cotton",
@@ -52,7 +55,8 @@
     "stackLimit": 50,
     "category": "rawFood",
     "nutrition": 0.1,
-    "rawPenalty": true
+    "rawPenalty": true,
+    "shelfLife": 4
   },
   {
     "key": "leather",
@@ -63,5 +67,14 @@
     "key": "recurveBow",
     "name": "Recurve bow",
     "stackLimit": 1
+  },
+  {
+    "key": "rawFish",
+    "name": "Raw fish",
+    "stackLimit": 50,
+    "category": "rawFood",
+    "nutrition": 0.1,
+    "rawPenalty": true,
+    "shelfLife": 3
   }
 ]
