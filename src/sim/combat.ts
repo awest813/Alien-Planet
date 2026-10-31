@@ -13,7 +13,12 @@ export interface RaidState {
   initial: number;
   killed: number;
   startedTick: number;
+  // When the first raider came within reach of the colony (undefined while still on the way).
+  arrivedTick?: number;
 }
+
+// Raiders this close to a colonist have arrived; the raid's time limit runs from then.
+const ARRIVAL_RANGE = 30;
 
 const WEAPONS: Record<Weapon, { range: number; cooldown: number; accuracy: number; damage: [number, number] }> = {
   bow: { range: 7, cooldown: 55, accuracy: 0.55, damage: [0.09, 0.17] },
@@ -189,9 +194,16 @@ function breach(sim: Simulation, e: Enemy): boolean {
     return false;
   }
   const region = sim.regionOf(e.tile);
-  // Stick with one wall until it's down (spreading blows over several walls breaks none).
-  if (e.breachTarget === undefined || !breakable(w, e.breachTarget)) {
-    e.breachTarget = breachWall(sim, region, sim.regionOf(goal.tile), goal.tile);
+  // Stick with one wall until it's down (spreading blows over several walls breaks none), unless
+  // the colonists have moved somewhere it no longer leads; then look again now and then.
+  const goalRegion = sim.regionOf(goal.tile);
+  const stale =
+    e.breachTarget !== undefined &&
+    !w.neighbors(e.breachTarget, false).some((n) => w.isPassable(n) && sim.regionOf(n) === goalRegion) &&
+    e.repathAt <= sim.tick;
+  if (e.breachTarget === undefined || !breakable(w, e.breachTarget) || stale) {
+    e.breachTarget = breachWall(sim, region, goalRegion, goal.tile);
+    e.repathAt = sim.tick + 200;
     e.path = [];
   }
   const wall = e.breachTarget;
@@ -203,14 +215,11 @@ function breach(sim: Simulation, e: Enemy): boolean {
     e.moveProgress = 0;
     if (e.cooldown <= 0) {
       e.cooldown = WEAPONS[e.weapon].cooldown;
-      const damage = (sim.wallDamage.get(wall) ?? 0) + 10;
+      w.damage[wall] += 10;
       const def = featureDef(w.feature[wall]);
-      if (damage >= def.build!.work) {
-        sim.wallDamage.delete(wall);
+      if (w.damage[wall] >= def.build!.work) {
         w.setFeature(wall, NONE);
         sim.addLog(`Raiders broke through a ${def.name.toLowerCase()}!`, 'danger');
-      } else {
-        sim.wallDamage.set(wall, damage);
       }
     }
     return true;
@@ -254,15 +263,25 @@ function breachWall(sim: Simulation, region: number, goalRegion: number, goalTil
 }
 
 // Raiders who beat the whole colony carry off part of its food, medicine and goods.
-function plunder(sim: Simulation): string {
+export function plunder(sim: Simulation): string {
   const w = sim.world;
   const loot = ['meal', 'fineMeal', 'herbalMedicine', 'cloth', 'leather', 'potatoes'].map((key) => itemId(key));
+  // Take 30% of each kind of loot, counted across all its stacks.
+  const quota = new Map<number, number>();
+  for (let i = 0; i < w.size; i++) {
+    if (loot.includes(w.itemType[i])) {
+      quota.set(w.itemType[i], (quota.get(w.itemType[i]) ?? 0) + w.itemCount[i]);
+    }
+  }
+  for (const [item, total] of quota) {
+    quota.set(item, Math.floor(total * 0.3));
+  }
   const taken = new Map<number, number>();
   for (let i = 0; i < w.size; i++) {
     const item = w.itemType[i];
-    if (loot.includes(item)) {
-      const n = w.takeItem(i, Math.ceil(w.itemCount[i] * 0.3));
-      taken.set(item, (taken.get(item) ?? 0) + n);
+    const left = (quota.get(item) ?? 0) - (taken.get(item) ?? 0);
+    if (left > 0) {
+      taken.set(item, (taken.get(item) ?? 0) + w.takeItem(i, left));
     }
   }
   const parts = [...taken].filter(([, n]) => n > 0).map(([item, n]) => `${n} ${itemDef(item).name.toLowerCase()}`);
@@ -380,9 +399,18 @@ export function updateEnemies(sim: Simulation): void {
   if (raid) {
     const fighting = sim.enemies.filter((e) => e.hp > 0 && !e.fleeing);
     if (
-      fighting.length > 0 &&
-      (raid.killed >= raid.initial * MORALE_BREAK || sim.tick - raid.startedTick > RAID_TIMEOUT)
+      raid.arrivedTick === undefined &&
+      fighting.some((e) => sim.living().some((c) => w.distance(e.tile, c.tile) <= ARRIVAL_RANGE))
     ) {
+      raid.arrivedTick = sim.tick;
+    }
+    // On a big map the walk in doesn't eat into the raid's time; a raid that never gets close
+    // gives up after twice the usual time.
+    const timedOut =
+      raid.arrivedTick !== undefined
+        ? sim.tick - raid.arrivedTick > RAID_TIMEOUT
+        : sim.tick - raid.startedTick > RAID_TIMEOUT * 2;
+    if (fighting.length > 0 && (raid.killed >= raid.initial * MORALE_BREAK || timedOut)) {
       for (const e of fighting) {
         e.fleeing = true;
         e.path = [];

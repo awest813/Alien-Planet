@@ -32,6 +32,10 @@ const RESEARCH_ORDER = [
   'insulation',
   'bedding',
   'fortifications',
+  'electricity',
+  'refrigeration',
+  'solarPower',
+  'sunLamps',
 ];
 
 // Finds the nearest w×h rectangle to the colonists where every tile can take a blueprint.

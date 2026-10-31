@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { ColonistView, TOOLS, TOOL_GROUPS, TileView, ToolGroup, UiState, controller } from '../game/controller';
+import { PHASE_NAMES } from '../sim/simulation';
 import { Bar, moodColor } from './common';
 
 // The always-on game HUD: top bar, colonist bar, inspector, side panel, and architect menu.
 
-export type Screen = 'menu' | 'work' | 'schedule' | 'production' | 'research' | 'story' | 'help' | null;
+export type Screen = 'menu' | 'settings' | 'work' | 'schedule' | 'production' | 'research' | 'story' | 'help' | null;
 
 const SPEEDS = [
   { label: '❚❚', title: 'Pause (Space)' },
@@ -408,15 +409,17 @@ type SideTab = 'alerts' | 'goals' | 'log';
 
 export function SidePanel({ state }: { state: UiState }) {
   const [tab, setTab] = useState<SideTab>('goals');
-  const [open, setOpen] = useState(true);
+  // Starts folded away on small screens, where it would cover the map.
+  const [open, setOpen] = useState(() => window.innerWidth > 720);
+  // Phases the player has unfolded; the current one is always open.
+  const [unfolded, setUnfolded] = useState<Set<string>>(new Set());
   const danger = state.alerts.filter((a) => a.tone === 'danger').length;
-  const phaseNames = ['Shelter', 'Living', 'Story', 'Seasons'];
-  const phases = phaseNames
-    .map((name, index) => ({
-      name,
-      objectives: state.objectives.filter((o) => o.phase === index + 1),
-    }))
-    .filter((p) => p.objectives.some((o) => !o.done));
+  const phases = PHASE_NAMES.map((name, index) => ({
+    name,
+    objectives: state.objectives.filter((o) => o.phase === index + 1),
+  }))
+    // A phase stays on the list while it has goals still to reach (a failed one doesn't count).
+    .filter((p) => p.objectives.some((o) => !o.done && !o.failed));
   if (!open) {
     return (
       <button className="panel side-toggle" onClick={() => setOpen(true)} title="Show alerts and goals">
@@ -463,8 +466,8 @@ export function SidePanel({ state }: { state: UiState }) {
             {state.alerts.length === 0 && <li className="calm">All quiet.</li>}
             {[...state.alerts]
               .sort((a, b) => (a.tone === b.tone ? 0 : a.tone === 'danger' ? -1 : 1))
-              .map((alert) => (
-                <li key={alert.text} className={alert.tone}>
+              .map((alert, index) => (
+                <li key={`${index}-${alert.text}`} className={alert.tone}>
                   {alert.text}
                 </li>
               ))}
@@ -474,27 +477,55 @@ export function SidePanel({ state }: { state: UiState }) {
           (phases.length === 0 ? (
             <div className="muted">Every objective is complete. The colony is yours.</div>
           ) : (
-            phases.map((p) => (
-              <div key={p.name}>
-                <h4>
-                  {p.name}{' '}
-                  <span className="muted">
-                    {p.objectives.filter((o) => o.done).length}/{p.objectives.length}
-                  </span>
-                </h4>
-                <ul className="objectives">
-                  {p.objectives
-                    .filter((o) => !o.done)
-                    .map((o) => (
-                      <li key={o.id} className={o.failed ? 'failed' : ''}>
-                        <span className="check">{o.failed ? '✖' : '○'}</span>
-                        {o.label}
-                        {o.progress && <span className="muted"> {o.progress}</span>}
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            ))
+            phases.map((p, index) => {
+              const shown = index === 0 || unfolded.has(p.name);
+              const toggle = () =>
+                setUnfolded((old) => {
+                  const next = new Set(old);
+                  if (!next.delete(p.name)) {
+                    next.add(p.name);
+                  }
+                  return next;
+                });
+              return (
+                <div key={p.name}>
+                  <h4>
+                    {index === 0 ? (
+                      p.name
+                    ) : (
+                      <button
+                        className="link"
+                        aria-expanded={shown}
+                        onClick={(e) => {
+                          toggle();
+                          // Bring the unfolded goals into view in the scrolling panel.
+                          const phase = e.currentTarget.closest('div');
+                          requestAnimationFrame(() => phase?.scrollIntoView({ block: 'nearest' }));
+                        }}
+                      >
+                        {shown ? '▾' : '▸'} {p.name}
+                      </button>
+                    )}{' '}
+                    <span className="muted">
+                      {p.objectives.filter((o) => o.done).length}/{p.objectives.length}
+                    </span>
+                  </h4>
+                  {shown && (
+                    <ul className="objectives">
+                      {p.objectives
+                        .filter((o) => !o.done)
+                        .map((o) => (
+                          <li key={o.id} className={o.failed ? 'failed' : ''}>
+                            <span className="check">{o.failed ? '✖' : '○'}</span>
+                            {o.label}
+                            {o.progress && <span className="muted"> {o.progress}</span>}
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })
           ))}
         {tab === 'log' && (
           <ul className="log">
@@ -552,7 +583,7 @@ export function Architect({ state }: { state: UiState }) {
               key={t.id}
               className={`${state.toolId === t.id ? 'active' : ''} ${locked ? 'locked' : ''}`}
               onClick={() => controller.setTool(t.tool)}
-              title={locked ? `Requires research: ${locked}` : t.hint}
+              title={locked ? `${t.hint} · needs research: ${locked}` : t.hint}
             >
               {locked && '🔒 '}
               {t.label}

@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react';
-import { SAVE_SLOTS, UiState, controller, slotLabel } from '../game/controller';
-import { SAVE_VERSION } from '../sim/serialize';
-import { DIFFICULTIES, Difficulty } from '../sim/storyteller';
+import { useEffect, useRef, useState } from 'react';
+import { UiState, controller } from '../game/controller';
 import { ScheduleSlot, WORK_TYPES } from '../sim/types';
 import { Bar, SLOT_LABELS, WORK_LABELS } from './common';
 
@@ -12,20 +10,40 @@ export function Modal({
   onClose,
   children,
   wide,
+  closable = true,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   wide?: boolean;
+  // False for screens the player has to act on (the fallen colony).
+  closable?: boolean;
 }) {
+  const panel = useRef<HTMLDivElement>(null);
+  // Move keyboard focus into the dialog when it opens (unless a button in it already took it).
+  useEffect(() => {
+    if (!panel.current?.contains(document.activeElement)) {
+      panel.current?.focus();
+    }
+  }, []);
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className={`panel modal ${wide ? 'wide' : ''}`} onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop" onClick={closable ? onClose : undefined}>
+      <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        className={`panel modal ${wide ? 'wide' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2>{title}</h2>
         {children}
-        <div className="row end">
-          <button onClick={onClose}>Close</button>
-        </div>
+        {closable && (
+          <div className="row end">
+            <button onClick={onClose}>Close</button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -59,6 +77,7 @@ export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => 
                   <td key={work}>
                     <button
                       className={`priority p${value}`}
+                      aria-label={`${c.name}, ${WORK_LABELS[work]}: ${value === 0 ? 'off' : `priority ${value}`}`}
                       onClick={() =>
                         controller.command({ type: 'priority', colonist: c.id, work, value: cycle(value) })
                       }
@@ -135,7 +154,8 @@ export function ProductionScreen({ state, onClose }: { state: UiState; onClose: 
   return (
     <Modal title="Production" onClose={onClose}>
       <p className="muted">
-        Colonists keep making each product until the colony holds the target amount (equipped bows don't count).
+        Colonists keep making each product until the colony holds the target amount (bows and clothes already in use
+        don't count).
       </p>
       <table className="saves">
         <tbody>
@@ -176,8 +196,8 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
           <b>Chop</b> (C) some trees and drag out a <b>Stockpile</b> (Z) so the wood has somewhere to go.
         </li>
         <li>
-          Drag a rectangle of <b>Wood wall</b> (B), click a <b>Door</b> (O) into it, and add <b>Beds</b> (E) inside
-          before night falls at 22:00.
+          Drag a small rectangle (about 5×4) of <b>Wood wall</b> (B), click a <b>Door</b> (O) into it, and add{' '}
+          <b>Beds</b> (E) inside before night falls at 22:00.
         </li>
         <li>
           Plant <b>Grow potatoes</b> (P), <b>Mine</b> (M) granite for a <b>Stove</b> (K), and set meal targets in{' '}
@@ -204,8 +224,9 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
         </li>
       </ul>
       <p className="muted">
-        Space pauses, 1–3 change speed. WASD or right-drag pans, the wheel zooms, and right-click drops the current
-        tool.
+        Space pauses, 1–3 change speed, Esc opens the menu (saves, settings), Tab jumps from colonist to colonist, and
+        the minimap (bottom right) moves the view. WASD or right-drag pans, the wheel zooms, and right-click drops the
+        current tool.
       </p>
       <p className="muted">
         Later, raiders come. The game pauses: press <b>Q</b> to draft everyone (or a selected colonist), then select a
@@ -228,7 +249,7 @@ export function ResearchScreen({ state, onClose }: { state: UiState; onClose: ()
       <p className="muted">
         {state.researchBench
           ? 'Pick a project; colonists with the Research work type study it at the research bench.'
-          : 'Build a research bench (Furniture) first, then pick a project.'}
+          : 'Build a research bench (Production) first, then pick a project.'}
       </p>
       <ul className="research">
         {state.research.map((p) => (
@@ -309,88 +330,5 @@ export function ConfirmButton({
     >
       {armed ? confirm : label}
     </button>
-  );
-}
-
-export function Menu({ state, onClose }: { state: UiState; onClose: () => void }) {
-  const [seed, setSeed] = useState('');
-  const [difficulty, setDifficulty] = useState<Difficulty>('standard');
-  const savesBySlot = new Map(state.saves.map((s) => [s.slot, s]));
-  const current = DIFFICULTIES.find((d) => d.key === state.difficulty);
-  return (
-    <Modal title="Colony menu" onClose={onClose}>
-      <p className="muted">
-        Day {state.day} · {state.colonists.filter((c) => !c.dead).length} colonists · {current?.label} · seed{' '}
-        {state.seed}
-      </p>
-      <h3>Saves</h3>
-      <table className="saves">
-        <tbody>
-          {SAVE_SLOTS.map((slot) => {
-            const meta = savesBySlot.get(slot);
-            const outdated = !!meta && meta.version !== SAVE_VERSION;
-            const details = meta
-              ? [
-                  `Day ${meta.day}, ${String(meta.hour).padStart(2, '0')}:00`,
-                  meta.colonists !== undefined ? `${meta.colonists} colonists` : null,
-                  new Date(meta.savedAt).toLocaleString(),
-                ]
-                  .filter(Boolean)
-                  .join(' · ')
-              : 'Empty';
-            return (
-              <tr key={slot}>
-                <td>{slotLabel(slot)}</td>
-                <td className="muted">
-                  {details}
-                  {outdated && <span className="tag warn">older version</span>}
-                </td>
-                <td>
-                  {slot !== 'autosave' &&
-                    (meta ? (
-                      <ConfirmButton label="Save" confirm="Overwrite?" onConfirm={() => controller.save(slot)} />
-                    ) : (
-                      <button onClick={() => controller.save(slot)}>Save</button>
-                    ))}
-                  <ConfirmButton
-                    label="Load"
-                    confirm="Lose current?"
-                    disabled={!meta || outdated}
-                    onConfirm={() => {
-                      controller.load(slot);
-                      onClose();
-                    }}
-                  />
-                  {meta && (
-                    <ConfirmButton label="Delete" confirm="Delete?" onConfirm={() => controller.deleteSave(slot)} />
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <p className="muted">The game autosaves every dawn. Unsaved progress is lost when you load or start over.</p>
-      <h3>New colony</h3>
-      <div className="difficulties">
-        {DIFFICULTIES.map((d) => (
-          <button key={d.key} className={difficulty === d.key ? 'active' : ''} onClick={() => setDifficulty(d.key)}>
-            <b>{d.label}</b>
-            <span>{d.description}</span>
-          </button>
-        ))}
-      </div>
-      <div className="row">
-        <input placeholder="Seed (blank for random)" value={seed} onChange={(e) => setSeed(e.target.value)} />
-        <ConfirmButton
-          label="Start"
-          confirm="Lose current?"
-          onConfirm={() => {
-            controller.newColony(seed, difficulty);
-            onClose();
-          }}
-        />
-      </div>
-    </Modal>
   );
 }

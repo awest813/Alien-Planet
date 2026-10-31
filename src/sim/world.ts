@@ -1,6 +1,16 @@
 import { MAX_COST_LINES, NONE, NORMAL_QUALITY, featureDef, itemDef, terrainDef } from './defs';
 import type { Carried } from './types';
 
+export type TileKind = 'items' | 'features' | 'designations' | 'blueprints' | 'zones';
+
+function toggle(set: Set<number>, i: number, present: boolean): void {
+  if (present) {
+    set.add(i);
+  } else {
+    set.delete(i);
+  }
+}
+
 export const Designation = {
   NONE: 0,
   MINE: 1,
@@ -44,6 +54,8 @@ export class World {
   public readonly fresh: Float32Array;
   // Cook's skill for meals, craftsmanship for clothing (averaged when stacks merge).
   public readonly quality: Float32Array;
+  // Damage raiders have done to a building they're breaking through (cleared when it changes).
+  public readonly damage: Float32Array;
   // Fuel held by a fuelled building (generators).
   public readonly fuel: Float32Array;
   // One item stack per tile.
@@ -54,6 +66,15 @@ export class World {
 
   // Tiles whose visuals changed since the renderer last looked.
   public readonly dirty = new Set<number>();
+  // Tiles changed since the lists behind tilesWith() were last brought up to date.
+  private readonly stale = new Set<number>();
+  private readonly lists: Record<TileKind, Set<number>> = {
+    items: new Set(),
+    features: new Set(),
+    designations: new Set(),
+    blueprints: new Set(),
+    zones: new Set(),
+  };
   // Bumped whenever passability or room boundaries may have changed.
   public structureVersion = 0;
   // Bumped whenever any feature changes (furniture affects room stats).
@@ -73,6 +94,7 @@ export class World {
     this.growth = new Float32Array(this.size);
     this.fresh = new Float32Array(this.size);
     this.quality = new Float32Array(this.size);
+    this.damage = new Float32Array(this.size);
     this.fuel = new Float32Array(this.size);
     this.itemType = new Uint8Array(this.size);
     this.itemCount = new Uint16Array(this.size);
@@ -97,6 +119,30 @@ export class World {
 
   public markDirty(i: number): void {
     this.dirty.add(i);
+    this.stale.add(i);
+  }
+
+  // Tiles holding items, buildings or plants, work orders, blueprints and zones, so searches
+  // don't have to scan the whole map. They catch up on changed tiles lazily, when next read.
+  public tilesWith(kind: TileKind): ReadonlySet<number> {
+    if (this.stale.size > 0) {
+      for (const i of this.stale) {
+        toggle(this.lists.items, i, this.itemType[i] !== NONE);
+        toggle(this.lists.features, i, this.feature[i] !== NONE);
+        toggle(this.lists.designations, i, this.designation[i] !== 0);
+        toggle(this.lists.blueprints, i, this.blueprint[i] !== NONE);
+        toggle(this.lists.zones, i, this.zone[i] !== 0);
+      }
+      this.stale.clear();
+    }
+    return this.lists[kind];
+  }
+
+  // Rebuilds the lists from scratch (after map generation or loading writes the layers directly).
+  public reindex(): void {
+    for (let i = 0; i < this.size; i++) {
+      this.stale.add(i);
+    }
   }
 
   public isPassable(i: number): boolean {
@@ -165,6 +211,7 @@ export class World {
     const roomBefore = this.blocksRoom(i);
     this.feature[i] = f;
     this.progress[i] = 0;
+    this.damage[i] = 0;
     this.growth[i] = 0;
     this.fuel[i] = 0;
     this.featureVersion++;
@@ -250,6 +297,9 @@ export class World {
     const def = itemDef(item);
     const space = def.stackLimit - (this.itemType[i] === item ? this.itemCount[i] : 0);
     const added = Math.min(space, count);
+    if (added <= 0) {
+      return count;
+    }
     if (added > 0) {
       const existing = this.itemType[i] === item ? this.itemCount[i] : 0;
       const merge = (old: number, incoming: number) => (old * existing + incoming * added) / (existing + added);
@@ -305,7 +355,8 @@ export class World {
         this.isPassable(i) &&
         this.blueprint[i] === NONE &&
         (this.feature[i] === NONE || !featureDef(this.feature[i]).icebox || !!itemDef(item).nutrition) &&
-        (this.itemType[i] === NONE || this.itemType[i] === item)
+        // One-per-tile things (bows, clothes) never pile up, even as a last resort.
+        (this.itemType[i] === NONE || (this.itemType[i] === item && itemDef(item).stackLimit > 1))
       ) {
         fallback = i;
       }
@@ -313,6 +364,17 @@ export class World {
         if (!seen[n] && this.isPassable(n)) {
           seen[n] = 1;
           queue.push(n);
+        }
+      }
+    }
+    // Walled in with nowhere to put it: the nearest empty tile anywhere takes it.
+    if (remaining > 0 && fallback < 0) {
+      let best = Infinity;
+      for (let i = 0; i < this.size; i++) {
+        const d = this.distance(start, i);
+        if (d < best && this.itemType[i] === NONE && this.isPassable(i) && this.blueprint[i] === NONE) {
+          best = d;
+          fallback = i;
         }
       }
     }

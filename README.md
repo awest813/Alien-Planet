@@ -9,6 +9,17 @@ how nice their rooms are. Let mood drop too far for too long and a colonist will
 
 ## Playing
 
+The game opens on a title screen: **Continue** picks up your most recent save, **New colony** asks for a
+difficulty, map size and seed, and **Load game**, **Settings** and **How to play** are there too. In a game,
+Esc (once there's no tool or selection to drop) or the Menu button opens the pause menu: resume, save or
+load, start a new colony, settings, help, or quit to the title (which autosaves). The game also autosaves
+every dawn and whenever you leave the page, so a closed tab doesn't lose the colony. When everyone has
+died, a summary shows how the colony fared.
+
+**Settings** (remembered in the browser): autosave, pausing on raids and on deaths or collapses, interface
+size, how long notifications stay, camera speed, name labels, the minimap, a list of controls, and a way to
+see the welcome help again.
+
 | Action                | Input                                                   |
 | --------------------- | ------------------------------------------------------- |
 | Pan                   | WASD / arrow keys, or right/middle-drag                 |
@@ -17,8 +28,10 @@ how nice their rooms are. Let mood drop too far for too long and a colonist will
 | Tools                 | Toolbar, or hotkeys shown on each button                |
 | Apply a tool          | Left-drag a rectangle (walls are placed as an outline)  |
 | Drop the current tool | Right-click or Esc                                      |
+| Pause menu            | Esc (with no tool or selection), or the Menu button     |
+| Next colonist         | Tab                                                     |
 | Select a colonist     | Click it on the map or in the colonist list             |
-| Save / load / new map | Menu button: four slots, delete, difficulty and seed    |
+| Save / load / new map | Pause menu: four slots, delete, difficulty, size, seed  |
 | Work priorities       | Work button: click a cell to cycle 1 → 4 → off          |
 | Schedules             | Schedule button: pick a brush and paint hours           |
 | Draft for combat      | Q (selected colonist, or everyone), or the Draft button |
@@ -32,7 +45,7 @@ Objectives:
   bed, and survive the first night with everyone indoors.
 - **Phase 2 – Living:** create a growing zone, harvest 24 potatoes, cook 5 meals at a stove, build a recreation
   spot, heat a bedroom with a campfire, and weave cloth for an armchair.
-- **Phase 3 – Story:** stock 5 herbal medicine, have a doctor tend someone, see two colonists become friends,
+- **Phase 3 – Story:** harvest 5 herbal medicine, have a doctor tend someone, see two colonists become friends,
   repel a raid, hunt an animal, equip a recurve bow, build sandbags, and reach day 12 with at least 4 colonists
   alive.
 - **Phase 4 – Seasons:** build a research bench and pick a project, complete three research projects, research
@@ -93,8 +106,8 @@ How the storytelling layer works:
   summers, freezing winter nights). Crops don't grow in winter and hard frost kills anything left in the field,
   so plant enough in spring and summer and harvest before winter.
 - **Research:** build a research bench, pick a project in the Research screen, and colonists with the Research
-  work type study it (training the Intellectual skill). Eleven projects unlock the recurve bow, sandbags, the
-  stone hearth, the fine bed and all the electrical tech below, or improve insulation, crop growth and
+  work type study it (training the Intellectual skill). Twelve projects unlock the recurve bow, sandbags, the
+  stone hearth, the fine bed, tailoring and all the electrical tech below, or improve insulation, crop growth and
   doctoring.
 - **Power:** the colony shares one grid. Wood-fired generators (kept fuelled by haulers) and solar panels (daytime
   only, weaker in winter) supply it; batteries store the surplus. If demand outstrips supply and storage,

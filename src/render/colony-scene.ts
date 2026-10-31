@@ -13,6 +13,7 @@ interface PawnView {
   carry: Phaser.GameObjects.Image;
   zzz: Phaser.GameObjects.Text;
   alert: Phaser.GameObjects.Text;
+  label: Phaser.GameObjects.Text;
 }
 
 interface Layers {
@@ -60,6 +61,7 @@ export class ColonyScene extends Phaser.Scene {
   private water!: Phaser.GameObjects.Graphics;
   private waterAt = 0;
   private heatmapAt = 0;
+  private heatmapView = '';
   // Tiles holding a heat/light source, refreshed when features change.
   private glowSources: number[] = [];
   private glowVersion = -1;
@@ -122,36 +124,51 @@ export class ColonyScene extends Phaser.Scene {
     const g = this.water;
     g.clear();
     const world = controller.sim.world;
-    for (let i = 0; i < world.size; i++) {
-      const t = world.terrain[i];
-      if (!isWater(t)) {
-        continue;
-      }
-      const x = world.xOf(i);
-      const y = world.yOf(i);
-      const px = x * TILE;
-      const py = y * TILE;
-      g.fillStyle(0xffffff, 0.35);
-      if (y > 0 && !isWater(world.terrain[i - world.width])) {
-        g.fillRect(px, py, TILE, 1);
-      }
-      if (y < world.height - 1 && !isWater(world.terrain[i + world.width])) {
-        g.fillRect(px, py + TILE - 1, TILE, 1);
-      }
-      if (x > 0 && !isWater(world.terrain[i - 1])) {
-        g.fillRect(px, py, 1, TILE);
-      }
-      if (x < world.width - 1 && !isWater(world.terrain[i + 1])) {
-        g.fillRect(px + TILE - 1, py, 1, TILE);
-      }
-      const seed = hash2(x, y, 5);
-      const shine = Math.sin(now / 700 + seed * 12);
-      if (shine > 0.4) {
-        const drift = Math.floor((now / 160 + seed * 16) % 12);
-        g.fillStyle(0xffffff, (shine - 0.4) * (t === DEEP ? 0.35 : 0.5));
-        g.fillRect(px + 1 + drift, py + 3 + Math.floor(seed * 9), 3, 1);
+    const view = this.visibleTiles();
+    for (let y = view.y0; y <= view.y1; y++) {
+      for (let x = view.x0; x <= view.x1; x++) {
+        const i = world.idx(x, y);
+        const t = world.terrain[i];
+        if (!isWater(t)) {
+          continue;
+        }
+        const px = x * TILE;
+        const py = y * TILE;
+        g.fillStyle(0xffffff, 0.35);
+        if (y > 0 && !isWater(world.terrain[i - world.width])) {
+          g.fillRect(px, py, TILE, 1);
+        }
+        if (y < world.height - 1 && !isWater(world.terrain[i + world.width])) {
+          g.fillRect(px, py + TILE - 1, TILE, 1);
+        }
+        if (x > 0 && !isWater(world.terrain[i - 1])) {
+          g.fillRect(px, py, 1, TILE);
+        }
+        if (x < world.width - 1 && !isWater(world.terrain[i + 1])) {
+          g.fillRect(px + TILE - 1, py, 1, TILE);
+        }
+        const seed = hash2(x, y, 5);
+        const shine = Math.sin(now / 700 + seed * 12);
+        if (shine > 0.4) {
+          const drift = Math.floor((now / 160 + seed * 16) % 12);
+          g.fillStyle(0xffffff, (shine - 0.4) * (t === DEEP ? 0.35 : 0.5));
+          g.fillRect(px + 1 + drift, py + 3 + Math.floor(seed * 9), 3, 1);
+        }
       }
     }
+  }
+
+  // The tiles the camera can see (plus a one-tile border), so per-frame drawing skips the rest
+  // of a big map.
+  private visibleTiles(): { x0: number; y0: number; x1: number; y1: number } {
+    const world = controller.sim.world;
+    const view = this.cameras.main.worldView;
+    return {
+      x0: Math.max(0, Math.floor(view.x / TILE) - 1),
+      y0: Math.max(0, Math.floor(view.y / TILE) - 1),
+      x1: Math.min(world.width - 1, Math.ceil(view.right / TILE) + 1),
+      y1: Math.min(world.height - 1, Math.ceil(view.bottom / TILE) + 1),
+    };
   }
 
   // ---- World tiles ----
@@ -307,7 +324,7 @@ export class ColonyScene extends Phaser.Scene {
       .setResolution(4)
       .setVisible(false);
     const root = this.add.container(0, 0, [figure, carry, label, zzz, alert]).setDepth(Depth.PAWNS);
-    return { root, figure, carry, zzz, alert };
+    return { root, figure, carry, zzz, alert, label };
   }
 
   private pawnPosition(c: Colonist): { x: number; y: number } {
@@ -337,6 +354,7 @@ export class ColonyScene extends Phaser.Scene {
       pawn.root.setAlpha(dead ? 0.55 : 1);
       pawn.figure.setAngle(c.sleeping || dead || downed ? 90 : 0);
       pawn.zzz.setVisible(c.sleeping).setY(-6 - ((time / 400) % 3));
+      pawn.label.setVisible(controller.settings.showNames);
       pawn.alert
         .setText(downed ? '+' : '!')
         .setColor(downed ? '#ff5c5c' : '#ff7a5c')
@@ -434,6 +452,8 @@ export class ColonyScene extends Phaser.Scene {
       const x = world.xOf(e.tile) + (world.xOf(to) - world.xOf(e.tile)) * t;
       const y = world.yOf(e.tile) + (world.yOf(to) - world.yOf(e.tile)) * t;
       raider.setPosition((x + 0.5) * TILE, (y + 0.5) * TILE).setAlpha(e.fleeing ? 0.6 : 1);
+      // The name label is the container's last child.
+      (raider.getAt(2) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames);
     }
   }
 
@@ -536,20 +556,27 @@ export class ColonyScene extends Phaser.Scene {
     }
     g.setVisible(true);
     const now = this.time.now;
-    if (now - this.heatmapAt < 500) {
+    const view = this.visibleTiles();
+    const viewKey = `${view.x0},${view.y0},${view.x1},${view.y1}`;
+    // Redraw twice a second, or straight away when the view moves.
+    if (now - this.heatmapAt < 500 && viewKey === this.heatmapView) {
       return;
     }
     this.heatmapAt = now;
+    this.heatmapView = viewKey;
     g.clear();
     const sim = controller.sim;
     const world = sim.world;
-    for (let i = 0; i < world.size; i++) {
-      if (world.blocksRoom(i)) {
-        continue;
+    for (let y = view.y0; y <= view.y1; y++) {
+      for (let x = view.x0; x <= view.x1; x++) {
+        const i = world.idx(x, y);
+        if (world.blocksRoom(i)) {
+          continue;
+        }
+        const t = sim.temperatureAt(i);
+        const color = t <= 0 ? 0x4f7cff : t < 10 ? 0x7fc8ff : t <= 26 ? 0x8fe36b : t <= 32 ? 0xffb347 : 0xff5c5c;
+        g.fillStyle(color, 0.28).fillRect(x * TILE, y * TILE, TILE, TILE);
       }
-      const t = sim.temperatureAt(i);
-      const color = t <= 0 ? 0x4f7cff : t < 10 ? 0x7fc8ff : t <= 26 ? 0x8fe36b : t <= 32 ? 0xffb347 : 0xff5c5c;
-      g.fillStyle(color, 0.28).fillRect(world.xOf(i) * TILE, world.yOf(i) * TILE, TILE, TILE);
     }
   }
 
@@ -571,7 +598,17 @@ export class ColonyScene extends Phaser.Scene {
       return;
     }
     const time = this.time.now;
+    // Glow reaches about four tiles, so skip fires well off screen.
+    const view = this.visibleTiles();
     for (const i of this.glowSources) {
+      if (
+        world.xOf(i) < view.x0 - 4 ||
+        world.xOf(i) > view.x1 + 4 ||
+        world.yOf(i) < view.y0 - 4 ||
+        world.yOf(i) > view.y1 + 4
+      ) {
+        continue;
+      }
       const strength = featureDef(world.feature[i]).heater > 0 ? 1 : 0.4;
       const flicker = 0.85 + 0.15 * Math.sin(time / 110 + i);
       const x = (world.xOf(i) + 0.5) * TILE;
@@ -734,7 +771,7 @@ export class ColonyScene extends Phaser.Scene {
 
     this.input.on('wheel', (pointer: Phaser.Input.Pointer, _objects: unknown, _dx: number, dy: number) => {
       const oldZoom = cam.zoom;
-      const zoom = Phaser.Math.Clamp(oldZoom * (dy > 0 ? 1 / 1.15 : 1.15), MIN_ZOOM, MAX_ZOOM);
+      const zoom = Phaser.Math.Clamp(oldZoom * (dy > 0 ? 1 / 1.15 : 1.15), this.minZoom(), MAX_ZOOM);
       // Keep the point under the cursor fixed while zooming.
       const worldX = cam.scrollX + cam.width / 2 + (pointer.x - cam.width / 2) / oldZoom;
       const worldY = cam.scrollY + cam.height / 2 + (pointer.y - cam.height / 2) / oldZoom;
@@ -752,16 +789,34 @@ export class ColonyScene extends Phaser.Scene {
       return !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
     };
     const onDown = (event: KeyboardEvent) => {
-      if (isTyping(event) || event.ctrlKey || event.metaKey || event.altKey) {
+      // Menus and screens own the keyboard while they're open.
+      if (isTyping(event) || event.ctrlKey || event.metaKey || event.altKey || controller.modalOpen) {
         return;
       }
       const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+      // Escape is handled by the interface (close screens, drop the tool, open the menu).
+      if (key === 'Escape') {
+        return;
+      }
       this.held.add(key);
+      // Holding a toggle key mustn't flicker it.
+      if (event.repeat && (key === ' ' || key === 'q' || key === 'Tab')) {
+        event.preventDefault();
+        return;
+      }
+      if (key === 'Tab' && document.activeElement && document.activeElement !== document.body) {
+        // Leave Tab to the browser when a button or field has focus.
+        this.held.delete(key);
+        return;
+      }
       if (key === ' ') {
         event.preventDefault();
         controller.togglePause();
       } else if (key === '1' || key === '2' || key === '3') {
         controller.setSpeed(Number(key));
+      } else if (key === 'Tab') {
+        event.preventDefault();
+        controller.cycleColonist();
       } else if (key === 'q') {
         if (controller.selectedColonist !== null) {
           controller.toggleDraft(controller.selectedColonist);
@@ -791,6 +846,13 @@ export class ColonyScene extends Phaser.Scene {
     });
   }
 
+  // Far enough out to see the whole map at once, and never less than that.
+  private minZoom(): number {
+    const world = controller.sim.world;
+    const cam = this.cameras.main;
+    return Math.min(MIN_ZOOM, cam.width / ((world.width + 4) * TILE), cam.height / ((world.height + 4) * TILE));
+  }
+
   private updateCamera(delta: number): void {
     const cam = this.cameras.main;
     if (controller.focusRequest !== null) {
@@ -799,11 +861,12 @@ export class ColonyScene extends Phaser.Scene {
       controller.focusRequest = null;
       cam.centerOn((world.xOf(i) + 0.5) * TILE, (world.yOf(i) + 0.5) * TILE);
     }
+    controller.cameraView = this.visibleTiles();
     const h = this.held;
     const dx = (h.has('d') || h.has('ArrowRight') ? 1 : 0) - (h.has('a') || h.has('ArrowLeft') ? 1 : 0);
     const dy = (h.has('s') || h.has('ArrowDown') ? 1 : 0) - (h.has('w') || h.has('ArrowUp') ? 1 : 0);
     if (dx !== 0 || dy !== 0) {
-      const step = (PAN_SPEED * delta) / 1000 / cam.zoom;
+      const step = (PAN_SPEED * controller.settings.panSpeed * delta) / 1000 / cam.zoom;
       cam.setScroll(cam.scrollX + dx * step, cam.scrollY + dy * step);
     }
   }

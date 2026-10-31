@@ -305,6 +305,7 @@ kbd {
 
 .tb-time {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
 }
@@ -368,6 +369,7 @@ kbd {
 
 .screens {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -507,6 +509,7 @@ kbd {
 .side {
   width: 100%;
   max-height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -666,7 +669,8 @@ kbd {
 .modal {
   width: 520px;
   max-width: calc(100% - 32px);
-  max-height: calc(100vh - 32px);
+  /* Of the (possibly scaled) interface, not the window. */
+  max-height: calc(100% - 32px);
   overflow-y: auto;
   pointer-events: auto;
 }
@@ -899,8 +903,9 @@ button.brush.active {
     display: none;
   }
 
+  /* Tool buttons drop their key badges to fit; the controls list keeps them. */
   .hint,
-  kbd {
+  .arch-tools kbd {
     display: none;
   }
 
@@ -915,11 +920,204 @@ button.brush.active {
     grid-template-columns: minmax(0, 220px) 1fr 0;
   }
 
+  /* The alerts and goals panel floats over the map, folded away until opened. */
   .right-column {
-    display: none;
+    position: fixed;
+    top: 120px;
+    right: var(--gap);
+    bottom: 110px;
+    width: min(240px, 70vw);
+    z-index: 5;
   }
 
   .difficulties {
     grid-template-columns: 1fr;
   }
+}
+
+/* Phase headers in the goals list fold and unfold. */
+button.link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+button.link:hover,
+button.link:focus-visible {
+  color: var(--accent, #ffd166);
+}
+
+/* Minimap, bottom of the right column. */
+/* The minimap keeps its size; the goals panel above shrinks (and scrolls) to make room. */
+.minimap,
+.minimap-toggle {
+  margin-top: auto;
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+
+.minimap {
+  padding: 6px;
+}
+
+.minimap canvas {
+  display: block;
+  cursor: crosshair;
+  image-rendering: pixelated;
+  touch-action: none;
+}
+
+.minimap-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.minimap-head button {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+@media (max-width: 560px) {
+  .minimap,
+  .minimap-toggle {
+    display: none;
+  }
+}
+
+/* ---------- Title screen and menus ---------- */
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+button.active:hover:not(:disabled),
+button.primary:hover:not(:disabled) {
+  background: #ffdc85;
+  border-color: #ffdc85;
+}
+
+/* The title sits over the map (a colony paused behind it), dimmed. */
+.title-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: radial-gradient(ellipse at center, rgba(8, 10, 16, 0.55), rgba(8, 10, 16, 0.85));
+  pointer-events: auto;
+}
+
+.title-panel {
+  width: 460px;
+  max-width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.title-panel h1 {
+  margin: 0;
+  font-size: 30px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+.title-panel .tagline {
+  margin: 4px 0 18px;
+}
+
+.title-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.title-buttons button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 12px;
+  font-size: 15px;
+  text-align: left;
+}
+
+.title-buttons button .muted {
+  font-size: 11px;
+  font-weight: 400;
+  color: inherit;
+  opacity: 0.75;
+}
+
+/* Two-column tables: end-of-colony summary and the controls list. */
+.summary {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0 10px;
+}
+
+.summary td {
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.summary td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Settings: a label on the left, its control on the right. */
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting > span {
+  flex: 1;
+}
+
+.setting input[type='checkbox'] {
+  margin: 0;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.segmented {
+  display: flex;
+  gap: 2px;
+}
+
+.segmented button {
+  padding: 3px 8px;
+}
+
+.modal h3 {
+  margin: 14px 0 4px;
+}
+
+/* The dialog itself only takes focus so keyboard users start inside it; no ring needed. */
+.modal:focus {
+  outline: none;
 }

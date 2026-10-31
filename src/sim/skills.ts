@@ -56,7 +56,8 @@ export function learn(sim: Simulation, c: Colonist, skill: SkillKey, amount = 1)
     c.skillXp[skill] -= xpToNext(c.skills[skill]);
     c.skills[skill]++;
     const level = c.skills[skill];
-    const milestone = level >= 10 && level % 5 === 0;
+    // Reaching 10 is worth a notification; later milestones just go in the log.
+    const milestone = level === 10;
     sim.addLog(
       `${c.name} reached ${SKILL_LABELS[skill].toLowerCase()} ${level}.`,
       milestone ? 'good' : 'info',

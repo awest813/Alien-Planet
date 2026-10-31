@@ -22,11 +22,12 @@ import { MAX_SKILL, SKILL_LABELS, xpToNext } from '../sim/skills';
 import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
-import { NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
+import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
 import { Command, DesignationKind, LogEntry, Needs, Priorities, SKILL_KEYS, ScheduleSlot, Skills } from '../sim/types';
 import { Designation, GROW_ZONE, STOCKPILE_ZONE } from '../sim/world';
 import { Difficulty } from '../sim/storyteller';
 import { SaveMeta, deleteSave, listSaves, readSave, writeSave } from './save-store';
+import { Settings, loadSettings, storeSettings } from './settings';
 
 export type Tool =
   | { kind: 'select' }
@@ -68,14 +69,20 @@ export const TOOL_GROUPS: { key: ToolGroup; label: string }[] = [
   { key: 'security', label: 'Security' },
 ];
 
-const build = (key: string, label: string, hotkey: string, group: ToolDef['group'], hint: string): ToolDef => ({
-  id: key,
-  label,
-  hotkey,
-  tool: { kind: 'build', feature: featureId(key) },
-  group,
-  hint,
-});
+// Build tools list their materials straight from the building data, so hints can't drift.
+const build = (key: string, label: string, hotkey: string, group: ToolDef['group'], hint: string): ToolDef => {
+  const cost = (featureDef(featureId(key)).build?.cost ?? [])
+    .map((c) => `${c.count} ${itemDef(c.item).name.toLowerCase()}`)
+    .join(', ');
+  return {
+    id: key,
+    label,
+    hotkey,
+    tool: { kind: 'build', feature: featureId(key) },
+    group,
+    hint: cost ? `${hint} · costs ${cost}` : hint,
+  };
+};
 
 export const TOOLS: ToolDef[] = [
   {
@@ -182,39 +189,47 @@ export const TOOLS: ToolDef[] = [
     group: 'zones',
     hint: 'Drag to remove stockpile and growing zones',
   },
-  build('woodWall', 'Wood wall', 'b', 'structure', 'Drag a rectangle outline of walls (5 wood each)'),
-  build('stoneWall', 'Granite wall', 'n', 'structure', 'Drag a rectangle outline of walls (5 granite each)'),
-  build('door', 'Door', 'o', 'structure', 'Click a wall gap to place a door (10 wood)'),
-  build('bridge', 'Bridge', '', 'structure', 'Walkway over shallow or deep water (8 wood)'),
-  build('bed', 'Bed', 'e', 'furniture', 'Colonists sleep better in beds (20 wood)'),
-  build('fineBed', 'Fine bed', '', 'furniture', 'Prettier, and colonists rest 25% faster (20 wood, 10 cloth)'),
-  build('table', 'Table', 'l', 'furniture', 'Colonists dislike eating without a table (20 wood)'),
-  build('armchair', 'Armchair', 'h', 'furniture', 'Comfortable recreation and decor (10 wood, 6 cloth)'),
-  build('horseshoePin', 'Horseshoe pin', 'i', 'furniture', 'Recreation spot (15 granite)'),
-  build('stove', 'Stove', 'k', 'production', 'Cooks meals from raw food (20 granite)'),
-  build('craftingBench', 'Crafting bench', 'j', 'production', 'Weaves cloth and crafts bows (30 wood)'),
-  build('researchBench', 'Research bench', '', 'production', 'Where colonists research new technology (30 wood)'),
+  build('woodWall', 'Wood wall', 'b', 'structure', 'Drag a rectangle outline of walls'),
+  build('stoneWall', 'Granite wall', 'n', 'structure', 'Drag a rectangle outline of walls'),
+  build('door', 'Door', 'o', 'structure', 'Click a wall gap to place a door'),
+  build('bridge', 'Bridge', '', 'structure', 'Walkway over shallow or deep water'),
+  build('bed', 'Bed', 'e', 'furniture', 'Colonists sleep better in beds'),
+  build('fineBed', 'Fine bed', '', 'furniture', 'Prettier, and colonists rest 25% faster'),
+  build('table', 'Table', 'l', 'furniture', 'Colonists dislike eating without a table'),
+  build('armchair', 'Armchair', 'h', 'furniture', 'Comfortable recreation and decor'),
+  build('horseshoePin', 'Horseshoe pin', 'i', 'furniture', 'Recreation spot'),
+  build('stove', 'Stove', 'k', 'production', 'Cooks meals from raw food'),
+  build('craftingBench', 'Crafting bench', 'j', 'production', 'Weaves cloth and crafts bows'),
+  build('researchBench', 'Research bench', '', 'production', 'Where colonists research new technology'),
   build(
     'fishingSpot',
     'Fishing spot',
     '',
     'production',
-    'Build on the shore; hunters fish here when food runs short and all winter (10 wood)',
+    'Build on the shore; hunters fish here when food runs short and all winter',
   ),
   build('icebox', 'Icebox', '', 'production', 'Food storage that keeps food fresh while powered (50 W)'),
   build('sunLamp', 'Sun lamp', '', 'production', 'Crops nearby grow day and night, all year (300 W)'),
   build('woodGenerator', 'Wood generator', '', 'power', '1000 W while fuelled; haulers refuel it with wood'),
   build('solarPanel', 'Solar panel', '', 'power', 'Up to 1200 W in daylight, less in winter'),
   build('battery', 'Battery', '', 'power', 'Stores 8 kWh of spare power for the night'),
-  build('campfire', 'Campfire', 'f', 'climate', 'Heats the room it is in (15 wood)'),
-  build('hearth', 'Stone hearth', '', 'climate', 'A strong heater for cold winters (25 granite)'),
+  build('campfire', 'Campfire', 'f', 'climate', 'Heats the room it is in'),
+  build('hearth', 'Stone hearth', '', 'climate', 'A strong heater for cold winters'),
   build('electricHeater', 'Electric heater', '', 'climate', 'Strong heater, keeps rooms at 21°C (175 W)'),
   build('airConditioner', 'Air conditioner', '', 'climate', 'Cools a room to 20°C in hot weather (200 W)'),
   build('freezer', 'Freezer unit', '', 'climate', 'Chills a room to −6°C: a walk-in freezer for food (300 W)'),
-  build('sandbags', 'Sandbags', '', 'security', 'Cover: halves the chance of being hit from that side (4 granite)'),
+  build('sandbags', 'Sandbags', '', 'security', 'Cover: cuts the chance of being hit from that side to about a third'),
 ];
 
 export const SPEEDS = [0, 1, 2, 4];
+
+const WORK_NAMES: Partial<Record<keyof Priorities, string>> = {
+  mining: 'mining',
+  plantCutting: 'cutting plants',
+  construction: 'construction',
+  hunting: 'hunting',
+  handling: 'animal handling',
+};
 // Roughly how much nutrition a colonist eats per day.
 const DAILY_NUTRITION = 1.4;
 export const TICKS_PER_SECOND = 20;
@@ -356,9 +371,19 @@ export interface UiState {
   overlay: Overlay;
   saves: SaveMeta[];
   toast: string | null;
+  // Everyone has died.
+  fallen: boolean;
+  settings: Settings;
+  // Whether the player is playing this colony (false for the backdrop behind the title screen).
+  inPlay: boolean;
+  // The most recent save this version can load, for Continue.
+  latestSave: SaveMeta | null;
+  stats: { raidsRepelled: number; kills: number; tamed: number; wintersSurvived: number; built: number };
   notifications: Notification[];
   seed: number;
   difficulty: Difficulty;
+  // Tiles per side.
+  mapSize: number;
 }
 
 const toolId = (tool: Tool): string =>
@@ -376,8 +401,12 @@ export class GameController {
   // Incremented whenever `sim` is replaced, so the renderer knows to rebuild.
   public simVersion = 0;
   public focusRequest: number | null = null;
+  // The tiles the camera can see, kept up to date by the renderer (for the minimap).
+  public cameraView = { x0: 0, y0: 0, x1: 0, y1: 0 };
 
   private speedIndex = 1;
+  // Speed to restore when a menu that paused the game closes.
+  private heldSpeed: number | null = null;
   private resumeSpeed = 1;
   private accumulator = 0;
   private lastFrame = performance.now();
@@ -391,15 +420,63 @@ export class GameController {
   private storySeen = 0;
   // Tick at which each colonist last started idling, for the idle alert.
   private idleSince = new Map<number, number>();
+  // Set once everyone has died (the game pauses and offers a new colony).
+  private fallen = false;
   private state: UiState;
   private readonly listeners = new Set<() => void>();
 
   constructor() {
+    // A colony to look at behind the title screen; it only counts once the player starts playing.
     this.sim = Simulation.newColony(Math.floor(Math.random() * 1e9));
     this.focusRequest = this.sim.colonists[0].tile;
     this.storySeen = this.sim.storyLog.length;
     this.state = this.buildState();
     this.refreshSaves();
+    // Leaving the page (closing the tab, switching away on a phone) saves the colony.
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          this.autosave();
+        }
+      });
+    }
+  }
+
+  // Player preferences, remembered between visits.
+  public settings: Settings = loadSettings();
+  // False until the player starts, continues or loads a colony, and again after quitting to the title.
+  private inPlay = false;
+
+  public setSettings(patch: Partial<Settings>): void {
+    this.settings = { ...this.settings, ...patch };
+    storeSettings(this.settings);
+    this.publish();
+  }
+
+  private autosave(): void {
+    if (this.inPlay && this.settings.autosave && this.sim.living().length > 0) {
+      this.save('autosave', true);
+    }
+  }
+
+  // The most recent save made by this version of the game.
+  private latestSave(): SaveMeta | null {
+    return this.saves.filter((s) => s.version === SAVE_VERSION).sort((a, b) => b.savedAt - a.savedAt)[0] ?? null;
+  }
+
+  public async continueLatest(): Promise<boolean> {
+    const latest = this.latestSave();
+    return latest ? this.load(latest.slot) : false;
+  }
+
+  // Back to the title screen; the colony is autosaved first (if autosave is on) so Continue
+  // picks it up again.
+  public async quitToTitle(): Promise<void> {
+    if (this.inPlay && this.settings.autosave && this.sim.living().length > 0) {
+      await this.save('autosave', true);
+    }
+    this.inPlay = false;
+    this.publish();
   }
 
   // ---- React store interface ----
@@ -436,12 +513,23 @@ export class GameController {
     }
     for (const event of this.sim.events.splice(0)) {
       if (event === 'dawn') {
-        this.save('autosave', true);
-      } else if (event === 'raid') {
+        this.autosave();
+      } else if (event === 'raid' && this.settings.pauseOnRaid) {
         // Give the player a moment to react.
         this.setSpeed(0);
         this.notify('Game paused. Press Q to draft your colonists.');
+      } else if (
+        (event === 'death' || event === 'collapse') &&
+        this.settings.pauseOnEmergency &&
+        this.sim.living().length > 0
+      ) {
+        this.setSpeed(0);
+        this.notify(event === 'death' ? 'Game paused: a colonist has died.' : 'Game paused: a colonist collapsed.');
       }
+    }
+    if (this.sim.living().length === 0 && !this.fallen) {
+      this.fallen = true;
+      this.setSpeed(0);
     }
     if (this.toast && (this.toastTimer -= deltaMs) <= 0) {
       this.toast = null;
@@ -457,6 +545,7 @@ export class GameController {
   // ---- Player actions ----
 
   public command(cmd: Command): void {
+    this.commandCount++;
     this.sim.apply(cmd);
     this.publish();
   }
@@ -473,6 +562,22 @@ export class GameController {
     }
     this.tool = tool;
     this.publish();
+  }
+
+  // Pauses while a full-screen menu is open, then picks up at the speed the player had.
+  public holdPause(): void {
+    if (this.heldSpeed === null) {
+      this.heldSpeed = this.speedIndex;
+      this.setSpeed(0);
+    }
+  }
+
+  public releasePause(): void {
+    if (this.heldSpeed !== null) {
+      const speed = this.heldSpeed;
+      this.heldSpeed = null;
+      this.setSpeed(speed);
+    }
   }
 
   public setSpeed(index: number): void {
@@ -527,6 +632,16 @@ export class GameController {
     this.publish();
   }
 
+  // Selects the next living colonist after the current one and centres the view on them.
+  public cycleColonist(): void {
+    const living = this.sim.living();
+    if (living.length === 0) {
+      return;
+    }
+    const at = living.findIndex((c) => c.id === this.selectedColonist);
+    this.selectColonist(living[(at + 1) % living.length].id, true);
+  }
+
   public selectColonist(id: number | null, focus = false): void {
     this.selectedColonist = id;
     if (id !== null) {
@@ -546,11 +661,15 @@ export class GameController {
     }
   }
 
-  public newColony(seedText: string, difficulty: Difficulty = 'standard'): void {
+  // Set by the UI while a full-screen menu is open, so game hotkeys don't act behind it.
+  public modalOpen = false;
+
+  public newColony(seedText: string, difficulty: Difficulty = 'standard', size = MAP_SIZE): void {
     const trimmed = seedText.trim();
     const seed =
       trimmed === '' ? Math.floor(Math.random() * 1e9) : /^\d+$/.test(trimmed) ? Number(trimmed) : hashSeed(trimmed);
-    this.replaceSim(Simulation.newColony(seed, difficulty));
+    this.replaceSim(Simulation.newColony(seed, difficulty, size));
+    this.inPlay = true;
     this.notify(`New colony founded (seed ${seed}).`);
   }
 
@@ -574,13 +693,23 @@ export class GameController {
   private collectNotifications(now: number): void {
     const story = this.sim.storyLog;
     const before = this.notifications.length;
-    // The story log is capped, so track entries by count and clamp if it was trimmed.
-    this.storySeen = Math.min(this.storySeen, story.length);
-    for (const entry of story.slice(this.storySeen)) {
-      this.notifications.push({ id: this.nextNotification++, text: entry.text, tone: entry.tone, expires: now + 8000 });
+    // The story log is capped, so count entries ever written rather than its length.
+    const fresh = Math.min(this.sim.storyCount - this.storySeen, story.length);
+    for (const entry of story.slice(story.length - fresh)) {
+      this.notifications.push({
+        id: this.nextNotification++,
+        text: entry.text,
+        tone: entry.tone,
+        expires: now + this.settings.noticeSeconds * 1000,
+      });
     }
-    this.storySeen = story.length;
-    this.notifications = this.notifications.filter((n) => n.expires > now).slice(-4);
+    this.storySeen = this.sim.storyCount;
+    // Keep at most four cards; the oldest calm ones make way first, so danger is never pushed out.
+    this.notifications = this.notifications.filter((n) => n.expires > now);
+    while (this.notifications.length > 4) {
+      const calm = this.notifications.findIndex((n) => n.tone !== 'danger');
+      this.notifications.splice(calm >= 0 ? calm : 0, 1);
+    }
     if (this.notifications.length !== before) {
       this.publish();
     }
@@ -603,25 +732,35 @@ export class GameController {
         serialize(sim),
       );
       await this.refreshSaves();
-      this.notify(auto ? 'Autosaved.' : `Saved to ${slotLabel(slot).toLowerCase()}.`);
+      if (!auto) {
+        this.notify(`Saved to ${slotLabel(slot).toLowerCase()}.`);
+      }
     } catch (error) {
       console.error(error);
       this.notify('Saving failed.');
     }
   }
 
-  public async load(slot: string): Promise<void> {
+  // Returns whether the save loaded.
+  public async load(slot: string): Promise<boolean> {
     try {
       const data = await readSave(slot);
       if (!data) {
         this.notify(`Nothing saved in ${slotLabel(slot).toLowerCase()}.`);
-        return;
+        return false;
+      }
+      if (data.version !== SAVE_VERSION) {
+        this.notify('That save is from an older version and cannot be loaded.');
+        return false;
       }
       this.replaceSim(deserialize(data));
+      this.inPlay = true;
       this.notify(`Loaded ${slotLabel(slot).toLowerCase()}.`);
+      return true;
     } catch (error) {
       console.error(error);
-      this.notify('That save is from an older version and cannot be loaded.');
+      this.notify('That save could not be loaded.');
+      return false;
     }
   }
 
@@ -629,12 +768,20 @@ export class GameController {
     this.sim = sim;
     this.simVersion++;
     this.idleSince.clear();
+    // A colony started from the fallen screen shouldn't sit paused.
+    if (this.fallen) {
+      this.setSpeed(1);
+    }
+    this.fallen = false;
     this.selectedColonist = null;
     this.selectedTile = null;
+    // The new map may be smaller than the old one.
+    this.hoverTile = null;
+    this.hoverColonist = null;
     this.accumulator = 0;
     this.focusRequest = sim.colonists[0].tile;
     // Don't replay a loaded colony's history as notifications.
-    this.storySeen = sim.storyLog.length;
+    this.storySeen = sim.storyCount;
     this.notifications = [];
     this.publish();
   }
@@ -752,12 +899,12 @@ export class GameController {
       })),
       selectedColonist: this.selectedColonist,
       resources: totals.map((r) => ({ name: itemDef(r.item).name, stored: r.stored, total: r.total })),
-      objectives: OBJECTIVES.map((o) => ({
+      objectives: OBJECTIVES.filter((o) => !o.hidden?.(sim)).map((o) => ({
         id: o.id,
         label: o.label,
         phase: o.phase,
         done: !!sim.objectivesDone[o.id],
-        failed: o.id === 'night' && sim.firstNight === 'failed',
+        failed: sim.objectiveFailed(o.id),
         progress: o.progress?.(sim),
       })),
       bills: sim.bills.map((bill) => {
@@ -785,7 +932,7 @@ export class GameController {
           step: product.stackLimit === 1 ? 1 : 5,
         };
       }),
-      alerts: this.buildAlerts(totals),
+      alerts: this.alertsFor(totals),
       log: sim.log.slice(-12).reverse(),
       story: [...sim.storyLog].reverse(),
       raid:
@@ -806,13 +953,40 @@ export class GameController {
       overlay: this.overlay,
       saves: this.saves,
       toast: this.toast,
+      fallen: this.fallen,
+      settings: this.settings,
+      inPlay: this.inPlay,
+      latestSave: this.latestSave(),
+      stats: {
+        raidsRepelled: sim.stats.raidsRepelled,
+        kills: sim.stats.kills,
+        tamed: sim.stats.tamed,
+        wintersSurvived: sim.stats.wintersSurvived,
+        built: sim.stats.built,
+      },
       notifications: this.notifications.map(({ id, text, tone }) => ({ id, text, tone })),
       seed: sim.seed,
       difficulty: sim.story.difficulty,
+      mapSize: sim.world.width,
     };
   }
 
   // Problems worth the player's attention right now, most urgent first.
+  // Alerts scan the map, so they're worked out once per game tick, not on every mouse move.
+  private alertsFor(totals: ReturnType<Simulation['resourceTotals']>): Alert[] {
+    // Orders given while paused change alerts too, so they count as well as ticks.
+    const key = `${this.simVersion}:${this.sim.tick}:${this.commandCount}`;
+    if (key !== this.alertsKey) {
+      this.alertsKey = key;
+      this.alerts = this.buildAlerts(totals);
+    }
+    return this.alerts;
+  }
+
+  private alertsKey = '';
+  private commandCount = 0;
+  private alerts: Alert[] = [];
+
   private buildAlerts(totals: ReturnType<Simulation['resourceTotals']>): Alert[] {
     const sim = this.sim;
     const w = sim.world;
@@ -851,7 +1025,7 @@ export class GameController {
       alerts.push({ text: 'No medicine: grow healroot for better treatment', tone: 'warn' });
     }
     const untilWinter = daysUntilWinter(sim.totalHours);
-    if (untilWinter > 0 && untilWinter <= 3) {
+    if (untilWinter > 0 && untilWinter <= 5) {
       alerts.push({
         text: `Winter in ${Math.ceil(untilWinter)} day${untilWinter > 1 ? 's' : ''}: harvest crops and stock food`,
         tone: 'warn',
@@ -895,8 +1069,9 @@ export class GameController {
       });
     }
     const beds = sim.countFeature((f) => featureDef(f).bed);
-    if (sim.day > 1 && beds < sim.colonists.length) {
-      const missing = sim.colonists.length - beds;
+    const alive = sim.living().length;
+    if (sim.day > 1 && alive > 0 && beds < alive) {
+      const missing = alive - beds;
       alerts.push({ text: `${missing} colonist${missing > 1 ? 's' : ''} without a bed`, tone: 'warn' });
     }
     if (!sim.world.zone.some((z) => z === STOCKPILE_ZONE) && totals.some((t) => t.total > 0)) {
@@ -909,7 +1084,12 @@ export class GameController {
         outstanding.set(need.item, (outstanding.get(need.item) ?? 0) + need.count);
       }
     }
-    const source: Record<string, string> = { wood: 'chop trees (C)', stone: 'mine rock (M)' };
+    const source: Record<string, string> = {
+      wood: 'chop trees (C)',
+      stone: 'mine rock (M)',
+      cloth: 'weave cotton at a crafting bench',
+      leather: 'hunt animals (V)',
+    };
     for (const [item, count] of outstanding) {
       const short = count - totals[item - 1].total;
       if (short > 0) {
@@ -966,9 +1146,32 @@ export class GameController {
     });
     if (idle.length > 0) {
       const names = idle.map((c) => c.name).join(', ');
-      alerts.push({ text: `Nothing to do: ${names}. Designate more work.`, tone: 'warn' });
+      // Work waiting that nobody is allowed to do is a likelier cause than a lack of work.
+      const unstaffed = this.unstaffedWork();
+      alerts.push({
+        text:
+          unstaffed.length > 0
+            ? `Nothing to do: ${names}. Nobody is assigned to ${unstaffed.join(', ')} (Work screen).`
+            : `Nothing to do: ${names}. Designate more work.`,
+        tone: 'warn',
+      });
     }
     return alerts;
+  }
+
+  // Kinds of work that are waiting but that no living colonist has enabled.
+  private unstaffedWork(): string[] {
+    const sim = this.sim;
+    const w = sim.world;
+    const staffed = (work: keyof Priorities) => sim.living().some((c) => c.priorities[work] > 0);
+    const waiting: [keyof Priorities, boolean][] = [
+      ['mining', w.designation.includes(Designation.MINE)],
+      ['plantCutting', w.designation.includes(Designation.CHOP) || w.designation.includes(Designation.FORAGE)],
+      ['construction', w.blueprint.some((b) => b !== NONE) || w.designation.includes(Designation.DECONSTRUCT)],
+      ['hunting', sim.animals.some((a) => a.hunted)],
+      ['handling', sim.animals.some((a) => a.taming)],
+    ];
+    return waiting.filter(([work, has]) => has && !staffed(work)).map(([work]) => WORK_NAMES[work] ?? work);
   }
 
   private describeTile(i: number): TileView {

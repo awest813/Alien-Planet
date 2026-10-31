@@ -2,7 +2,7 @@ import { RaidState } from './combat';
 import { PowerState } from './power';
 import { ResearchState } from './research';
 import { Rng } from './rng';
-import { Simulation, StoryEntry } from './simulation';
+import { SimTimers, Simulation, StoryEntry } from './simulation';
 import { StoryState } from './storyteller';
 import {
   Animal,
@@ -26,7 +26,7 @@ import {
 } from './types';
 import { World } from './world';
 
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 10;
 
 interface SavedColonist {
   id: number;
@@ -53,6 +53,15 @@ interface SavedColonist {
   passions: Record<SkillKey, Passion>;
   weapon: ColonistWeapon;
   apparel: WornApparel | null;
+  // What they were doing in the moment: asleep, mid-cooldown, marching to a drafted spot.
+  sleeping: boolean;
+  restTicks: number;
+  restOutside: number;
+  restCold: number;
+  workStreak: number;
+  cooldown: number;
+  draftTarget: number;
+  path: number[];
   practicedAt?: Partial<Record<SkillKey, number>>;
 }
 
@@ -78,8 +87,10 @@ export interface SaveData {
     growth: Float32Array;
     fresh: Float32Array;
     quality: Float32Array;
+    damage: Float32Array;
     fuel: Float32Array;
-    temperature: Float32Array;
+    // Float64, so room temperatures come back exactly.
+    temperature: Float64Array;
   };
   colonists: SavedColonist[];
   bills: Bill[];
@@ -96,6 +107,8 @@ export interface SaveData {
   raid: RaidState | null;
   firstNight: NightResult;
   objectivesDone: Record<string, boolean>;
+  timers: SimTimers;
+  roomTemps: number[];
 }
 
 export function serialize(sim: Simulation): SaveData {
@@ -120,6 +133,7 @@ export function serialize(sim: Simulation): SaveData {
       growth: w.growth.slice(),
       fresh: w.fresh.slice(),
       quality: w.quality.slice(),
+      damage: w.damage.slice(),
       fuel: w.fuel.slice(),
       temperature: sim.tileTemperatures(),
     },
@@ -149,6 +163,15 @@ export function serialize(sim: Simulation): SaveData {
         passions: c.passions,
         weapon: c.weapon,
         apparel: c.apparel,
+        sleeping: c.sleeping,
+        restTicks: c.restTicks,
+        restOutside: c.restOutside,
+        restCold: c.restCold,
+        workStreak: c.workStreak,
+        cooldown: c.cooldown,
+        draftTarget: c.draftTarget,
+        // Only a drafted colonist's walk is an order; anyone else re-plans after loading.
+        path: c.drafted ? c.path : [],
         practicedAt: c.practicedAt,
       }),
     ),
@@ -166,6 +189,8 @@ export function serialize(sim: Simulation): SaveData {
     raid: structuredClone(sim.raid),
     firstNight: sim.firstNight,
     objectivesDone: { ...sim.objectivesDone },
+    timers: sim.exportTimers(),
+    roomTemps: sim.roomTemperatures(),
   };
 }
 
@@ -187,22 +212,15 @@ export function deserialize(data: SaveData): Simulation {
   world.growth.set(layers.growth);
   world.fresh.set(layers.fresh);
   world.quality.set(layers.quality);
+  world.damage.set(layers.damage);
   world.fuel.set(layers.fuel);
   world.structureVersion++;
 
   const colonists: Colonist[] = data.colonists.map((saved) => ({
     ...structuredClone(saved),
-    path: [],
     moveProgress: 0,
     job: null,
     reserved: [],
-    workStreak: 0,
-    sleeping: false,
-    restTicks: 0,
-    restOutside: 0,
-    restCold: 0,
-    draftTarget: -1,
-    cooldown: 0,
     practicedAt: saved.practicedAt ?? {},
   }));
 
@@ -212,6 +230,7 @@ export function deserialize(data: SaveData): Simulation {
   sim.stats = structuredClone(data.stats);
   sim.log = data.log.map((entry) => ({ ...entry }));
   sim.storyLog = structuredClone(data.storyLog);
+  sim.storyCount = sim.storyLog.length;
   // Saves from before difficulty settings play on standard.
   sim.story = { ...structuredClone(data.story), difficulty: data.story.difficulty ?? 'standard' };
   sim.enemies = structuredClone(data.enemies);
@@ -225,5 +244,7 @@ export function deserialize(data: SaveData): Simulation {
   sim.objectivesDone = { ...data.objectivesDone };
   sim.syncClock();
   sim.setTileTemperatures(layers.temperature);
+  sim.setRoomTemperatures(data.roomTemps);
+  sim.resumeAfterLoad(data.timers);
   return sim;
 }

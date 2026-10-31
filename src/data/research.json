@@ -2,7 +2,7 @@
   {
     "key": "archery",
     "name": "Archery",
-    "cost": 1200,
+    "cost": 900,
     "description": "Unlocks crafting recurve bows from leather."
   },
   {
@@ -15,7 +15,7 @@
   {
     "key": "hearths",
     "name": "Hearths",
-    "cost": 1200,
+    "cost": 800,
     "description": "Unlocks the stone hearth, a much stronger heater than a campfire."
   },
   {

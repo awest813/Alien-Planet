@@ -1,32 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { controller } from '../game/controller';
+import { helpSeen, markHelpSeen } from '../game/settings';
 import { useUiState } from './common';
 import { Architect, ColonistBar, HoverCard, Inspector, Notices, Screen, SidePanel, TopBar } from './hud';
-import { HelpScreen, Menu, ProductionScreen, ResearchScreen, ScheduleScreen, StoryScreen, WorkScreen } from './screens';
-
-const HELP_SEEN_KEY = 'colony-alpha:help-seen';
-
-// Browser storage can be unavailable (private mode, blocked site data), so never let it throw.
-function helpSeen(): boolean {
-  try {
-    return localStorage.getItem(HELP_SEEN_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function markHelpSeen(): void {
-  try {
-    localStorage.setItem(HELP_SEEN_KEY, '1');
-  } catch {
-    // Not remembered; the help panel will show again next time.
-  }
-}
+import { FallenScreen, MenuActions, PauseMenu, SettingsScreen, TitleScreen } from './menus';
+import { Minimap } from './minimap';
+import { HelpScreen, ProductionScreen, ResearchScreen, ScheduleScreen, StoryScreen, WorkScreen } from './screens';
 
 // Layout: top bar and colonist bar across the top, inspector on the left, alerts and goals on
-// the right, the architect menu along the bottom, and the map showing through the middle.
+// the right, the architect menu along the bottom, and the map showing through the middle. Before
+// a colony is under way, the title screen sits over the map instead.
 export function App() {
   const state = useUiState();
-  const [screen, setScreen] = useState<Screen>(() => (helpSeen() ? null : 'help'));
+  const onTitle = !state.inPlay;
+  const [screen, setScreen] = useState<Screen>(null);
   const close = () => {
     if (screen === 'help') {
       markHelpSeen();
@@ -34,33 +21,107 @@ export function App() {
     setScreen(null);
   };
 
+  const actions: MenuActions = {
+    // A new player gets the welcome help as their first colony starts.
+    onPlay: () => setScreen(helpSeen() ? null : 'help'),
+    onSettings: () => setScreen('settings'),
+    onHelp: () => setScreen('help'),
+    onTitle: () => {
+      setScreen(null);
+      controller.quitToTitle();
+    },
+  };
+
+  // Game hotkeys stand aside while any menu or screen is open.
+  const anyScreen = onTitle || screen !== null || state.fallen;
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setScreen(null);
+    controller.modalOpen = anyScreen;
+  }, [anyScreen]);
+
+  // The title screen, help, settings and the pause menu stop the clock while they're open.
+  const pausing = onTitle || screen === 'help' || screen === 'menu' || screen === 'settings';
+  useEffect(() => {
+    if (pausing) {
+      controller.holdPause();
+    } else {
+      controller.releasePause();
+    }
+  }, [pausing]);
+
+  // Escape peels back one layer at a time: an open screen, then the current tool, then the
+  // selection, and finally opens the pause menu.
+  const latest = useRef({ screen, onTitle });
+  latest.current = { screen, onTitle };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') {
+        return;
+      }
+      const open = latest.current.screen;
+      if (open) {
+        if (open === 'help') {
+          markHelpSeen();
+        }
+        setScreen(null);
+      } else if (latest.current.onTitle || controller.getState().fallen) {
+        // Nothing to back out of.
+      } else if (controller.tool.kind !== 'select') {
+        controller.setTool({ kind: 'select' });
+      } else if (controller.selectedColonist !== null || controller.selectedTile !== null) {
+        controller.selectColonist(null);
+        controller.selectTile(null);
+      } else {
+        setScreen('menu');
+      }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Interface size: scale everything from the top-left corner and give it the room to fill.
+  const scale = state.settings.uiScale;
+  const scaled =
+    scale === 1
+      ? undefined
+      : {
+          transform: `scale(${scale})`,
+          transformOrigin: '0 0',
+          width: `${100 / scale}vw`,
+          height: `${100 / scale}vh`,
+          right: 'auto',
+          bottom: 'auto',
+        };
+
   return (
-    <div className="ui">
-      <TopBar state={state} onOpen={setScreen} />
-      <ColonistBar state={state} />
-      <div className="left-column">
-        <Inspector state={state} />
-      </div>
-      <div className="right-column">
-        <SidePanel state={state} />
-      </div>
-      <div className="bottom">
-        <HoverCard state={state} />
-        <Architect state={state} />
-      </div>
-      <Notices state={state} />
-      {screen === 'menu' && <Menu state={state} onClose={close} />}
-      {screen === 'work' && <WorkScreen state={state} onClose={close} />}
-      {screen === 'schedule' && <ScheduleScreen state={state} onClose={close} />}
-      {screen === 'production' && <ProductionScreen state={state} onClose={close} />}
-      {screen === 'research' && <ResearchScreen state={state} onClose={close} />}
-      {screen === 'story' && <StoryScreen state={state} onClose={close} />}
+    <div className="ui" style={scaled}>
+      {onTitle ? (
+        <TitleScreen state={state} actions={actions} />
+      ) : (
+        <>
+          <TopBar state={state} onOpen={setScreen} />
+          <ColonistBar state={state} />
+          <div className="left-column">
+            <Inspector state={state} />
+          </div>
+          <div className="right-column">
+            <SidePanel state={state} />
+            {state.settings.showMinimap && <Minimap />}
+          </div>
+          <div className="bottom">
+            <HoverCard state={state} />
+            <Architect state={state} />
+          </div>
+          <Notices state={state} />
+          {state.fallen && !screen && <FallenScreen state={state} actions={actions} />}
+          {screen === 'menu' && <PauseMenu state={state} onClose={close} actions={actions} />}
+          {screen === 'work' && <WorkScreen state={state} onClose={close} />}
+          {screen === 'schedule' && <ScheduleScreen state={state} onClose={close} />}
+          {screen === 'production' && <ProductionScreen state={state} onClose={close} />}
+          {screen === 'research' && <ResearchScreen state={state} onClose={close} />}
+          {screen === 'story' && <StoryScreen state={state} onClose={close} />}
+        </>
+      )}
+      {screen === 'settings' && <SettingsScreen state={state} onClose={close} />}
       {screen === 'help' && <HelpScreen onClose={close} />}
     </div>
   );

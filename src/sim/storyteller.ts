@@ -1,4 +1,4 @@
-import { MAX_ANIMALS, herdArrives, wildCount } from './animals';
+import { herdArrives, wildCap, wildCount } from './animals';
 import { spawnRaid } from './combat';
 import { TICKS_PER_HOUR } from './constants';
 import { ANIMALS, FACTIONS, NONE, featureDef, itemId } from './defs';
@@ -118,7 +118,7 @@ const EVENTS: EventDef[] = [
     key: 'herd',
     minDay: 2,
     cooldownDays: 4,
-    weight: (sim) => (wildCount(sim) < MAX_ANIMALS - 3 ? 1 : 0),
+    weight: (sim) => (wildCount(sim) < wildCap(sim) - 3 ? 1 : 0),
     run: (sim) => {
       const count = herdArrives(sim);
       if (count === 0) {
@@ -176,8 +176,11 @@ const EVENTS: EventDef[] = [
           lost++;
         }
       }
+      if (lost === 0) {
+        return false;
+      }
       sim.addLog(`Blight has struck the fields. ${lost} plants withered.`, 'warn', true);
-      return lost > 0;
+      return true;
     },
   },
 ];
@@ -214,7 +217,16 @@ export function updateStoryteller(sim: Simulation): void {
     if (roll <= 0) {
       if (event.run(sim)) {
         story.lastEventTick = sim.tick;
-        story.cooldowns[event.key] = sim.tick + event.cooldownDays * DAY;
+        // Raids don't arrive like clockwork: up to two extra days on top of the cooldown (half a day
+        // on harsh, which keeps the pressure on).
+        const maxSpread = story.difficulty === 'harsh' ? DAY / 2 : 2 * DAY;
+        const spread = event.key === 'raid' ? Math.floor(sim.rng.next() * maxSpread) : 0;
+        story.cooldowns[event.key] = sim.tick + event.cooldownDays * DAY + spread;
+        // Give the colony half a day between a raid and an illness, either way round.
+        const other = event.key === 'raid' ? 'disease' : event.key === 'disease' ? 'raid' : null;
+        if (other) {
+          story.cooldowns[other] = Math.max(story.cooldowns[other] ?? 0, sim.tick + DAY / 2);
+        }
       }
       return;
     }

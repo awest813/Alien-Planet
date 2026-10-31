@@ -1,10 +1,13 @@
-import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
+import { MAP_SIZE, MOVE_SPEED, TICKS_PER_HOUR } from './constants';
 import { ANIMALS, itemId } from './defs';
 import { damage } from './health';
 import type { Simulation } from './simulation';
 import { Animal, Colonist } from './types';
 
+// Wild animals on the standard 64×64 map; bigger maps hold proportionally more.
 export const MAX_ANIMALS = 18;
+
+export const wildCap = (sim: Simulation) => Math.round((MAX_ANIMALS * sim.world.size) / (MAP_SIZE * MAP_SIZE));
 const BITE_COOLDOWN = 50;
 const WANDER_RADIUS = 6;
 // An enraged animal calms down after this long.
@@ -59,7 +62,7 @@ export function populateWildlife(sim: Simulation, count: number, avoid: number):
 // A small herd wanders in from the map edge. Returns how many arrived.
 export function herdArrives(sim: Simulation): number {
   const region = sim.outsideRegion();
-  if (region === undefined || wildCount(sim) >= MAX_ANIMALS) {
+  if (region === undefined || wildCount(sim) >= wildCap(sim)) {
     return 0;
   }
   const w = sim.world;
@@ -76,7 +79,7 @@ export function herdArrives(sim: Simulation): number {
     return 0;
   }
   const kind = pickKind(sim);
-  const count = Math.min(MAX_ANIMALS - wildCount(sim), sim.rng.int(3, 5));
+  const count = Math.min(wildCap(sim) - wildCount(sim), sim.rng.int(3, 5));
   for (let n = 0; n < count; n++) {
     addAnimal(sim, edge, kind);
   }
@@ -173,9 +176,20 @@ function guard(sim: Simulation, a: Animal): boolean {
     raider.hp -= def.bite[0] + sim.rng.next() * (def.bite[1] - def.bite[0]);
     if (raider.hp <= 0) {
       sim.addLog(`A tame ${def.name.toLowerCase()} brought down ${raider.name}!`, 'good');
+      sim.stats.kills++;
       if (sim.raid) {
         sim.raid.killed++;
       }
+    }
+  }
+  // The raider fights back.
+  if (raider.hp > 0 && sim.rng.next() < 0.6) {
+    sim.shots.push({ from: raider.tile, to: a.tile, hit: true, ranged: false, tick: sim.tick });
+    a.hp -= 0.1 + sim.rng.next() * 0.12;
+    if (a.hp <= 0) {
+      sim.world.dropItemNear(a.tile, itemId('rawMeat'), Math.floor(def.meat / 2));
+      sim.world.dropItemNear(a.tile, itemId('leather'), def.leather);
+      sim.addLog(`${raider.name} killed a tame ${def.name.toLowerCase()}.`, 'warn');
     }
   }
   a.cooldown = BITE_COOLDOWN;

@@ -198,7 +198,11 @@ export function checkHealth(sim: Simulation, c: Colonist): void {
   if (downed && !h.downed) {
     sim.endJob(c);
     sim.dropCarried(c);
-    sim.addLog(`${c.name} has collapsed and needs a doctor.`, 'danger', true);
+    // In a raid, collapses go to the log only; the raid's own card covers it.
+    sim.addLog(`${c.name} has collapsed and needs a doctor.`, 'danger', !sim.raid);
+    if (!sim.raid) {
+      sim.events.push('collapse');
+    }
   } else if (!downed && h.downed) {
     sim.addLog(`${c.name} is back on their feet.`, 'good');
   }
@@ -220,6 +224,7 @@ function die(sim: Simulation, c: Colonist, cause: string): void {
   c.health.downed = false;
   c.drafted = false;
   sim.addLog(`${c.name} has died of ${cause}.`, 'danger', true);
+  sim.events.push('death');
   for (const other of sim.living()) {
     if (other.lover === c.id) {
       other.lover = -1;
