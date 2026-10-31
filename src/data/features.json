@@ -526,5 +526,34 @@
       ],
       "work": 60
     }
+  },
+  {
+    "key": "stonecutterTable",
+    "name": "Stonecutter's table",
+    "workbench": "stonecutting",
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 30
+        }
+      ],
+      "work": 160
+    }
+  },
+  {
+    "key": "blockWall",
+    "name": "Block wall",
+    "blocksRoom": true,
+    "beauty": 1,
+    "build": {
+      "cost": [
+        {
+          "item": "stoneBlocks",
+          "count": 5
+        }
+      ],
+      "work": 360
+    }
   }
 ]

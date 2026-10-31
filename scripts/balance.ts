@@ -304,6 +304,9 @@ function play(seed: number): Result {
     coldSnap: count(/cold snap/),
     supplies: count(/gift of supplies/),
     blight: count(/Blight/),
+    caravan: count(/^Traders from .* on their way/),
+    lightning: count(/^Lightning struck/),
+    burned: burnCounts.get(sim) ?? 0,
   };
   return {
     seed,
@@ -333,6 +336,8 @@ function play(seed: number): Result {
 
 // Mental breaks aren't story entries, so count them via a wrapped logger.
 const breakCounts = new WeakMap<Simulation, number>();
+// Buildings and plants lost to fire aren't story entries either.
+const burnCounts = new WeakMap<Simulation, number>();
 function countBreaks(sim: Simulation): number {
   return breakCounts.get(sim) ?? 0;
 }
@@ -340,6 +345,9 @@ const originalAddLog = Simulation.prototype.addLog;
 Simulation.prototype.addLog = function (this: Simulation, text, tone, story) {
   if (text.includes('in a daze')) {
     breakCounts.set(this, (breakCounts.get(this) ?? 0) + 1);
+  }
+  if (text.startsWith('Fire destroyed')) {
+    burnCounts.set(this, (burnCounts.get(this) ?? 0) + 1);
   }
   if (trace && text.includes('has died')) {
     console.log(`  --- trace day ${this.day} ${Math.floor(this.hour)}h: ${text}`);

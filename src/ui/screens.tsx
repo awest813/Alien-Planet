@@ -170,12 +170,23 @@ export function ProductionScreen({ state, onClose }: { state: UiState; onClose: 
                   {bill.minSkill && <span className="tag">needs {bill.minSkill}</span>}
                 </div>
               </td>
-              <td className="muted">{bill.stock} in stock</td>
-              <td>
-                <button onClick={() => set(bill.recipe, bill.target - bill.step)}>−{bill.step}</button>
-                <span className="target">Keep {bill.target}</span>
-                <button onClick={() => set(bill.recipe, bill.target + bill.step)}>+{bill.step}</button>
-              </td>
+              <td className="muted">{bill.mend ? `${bill.stock} worn` : `${bill.stock} in stock`}</td>
+              {bill.mend ? (
+                <td>
+                  <button
+                    className={bill.target > 0 ? 'active' : ''}
+                    onClick={() => set(bill.recipe, bill.target > 0 ? 0 : 1)}
+                  >
+                    {bill.target > 0 ? 'Mending' : 'Paused'}
+                  </button>
+                </td>
+              ) : (
+                <td>
+                  <button onClick={() => set(bill.recipe, bill.target - bill.step)}>−{bill.step}</button>
+                  <span className="target">Keep {bill.target}</span>
+                  <button onClick={() => set(bill.recipe, bill.target + bill.step)}>+{bill.step}</button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -239,6 +250,12 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
         winter: cold beyond what colonists wear builds into hypothermia, and a skilled cook makes fine meals that rarely
         make anyone sick. <b>Tame</b> deer for milk and boars as guards (Handle work type); tame pairs breed.
       </p>
+      <p className="muted">
+        Watch the weather in the top bar: rain chills anyone outside, droughts stunt crops, and storms bring lightning
+        that can start fires (haulers and builders put them out). When traders arrive, <b>Trade</b> lights up in the top
+        bar: sell surplus from your stockpiles for silver and buy what you're short of. A stonecutter's table makes
+        blocks for block walls, and a crafting bench mends worn clothes once you know tailoring.
+      </p>
     </Modal>
   );
 }
@@ -281,6 +298,24 @@ export function ResearchScreen({ state, onClose }: { state: UiState; onClose: ()
 export function StoryScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
   return (
     <Modal title="The story so far" onClose={onClose}>
+      <h3>Factions</h3>
+      <table className="summary">
+        <tbody>
+          {state.factions.map((f) => (
+            <tr key={f.name}>
+              <td>
+                <b>{f.name}</b>
+                <div className="muted small">{f.description}</div>
+              </td>
+              <td className="num">
+                {f.relation}
+                {f.goodwill !== null && <span className="muted"> ({f.goodwill})</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <h3>Events</h3>
       <ul className="story">
         {state.story.map((entry, index) => (
           <li key={index} className={entry.tone}>

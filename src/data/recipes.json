@@ -3,94 +3,151 @@
     "key": "cookMeal",
     "name": "Cook simple meal",
     "bench": "cooking",
-    "ingredient": {
-      "category": "rawFood",
-      "count": 6
-    },
     "product": {
       "item": "meal",
       "count": 1
     },
     "work": 120,
-    "defaultTarget": 10
+    "defaultTarget": 10,
+    "ingredients": [
+      {
+        "category": "rawFood",
+        "count": 6
+      }
+    ]
   },
   {
     "key": "cookFineMeal",
     "name": "Cook fine meal",
     "bench": "cooking",
-    "ingredient": {
-      "category": "rawFood",
-      "count": 10
-    },
     "product": {
       "item": "fineMeal",
       "count": 1
     },
     "work": 220,
     "defaultTarget": 4,
-    "minSkill": 6
+    "minSkill": 6,
+    "ingredients": [
+      {
+        "foodKind": "meat",
+        "count": 4
+      },
+      {
+        "foodKind": "veg",
+        "count": 4
+      }
+    ]
   },
   {
     "key": "weaveCloth",
     "name": "Weave cloth",
     "bench": "crafting",
-    "ingredient": {
-      "item": "cotton",
-      "count": 6
-    },
     "product": {
       "item": "cloth",
       "count": 4
     },
     "work": 160,
-    "defaultTarget": 20
+    "defaultTarget": 20,
+    "ingredients": [
+      {
+        "item": "cotton",
+        "count": 6
+      }
+    ]
   },
   {
     "key": "craftBow",
     "name": "Craft recurve bow",
     "bench": "crafting",
-    "ingredient": {
-      "item": "leather",
-      "count": 6
-    },
     "product": {
       "item": "recurveBow",
       "count": 1
     },
     "work": 300,
     "defaultTarget": 2,
-    "research": "archery"
+    "research": "archery",
+    "ingredients": [
+      {
+        "item": "leather",
+        "count": 6
+      }
+    ]
   },
   {
     "key": "tailorTunic",
     "name": "Tailor tunic",
     "bench": "crafting",
-    "ingredient": {
-      "item": "cloth",
-      "count": 15
-    },
     "product": {
       "item": "tunic",
       "count": 1
     },
     "work": 400,
     "defaultTarget": 1,
-    "research": "tailoring"
+    "research": "tailoring",
+    "ingredients": [
+      {
+        "item": "cloth",
+        "count": 15
+      }
+    ]
   },
   {
     "key": "tailorParka",
     "name": "Tailor parka",
     "bench": "crafting",
-    "ingredient": {
-      "item": "leather",
-      "count": 20
-    },
     "product": {
       "item": "parka",
       "count": 1
     },
     "work": 600,
     "defaultTarget": 2,
+    "research": "tailoring",
+    "ingredients": [
+      {
+        "item": "leather",
+        "count": 20
+      }
+    ]
+  },
+  {
+    "key": "cutBlocks",
+    "name": "Cut granite blocks",
+    "bench": "stonecutting",
+    "ingredients": [
+      {
+        "item": "stone",
+        "count": 1
+      }
+    ],
+    "product": {
+      "item": "stoneBlocks",
+      "count": 2
+    },
+    "work": 90,
+    "defaultTarget": 30
+  },
+  {
+    "key": "mendApparel",
+    "name": "Mend worn clothes",
+    "bench": "crafting",
+    "ingredients": [
+      {
+        "category": "apparel",
+        "worn": true,
+        "count": 1
+      },
+      {
+        "item": "cloth",
+        "count": 4
+      }
+    ],
+    "mend": true,
+    "product": {
+      "item": "tunic",
+      "count": 1
+    },
+    "work": 260,
+    "defaultTarget": 1,
     "research": "tailoring"
   }
 ]

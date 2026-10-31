@@ -14,6 +14,8 @@ export interface Settings {
   // Name labels over colonists and raiders.
   showNames: boolean;
   showMinimap: boolean;
+  // The screen flash when lightning strikes.
+  lightningFlashes: boolean;
   // How long notification cards stay up.
   noticeSeconds: number;
   // Keyboard panning speed, as a multiple of normal.
@@ -23,6 +25,14 @@ export interface Settings {
   newMapSize: number;
 }
 
+function prefersReducedMotion(): boolean {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   autosave: true,
   pauseOnRaid: true,
@@ -30,6 +40,8 @@ export const DEFAULT_SETTINGS: Settings = {
   uiScale: 1,
   showNames: true,
   showMinimap: true,
+  // Off for anyone whose system asks for less motion.
+  lightningFlashes: !prefersReducedMotion(),
   noticeSeconds: 8,
   panSpeed: 1,
   newDifficulty: 'standard',

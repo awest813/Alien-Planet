@@ -90,6 +90,8 @@ describe('cooking', () => {
     const { x, y } = clearAround(sim, 10);
     w.setFeature(w.idx(x + 3, y), featureId('stove'));
     w.dropItemNear(w.idx(x, y + 3), itemId('potatoes'), 120);
+    // Fine meals need meat or fish as well as vegetables.
+    w.dropItemNear(w.idx(x - 3, y + 3), itemId('rawMeat'), 40);
     const fine = sim.bills.findIndex((b) => b.recipe === 1);
     sim.bills[0].target = 0;
     sim.bills[fine].target = 5;
@@ -150,5 +152,77 @@ describe('saving', () => {
     expect(copy.colonists[0].apparel).toEqual(sim.colonists[0].apparel);
     expect(copy.colonists[0].health.hypothermia).toBeCloseTo(0.3);
     expect(copy.world.quality[tile]).toBeCloseTo(w.quality[tile]);
+  });
+});
+
+describe('richer production', () => {
+  function workshop(seed: number) {
+    const sim = Simulation.newColony(seed);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    for (const c of sim.colonists) {
+      c.needs.food = 1;
+      c.priorities.crafting = 1;
+      c.priorities.cooking = 1;
+      c.skills.cooking = 10;
+      c.skills.crafting = 10;
+    }
+    return { sim, w, x, y };
+  }
+
+  it('cooks fine meals only with both meat and vegetables', () => {
+    const { sim, w, x, y } = workshop(21);
+    w.setFeature(w.idx(x + 3, y), featureId('stove'));
+    w.dropItemNear(w.idx(x, y + 3), itemId('potatoes'), 60);
+    sim.bills[0].target = 0;
+    run(sim, HOUR * 4);
+    expect(sim.stockOf(itemId('fineMeal'))).toBe(0);
+    w.dropItemNear(w.idx(x - 3, y + 3), itemId('rawFish'), 30);
+    run(sim, HOUR * 6);
+    expect(sim.stockOf(itemId('fineMeal'))).toBeGreaterThan(0);
+  });
+
+  it('cuts granite into blocks at a stonecutter', () => {
+    const { sim, w, x, y } = workshop(22);
+    w.setFeature(w.idx(x + 3, y), featureId('stonecutterTable'));
+    w.dropItemNear(w.idx(x, y + 3), itemId('stone'), 20);
+    run(sim, HOUR * 4);
+    expect(sim.stockOf(itemId('stoneBlocks'))).toBeGreaterThan(0);
+  });
+
+  it('mends worn clothing, keeping its quality', () => {
+    const { sim, w, x, y } = workshop(23);
+    sim.research.done.push('tailoring');
+    w.setFeature(w.idx(x + 3, y), featureId('craftingBench'));
+    const tile = w.idx(x - 2, y + 3);
+    w.addItem(tile, PARKA, 1, 0.3, 15);
+    // A warm summer day, so nobody wants to wear the parka instead of mending it.
+    setHour(sim, (t) => t > 22 && sim.hour >= 9 && sim.hour < 12);
+    sim.syncClock();
+    w.dropItemNear(w.idx(x + 1, y + 4), itemId('cloth'), 10);
+    run(sim, HOUR * 6);
+    const parka = [...w.tilesWith('items')].find((i) => w.itemType[i] === PARKA);
+    const worn = sim.colonists.find((c) => c.apparel?.item === PARKA)?.apparel;
+    const wear = parka !== undefined ? w.fresh[parka] : worn?.wear;
+    const quality = parka !== undefined ? w.quality[parka] : worn?.quality;
+    expect(wear).toBeGreaterThan(0.9);
+    expect(quality).toBeCloseTo(15);
+  });
+
+  it('drops half-gathered ingredients instead of losing them', () => {
+    const { sim, w, x, y } = workshop(24);
+    w.setFeature(w.idx(x + 3, y), featureId('stove'));
+    w.dropItemNear(w.idx(x, y + 3), itemId('potatoes'), 30);
+    w.dropItemNear(w.idx(x - 3, y + 3), itemId('rawMeat'), 30);
+    const food = () => sim.stockOf(itemId('potatoes')) + sim.stockOf(itemId('rawMeat'));
+    const before = food();
+    sim.bills[0].target = 0;
+    run(sim, 60);
+    for (const c of sim.colonists) {
+      sim.dropCarried(c);
+      sim.endJob(c);
+    }
+    // Whatever was gathered is back on the ground (nothing was cooked in that time).
+    expect(food()).toBe(before);
   });
 });

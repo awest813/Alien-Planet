@@ -1,6 +1,7 @@
 import diseasesJson from '../data/diseases.json';
 import { TICKS_PER_HOUR } from './constants';
 import { comfortRange } from './apparel';
+import { WET_CHILL, isWet } from './weather';
 import { itemId } from './defs';
 import { FRIEND_OPINION, mutualOpinion, traitFactor, traitValue } from './social';
 import type { Simulation } from './simulation';
@@ -15,7 +16,7 @@ interface DiseaseDef {
 
 export const DISEASES: Record<string, DiseaseDef> = diseasesJson;
 
-export type DamageKind = 'arrow' | 'cut' | 'bruise';
+export type DamageKind = 'arrow' | 'cut' | 'bruise' | 'burn';
 
 const DEFAULT_PAIN_THRESHOLD = 0.8;
 // Bleeding per hour as a fraction of the wound's severity.
@@ -77,7 +78,8 @@ export function updateExposure(sim: Simulation, c: Colonist, hours: number): voi
   if (h.dead) {
     return;
   }
-  const t = sim.temperatureAt(c.tile);
+  // Rain soaks through clothes: out in it, it feels colder.
+  const t = sim.temperatureAt(c.tile) - (isWet(sim, c.tile) ? WET_CHILL : 0);
   const { min, max } = comfortRange(c);
   h.hypothermia =
     t < min
@@ -94,8 +96,10 @@ export function damage(sim: Simulation, c: Colonist, amount: number, kind: Damag
     return;
   }
   const severity = amount * traitFactor(c, 'damageTaken');
-  const label = kind === 'arrow' ? 'Arrow wound' : kind === 'cut' ? 'Cut' : 'Bruise';
-  c.health.injuries.push({ label, severity, bleeding: kind === 'bruise' ? 0 : severity * BLEED_RATE, tended: 0 });
+  const label = { arrow: 'Arrow wound', cut: 'Cut', bruise: 'Bruise', burn: 'Burn' }[kind];
+  // Bruises and burns hurt but don't bleed.
+  const bleeds = kind === 'arrow' || kind === 'cut';
+  c.health.injuries.push({ label, severity, bleeding: bleeds ? severity * BLEED_RATE : 0, tended: 0 });
   checkHealth(sim, c);
 }
 
@@ -213,7 +217,7 @@ function die(sim: Simulation, c: Colonist, cause: string): void {
   sim.endJob(c);
   sim.dropCarried(c);
   if (c.weapon === 'recurveBow') {
-    sim.world.dropItemNear(c.tile, itemId('recurveBow'), 1);
+    sim.world.dropItemNear(c.tile, itemId('recurveBow'), 1, undefined, c.weaponQuality);
     c.weapon = 'bow';
   }
   if (c.apparel) {

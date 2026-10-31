@@ -53,6 +53,20 @@ describe('defences', () => {
     expect(coverFactor(w, w.idx(9, 4), target)).toBe(1);
   });
 
+  it('has a colonist trade up to a clearly better-made bow', () => {
+    const sim = Simulation.newColony(12);
+    for (const c of sim.colonists) {
+      c.weapon = 'recurveBow';
+      c.weaponQuality = 5;
+    }
+    sim.world.dropItemNear(sim.colonists[0].tile, itemId('recurveBow'), 1, undefined, 15);
+    run(sim, 400);
+    expect(sim.colonists.filter((c) => c.weaponQuality === 15)).toHaveLength(1);
+    // The old bow is left for someone else, and nobody swaps for one no better than their own.
+    expect(sim.stockOf(itemId('recurveBow'))).toBe(1);
+    expect(sim.colonists.filter((c) => c.weaponQuality === 5)).toHaveLength(sim.colonists.length - 1);
+  });
+
   it('has colonists pick up a recurve bow from storage', () => {
     const sim = Simulation.newColony(3);
     sim.world.dropItemNear(sim.colonists[0].tile, itemId('recurveBow'), 2);

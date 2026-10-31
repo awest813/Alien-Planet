@@ -13,7 +13,7 @@ import traitsJson from '../data/traits.json';
 // simulation can store the world in compact typed arrays.
 
 export type WorkType = 'mine' | 'chop' | 'forage';
-export type BenchType = 'cooking' | 'crafting';
+export type BenchType = 'cooking' | 'crafting' | 'stonecutting';
 
 export interface TerrainDef {
   id: number;
@@ -38,6 +38,10 @@ export interface ItemDef {
   shelfLife?: number;
   // A meal good enough to lift the mood.
   fine: boolean;
+  // For raw food: what kind it is, for recipes that want a mix.
+  foodKind?: 'meat' | 'veg' | 'dairy';
+  // Worth in silver, for trade.
+  value: number;
   // Clothing: how many degrees it widens the comfortable range, and how long it lasts.
   apparel?: ApparelSpec;
 }
@@ -113,14 +117,30 @@ export interface RecipeDef {
   key: string;
   name: string;
   bench: BenchType;
-  ingredient: { item?: number; category?: string; count: number };
+  // Everything one batch consumes, gathered one ingredient at a time.
+  ingredients: Ingredient[];
   product: Cost;
+  // Repairs the worn clothing it's given rather than making something new.
+  mend: boolean;
   work: number;
   defaultTarget: number;
   research?: string;
   // Lowest skill a colonist needs to work this bill.
   minSkill: number;
 }
+
+// One ingredient line: a specific item, any item of a category, or any raw food of a kind;
+// `worn` asks for clothing that has seen better days.
+export interface Ingredient {
+  item?: number;
+  category?: string;
+  foodKind?: string;
+  worn?: boolean;
+  count: number;
+}
+
+// Below this much wear left, clothing can be mended.
+export const MENDABLE = 0.6;
 
 export interface ThoughtDef {
   key: string;
@@ -169,6 +189,8 @@ interface RawItem {
   shelfLife?: number;
   fine?: boolean;
   apparel?: ApparelSpec;
+  foodKind?: 'meat' | 'veg' | 'dairy';
+  value?: number;
 }
 
 // Quality of food and goods made by an average hand (and of anything found or gifted).
@@ -189,6 +211,8 @@ export const ITEMS: ItemDef[] = (itemsJson as RawItem[]).map((t, i) => ({
   shelfLife: t.shelfLife,
   fine: !!t.fine,
   apparel: t.apparel,
+  foodKind: t.foodKind,
+  value: t.value ?? 1,
 }));
 
 const itemIdByKey = new Map(ITEMS.map((item) => [item.key, item.id]));
@@ -248,17 +272,28 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
 // Blueprints track delivered materials per cost line; no building needs more than this many.
 export const MAX_COST_LINES = Math.max(...FEATURES.map((f) => f.build?.cost.length ?? 0));
 
+interface RawIngredient {
+  item?: string;
+  category?: string;
+  foodKind?: string;
+  worn?: boolean;
+  count: number;
+}
+
 export const RECIPES: RecipeDef[] = recipesJson.map((r, i) => ({
   id: i,
   key: r.key,
   name: r.name,
   bench: r.bench as BenchType,
-  ingredient: {
-    item: 'item' in r.ingredient ? resolveItem(r.ingredient.item as string) : undefined,
-    category: 'category' in r.ingredient ? (r.ingredient.category as string) : undefined,
-    count: r.ingredient.count,
-  },
+  ingredients: (r.ingredients as RawIngredient[]).map((ing) => ({
+    item: ing.item !== undefined ? resolveItem(ing.item) : undefined,
+    category: ing.category,
+    foodKind: ing.foodKind,
+    worn: !!ing.worn,
+    count: ing.count,
+  })),
   product: { item: resolveItem(r.product.item), count: r.product.count },
+  mend: 'mend' in r && !!r.mend,
   work: r.work,
   defaultTarget: r.defaultTarget,
   research: 'research' in r ? (r.research as string) : undefined,
@@ -281,8 +316,12 @@ export const itemId = (key: string): number => resolveItem(key);
 export const featureId = (key: string): number => featureIdByKey.get(key)!;
 
 // Whether an item satisfies a recipe ingredient.
-export const matchesIngredient = (item: number, ingredient: RecipeDef['ingredient']): boolean =>
-  ingredient.item !== undefined ? item === ingredient.item : itemDef(item).category === ingredient.category;
+export const matchesIngredient = (item: number, ingredient: Ingredient): boolean =>
+  ingredient.item !== undefined
+    ? item === ingredient.item
+    : ingredient.foodKind !== undefined
+      ? itemDef(item).foodKind === ingredient.foodKind
+      : itemDef(item).category === ingredient.category;
 
 export const isFood = (item: number): boolean => itemDef(item).nutrition > 0;
 

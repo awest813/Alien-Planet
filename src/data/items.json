@@ -2,12 +2,14 @@
   {
     "key": "wood",
     "name": "Wood",
-    "stackLimit": 75
+    "stackLimit": 75,
+    "value": 1
   },
   {
     "key": "stone",
     "name": "Granite chunks",
-    "stackLimit": 25
+    "stackLimit": 25,
+    "value": 1
   },
   {
     "key": "berries",
@@ -15,7 +17,9 @@
     "stackLimit": 50,
     "category": "rawFood",
     "nutrition": 0.1,
-    "shelfLife": 7
+    "shelfLife": 7,
+    "foodKind": "veg",
+    "value": 1
   },
   {
     "key": "potatoes",
@@ -24,7 +28,9 @@
     "category": "rawFood",
     "nutrition": 0.1,
     "rawPenalty": true,
-    "shelfLife": 25
+    "shelfLife": 25,
+    "foodKind": "veg",
+    "value": 1
   },
   {
     "key": "meal",
@@ -32,22 +38,26 @@
     "stackLimit": 10,
     "category": "meal",
     "nutrition": 0.9,
-    "shelfLife": 5
+    "shelfLife": 5,
+    "value": 10
   },
   {
     "key": "cotton",
     "name": "Cotton",
-    "stackLimit": 50
+    "stackLimit": 50,
+    "value": 1
   },
   {
     "key": "cloth",
     "name": "Cloth",
-    "stackLimit": 50
+    "stackLimit": 50,
+    "value": 4
   },
   {
     "key": "herbalMedicine",
     "name": "Herbal medicine",
-    "stackLimit": 25
+    "stackLimit": 25,
+    "value": 14
   },
   {
     "key": "rawMeat",
@@ -56,17 +66,21 @@
     "category": "rawFood",
     "nutrition": 0.1,
     "rawPenalty": true,
-    "shelfLife": 6
+    "shelfLife": 6,
+    "foodKind": "meat",
+    "value": 1
   },
   {
     "key": "leather",
     "name": "Leather",
-    "stackLimit": 50
+    "stackLimit": 50,
+    "value": 3
   },
   {
     "key": "recurveBow",
     "name": "Recurve bow",
-    "stackLimit": 1
+    "stackLimit": 1,
+    "value": 60
   },
   {
     "key": "rawFish",
@@ -75,7 +89,9 @@
     "category": "rawFood",
     "nutrition": 0.1,
     "rawPenalty": true,
-    "shelfLife": 5
+    "shelfLife": 5,
+    "foodKind": "meat",
+    "value": 1
   },
   {
     "key": "fineMeal",
@@ -84,7 +100,8 @@
     "category": "meal",
     "nutrition": 1,
     "shelfLife": 5,
-    "fine": true
+    "fine": true,
+    "value": 18
   },
   {
     "key": "tunic",
@@ -95,7 +112,8 @@
       "cold": 4,
       "heat": 3,
       "wearDays": 36
-    }
+    },
+    "value": 30
   },
   {
     "key": "parka",
@@ -106,7 +124,8 @@
       "cold": 18,
       "heat": -6,
       "wearDays": 48
-    }
+    },
+    "value": 70
   },
   {
     "key": "milk",
@@ -114,6 +133,20 @@
     "stackLimit": 30,
     "category": "rawFood",
     "nutrition": 0.06,
-    "shelfLife": 2
+    "shelfLife": 2,
+    "foodKind": "dairy",
+    "value": 1
+  },
+  {
+    "key": "stoneBlocks",
+    "name": "Granite blocks",
+    "stackLimit": 50,
+    "value": 2
+  },
+  {
+    "key": "silver",
+    "name": "Silver",
+    "stackLimit": 500,
+    "value": 1
   }
 ]

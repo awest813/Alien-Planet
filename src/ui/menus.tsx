@@ -357,6 +357,7 @@ export function SettingsScreen({ state, onClose }: { state: UiState; onClose: ()
       <Choice label="Camera speed" value={s.panSpeed} options={PAN_SPEEDS} onChange={(v) => set({ panSpeed: v })} />
       <Toggle label="Names over colonists and raiders" value={s.showNames} onChange={(v) => set({ showNames: v })} />
       <Toggle label="Minimap" value={s.showMinimap} onChange={(v) => set({ showMinimap: v })} />
+      <Toggle label="Lightning flashes" value={s.lightningFlashes} onChange={(v) => set({ lightningFlashes: v })} />
       <h3>Controls</h3>
       <table className="summary">
         <tbody>
@@ -380,6 +381,118 @@ export function SettingsScreen({ state, onClose }: { state: UiState; onClose: ()
           }}
         >
           {helpReset ? 'Welcome will show on your next colony' : 'Show the welcome screen again'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// Buying from and selling to a visiting caravan. Quantities are picked on both sides and the
+// deal settles the difference in silver.
+export function TradeScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+  const [buy, setBuy] = useState<Record<number, number>>({});
+  const [sell, setSell] = useState<Record<number, number>>({});
+  const trade = state.trade;
+  if (!trade) {
+    return (
+      <Modal title="Trade" onClose={onClose}>
+        <p>The traders have gone.</p>
+      </Modal>
+    );
+  }
+  const cost = trade.theirs.reduce((sum, line) => sum + (buy[line.item] ?? 0) * line.price, 0);
+  const income = trade.ours.reduce((sum, line) => sum + (sell[line.item] ?? 0) * line.price, 0);
+  const balance = Math.round(cost - income);
+  const problem = !trade.open
+    ? 'The traders are not open for business.'
+    : balance > trade.silver
+      ? 'Not enough silver.'
+      : -balance > trade.traderSilver
+        ? 'The traders cannot afford that.'
+        : null;
+  const lines = (side: 'buy' | 'sell') => {
+    const list = side === 'buy' ? trade.theirs : trade.ours;
+    const picked = side === 'buy' ? buy : sell;
+    const set = side === 'buy' ? setBuy : setSell;
+    const change = (item: number, max: number, by: number) =>
+      set({ ...picked, [item]: Math.max(0, Math.min(max, (picked[item] ?? 0) + by)) });
+    if (list.length === 0) {
+      return (
+        <p className="muted">
+          {side === 'buy'
+            ? 'They have nothing left to sell.'
+            : 'Nothing in your stockpiles yet: only goods (and silver) in a stockpile zone can be traded.'}
+        </p>
+      );
+    }
+    return (
+      <table className="saves trade">
+        <tbody>
+          {list.map((line) => (
+            <tr key={line.item}>
+              <td>
+                {line.name}
+                <div className="muted small">
+                  {line.count} · {line.price.toFixed(1)} silver each
+                </div>
+              </td>
+              <td className="qty">
+                <button aria-label={`Ten fewer ${line.name}`} onClick={() => change(line.item, line.count, -10)}>
+                  −10
+                </button>
+                <button aria-label={`One fewer ${line.name}`} onClick={() => change(line.item, line.count, -1)}>
+                  −
+                </button>
+                <span className="num">{picked[line.item] ?? 0}</span>
+                <button aria-label={`One more ${line.name}`} onClick={() => change(line.item, line.count, 1)}>
+                  +
+                </button>
+                <button aria-label={`Ten more ${line.name}`} onClick={() => change(line.item, line.count, 10)}>
+                  +10
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  };
+  const toList = (picked: Record<number, number>) =>
+    Object.entries(picked)
+      .map(([item, n]) => [Number(item), n] as [number, number])
+      .filter(([, n]) => n > 0);
+  return (
+    <Modal title={`Trade with ${trade.faction}`} onClose={onClose} wide>
+      <p className="muted">
+        {trade.relation} (goodwill {trade.goodwill}) · leaving in {trade.leavesIn}h · your silver {trade.silver} · their
+        silver {trade.traderSilver}. Better goodwill means better prices; trading builds it.
+      </p>
+      <div className="trade-columns">
+        <div>
+          <h3>Buy from them</h3>
+          {lines('buy')}
+        </div>
+        <div>
+          <h3>Sell from your stockpiles</h3>
+          {lines('sell')}
+        </div>
+      </div>
+      <div className="row">
+        <span>
+          {balance > 0 ? `You pay ${balance} silver` : balance < 0 ? `You receive ${-balance} silver` : 'Even trade'}
+        </span>
+        {problem && <span className="tag warn">{problem}</span>}
+        <button
+          className="primary"
+          disabled={!!problem || (cost === 0 && income === 0)}
+          onClick={() => {
+            if (controller.trade(toList(buy), toList(sell))) {
+              setBuy({});
+              setSell({});
+            }
+          }}
+        >
+          Make the deal
         </button>
       </div>
     </Modal>

@@ -23,6 +23,7 @@ export type JobType =
   | 'warmUp'
   | 'rescue'
   | 'tame'
+  | 'extinguish'
   | 'wander';
 
 export interface Job {
@@ -113,6 +114,8 @@ export interface Carried {
   fresh?: number;
   // Cook's skill for meals, craftsmanship for clothing.
   quality?: number;
+  // A crafter gathering a recipe carries one bundle per ingredient: these are the ones after the first.
+  extra?: Carried[];
 }
 
 export interface WornApparel {
@@ -168,6 +171,8 @@ export interface Colonist {
   skillXp: Record<SkillKey, number>;
   passions: Record<SkillKey, Passion>;
   weapon: ColonistWeapon;
+  // Craftsmanship of the bow in hand: better bows hit harder.
+  weaponQuality: number;
   apparel: WornApparel | null;
   // Tick each skill was last practised, for rust.
   practicedAt: Partial<Record<SkillKey, number>>;

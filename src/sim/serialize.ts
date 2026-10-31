@@ -24,9 +24,11 @@ import {
   TimedThought,
   WornApparel,
 } from './types';
+import { Caravan } from './trade';
+import { WeatherState } from './weather';
 import { World } from './world';
 
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 12;
 
 interface SavedColonist {
   id: number;
@@ -52,6 +54,7 @@ interface SavedColonist {
   skillXp: Record<SkillKey, number>;
   passions: Record<SkillKey, Passion>;
   weapon: ColonistWeapon;
+  weaponQuality: number;
   apparel: WornApparel | null;
   // What they were doing in the moment: asleep, mid-cooldown, marching to a drafted spot.
   sleeping: boolean;
@@ -88,6 +91,7 @@ export interface SaveData {
     fresh: Float32Array;
     quality: Float32Array;
     damage: Float32Array;
+    fire: Float32Array;
     fuel: Float32Array;
     // Float64, so room temperatures come back exactly.
     temperature: Float64Array;
@@ -102,6 +106,9 @@ export interface SaveData {
   nextEnemyId: number;
   animals: Animal[];
   nextAnimalId: number;
+  caravan: Caravan | null;
+  goodwill: Record<number, number>;
+  nextVisitorId: number;
   research: ResearchState;
   power: PowerState;
   raid: RaidState | null;
@@ -109,6 +116,7 @@ export interface SaveData {
   objectivesDone: Record<string, boolean>;
   timers: SimTimers;
   roomTemps: number[];
+  weather: WeatherState;
 }
 
 export function serialize(sim: Simulation): SaveData {
@@ -134,6 +142,7 @@ export function serialize(sim: Simulation): SaveData {
       fresh: w.fresh.slice(),
       quality: w.quality.slice(),
       damage: w.damage.slice(),
+      fire: w.fire.slice(),
       fuel: w.fuel.slice(),
       temperature: sim.tileTemperatures(),
     },
@@ -162,6 +171,7 @@ export function serialize(sim: Simulation): SaveData {
         skillXp: c.skillXp,
         passions: c.passions,
         weapon: c.weapon,
+        weaponQuality: c.weaponQuality,
         apparel: c.apparel,
         sleeping: c.sleeping,
         restTicks: c.restTicks,
@@ -183,6 +193,9 @@ export function serialize(sim: Simulation): SaveData {
     enemies: structuredClone(sim.enemies),
     nextEnemyId: sim.nextEnemyId,
     animals: structuredClone(sim.animals),
+    caravan: structuredClone(sim.caravan),
+    goodwill: { ...sim.goodwill },
+    nextVisitorId: sim.nextVisitorId,
     nextAnimalId: sim.nextAnimalId,
     research: structuredClone(sim.research),
     power: structuredClone(sim.power),
@@ -191,6 +204,7 @@ export function serialize(sim: Simulation): SaveData {
     objectivesDone: { ...sim.objectivesDone },
     timers: sim.exportTimers(),
     roomTemps: sim.roomTemperatures(),
+    weather: { ...sim.weather },
   };
 }
 
@@ -213,6 +227,7 @@ export function deserialize(data: SaveData): Simulation {
   world.fresh.set(layers.fresh);
   world.quality.set(layers.quality);
   world.damage.set(layers.damage);
+  world.fire.set(layers.fire);
   world.fuel.set(layers.fuel);
   world.structureVersion++;
 
@@ -236,6 +251,9 @@ export function deserialize(data: SaveData): Simulation {
   sim.enemies = structuredClone(data.enemies);
   sim.nextEnemyId = data.nextEnemyId;
   sim.animals = structuredClone(data.animals);
+  sim.caravan = structuredClone(data.caravan);
+  sim.goodwill = { ...data.goodwill };
+  sim.nextVisitorId = data.nextVisitorId;
   sim.nextAnimalId = data.nextAnimalId;
   sim.research = structuredClone(data.research);
   sim.power = structuredClone(data.power);
@@ -245,6 +263,12 @@ export function deserialize(data: SaveData): Simulation {
   sim.syncClock();
   sim.setTileTemperatures(layers.temperature);
   sim.setRoomTemperatures(data.roomTemps);
+  sim.weather = { ...data.weather };
+  for (let i = 0; i < world.size; i++) {
+    if (world.fire[i] > 0) {
+      sim.burning.add(i);
+    }
+  }
   sim.resumeAfterLoad(data.timers);
   return sim;
 }

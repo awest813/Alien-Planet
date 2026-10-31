@@ -56,6 +56,8 @@ export class World {
   public readonly quality: Float32Array;
   // Damage raiders have done to a building they're breaking through (cleared when it changes).
   public readonly damage: Float32Array;
+  // Hours left for a fire burning on the tile (0: not burning).
+  public readonly fire: Float32Array;
   // Fuel held by a fuelled building (generators).
   public readonly fuel: Float32Array;
   // One item stack per tile.
@@ -95,6 +97,7 @@ export class World {
     this.fresh = new Float32Array(this.size);
     this.quality = new Float32Array(this.size);
     this.damage = new Float32Array(this.size);
+    this.fire = new Float32Array(this.size);
     this.fuel = new Float32Array(this.size);
     this.itemType = new Uint8Array(this.size);
     this.itemCount = new Uint16Array(this.size);

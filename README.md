@@ -90,9 +90,13 @@ How the storytelling layer works:
   whatever in storage suits the weather best. Cold or heat beyond what they're wearing builds into
   hypothermia or heatstroke: they go and warm up (or cool off), sleepers wake rather than freeze, and doctors
   carry anyone who collapses somewhere safe. Left too long, exposure kills.
-- **Better food, worse food:** a cook with skill 6 or more can make fine meals (a mood boost). Meals carry
-  their cook's skill: poorly cooked meals, and raw meat or fish, sometimes cause food poisoning, which slows
-  a colonist down for half a day.
+- **Better food, worse food:** a cook with skill 6 or more can make fine meals (a mood boost) from both meat
+  or fish and vegetables. Meals carry their cook's skill: poorly cooked meals, and raw meat or fish, sometimes
+  cause food poisoning, which slows a colonist down for half a day.
+- **Production chains:** recipes can take several ingredients, which the crafter gathers one after another. A
+  stonecutter's table cuts granite chunks into blocks for sturdy, slightly prettier block walls, and once
+  Tailoring is researched, a crafting bench can mend worn clothes with cloth (Production lets you pause mending).
+  Recurve bows get a quality tier too: better bows hit harder, and colonists swap for a clearly better one.
 - **Skills:** every skill (mining, construction, plants, cooking, crafting, medicine, combat) improves with
   practice, up to 20. Each colonist has a couple of passions (★ interested, ★★ burning) that speed learning and
   lift their mood while doing that work. Expert skills slowly rust without practice.
@@ -117,13 +121,25 @@ How the storytelling layer works:
   (chill a sealed room to −6°C). Food rots over days — faster when warm, not at all when frozen or in a running
   icebox — so a freezer room or iceboxes keep the harvest through winter. Haulers move perishable food into
   either automatically.
+- **Weather:** clear skies, rain, storms, fog, summer droughts and winter snow come and go in spells (shown in the
+  top bar). Rain soaks anyone outside, who feel the cold more and grumble about it; rain helps crops and
+  droughts halve their growth; fog and rain spoil aim for both sides. Below freezing, rain falls as snow.
+- **Fire:** lightning in storms can set trees, crops and wooden buildings alight near the colony. Fire spreads to
+  anything flammable next to it (faster in a drought); rain stops it spreading and soon puts it out. Whatever
+  burns through is destroyed along with any items on the tile, and a lost building is marked for rebuilding (as
+  are walls raiders break through). Colonists who haul or build drop their work, or wake up, to beat out fires
+  near home. The lightning flash can be turned off in Settings.
+- **Trade and factions:** now and then a caravan from the friendly Meadow Kin walks in and stays for most of a
+  day. Open Trade in the top bar to buy their goods and sell anything in your stockpiles for silver (the colony
+  lands with 100). Prices depend on goodwill, which grows with every sizeable deal and brings caravans more
+  often; the Story screen lists every faction and where you stand with it.
 - **Water:** shallow water is slow to wade through and leaves colonists soaked (a small mood hit); deep water
   is impassable until you build a bridge over it. Fishing spots on the shore let hunters catch raw fish while
   the colony is short of food. In hard frost the shallows freeze from the shore inwards and can be walked
   across; frozen water can't be fished, and the ice melts again when it warms up.
 - **Sun lamps:** crops beneath them grow day and night, all year, so a heated greenhouse can farm in winter.
 - **Storyteller:** roughly once or twice a day it may send a raid, an illness, a wanderer who joins, a cold
-  snap, a gift of supplies from the friendly Meadow Kin, or crop blight. Each event pops up as a short
+  snap, a trade caravan or a gift of supplies from the friendly Meadow Kin, or crop blight. Each event pops up as a short
   notification card and goes into the Story screen. Pick the difficulty when founding a colony: Peaceful (no
   raids), Standard, or Harsh (bigger, harder-hitting raids).
 
@@ -188,8 +204,10 @@ covers traits, line of sight, raids, bleeding and tending, disease, relationship
 the calendar, winter cold, frost and research. `src/sim/tech.test.ts` covers power, spoilage, cold storage and
 sun lamps, `src/sim/water.test.ts` covers bridges, fishing, ice, wading and battery charging, and
 `src/sim/playtest.test.ts` covers fixes from persona playtests (feeding the downed, raiders breaching walls,
-idle generators), `src/sim/needs.test.ts` covers clothing, exposure, fine meals, food poisoning and saves, and
-`src/sim/husbandry.test.ts` covers taming, herding, breeding, milk and guard animals.
+idle generators), `src/sim/needs.test.ts` covers clothing, exposure, fine meals, food poisoning, multi-ingredient
+crafting, stonecutting, mending and saves, `src/sim/husbandry.test.ts` covers taming, herding, breeding, milk and
+guard animals, `src/sim/weather.test.ts` covers weather, soaking, lightning, fire and firefighting, and
+`src/sim/trade.test.ts` covers caravans, buying and selling, goodwill and saving a visit.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,
 drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation:

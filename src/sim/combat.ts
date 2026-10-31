@@ -1,4 +1,6 @@
 import { hurtAnimal } from './animals';
+import { qualityFactor } from './apparel';
+import { weatherDef } from './weather';
 import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
 import { FACTIONS, NONE, featureDef, itemDef, itemId } from './defs';
 import { damage } from './health';
@@ -221,7 +223,9 @@ function breach(sim: Simulation, e: Enemy): boolean {
       w.damage[wall] += 10;
       const def = featureDef(w.feature[wall]);
       if (w.damage[wall] >= def.build!.work) {
+        const feature = w.feature[wall];
         w.setFeature(wall, NONE);
+        sim.rebuild(wall, feature);
         sim.addLog(`Raiders broke through a ${def.name.toLowerCase()}!`, 'danger');
       }
     }
@@ -343,7 +347,7 @@ function enemyAttack(sim: Simulation, e: Enemy, target: Colonist): void {
   const dist = sim.world.distance(e.tile, target.tile);
   const ranged = weapon.range > 1;
   const accuracy = ranged
-    ? Math.max(0.15, weapon.accuracy - dist * 0.03) * coverFactor(sim.world, e.tile, target.tile)
+    ? Math.max(0.15, weapon.accuracy - dist * 0.03) * coverFactor(sim.world, e.tile, target.tile) * weatherDef(sim).aim
     : weapon.accuracy;
   const hit = sim.rng.next() < accuracy;
   recordShot(sim, e.tile, target.tile, hit, ranged);
@@ -477,13 +481,17 @@ function colonistAttack(sim: Simulation, c: Colonist, target: number, ranged: bo
   const dist = sim.world.distance(c.tile, target);
   const accuracy = ranged
     ? Math.max(0.1, Math.min(0.95, 0.4 + c.skills.combat * 0.03 + (traitValue(c, 'accuracy') ?? 0) - dist * 0.025)) *
-      coverFactor(sim.world, c.tile, target)
+      coverFactor(sim.world, c.tile, target) *
+      weatherDef(sim).aim
     : 0.7 + c.skills.combat * 0.015;
   const hit = sim.rng.next() < accuracy;
   recordShot(sim, c.tile, target, hit, ranged);
   c.cooldown = ranged ? weapon.cooldown : COLONIST_MELEE.cooldown;
   learn(sim, c, 'combat', COMBAT_XP);
-  return hit ? roll(sim, ranged ? weapon.damage : COLONIST_MELEE.damage) : 0;
+  // A better-made bow hits harder (0.7× for poor work up to 1.3× for a masterwork).
+  return hit
+    ? roll(sim, ranged ? weapon.damage : COLONIST_MELEE.damage) * (ranged ? qualityFactor(c.weaponQuality) : 1)
+    : 0;
 }
 
 function attackEnemy(sim: Simulation, c: Colonist, e: Enemy, ranged: boolean): void {

@@ -77,6 +77,8 @@ describe('cold storage and spoilage', () => {
     // The start of summer, so it stays warm outdoors for the whole test.
     sim.tick = (4 * 24 + 12 - START_HOUR) * HOUR;
     sim.syncClock();
+    // Clear skies throughout: rain would cool the air and slow the rot.
+    sim.weather = { kind: 'clear', until: Number.MAX_SAFE_INTEGER };
     // A couple of days past its shelf life, so a passing cold snap can't save the meat.
     const life = itemDef(itemId('rawMeat')).shelfLife!;
     const days = life + 2;

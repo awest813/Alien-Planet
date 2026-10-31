@@ -1,6 +1,9 @@
 import { impressivenessLabel } from '../sim/climate';
 import {
+  BenchType,
   FACTIONS,
+  Ingredient,
+  MENDABLE,
   NONE,
   RECIPES,
   RESEARCH,
@@ -23,6 +26,8 @@ import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
+import { applyTrade, goodwillOf, prices, standingLabel, tradableItems, tradeOpen } from '../sim/trade';
+import { weatherDef } from '../sim/weather';
 import { Command, DesignationKind, LogEntry, Needs, Priorities, SKILL_KEYS, ScheduleSlot, Skills } from '../sim/types';
 import { Designation, GROW_ZONE, STOCKPILE_ZONE } from '../sim/world';
 import { Difficulty } from '../sim/storyteller';
@@ -191,6 +196,13 @@ export const TOOLS: ToolDef[] = [
   },
   build('woodWall', 'Wood wall', 'b', 'structure', 'Drag a rectangle outline of walls'),
   build('stoneWall', 'Granite wall', 'n', 'structure', 'Drag a rectangle outline of walls'),
+  build(
+    'blockWall',
+    'Block wall',
+    '',
+    'structure',
+    'Sturdier and prettier than granite: raiders take twice as long to break through',
+  ),
   build('door', 'Door', 'o', 'structure', 'Click a wall gap to place a door'),
   build('bridge', 'Bridge', '', 'structure', 'Walkway over shallow or deep water'),
   build('bed', 'Bed', 'e', 'furniture', 'Colonists sleep better in beds'),
@@ -201,6 +213,7 @@ export const TOOLS: ToolDef[] = [
   build('stove', 'Stove', 'k', 'production', 'Cooks meals from raw food'),
   build('craftingBench', 'Crafting bench', 'j', 'production', 'Weaves cloth and crafts bows'),
   build('researchBench', 'Research bench', '', 'production', 'Where colonists research new technology'),
+  build('stonecutterTable', "Stonecutter's table", '', 'production', 'Cuts granite chunks into blocks for block walls'),
   build(
     'fishingSpot',
     'Fishing spot',
@@ -222,6 +235,27 @@ export const TOOLS: ToolDef[] = [
 ];
 
 export const SPEEDS = [0, 1, 2, 4];
+
+const BENCH_NAMES: Record<BenchType, string> = {
+  cooking: 'stove',
+  crafting: 'crafting bench',
+  stonecutting: "stonecutter's table",
+};
+
+const FOOD_KIND_NAMES: Record<string, string> = { meat: 'meat or fish', veg: 'vegetables', dairy: 'dairy' };
+
+function ingredientName(ing: Ingredient): string {
+  if (ing.item !== undefined) {
+    return itemDef(ing.item).name.toLowerCase();
+  }
+  if (ing.foodKind !== undefined) {
+    return FOOD_KIND_NAMES[ing.foodKind] ?? ing.foodKind;
+  }
+  if (ing.worn) {
+    return 'worn clothing';
+  }
+  return (ing.category ?? '').replace(/([A-Z])/g, ' $1').toLowerCase();
+}
 
 const WORK_NAMES: Partial<Record<keyof Priorities, string>> = {
   mining: 'mining',
@@ -315,6 +349,8 @@ export interface BillView {
   stock: number;
   // What one batch consumes and makes, e.g. "6 raw food → 1 simple meal".
   recipeText: string;
+  // A mending bill: on or off, rather than a stock target.
+  mend: boolean;
   bench: string;
   hasBench: boolean;
   // Research project that must be finished first, if any.
@@ -322,6 +358,27 @@ export interface BillView {
   // Skill a colonist needs to work it, e.g. "Cooking 6".
   minSkill: string | null;
   step: number;
+}
+
+export interface TradeLine {
+  item: number;
+  name: string;
+  count: number;
+  // Silver per unit.
+  price: number;
+}
+
+export interface TradeView {
+  open: boolean;
+  faction: string;
+  relation: string;
+  goodwill: number;
+  leavesIn: number;
+  // Silver in the colony's stockpiles, and the traders' purse.
+  silver: number;
+  traderSilver: number;
+  theirs: TradeLine[];
+  ours: TradeLine[];
 }
 
 export interface Alert {
@@ -378,6 +435,13 @@ export interface UiState {
   inPlay: boolean;
   // The most recent save this version can load, for Continue.
   latestSave: SaveMeta | null;
+  // A trade caravan: on its way (not open yet), here (open), or null when none is about.
+  trade: TradeView | null;
+  factions: { name: string; description: string; relation: string; goodwill: number | null }[];
+  // Current weather, e.g. { label: 'Rain', icon: '🌧' } (no icon when clear).
+  weather: { label: string; icon: string };
+  // Tiles on fire anywhere on the map.
+  fires: number;
   stats: {
     raidsRepelled: number;
     kills: number;
@@ -531,6 +595,9 @@ export class GameController {
     for (const event of this.sim.events.splice(0)) {
       if (event === 'dawn') {
         this.autosave();
+      } else if (event === 'fire' && this.settings.pauseOnEmergency) {
+        this.setSpeed(0);
+        this.notify('Game paused: fire near the colony.');
       } else if (event === 'raidNear' && this.settings.pauseOnRaid) {
         // On a big map the raid was announced hours ago; stop again as it arrives.
         this.setSpeed(0);
@@ -744,6 +811,52 @@ export class GameController {
     }
   }
 
+  private tradeView(): TradeView | null {
+    const sim = this.sim;
+    const caravan = sim.caravan;
+    if (!caravan) {
+      return null;
+    }
+    const price = prices(sim, caravan.faction);
+    const silver = itemId('silver');
+    const goodwill = goodwillOf(sim, caravan.faction);
+    // What the colony's stockpiles hold, in one pass.
+    const stock = new Map<number, number>();
+    for (const i of sim.world.tilesWith('items')) {
+      if (sim.isStockpile(i)) {
+        const item = sim.world.itemType[i];
+        stock.set(item, (stock.get(item) ?? 0) + sim.world.itemCount[i]);
+      }
+    }
+    return {
+      open: tradeOpen(sim),
+      faction: FACTIONS[caravan.faction].name,
+      relation: standingLabel(goodwill, false),
+      goodwill,
+      leavesIn: Math.max(0, Math.ceil((caravan.leaveAt - sim.tick) / TICKS_PER_HOUR)),
+      silver: stock.get(silver) ?? 0,
+      traderSilver: caravan.silver,
+      theirs: caravan.stock.map((s) => ({
+        item: s.item,
+        name: itemDef(s.item).name,
+        count: s.count,
+        price: price.buy(s.item),
+      })),
+      ours: tradableItems()
+        .map((item) => ({ item, name: itemDef(item).name, count: stock.get(item) ?? 0, price: price.sell(item) }))
+        .filter((line) => line.count > 0),
+    };
+  }
+
+  // One deal with the visiting traders.
+  public trade(buy: [number, number][], sell: [number, number][]): boolean {
+    const error = applyTrade(this.sim, buy, sell);
+    this.commandCount++;
+    this.notify(error ?? 'Deal done.');
+    this.publish();
+    return error === null;
+  }
+
   // Returns whether the save was written.
   public async save(slot: string, auto = false): Promise<boolean> {
     const sim = this.sim;
@@ -932,7 +1045,10 @@ export class GameController {
           passion: c.passions[key],
           progress: c.skills[key] >= MAX_SKILL ? 1 : c.skillXp[key] / xpToNext(c.skills[key]),
         })),
-        weapon: COLONIST_WEAPONS[c.weapon].name,
+        weapon:
+          c.weapon === 'recurveBow'
+            ? `${qualityLabel(c.weaponQuality)} ${COLONIST_WEAPONS[c.weapon].name.toLowerCase()}`
+            : COLONIST_WEAPONS[c.weapon].name,
         apparel: c.apparel
           ? `${qualityLabel(c.apparel.quality)} ${itemDef(c.apparel.item).name.toLowerCase()} (${Math.round(c.apparel.wear * 100)}%)`
           : 'Nothing',
@@ -955,18 +1071,23 @@ export class GameController {
       })),
       bills: sim.bills.map((bill) => {
         const recipe = RECIPES[bill.recipe];
-        const input = recipe.ingredient.item
-          ? itemDef(recipe.ingredient.item).name.toLowerCase()
-          : (recipe.ingredient.category ?? '').replace(/([A-Z])/g, ' $1').toLowerCase();
+        const input = recipe.ingredients.map((ing) => `${ing.count} ${ingredientName(ing)}`).join(' + ');
         const product = itemDef(recipe.product.item);
+        // Mending's "stock" is the worn clothing waiting for it.
+        const worn = [...sim.world.tilesWith('items')].filter(
+          (i) => !!itemDef(sim.world.itemType[i]).apparel && sim.world.fresh[i] < MENDABLE,
+        ).length;
         return {
           recipe: bill.recipe,
           name: recipe.name,
           product: product.name,
           target: bill.target,
-          stock: totals[recipe.product.item - 1].total,
-          recipeText: `${recipe.ingredient.count} ${input} → ${recipe.product.count} ${product.name.toLowerCase()}`,
-          bench: recipe.bench === 'cooking' ? 'stove' : 'crafting bench',
+          stock: recipe.mend ? worn : totals[recipe.product.item - 1].total,
+          mend: recipe.mend,
+          recipeText: recipe.mend
+            ? `${input} → mended`
+            : `${input} → ${recipe.product.count} ${product.name.toLowerCase()}`,
+          bench: BENCH_NAMES[recipe.bench],
           hasBench: sim.countFeature((f) => featureDef(f).workbench === recipe.bench) > 0,
           minSkill:
             recipe.minSkill > 0 ? `${recipe.bench === 'cooking' ? 'Cooking' : 'Crafting'} ${recipe.minSkill}` : null,
@@ -1003,6 +1124,15 @@ export class GameController {
       settings: this.settings,
       inPlay: this.inPlay,
       latestSave: this.latestSave(),
+      weather: { label: weatherDef(sim).label, icon: weatherDef(sim).icon },
+      trade: this.tradeView(),
+      factions: FACTIONS.map((f) => ({
+        name: f.name,
+        description: f.description,
+        relation: standingLabel(goodwillOf(sim, f.id), f.hostile),
+        goodwill: f.hostile ? null : goodwillOf(sim, f.id),
+      })),
+      fires: sim.burning.size,
       stats: {
         raidsRepelled: sim.stats.raidsRepelled,
         kills: sim.stats.kills,
@@ -1039,6 +1169,17 @@ export class GameController {
     const w = sim.world;
     const alerts: Alert[] = [];
     const raiders = sim.enemies.filter((e) => !e.fleeing).length;
+    if (sim.caravan && tradeOpen(sim)) {
+      const hours = Math.max(0, Math.ceil((sim.caravan.leaveAt - sim.tick) / TICKS_PER_HOUR));
+      alerts.push({ text: `Traders are visiting for ${hours} more hours: open Trade in the top bar.`, tone: 'warn' });
+    }
+    if (sim.burning.size > 0) {
+      const n = sim.burning.size;
+      alerts.push({
+        text: `Fire! ${n} tile${n > 1 ? 's' : ''} burning. Colonists who haul or build will fight fires near home.`,
+        tone: 'danger',
+      });
+    }
     if (raiders > 0) {
       alerts.push({
         text: `Raid: ${raiders} raider${raiders > 1 ? 's' : ''} from ${FACTIONS[sim.enemies[0].faction].name}. Draft with Q.`,
@@ -1295,6 +1436,9 @@ export class GameController {
     }
     if (def?.crop) {
       details.push(w.growth[i] >= 1 ? 'Ready to harvest' : `${Math.floor(w.growth[i] * 100)}% grown`);
+    }
+    if (w.fire[i] > 0) {
+      details.push('On fire!');
     }
     const item = w.itemType[i];
     if (item !== NONE && itemDef(item).apparel) {

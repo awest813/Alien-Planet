@@ -5,7 +5,17 @@ import { Bar, moodColor } from './common';
 
 // The always-on game HUD: top bar, colonist bar, inspector, side panel, and architect menu.
 
-export type Screen = 'menu' | 'settings' | 'work' | 'schedule' | 'production' | 'research' | 'story' | 'help' | null;
+export type Screen =
+  | 'menu'
+  | 'settings'
+  | 'trade'
+  | 'work'
+  | 'schedule'
+  | 'production'
+  | 'research'
+  | 'story'
+  | 'help'
+  | null;
 
 const SPEEDS = [
   { label: '❚❚', title: 'Pause (Space)' },
@@ -30,6 +40,11 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
         <span className="temp" title="Outdoor temperature">
           {state.outdoorTemp}°C
         </span>
+        {state.weather.icon && (
+          <span className="weather" title="Weather">
+            {state.weather.icon} {state.weather.label}
+          </span>
+        )}
         <div className="speeds" role="group" aria-label="Game speed">
           {SPEEDS.map((s, index) => (
             <button
@@ -78,6 +93,16 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
         <button onClick={() => onOpen('production')}>Production</button>
         <button onClick={() => onOpen('research')}>Research</button>
         <button onClick={() => onOpen('story')}>Story</button>
+        {state.trade && (
+          <button
+            className={state.trade.open ? 'primary' : ''}
+            disabled={!state.trade.open}
+            title={state.trade.open ? `Trade with ${state.trade.faction}` : 'Traders are on their way'}
+            onClick={() => onOpen('trade')}
+          >
+            Trade
+          </button>
+        )}
         <button onClick={() => onOpen('help')} title="How to play">
           ?
         </button>

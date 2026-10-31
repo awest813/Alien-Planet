@@ -213,6 +213,21 @@ function drawFeature(c: Ctx, key: string): void {
         }
       }
       break;
+    case 'blockWall':
+      c.fillStyle = '#6f6e74';
+      c.fillRect(0, 0, TILE, TILE);
+      c.fillStyle = '#a3a2a9';
+      for (let row = 0; row < 2; row++) {
+        const offset = row % 2 ? 8 : 0;
+        for (let x = -offset; x < TILE; x += 16) {
+          c.fillRect(x + 1, row * 8 + 1, 14, 6);
+        }
+      }
+      c.fillStyle = '#c4c3c9';
+      c.fillRect(1, 1, 14, 1);
+      c.fillRect(9, 9, 6, 1);
+      c.fillRect(0, 9, 7, 1);
+      break;
     case 'door':
       c.fillStyle = '#4a2f16';
       c.fillRect(0, 0, TILE, TILE);
@@ -262,6 +277,19 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillStyle = '#9aa0a8';
       c.fillRect(3, 2, 4, 2);
       c.fillRect(10, 1, 1, 3);
+      break;
+    case 'stonecutterTable':
+      c.fillStyle = '#5a3818';
+      c.fillRect(1, 10, 2, 5);
+      c.fillRect(13, 10, 2, 5);
+      c.fillStyle = '#7d7c82';
+      c.fillRect(0, 5, 16, 6);
+      c.fillStyle = '#a3a2a9';
+      c.fillRect(0, 5, 16, 1);
+      c.fillRect(3, 2, 5, 3);
+      c.fillStyle = '#c9ccd2';
+      c.fillRect(10, 1, 2, 4);
+      c.fillRect(9, 1, 4, 1);
       break;
     case 'table':
       c.fillStyle = '#5a3818';
@@ -598,6 +626,24 @@ function drawItem(c: Ctx, key: string): void {
       c.fillStyle = '#8a8990';
       c.fillRect(3, 8, 4, 1);
       c.fillRect(8, 6, 4, 1);
+      break;
+    case 'stoneBlocks':
+      c.fillStyle = '#8a8990';
+      c.fillRect(2, 9, 6, 4);
+      c.fillRect(8, 9, 6, 4);
+      c.fillRect(5, 5, 6, 4);
+      c.fillStyle = '#b4b3ba';
+      c.fillRect(2, 9, 6, 1);
+      c.fillRect(8, 9, 6, 1);
+      c.fillRect(5, 5, 6, 1);
+      break;
+    case 'silver':
+      c.fillStyle = '#9aa3ad';
+      c.fillRect(3, 9, 10, 4);
+      c.fillStyle = '#d8dee5';
+      c.fillRect(4, 7, 8, 3);
+      c.fillStyle = '#f2f5f8';
+      c.fillRect(5, 7, 3, 1);
       break;
     case 'potatoes':
       c.fillStyle = '#a07a3a';

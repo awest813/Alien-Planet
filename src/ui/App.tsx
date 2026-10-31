@@ -3,7 +3,7 @@ import { controller } from '../game/controller';
 import { helpSeen, markHelpSeen } from '../game/settings';
 import { useUiState } from './common';
 import { Architect, ColonistBar, HoverCard, Inspector, Notices, Screen, SidePanel, TopBar } from './hud';
-import { FallenScreen, MenuActions, PauseMenu, SettingsScreen, TitleScreen } from './menus';
+import { FallenScreen, MenuActions, PauseMenu, SettingsScreen, TitleScreen, TradeScreen } from './menus';
 import { Minimap } from './minimap';
 import { HelpScreen, ProductionScreen, ResearchScreen, ScheduleScreen, StoryScreen, WorkScreen } from './screens';
 
@@ -41,7 +41,7 @@ export function App() {
   }, [anyScreen]);
 
   // The title screen, help, settings and the pause menu stop the clock while they're open.
-  const pausing = onTitle || screen === 'help' || screen === 'menu' || screen === 'settings';
+  const pausing = onTitle || screen === 'help' || screen === 'menu' || screen === 'settings' || screen === 'trade';
   useEffect(() => {
     if (pausing) {
       controller.holdPause();
@@ -125,6 +125,7 @@ export function App() {
           {screen === 'production' && <ProductionScreen state={state} onClose={close} />}
           {screen === 'research' && <ResearchScreen state={state} onClose={close} />}
           {screen === 'story' && <StoryScreen state={state} onClose={close} />}
+          {screen === 'trade' && <TradeScreen state={state} onClose={close} />}
         </>
       )}
       {screen === 'settings' && <SettingsScreen state={state} onClose={close} />}

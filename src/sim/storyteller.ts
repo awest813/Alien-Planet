@@ -3,6 +3,7 @@ import { spawnRaid } from './combat';
 import { TICKS_PER_HOUR } from './constants';
 import { ANIMALS, FACTIONS, NONE, featureDef, itemId } from './defs';
 import { infect } from './health';
+import { caravanArrives, goodwillOf } from './trade';
 import { Season } from './seasons';
 import type { Simulation } from './simulation';
 
@@ -139,6 +140,14 @@ const EVENTS: EventDef[] = [
       sim.addLog('A cold snap has rolled in. Expect freezing nights for the next two days.', 'warn', true);
       return true;
     },
+  },
+  {
+    // Friendly traders come by more often the better the colony gets on with them.
+    key: 'caravan',
+    minDay: 3,
+    cooldownDays: 5,
+    weight: (sim) => (sim.caravan ? 0 : 0.6 + goodwillOf(sim, friendlyFaction().id) / 100),
+    run: (sim) => caravanArrives(sim),
   },
   {
     key: 'supplies',

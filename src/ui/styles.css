@@ -321,6 +321,14 @@ kbd {
   white-space: nowrap;
 }
 
+.weather {
+  font-size: 12px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+}
+
 .speeds {
   display: flex;
   gap: 2px;
@@ -1120,4 +1128,33 @@ button.primary:hover:not(:disabled) {
 /* The dialog itself only takes focus so keyboard users start inside it; no ring needed. */
 .modal:focus {
   outline: none;
+}
+
+/* Trade: their goods beside yours. */
+.trade-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .trade-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.trade td.qty {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.trade td.qty .num {
+  display: inline-block;
+  min-width: 28px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.trade td.qty button {
+  padding: 2px 6px;
 }

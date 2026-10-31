@@ -51,6 +51,7 @@ export class ColonyScene extends Phaser.Scene {
   private layers: Layers;
   private pawns = new Map<number, PawnView>();
   private raiders = new Map<number, Phaser.GameObjects.Container>();
+  private traders = new Map<number, Phaser.GameObjects.Container>();
   private beasts = new Map<number, Phaser.GameObjects.Container>();
   private itemLabels = new Map<number, Phaser.GameObjects.Text>();
   private overlay: Phaser.GameObjects.Graphics;
@@ -58,6 +59,8 @@ export class ColonyScene extends Phaser.Scene {
   private night: Phaser.GameObjects.Rectangle;
   private glow: Phaser.GameObjects.Graphics;
   private heatmap: Phaser.GameObjects.Graphics;
+  private fireFx!: Phaser.GameObjects.Graphics;
+  private weatherFx!: Phaser.GameObjects.Graphics;
   private water!: Phaser.GameObjects.Graphics;
   private waterAt = 0;
   private heatmapAt = 0;
@@ -84,6 +87,9 @@ export class ColonyScene extends Phaser.Scene {
       .graphics()
       .setDepth(Depth.NIGHT + 1)
       .setBlendMode(Phaser.BlendModes.ADD);
+    // Flames show through the night shading; weather sits over everything on the map.
+    this.fireFx = this.add.graphics().setDepth(Depth.NIGHT + 1);
+    this.weatherFx = this.add.graphics().setDepth(Depth.NIGHT + 3);
     // Above the tiles and night shading, below colonists.
     this.heatmap = this.add.graphics().setDepth(Depth.NIGHT + 2);
     this.water = this.add.graphics().setDepth(Depth.WATER);
@@ -106,12 +112,86 @@ export class ColonyScene extends Phaser.Scene {
     }
     this.syncPawns();
     this.syncRaiders();
+    this.syncTraders();
     this.syncAnimals();
     this.drawOverlay();
     this.updateCamera(delta);
     this.updateNight();
     this.drawHeatmap();
     this.drawWater();
+    this.drawFires();
+    this.drawWeather();
+  }
+
+  // Flickering flames on burning tiles in view.
+  private drawFires(): void {
+    const g = this.fireFx;
+    g.clear();
+    const sim = controller.sim;
+    if (sim.burning.size === 0) {
+      return;
+    }
+    const world = sim.world;
+    const view = this.visibleTiles();
+    const now = this.time.now;
+    for (const i of sim.burning) {
+      const x = world.xOf(i);
+      const y = world.yOf(i);
+      if (x < view.x0 || x > view.x1 || y < view.y0 || y > view.y1) {
+        continue;
+      }
+      const flicker = 0.75 + 0.25 * Math.sin(now / 70 + i * 1.7);
+      const px = x * TILE;
+      const py = y * TILE;
+      g.fillStyle(0xd9480f, 0.8).fillRect(px + 2, py + 5, TILE - 4, TILE - 6);
+      g.fillStyle(0xff8c1a, 0.9 * flicker).fillRect(px + 4, py + 3 + 2 * (1 - flicker), TILE - 8, TILE - 6);
+      g.fillStyle(0xffe066, flicker).fillRect(px + 6, py + 7, TILE - 12, TILE - 10);
+    }
+  }
+
+  // Rain, snow, fog and storm flashes over whatever part of the map is in view.
+  private drawWeather(): void {
+    const g = this.weatherFx;
+    g.clear();
+    const sim = controller.sim;
+    const kind = sim.weather.kind;
+    if (kind === 'clear') {
+      return;
+    }
+    const cam = this.cameras.main;
+    const v = cam.worldView;
+    const s = 1 / cam.zoom;
+    const now = this.time.now;
+    const frac = (n: number) => n - Math.floor(n);
+    if (kind === 'rain' || kind === 'storm') {
+      if (kind === 'storm') {
+        g.fillStyle(0x10141c, 0.2).fillRect(v.x, v.y, v.width, v.height);
+      }
+      g.fillStyle(0xa8c8ff, kind === 'storm' ? 0.55 : 0.4);
+      const drops = kind === 'storm' ? 260 : 160;
+      for (let k = 0; k < drops; k++) {
+        const x = v.x + frac(k * 0.6180339 + now * 0.00004) * v.width;
+        const y = v.y + frac(k * 0.3819 + now * (kind === 'storm' ? 0.0014 : 0.001)) * v.height;
+        g.fillRect(x, y, s, 7 * s);
+      }
+      // Lightning: a white flash that fades over a second of game time.
+      const age = sim.tick - sim.lastLightning;
+      if (controller.settings.lightningFlashes && sim.lastLightning >= 0 && age < 20) {
+        g.fillStyle(0xffffff, 0.45 * (1 - age / 20)).fillRect(v.x, v.y, v.width, v.height);
+      }
+    } else if (kind === 'snow') {
+      g.fillStyle(0xffffff, 0.85);
+      for (let k = 0; k < 140; k++) {
+        const drift = Math.sin(now / 900 + k) * 6 * s;
+        const x = v.x + frac(k * 0.6180339) * v.width + drift;
+        const y = v.y + frac(k * 0.3819 + now * 0.00018) * v.height;
+        g.fillRect(x, y, 2 * s, 2 * s);
+      }
+    } else if (kind === 'fog') {
+      g.fillStyle(0xc8ccd2, 0.3).fillRect(v.x, v.y, v.width, v.height);
+    } else if (kind === 'drought') {
+      g.fillStyle(0xffa040, 0.08).fillRect(v.x, v.y, v.width, v.height);
+    }
   }
 
   // Drifting glints on open water, and foam where it meets the shore.
@@ -183,6 +263,8 @@ export class ColonyScene extends Phaser.Scene {
     this.pawns.clear();
     this.raiders.forEach((raider) => raider.destroy());
     this.raiders.clear();
+    this.traders.forEach((trader) => trader.destroy());
+    this.traders.clear();
     this.beasts.forEach((beast) => beast.destroy());
     this.beasts.clear();
 
@@ -364,6 +446,44 @@ export class ColonyScene extends Phaser.Scene {
       } else {
         pawn.carry.setVisible(false);
       }
+    }
+  }
+
+  // Visiting traders: green-clad figures with green name labels.
+  private syncTraders(): void {
+    const sim = controller.sim;
+    const world = sim.world;
+    const visitors = sim.caravan?.visitors ?? [];
+    const present = new Set(visitors.map((v) => v.id));
+    for (const [id, trader] of this.traders) {
+      if (!present.has(id)) {
+        trader.destroy();
+        this.traders.delete(id);
+      }
+    }
+    for (const v of visitors) {
+      let trader = this.traders.get(v.id);
+      if (!trader) {
+        const body = this.add.image(0, 0, 'pawn-body').setTint(0x5f9a4a);
+        const head = this.add.image(0, 0, 'pawn-head');
+        const label = this.add
+          .text(0, -11, v.name, {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '6px',
+            color: '#9fe38a',
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5, 1)
+          .setResolution(4);
+        trader = this.add.container(0, 0, [body, head, label]).setDepth(Depth.PAWNS);
+        this.traders.set(v.id, trader);
+      }
+      const to = v.path.length > 0 ? v.path[0] : v.tile;
+      const x = world.xOf(v.tile) + (world.xOf(to) - world.xOf(v.tile)) * v.moveProgress;
+      const y = world.yOf(v.tile) + (world.yOf(to) - world.yOf(v.tile)) * v.moveProgress;
+      trader.setPosition((x + 0.5) * TILE, (y + 0.5) * TILE);
+      (trader.getAt(2) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames);
     }
   }
 
