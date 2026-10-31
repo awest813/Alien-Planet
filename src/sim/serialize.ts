@@ -158,7 +158,6 @@ export function deserialize(data: SaveData): Simulation {
 
   const colonists: Colonist[] = data.colonists.map((saved) => ({
     ...structuredClone(saved),
-    nightTicks: saved.nightTicks ?? 0,
     path: [],
     moveProgress: 0,
     job: null,

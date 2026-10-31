@@ -230,7 +230,7 @@ export class Simulation {
       colonists.push(c);
     }
     // Survival rations to tide the colony over until the first harvest.
-    world.dropItemNear(spawn, itemId('meal'), 10);
+    world.dropItemNear(spawn, itemId('meal'), 18);
     const sim = new Simulation(world, colonists, seed, rng);
     sim.addLog(
       'Five colonists have landed with a few days of rations. Designate work and they will get to it.',
@@ -787,7 +787,8 @@ export class Simulation {
   private onDawn(): void {
     let exposed = 0;
     for (const c of this.colonists) {
-      if (c.nightTicks > 0 && c.exposedTicks > c.nightTicks * 0.5) {
+      // Only colonists who were around for a good part of the night count (not late arrivals).
+      if (c.nightTicks > TICKS_PER_HOUR * 2 && c.exposedTicks > c.nightTicks * 0.5) {
         exposed++;
       }
       c.nightTicks = 0;
@@ -989,7 +990,6 @@ export class Simulation {
         c.job?.type !== 'tend' &&
         c.job?.type !== 'eat' &&
         c.priorities.doctor > 0 &&
-        !needsBedRest(c) &&
         this.urgentPatient(c)
       ) {
         this.endJob(c);
@@ -1066,6 +1066,10 @@ export class Simulation {
       return;
     }
     if (needsBedRest(c)) {
+      // The walking wounded patch up others (or, failing that, themselves) before lying down.
+      if (c.priorities.doctor > 0 && (this.urgentPatient(c) || needsTending(this, c)) && this.tryTend(c)) {
+        return;
+      }
       this.startRest(c);
       return;
     }
@@ -1998,7 +2002,10 @@ export class Simulation {
     const region = this.regionOf(c.tile);
     // Others first (self-treatment is a last resort), then the most urgent: downed, then bleeding.
     const urgency = (p: Colonist) =>
-      (p === c ? 1000 : 0) - (p.health.downed ? 100 : 0) - bleedingOf(p) * 50 + w.distance(c.tile, p.tile);
+      (p === c ? 1000 : 0) -
+      (p.health.downed ? 100 : 0) -
+      (bleedingOf(p) > 0 ? 50 + p.health.bloodLoss * 200 : 0) +
+      w.distance(c.tile, p.tile);
     const patient = this.living()
       .filter((p) => needsTending(this, p) && !this.isReserved(`t${p.id}`, c) && this.regions.region[p.tile] === region)
       .sort((a, b) => urgency(a) - urgency(b))[0];

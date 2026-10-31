@@ -104,7 +104,7 @@ src/
 
 In development the controller is exposed as `window.colony` for poking at the simulation from the console.
 
-### Tests
+### Tests and balance
 
 The simulation runs headlessly, so it is tested directly with [Vitest](https://vitest.dev/):
 
@@ -115,6 +115,19 @@ npm test
 `src/sim/simulation.test.ts` covers world generation, pathfinding, room detection, item conservation, construction,
 farming and cooking, heating, save/load, and regression tests for fixed AI bugs. `src/sim/phase3.test.ts`
 covers traits, line of sight, raids, bleeding and tending, disease, relationships, and events.
+
+`scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,
+drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation:
+
+```
+npx tsx scripts/balance.ts 20 8          # 20 days on 8 seeds
+npx tsx scripts/balance.ts 20 8 passive  # never draft during raids
+npx tsx scripts/balance.ts 20 4 trace    # print the colony state whenever someone dies
+```
+
+With the current tuning, early raids are manageable and late ones (6–7 raiders after day 15) can cost a colony
+a few colonists, but rarely everyone. First friendships appear around day 6–7, with a few rivalries and couples
+over 20 days.
 
 ## Roadmap
 

@@ -17,10 +17,11 @@ export type DamageKind = 'arrow' | 'cut' | 'bruise';
 
 const DEFAULT_PAIN_THRESHOLD = 0.8;
 // Bleeding per hour as a fraction of the wound's severity.
-const BLEED_RATE = 0.25;
+const BLEED_RATE = 0.18;
 const FATAL_INJURIES = 1.6;
 const DOWNED_BLOOD_LOSS = 0.6;
 const BLOOD_REGEN_PER_HOUR = 0.06;
+const CLOT_PER_HOUR = 0.15;
 
 export const healthyState = (): Health => ({ injuries: [], bloodLoss: 0, disease: null, downed: false, dead: false });
 
@@ -93,6 +94,12 @@ export function updateHealth(sim: Simulation, c: Colonist, hours: number): void 
   const bleeding = bleedingOf(c);
   h.bloodLoss = bleeding > 0 ? h.bloodLoss + bleeding * hours : Math.max(0, h.bloodLoss - BLOOD_REGEN_PER_HOUR * hours);
 
+  // Untended wounds slowly clot: light wounds stop on their own, many wounds still kill.
+  for (const injury of h.injuries) {
+    if (injury.tended === 0) {
+      injury.bleeding *= Math.max(0, 1 - CLOT_PER_HOUR * hours);
+    }
+  }
   const restBonus = c.sleeping ? 1.5 : 1;
   for (const injury of h.injuries) {
     const rate = injury.tended > 0 ? 0.015 + 0.03 * injury.tended : 0.004;
@@ -133,7 +140,9 @@ export function checkHealth(sim: Simulation, c: Colonist): void {
     return;
   }
   const threshold = traitValue(c, 'painThreshold') ?? DEFAULT_PAIN_THRESHOLD;
-  const downed = painOf(c) > threshold || h.bloodLoss > DOWNED_BLOOD_LOSS;
+  // Once down, a colonist stays down until clearly better, rather than flickering at the threshold.
+  const recovery = h.downed ? 0.75 : 1;
+  const downed = painOf(c) > threshold * recovery || h.bloodLoss > DOWNED_BLOOD_LOSS * recovery;
   if (downed && !h.downed) {
     sim.endJob(c);
     sim.dropCarried(c);

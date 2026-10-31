@@ -1,15 +1,15 @@
 import { TRAITS, TraitDef } from './defs';
-import { Rng } from './rng';
+import { Rng, hash2 } from './rng';
 import type { Simulation } from './simulation';
 import { Colonist } from './types';
 
 export const FRIEND_OPINION = 30;
 export const RIVAL_OPINION = -30;
-const LOVER_OPINION = 60;
+const LOVER_OPINION = 50;
 const BREAKUP_OPINION = 15;
 // Chance per slow update that two nearby colonists interact.
-const INTERACTION_CHANCE = 0.06;
-const INTERACTION_RANGE = 6;
+const INTERACTION_CHANCE = 0.03;
+const INTERACTION_RANGE = 5;
 
 type NumericTraitField = 'workSpeed' | 'plantSpeed' | 'joyDecay' | 'foodDecay' | 'damageTaken' | 'opinionGiven';
 
@@ -38,6 +38,11 @@ export function rollTraits(rng: Rng): string[] {
     }
   }
   return traits;
+}
+
+// Fixed chemistry between two colonists, -1 (oil and water) to 1 (kindred spirits).
+export function compatibility(sim: Simulation, a: Colonist, b: Colonist): number {
+  return hash2(Math.min(a.id, b.id), Math.max(a.id, b.id), sim.seed) * 2 - 1;
 }
 
 // Opinions are one-way; relationships use the lower of the two.
@@ -82,26 +87,30 @@ function adjust(from: Colonist, to: Colonist, amount: number): void {
 
 function interact(sim: Simulation, a: Colonist, b: Colonist): void {
   const before = relationLabel(a, b);
-  const insultChance = traitValue(a, 'insultChance') ?? 0.06;
+  const chemistry = compatibility(sim, a, b);
+  // Bad chemistry breeds insults; good chemistry, deep talks.
+  const insultChance = (traitValue(a, 'insultChance') ?? 0.04) + Math.max(0, -chemistry) * 0.08;
+  const deepTalkChance = 0.06 + Math.max(0, chemistry) * 0.14;
   const roll = sim.rng.next();
   if (roll < insultChance) {
-    adjust(a, b, -8);
+    adjust(a, b, -10);
+    adjust(b, a, -3);
     sim.addThought(b, 'insulted');
     sim.addLog(`${a.name} insulted ${b.name}.`, 'warn');
-  } else if (roll < insultChance + 0.15) {
+  } else if (roll < insultChance + deepTalkChance) {
     adjust(a, b, 6);
     adjust(b, a, 6);
     sim.addThought(a, 'deepTalk');
     sim.addThought(b, 'deepTalk');
-    if (a.lover < 0 && b.lover < 0 && mutualOpinion(a, b) >= LOVER_OPINION && sim.rng.next() < 0.25) {
+    if (a.lover < 0 && b.lover < 0 && chemistry > 0.2 && mutualOpinion(a, b) >= LOVER_OPINION && sim.rng.next() < 0.3) {
       a.lover = b.id;
       b.lover = a.id;
       sim.addLog(`${a.name} and ${b.name} have fallen in love.`, 'good', true);
       return;
     }
   } else {
-    adjust(a, b, 3);
-    adjust(b, a, 3);
+    adjust(a, b, 1.5 + 2 * chemistry);
+    adjust(b, a, 1.5 + 2 * chemistry);
   }
 
   if (a.lover === b.id && mutualOpinion(a, b) < BREAKUP_OPINION) {

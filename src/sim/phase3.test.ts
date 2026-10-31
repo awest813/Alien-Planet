@@ -4,9 +4,9 @@ import { TRAITS, featureId, itemId, terrainId } from './defs';
 import { bleedingOf, damage, infect } from './health';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
-import { mutualOpinion } from './social';
+import { compatibility, mutualOpinion, updateSocial } from './social';
 import { triggerEvent } from './storyteller';
-import { HOUR, clearAround, run } from './test-helpers';
+import { HOUR, run } from './test-helpers';
 import { World } from './world';
 
 describe('traits', () => {
@@ -74,13 +74,17 @@ describe('health', () => {
     for (const c of untreated.colonists) {
       c.priorities.doctor = 0;
     }
-    damage(untreated, victim, 0.5, 'cut');
+    for (let k = 0; k < 4; k++) {
+      damage(untreated, victim, 0.35, 'cut');
+    }
     expect(bleedingOf(victim)).toBeGreaterThan(0);
     run(untreated, HOUR * 12);
     expect(victim.health.dead).toBe(true);
 
     const treated = Simulation.newColony(31);
-    damage(treated, treated.colonists[0], 0.5, 'cut');
+    for (let k = 0; k < 4; k++) {
+      damage(treated, treated.colonists[0], 0.35, 'cut');
+    }
     run(treated, HOUR * 3);
     expect(treated.stats.tended).toBeGreaterThan(0);
     expect(bleedingOf(treated.colonists[0])).toBe(0);
@@ -112,25 +116,29 @@ describe('health', () => {
 });
 
 describe('relationships and events', () => {
-  it('warms colonists to each other, forming friendships within a week', () => {
-    const pairs = (sim: Simulation) =>
-      sim.living().flatMap((a) =>
-        sim
-          .living()
-          .filter((b) => b.id > a.id)
-          .map((b) => mutualOpinion(a, b)),
-      );
-    const average = (values: number[]) => values.reduce((sum, v) => sum + v, 0) / values.length;
+  it('forms friendships within a week, driven by chemistry', () => {
     let friendships = 0;
+    let goodChemistry = 0;
+    let badChemistry = 0;
     for (const seed of [1, 2, 3]) {
+      // A week of conversations between colonists who spend their days together.
       const sim = Simulation.newColony(seed);
-      clearAround(sim, 6);
-      const before = average(pairs(sim));
-      run(sim, HOUR * 24 * 6);
-      expect(average(pairs(sim))).toBeGreaterThan(before);
-      friendships += pairs(sim).filter((opinion) => opinion >= 30).length;
+      for (let update = 0; update < 7 * 16 * 10; update++) {
+        updateSocial(sim);
+      }
+      const living = sim.living();
+      for (const a of living) {
+        for (const b of living.filter((o) => o.id > a.id)) {
+          const opinion = mutualOpinion(a, b);
+          friendships += opinion >= 30 ? 1 : 0;
+          const chemistry = compatibility(sim, a, b);
+          goodChemistry += chemistry > 0.4 ? opinion : 0;
+          badChemistry += chemistry < -0.4 ? opinion : 0;
+        }
+      }
     }
     expect(friendships).toBeGreaterThan(0);
+    expect(goodChemistry).toBeGreaterThan(badChemistry);
   });
 
   it('lets a wanderer join the colony', () => {

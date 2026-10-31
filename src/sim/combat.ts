@@ -14,15 +14,16 @@ export interface RaidState {
 }
 
 const WEAPONS: Record<Weapon, { range: number; cooldown: number; accuracy: number; damage: [number, number] }> = {
-  bow: { range: 7, cooldown: 60, accuracy: 0.5, damage: [0.08, 0.16] },
-  knife: { range: 1, cooldown: 40, accuracy: 0.85, damage: [0.1, 0.18] },
+  bow: { range: 7, cooldown: 55, accuracy: 0.55, damage: [0.08, 0.15] },
+  knife: { range: 1, cooldown: 40, accuracy: 0.85, damage: [0.12, 0.2] },
 };
 const COLONIST_BOW = { range: 8, cooldown: 50, damage: [0.22, 0.32] as [number, number] };
 const COLONIST_MELEE = { cooldown: 45, damage: [0.08, 0.14] as [number, number] };
 // Undrafted colonists shoot back at raiders this close; drafted ones use the full bow range.
 const SELF_DEFENCE_RANGE = 6;
-// Raiders give up after this long, or once half of them are dead.
+// Raiders give up after this long, or once this share of them has fallen.
 const RAID_TIMEOUT = TICKS_PER_HOUR * 36;
+const MORALE_BREAK = 0.6;
 const SHOT_LIFETIME = 8;
 
 const chebyshev = (w: World, a: number, b: number) =>
@@ -242,7 +243,10 @@ export function updateEnemies(sim: Simulation): void {
   const raid = sim.raid;
   if (raid) {
     const fighting = sim.enemies.filter((e) => e.hp > 0 && !e.fleeing);
-    if (fighting.length > 0 && (raid.killed * 2 >= raid.initial || sim.tick - raid.startedTick > RAID_TIMEOUT)) {
+    if (
+      fighting.length > 0 &&
+      (raid.killed >= raid.initial * MORALE_BREAK || sim.tick - raid.startedTick > RAID_TIMEOUT)
+    ) {
       for (const e of fighting) {
         e.fleeing = true;
         e.path = [];

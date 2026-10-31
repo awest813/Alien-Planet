@@ -38,7 +38,8 @@ const EVENTS: EventDef[] = [
     weight: () => 3,
     run: (sim) => {
       const living = sim.living().length;
-      const count = Math.max(2, Math.min(7, 1 + Math.floor((sim.day - 2) / 2) + (living > 5 ? 1 : 0)));
+      // Two raiders on day 4, one more every three days, plus one for a big colony; never more than seven.
+      const count = Math.min(7, 2 + Math.floor((sim.day - 4) / 3) + (living > 6 ? 1 : 0));
       return spawnRaid(sim, sim.rng.pick(hostileFactions()).id, count);
     },
   },
@@ -122,9 +123,9 @@ const EVENTS: EventDef[] = [
   },
   {
     key: 'blight',
-    minDay: 4,
-    cooldownDays: 6,
-    weight: (sim) => (sim.countFeature((f) => !!featureDef(f).crop) > 8 ? 1 : 0),
+    minDay: 5,
+    cooldownDays: 8,
+    weight: (sim) => (sim.countFeature((f) => !!featureDef(f).crop) > 8 ? 0.6 : 0),
     run: (sim) => {
       const w = sim.world;
       let lost = 0;
