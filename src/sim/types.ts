@@ -22,6 +22,7 @@ export type JobType =
   | 'feed'
   | 'warmUp'
   | 'rescue'
+  | 'tame'
   | 'wander';
 
 export interface Job {
@@ -53,6 +54,7 @@ export interface Skills {
   combat: number;
   crafting: number;
   research: number;
+  animals: number;
 }
 
 export type SkillKey = keyof Skills;
@@ -80,6 +82,7 @@ export const WORK_TYPES = [
   'plantCutting',
   'mining',
   'hunting',
+  'handling',
   'crafting',
   'research',
   'hauling',
@@ -181,6 +184,9 @@ export interface Animal {
   hp: number;
   // Marked by the player for hunting.
   hunted: boolean;
+  // Marked by the player for taming, and tamed.
+  taming: boolean;
+  tame: boolean;
   // Colonist id it is attacking, or -1.
   revengeOn: number;
   cooldown: number;
@@ -282,6 +288,7 @@ export type Command =
   | { type: 'draft'; colonist: number; drafted: boolean }
   | { type: 'move'; colonist: number; tile: number }
   | { type: 'hunt'; rect: Rect; add: boolean }
+  | { type: 'tame'; rect: Rect; add: boolean }
   | { type: 'research'; project: string | null };
 
 export interface LogEntry {
@@ -298,6 +305,7 @@ export interface Stats {
   raidsRepelled: number;
   kills: number;
   hunted: number;
+  tamed: number;
   wintersSurvived: number;
 }
 

@@ -1,6 +1,6 @@
 import { hurtAnimal } from './animals';
 import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
-import { FACTIONS, NONE, featureDef } from './defs';
+import { FACTIONS, NONE, featureDef, itemDef, itemId } from './defs';
 import { damage } from './health';
 import { learn } from './skills';
 import { traitValue } from './social';
@@ -142,7 +142,7 @@ export function spawnRaid(sim: Simulation, faction: number, count: number): bool
         path: [],
         moveProgress: 0,
         hp: 1,
-        weapon: sim.rng.next() < 0.6 ? 'bow' : 'knife',
+        weapon: sim.rng.next() < 0.7 ? 'bow' : 'knife',
         cooldown: 0,
         fleeing: false,
         repathAt: 0,
@@ -189,9 +189,9 @@ function breach(sim: Simulation, e: Enemy): boolean {
     return false;
   }
   const region = sim.regionOf(e.tile);
-  if (e.breachTarget === undefined || !breakable(w, e.breachTarget) || e.repathAt <= sim.tick) {
+  // Stick with one wall until it's down (spreading blows over several walls breaks none).
+  if (e.breachTarget === undefined || !breakable(w, e.breachTarget)) {
     e.breachTarget = breachWall(sim, region, sim.regionOf(goal.tile), goal.tile);
-    e.repathAt = sim.tick + 60;
     e.path = [];
   }
   const wall = e.breachTarget;
@@ -253,6 +253,22 @@ function breachWall(sim: Simulation, region: number, goalRegion: number, goalTil
   return best;
 }
 
+// Raiders who beat the whole colony carry off part of its food, medicine and goods.
+function plunder(sim: Simulation): string {
+  const w = sim.world;
+  const loot = ['meal', 'fineMeal', 'herbalMedicine', 'cloth', 'leather', 'potatoes'].map((key) => itemId(key));
+  const taken = new Map<number, number>();
+  for (let i = 0; i < w.size; i++) {
+    const item = w.itemType[i];
+    if (loot.includes(item)) {
+      const n = w.takeItem(i, Math.ceil(w.itemCount[i] * 0.3));
+      taken.set(item, (taken.get(item) ?? 0) + n);
+    }
+  }
+  const parts = [...taken].filter(([, n]) => n > 0).map(([item, n]) => `${n} ${itemDef(item).name.toLowerCase()}`);
+  return parts.length > 0 ? ` and carried off ${parts.join(', ')}` : '';
+}
+
 function moveEnemy(sim: Simulation, e: Enemy): void {
   const w = sim.world;
   const next = e.path[0];
@@ -310,7 +326,7 @@ function enemyAttack(sim: Simulation, e: Enemy, target: Colonist): void {
   const hit = sim.rng.next() < accuracy;
   recordShot(sim, e.tile, target.tile, hit, ranged);
   if (hit) {
-    const harsh = sim.story.difficulty === 'harsh' ? 1.2 : 1;
+    const harsh = sim.story.difficulty === 'harsh' ? 1.1 : 1;
     damage(sim, target, roll(sim, weapon.damage) * harsh, e.weapon === 'bow' ? 'arrow' : 'cut');
   }
   e.cooldown = weapon.cooldown;
@@ -389,7 +405,7 @@ export function updateEnemies(sim: Simulation): void {
         sim.addThought(c, 'repelledRaid');
       }
     } else if (sim.living().length > 0) {
-      sim.addLog('The raiders left the colony for dead.', 'danger', true);
+      sim.addLog(`The raiders left the colony for dead${plunder(sim)}.`, 'danger', true);
     }
     for (const c of sim.living()) {
       if (c.drafted) {

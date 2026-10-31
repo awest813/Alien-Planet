@@ -393,6 +393,8 @@ export class ColonyScene extends Phaser.Scene {
       }
       body.setTint(a.revengeOn >= 0 ? 0xff8a8a : 0xffffff);
       (beast.getAt(1) as Phaser.GameObjects.Graphics).setVisible(a.hunted);
+      (beast.getAt(2) as Phaser.GameObjects.Graphics).setVisible(a.taming);
+      (beast.getAt(3) as Phaser.GameObjects.Graphics).setVisible(a.tame);
     }
   }
 
@@ -402,7 +404,13 @@ export class ColonyScene extends Phaser.Scene {
     const marker = this.add.graphics();
     marker.lineStyle(1, 0xff5c5c, 0.9).strokeCircle(0, -9, 3);
     marker.lineBetween(-5, -9, -2, -9).lineBetween(2, -9, 5, -9).lineBetween(0, -14, 0, -11).lineBetween(0, -7, 0, -4);
-    return this.add.container(0, 0, [body, marker]).setDepth(Depth.PAWNS - 1);
+    // A green ring over animals to be tamed, and a collar on tame ones.
+    const taming = this.add.graphics();
+    taming.lineStyle(1, 0x8fe36b, 0.9).strokeCircle(0, -9, 3);
+    const collar = this.add.graphics();
+    collar.fillStyle(0xd94b4b, 1).fillRect(-2, -3, 4, 1);
+    collar.fillStyle(0xffd166, 1).fillRect(0, -2, 1, 1);
+    return this.add.container(0, 0, [body, marker, taming, collar]).setDepth(Depth.PAWNS - 1);
   }
 
   private syncRaiders(): void {
@@ -620,9 +628,13 @@ export class ColonyScene extends Phaser.Scene {
       case 'cancel':
         controller.command({ type: 'cancel', rect });
         controller.command({ type: 'hunt', rect, add: false });
+        controller.command({ type: 'tame', rect, add: false });
         break;
       case 'hunt':
         controller.command({ type: 'hunt', rect, add: true });
+        break;
+      case 'tame':
+        controller.command({ type: 'tame', rect, add: true });
         break;
       case 'zone':
         controller.command({ type: 'zone', rect, zone: tool.zone });

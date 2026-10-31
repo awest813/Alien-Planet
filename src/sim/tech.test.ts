@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { featureId, itemId } from './defs';
+import { featureId, itemDef, itemId } from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation, START_HOUR } from './simulation';
 import { HOUR, clearAround, outline, run } from './test-helpers';
@@ -74,10 +74,13 @@ describe('cold storage and spoilage', () => {
     w.addItem(icebox, itemId('rawMeat'), 10);
     const warm = w.idx(x - 6, y - 8);
     w.addItem(warm, itemId('rawMeat'), 10);
-    // Mid-summer, so it's warm outdoors.
-    sim.tick = (9 * 24 + 12 - START_HOUR) * HOUR;
+    // The start of summer, so it stays warm outdoors for the whole test.
+    sim.tick = (4 * 24 + 12 - START_HOUR) * HOUR;
     sim.syncClock();
-    for (let hour = 0; hour < 24 * 5; hour++) {
+    // A couple of days past its shelf life, so a passing cold snap can't save the meat.
+    const life = itemDef(itemId('rawMeat')).shelfLife!;
+    const days = life + 2;
+    for (let hour = 0; hour < 24 * days; hour++) {
       // Newcomers who wander in would otherwise start hauling.
       for (const c of sim.colonists) {
         c.needs.food = 1;
@@ -89,7 +92,7 @@ describe('cold storage and spoilage', () => {
     }
     expect(w.itemType[warm]).not.toBe(itemId('rawMeat'));
     expect(w.itemType[icebox]).toBe(itemId('rawMeat'));
-    expect(w.fresh[icebox]).toBeCloseTo(4);
+    expect(w.fresh[icebox]).toBeCloseTo(life);
   });
 
   it('chills a sealed room with a freezer unit', () => {

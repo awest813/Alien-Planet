@@ -208,5 +208,10 @@
     "label": "New clothes",
     "mood": 3,
     "hours": 12
+  },
+  "tamedAnimal": {
+    "label": "Tamed an animal",
+    "mood": 4,
+    "hours": 12
   }
 }

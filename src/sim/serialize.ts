@@ -26,7 +26,7 @@ import {
 } from './types';
 import { World } from './world';
 
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 interface SavedColonist {
   id: number;

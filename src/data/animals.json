@@ -6,7 +6,10 @@
     "meat": 12,
     "leather": 4,
     "fleeRange": 4,
-    "weight": 5
+    "weight": 5,
+    "wildness": 0.2,
+    "breedChance": 0.25,
+    "milk": 5
   },
   "hare": {
     "name": "Hare",
@@ -15,7 +18,9 @@
     "meat": 4,
     "leather": 1,
     "fleeRange": 3,
-    "weight": 4
+    "weight": 4,
+    "wildness": 0.1,
+    "breedChance": 0.45
   },
   "boar": {
     "name": "Boar",
@@ -27,6 +32,9 @@
     "weight": 3,
     "revengeChance": 0.6,
     "bite": [0.09, 0.17],
-    "description": "Fights back when hunted."
+    "description": "Fights back when hunted.",
+    "wildness": 0.35,
+    "breedChance": 0.3,
+    "guard": true
   }
 }

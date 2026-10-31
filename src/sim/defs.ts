@@ -344,6 +344,14 @@ export interface AnimalDef {
   // Chance to turn on whoever hurt it, and its bite damage.
   revengeChance?: number;
   bite?: [number, number];
+  // 0..1: how much harder than average it is to tame.
+  wildness: number;
+  // Chance per day that a tame pair has young.
+  breedChance: number;
+  // Milk a tame one gives each morning.
+  milk?: number;
+  // Tame ones bite raiders who come close.
+  guard?: boolean;
 }
 
 export const ANIMALS: Record<string, AnimalDef> = Object.fromEntries(

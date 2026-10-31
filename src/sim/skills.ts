@@ -18,6 +18,7 @@ export const SKILL_LABELS: Record<SkillKey, string> = {
   medicine: 'Medicine',
   combat: 'Combat',
   research: 'Intellectual',
+  animals: 'Animals',
 };
 
 // Experience needed to go from `level` to the next.

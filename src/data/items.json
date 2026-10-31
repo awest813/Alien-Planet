@@ -56,7 +56,7 @@
     "category": "rawFood",
     "nutrition": 0.1,
     "rawPenalty": true,
-    "shelfLife": 4
+    "shelfLife": 6
   },
   {
     "key": "leather",
@@ -75,7 +75,7 @@
     "category": "rawFood",
     "nutrition": 0.1,
     "rawPenalty": true,
-    "shelfLife": 3
+    "shelfLife": 5
   },
   {
     "key": "fineMeal",
@@ -107,5 +107,13 @@
       "heat": -6,
       "wearDays": 48
     }
+  },
+  {
+    "key": "milk",
+    "name": "Milk",
+    "stackLimit": 30,
+    "category": "rawFood",
+    "nutrition": 0.06,
+    "shelfLife": 2
   }
 ]

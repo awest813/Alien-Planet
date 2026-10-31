@@ -34,6 +34,8 @@ function addAnimal(sim: Simulation, tile: number, kind = pickKind(sim)): Animal 
     moveProgress: 0,
     hp: ANIMALS[kind].hp,
     hunted: false,
+    taming: false,
+    tame: false,
     revengeOn: -1,
     cooldown: 0,
     restUntil: 0,
@@ -57,7 +59,7 @@ export function populateWildlife(sim: Simulation, count: number, avoid: number):
 // A small herd wanders in from the map edge. Returns how many arrived.
 export function herdArrives(sim: Simulation): number {
   const region = sim.outsideRegion();
-  if (region === undefined || sim.animals.length >= MAX_ANIMALS) {
+  if (region === undefined || wildCount(sim) >= MAX_ANIMALS) {
     return 0;
   }
   const w = sim.world;
@@ -74,7 +76,7 @@ export function herdArrives(sim: Simulation): number {
     return 0;
   }
   const kind = pickKind(sim);
-  const count = Math.min(MAX_ANIMALS - sim.animals.length, sim.rng.int(3, 5));
+  const count = Math.min(MAX_ANIMALS - wildCount(sim), sim.rng.int(3, 5));
   for (let n = 0; n < count; n++) {
     addAnimal(sim, edge, kind);
   }
@@ -123,9 +125,68 @@ function wanderTarget(sim: Simulation, a: Animal, distance: number, from?: numbe
   return undefined;
 }
 
+// Tame animals keep within this distance of the colony.
+const HOME_RANGE = 10;
+const MAX_TAME = 14;
+
+export const wildCount = (sim: Simulation) => sim.animals.filter((a) => !a.tame).length;
+
+// Each morning tame pairs may have young, and tame milkers give milk.
+export function animalsAtDawn(sim: Simulation): void {
+  const tame = sim.animals.filter((a) => a.tame && a.hp > 0);
+  const born: string[] = [];
+  for (const kind of Object.keys(ANIMALS)) {
+    const herd = tame.filter((a) => a.kind === kind);
+    for (let pair = 0; pair < Math.floor(herd.length / 2); pair++) {
+      if (sim.animals.filter((a) => a.tame).length >= MAX_TAME || !sim.rng.chance(ANIMALS[kind].breedChance)) {
+        continue;
+      }
+      const young = addAnimal(sim, herd[pair * 2].tile, kind);
+      young.tame = true;
+      born.push(ANIMALS[kind].name.toLowerCase());
+    }
+  }
+  if (born.length > 0) {
+    sim.addLog(`New ${born.length > 1 ? 'young' : 'young one'} in the herd: ${born.join(', ')}.`, 'good');
+  }
+  for (const a of tame) {
+    const milk = ANIMALS[a.kind].milk;
+    if (milk) {
+      sim.world.dropItemNear(a.tile, itemId('milk'), milk);
+    }
+  }
+}
+
+// Tame boars bite raiders who come within reach.
+function guard(sim: Simulation, a: Animal): boolean {
+  const def = ANIMALS[a.kind];
+  if (!def.guard || !def.bite || a.cooldown > 0) {
+    return false;
+  }
+  const raider = sim.enemies.find((e) => e.hp > 0 && chebyshev(sim, a.tile, e.tile) <= 1);
+  if (!raider) {
+    return false;
+  }
+  const hit = sim.rng.next() < 0.7;
+  sim.shots.push({ from: a.tile, to: raider.tile, hit, ranged: false, tick: sim.tick });
+  if (hit) {
+    raider.hp -= def.bite[0] + sim.rng.next() * (def.bite[1] - def.bite[0]);
+    if (raider.hp <= 0) {
+      sim.addLog(`A tame ${def.name.toLowerCase()} brought down ${raider.name}!`, 'good');
+      if (sim.raid) {
+        sim.raid.killed++;
+      }
+    }
+  }
+  a.cooldown = BITE_COOLDOWN;
+  a.path = [];
+  return true;
+}
+
 export function updateAnimals(sim: Simulation): void {
   const w = sim.world;
   const awake = sim.living().filter((c) => !c.sleeping);
+  const home = sim.living()[0]?.tile;
   for (const a of sim.animals) {
     if (a.hp <= 0) {
       continue;
@@ -164,7 +225,9 @@ export function updateAnimals(sim: Simulation): void {
           a.revengeOn = -1;
         }
       }
-    } else if (def.fleeRange > 0 && a.path.length === 0) {
+    } else if (a.tame && guard(sim, a)) {
+      continue;
+    } else if (def.fleeRange > 0 && !a.tame && !a.taming && a.path.length === 0) {
       // Skittish animals keep their distance from people.
       const near = awake.find((c) => w.distance(c.tile, a.tile) < def.fleeRange);
       if (near) {
@@ -175,7 +238,9 @@ export function updateAnimals(sim: Simulation): void {
       }
     }
     if (a.path.length === 0 && a.revengeOn < 0 && sim.tick >= a.restUntil) {
-      const to = wanderTarget(sim, a, WANDER_RADIUS);
+      // Tame animals that stray too far head back towards the colony.
+      const strayed = a.tame && home !== undefined && w.distance(a.tile, home) > HOME_RANGE;
+      const to = strayed ? homeward(sim, a, home) : wanderTarget(sim, a, WANDER_RADIUS);
       if (to !== undefined) {
         pathTo(sim, a, [to]);
       }
@@ -198,6 +263,8 @@ export function hurtAnimal(sim: Simulation, a: Animal, amount: number, attacker:
   if (a.hp <= 0) {
     sim.world.dropItemNear(a.tile, itemId('rawMeat'), def.meat);
     sim.world.dropItemNear(a.tile, itemId('leather'), def.leather);
+    sim.stats.produced.rawMeat = (sim.stats.produced.rawMeat ?? 0) + def.meat;
+    sim.stats.produced.leather = (sim.stats.produced.leather ?? 0) + def.leather;
     sim.stats.hunted++;
     sim.addLog(`${attacker.name} brought down a ${def.name.toLowerCase()}.`, 'good');
     return;
@@ -213,6 +280,19 @@ export function hurtAnimal(sim: Simulation, a: Animal, amount: number, attacker:
       pathTo(sim, a, [to]);
     }
   }
+}
+
+function homeward(sim: Simulation, a: Animal, home: number): number | undefined {
+  const w = sim.world;
+  const region = sim.regionOf(a.tile);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const tx = w.xOf(home) + sim.rng.int(-4, 4);
+    const ty = w.yOf(home) + sim.rng.int(-4, 4);
+    if (w.inBounds(tx, ty) && w.isPassable(w.idx(tx, ty)) && sim.regionOf(w.idx(tx, ty)) === region) {
+      return w.idx(tx, ty);
+    }
+  }
+  return undefined;
 }
 
 export function animalName(a: Animal): string {

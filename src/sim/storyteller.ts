@@ -1,4 +1,4 @@
-import { MAX_ANIMALS, herdArrives } from './animals';
+import { MAX_ANIMALS, herdArrives, wildCount } from './animals';
 import { spawnRaid } from './combat';
 import { TICKS_PER_HOUR } from './constants';
 import { ANIMALS, FACTIONS, NONE, featureDef, itemId } from './defs';
@@ -59,9 +59,13 @@ const EVENTS: EventDef[] = [
     weight: (sim) => (sim.story.difficulty === 'peaceful' ? 0 : 3),
     run: (sim) => {
       const living = sim.living().length;
-      // Two raiders on day 4, one more every three days, plus one for a big colony; never more than seven.
+      // Two raiders on day 4 and one more every three days, plus extra for a big or well-armed colony.
+      // The cap is seven at first (nine on harsh), rising by one every eight days after day 19.
       const harsh = sim.story.difficulty === 'harsh' ? 2 : 0;
-      const count = Math.min(7 + harsh, 2 + harsh + Math.floor((sim.day - 4) / 3) + (living > 6 ? 1 : 0));
+      const armed = sim.living().filter((c) => c.weapon === 'recurveBow').length;
+      const cap = Math.min(9 + harsh, 7 + harsh + Math.max(0, Math.floor((sim.day - 19) / 8)));
+      const size = 2 + harsh + Math.floor((sim.day - 4) / 3) + (living > 6 ? 1 : 0) + Math.floor(armed / 3);
+      const count = Math.min(cap, size);
       return spawnRaid(sim, sim.rng.pick(hostileFactions()).id, count);
     },
   },
@@ -114,7 +118,7 @@ const EVENTS: EventDef[] = [
     key: 'herd',
     minDay: 2,
     cooldownDays: 4,
-    weight: (sim) => (sim.animals.length < MAX_ANIMALS - 3 ? 1 : 0),
+    weight: (sim) => (wildCount(sim) < MAX_ANIMALS - 3 ? 1 : 0),
     run: (sim) => {
       const count = herdArrives(sim);
       if (count === 0) {

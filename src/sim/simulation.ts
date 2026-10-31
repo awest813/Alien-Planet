@@ -8,6 +8,7 @@ import {
   updateRoomTemperatures,
 } from './climate';
 import {
+  ANIMALS,
   COLONIST_COLORS,
   COLONIST_NAMES,
   FEATURES,
@@ -26,7 +27,7 @@ import {
   terrainDef,
   terrainId,
 } from './defs';
-import { animalName, populateWildlife, updateAnimals } from './animals';
+import { animalName, animalsAtDawn, populateWildlife, updateAnimals } from './animals';
 import { apparelScore, comfortRange, qualityLabel, starterApparel, wearApparel, wornScore, TATTERED } from './apparel';
 import { COLONIST_WEAPONS, RaidState, attackAnimal, canAttack, colonistCombat, updateEnemies } from './combat';
 import {
@@ -54,7 +55,7 @@ import {
 import { Pathfinder } from './pathfinding';
 import { PowerState, freshPower, updatePower } from './power';
 import { ResearchState, freshResearch, isAvailable, isResearched } from './research';
-import { DAYS_PER_YEAR, Season, daysUntilWinter, seasonOf } from './seasons';
+import { DAYS_PER_YEAR, Season, daysUntilWinter, seasonDay, seasonOf } from './seasons';
 import { emptyXp, learn, rollPassions, rustSkills, skillFactor } from './skills';
 import { PassRegions, Rooms, computePassRegions, computeRooms } from './regions';
 import { Rng, hash2 } from './rng';
@@ -123,18 +124,20 @@ const TEND_TICKS = 80;
 const MEDICINE = itemId('herbalMedicine');
 const RECURVE_BOW = itemId('recurveBow');
 const RAW_FISH = itemId('rawFish');
+// Ticks of handling before each taming attempt.
+const TAME_TICKS = 150;
 const SHALLOW_WATER = terrainId('shallowWater');
 const ICE = terrainId('ice');
 // Work per catch at a fishing spot, and fish per catch.
-const FISH_WORK = 160;
+const FISH_WORK = 90;
 const FISH_PER_CATCH = 3;
 // Colonists only fish while the colony holds less than this much nutrition per head.
-const FISH_FOOD_TARGET = 4;
+const FISH_FOOD_TARGET = 6;
 // Shallow water freezes from the shore inwards below this, and thaws above THAW.
 const FREEZE = -2;
 const THAW = 3;
 // Below this, crops in the field start dying.
-const FROST = -3;
+const FROST = -5;
 
 // Plants are worked from their own tile; rock, buildings, and workbenches from an adjacent one.
 const standsOn = (type: JobType): boolean =>
@@ -156,6 +159,7 @@ function createColonist(id: number, name: string, tile: number, rng: Rng): Colon
     research: rng.int(1, 9),
     medicine: rng.int(1, 9),
     combat: rng.int(1, 9),
+    animals: rng.int(1, 9),
   };
   return {
     id,
@@ -229,6 +233,7 @@ export class Simulation {
     raidsRepelled: 0,
     kills: 0,
     hunted: 0,
+    tamed: 0,
     wintersSurvived: 0,
   };
   public log: LogEntry[] = [];
@@ -555,12 +560,18 @@ export class Simulation {
         break;
       }
       case 'hunt':
+      case 'tame':
         for (const a of this.animals) {
           const x = w.xOf(a.tile);
           const y = w.yOf(a.tile);
           const { x0, y0, x1, y1 } = cmd.rect;
           if (x >= Math.min(x0, x1) && x <= Math.max(x0, x1) && y >= Math.min(y0, y1) && y <= Math.max(y0, y1)) {
-            a.hunted = cmd.add;
+            if (cmd.type === 'hunt') {
+              a.hunted = cmd.add;
+            } else {
+              // Already-tame animals have nothing left to tame.
+              a.taming = cmd.add && !a.tame;
+            }
           }
         }
         break;
@@ -765,6 +776,10 @@ export class Simulation {
         return 'Refuelling the generator';
       case 'fish':
         return 'Fishing';
+      case 'tame': {
+        const animal = this.animals.find((a) => a.id === job.patient);
+        return animal ? `Taming a ${animalName(animal).toLowerCase()}` : 'Taming';
+      }
       case 'feed':
         return `Feeding ${this.colonists[job.patient]?.name ?? 'a patient'}`;
       case 'research': {
@@ -1180,6 +1195,7 @@ export class Simulation {
       }
     }
     this.lastSeason = season;
+    animalsAtDawn(this);
   }
 
   private checkObjectives(): void {
@@ -1549,6 +1565,8 @@ export class Simulation {
         return this.tryDesignations(c, [Designation.CHOP, Designation.FORAGE]);
       case 'hunting':
         return this.tryHunt(c) || this.tryFish(c);
+      case 'handling':
+        return this.tryTame(c);
       case 'research':
         return this.tryResearch(c);
       case 'cooking':
@@ -1607,6 +1625,9 @@ export class Simulation {
         break;
       case 'rescue':
         this.stepRescue(c, job);
+        break;
+      case 'tame':
+        this.stepTame(c, job);
         break;
       case 'hunt':
         this.stepHunt(c, job);
@@ -1750,6 +1771,7 @@ export class Simulation {
     const untilWinter = daysUntilWinter(this.totalHours);
     const speed = this.isResearched('cropRotation') ? 1.25 : 1;
     // Only sow where the crop can ripen: under a sun lamp, or outdoors with enough season left.
+    const earlySpring = this.season === 'Spring' && seasonDay(this.totalHours) <= 2;
     const canRipen = (i: number) => {
       if (this.temperatureAt(i) < CROP_MIN_TEMP) {
         return false;
@@ -1757,8 +1779,12 @@ export class Simulation {
       if (lit[i]) {
         return true;
       }
+      // Early spring frosts kill seedlings; and leave a day's margin before winter.
+      if (earlySpring) {
+        return false;
+      }
       const crop = featureDef(growZoneCrop(w.zone[i])).crop!;
-      return untilWinter > crop.growDays / (terrainDef(w.terrain[i]).fertility * speed);
+      return untilWinter > crop.growDays / (terrainDef(w.terrain[i]).fertility * speed) + 1;
     };
     const targets = this.nearest(
       c.tile,
@@ -1901,7 +1927,14 @@ export class Simulation {
       case 'harvestCrop': {
         const crop = featureDef(w.feature[t]).crop!;
         w.setFeature(t, NONE);
-        w.dropItemNear(t, crop.item, crop.count);
+        // Set the harvest down beside the field, not on it, so the tile can be sown again.
+        const region = this.regionOf(t);
+        const offField = this.nearest(
+          t,
+          (i) => w.zone[i] < GROW_ZONE && w.canHoldItem(i, crop.item) && this.regions.region[i] === region,
+          1,
+        )[0];
+        w.dropItemNear(offField ?? t, crop.item, crop.count);
         this.produce(crop.item, crop.count);
         c.workStreak++;
         break;
@@ -2799,6 +2832,11 @@ export class Simulation {
     return this.resourceTotals().reduce((sum, r) => sum + r.total * itemDef(r.item).nutrition, 0);
   }
 
+  // Nothing grows in winter, so fishing is always worth it then.
+  private foodIsPlentiful(): boolean {
+    return this.season !== 'Winter' && this.foodOnHand() >= this.living().length * FISH_FOOD_TARGET;
+  }
+
   private canFishAt(i: number): boolean {
     const w = this.world;
     return w.feature[i] !== NONE && featureDef(w.feature[i]).fishing && w.neighbors(i).some((n) => w.isFishable(n));
@@ -2811,7 +2849,7 @@ export class Simulation {
     const spot = this.fishingSpots
       .filter((i) => this.canFishAt(i) && this.regions.region[i] === region && !this.isReserved(`w${i}`, c))
       .sort((a, b) => w.distance(c.tile, a) - w.distance(c.tile, b))[0];
-    if (spot === undefined || this.foodOnHand() >= this.living().length * FISH_FOOD_TARGET) {
+    if (spot === undefined || this.foodIsPlentiful()) {
       return false;
     }
     const path = this.pathfinder.find(c.tile, [spot]);
@@ -2836,7 +2874,7 @@ export class Simulation {
       job.progress -= FISH_WORK;
       w.dropItemNear(job.target, RAW_FISH, FISH_PER_CATCH);
       this.produce(RAW_FISH, FISH_PER_CATCH);
-      if (this.foodOnHand() >= this.living().length * FISH_FOOD_TARGET) {
+      if (this.foodIsPlentiful()) {
         job.wait = 0;
       }
     }
@@ -2844,6 +2882,68 @@ export class Simulation {
       this.addThought(c, 'fishedPeacefully');
       this.endJob(c);
     }
+  }
+
+  private tryTame(c: Colonist): boolean {
+    const w = this.world;
+    const region = this.regionOf(c.tile);
+    const animal = this.animals
+      .filter(
+        (a) =>
+          a.taming && !a.tame && a.hp > 0 && this.regions.region[a.tile] === region && !this.isReserved(`tm${a.id}`, c),
+      )
+      .sort((a, b) => w.distance(c.tile, a.tile) - w.distance(c.tile, b.tile))[0];
+    if (!animal) {
+      return false;
+    }
+    this.reserve(c, `tm${animal.id}`);
+    this.assign(c, this.makeJob('tame', -1, { patient: animal.id }), []);
+    return true;
+  }
+
+  // Walk up to the animal, spend a while calming it, then see whether it takes to the handler.
+  private stepTame(c: Colonist, job: Job): void {
+    const w = this.world;
+    const animal = this.animals.find((a) => a.id === job.patient);
+    if (!animal || animal.hp <= 0 || animal.tame || !animal.taming) {
+      this.endJob(c);
+      return;
+    }
+    const near =
+      Math.max(Math.abs(w.xOf(c.tile) - w.xOf(animal.tile)), Math.abs(w.yOf(c.tile) - w.yOf(animal.tile))) <= 1;
+    if (!near) {
+      const goals = [animal.tile, ...w.neighbors(animal.tile)].filter((i) => w.isPassable(i));
+      const path = this.pathfinder.find(c.tile, goals);
+      if (!path || path.length === 0) {
+        this.endJob(c);
+        return;
+      }
+      c.path = path.slice(0, 6);
+      return;
+    }
+    // Hold still while being handled.
+    animal.path = [];
+    animal.restUntil = this.tick + 40;
+    job.progress += 1;
+    learn(this, c, 'animals');
+    if (job.progress < TAME_TICKS) {
+      return;
+    }
+    const def = ANIMALS[animal.kind];
+    const chance = Math.max(0.05, Math.min(0.85, 0.2 + c.skills.animals * 0.035 - def.wildness));
+    if (this.rng.chance(chance)) {
+      animal.tame = true;
+      animal.taming = false;
+      animal.revengeOn = -1;
+      this.stats.tamed++;
+      this.addThought(c, 'tamedAnimal');
+      this.addLog(`${c.name} tamed a ${def.name.toLowerCase()}.`, 'good');
+    } else if (def.revengeChance && this.rng.chance(def.revengeChance * 0.3)) {
+      animal.revengeOn = c.id;
+      animal.revengeUntil = this.tick + TICKS_PER_HOUR;
+      this.addLog(`The ${def.name.toLowerCase()} lashed out at ${c.name}!`, 'warn');
+    }
+    this.endJob(c);
   }
 
   // Swap the starting short bow for a recurve bow lying in storage.

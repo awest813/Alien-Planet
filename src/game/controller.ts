@@ -34,7 +34,8 @@ export type Tool =
   | { kind: 'cancel' }
   | { kind: 'zone'; zone: number }
   | { kind: 'build'; feature: number }
-  | { kind: 'hunt' };
+  | { kind: 'hunt' }
+  | { kind: 'tame' };
 
 export interface ToolDef {
   id: string;
@@ -126,6 +127,14 @@ export const TOOLS: ToolDef[] = [
     hint: 'Drag over animals to hunt them for meat and leather (boars fight back)',
   },
   {
+    id: 'tame',
+    label: 'Tame',
+    hotkey: '',
+    tool: { kind: 'tame' },
+    group: 'orders',
+    hint: 'Drag over wild animals to tame them: deer give milk, boars guard the colony, pairs breed',
+  },
+  {
     id: 'cancel',
     label: 'Cancel',
     hotkey: 'x',
@@ -185,7 +194,13 @@ export const TOOLS: ToolDef[] = [
   build('stove', 'Stove', 'k', 'production', 'Cooks meals from raw food (20 granite)'),
   build('craftingBench', 'Crafting bench', 'j', 'production', 'Weaves cloth and crafts bows (30 wood)'),
   build('researchBench', 'Research bench', '', 'production', 'Where colonists research new technology (30 wood)'),
-  build('fishingSpot', 'Fishing spot', '', 'production', 'Build on the shore; hunters catch fish here (10 wood)'),
+  build(
+    'fishingSpot',
+    'Fishing spot',
+    '',
+    'production',
+    'Build on the shore; hunters fish here when food runs short and all winter (10 wood)',
+  ),
   build('icebox', 'Icebox', '', 'production', 'Food storage that keeps food fresh while powered (50 W)'),
   build('sunLamp', 'Sun lamp', '', 'production', 'Crops nearby grow day and night, all year (300 W)'),
   build('woodGenerator', 'Wood generator', '', 'power', '1000 W while fuelled; haulers refuel it with wood'),
@@ -1020,7 +1035,9 @@ export class GameController {
     }
     if (def?.fishing) {
       details.push(
-        w.neighbors(i).some((n) => w.isFishable(n)) ? 'Hunters fish here when food runs short' : 'The water is frozen',
+        w.neighbors(i).some((n) => w.isFishable(n))
+          ? 'Hunters fish here when food runs short, and all winter'
+          : 'The water is frozen',
       );
     }
     if (def?.growLight) {
@@ -1044,7 +1061,7 @@ export class GameController {
     const room = sim.roomAt(i);
     const beast = sim.animals.find((a) => a.tile === i);
     const animal = beast
-      ? `${animalName(beast)}${beast.hunted ? ' · marked for hunting' : ''}${beast.revengeOn >= 0 ? ' · enraged' : ''}`
+      ? `${beast.tame ? 'Tame ' + animalName(beast).toLowerCase() : animalName(beast)}${beast.taming ? ' · to be tamed' : ''}${beast.hunted ? ' · marked for hunting' : ''}${beast.revengeOn >= 0 ? ' · enraged' : ''}`
       : null;
     return {
       x: w.xOf(i),

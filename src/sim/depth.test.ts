@@ -5,7 +5,7 @@ import { featureId, itemId, terrainId } from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
 import { learn, rustSkills, xpToNext } from './skills';
-import { HOUR, run } from './test-helpers';
+import { HOUR, clearAround, outline, run } from './test-helpers';
 import { World } from './world';
 
 describe('skills', () => {
@@ -111,9 +111,13 @@ describe('review regressions', () => {
     const sim = Simulation.newColony(7);
     // Boars don't run from people, so it stays put while the wall goes up around it.
     const a = sim.animals.find((x) => x.kind === 'boar') ?? sim.animals[0];
+    const w = sim.world;
+    // Put it on plain ground near the colony, where a wall can go.
+    const { x, y } = clearAround(sim, 6);
+    a.kind = 'boar';
+    a.tile = w.idx(x + 3, y);
     a.restUntil = Number.MAX_SAFE_INTEGER;
     a.path = [];
-    const w = sim.world;
     const tile = a.tile;
     w.dropItemNear(sim.colonists[0].tile, itemId('wood'), 50);
     sim.apply({ type: 'build', feature: featureId('woodWall'), tiles: [tile] });
@@ -129,6 +133,15 @@ describe('review regressions', () => {
     const sim = Simulation.newColony(8);
     const boar = sim.animals.find((x) => x.kind === 'boar') ?? sim.animals[0];
     const target = sim.colonists[0];
+    // Wall the target in so the boar can't get at them.
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 6);
+    target.tile = w.idx(x, y);
+    for (const t of outline(w, x - 1, y - 1, x + 1, y + 1)) {
+      w.setFeature(t, featureId('stoneWall'));
+    }
+    boar.tile = w.idx(x + 5, y);
+    boar.path = [];
     boar.revengeOn = target.id;
     boar.revengeUntil = sim.tick + HOUR * 2;
     run(sim, HOUR * 3);

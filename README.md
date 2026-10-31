@@ -67,6 +67,10 @@ How the storytelling layer works:
   pauses; drafted colonists shoot anything within range and line of sight, undrafted ones defend themselves at
   close range. Raiders flee once half of them fall. Walling yourself in doesn't stop them: raiders who
   can't reach anyone smash through the nearest wall or door.
+- **Animal husbandry:** mark wild animals with the Tame tool; colonists with the Handle work type (and the
+  Animals skill) calm them and try to win them over, harder for wilder animals, and a boar may lash out.
+  Tame animals stay near the colony, pairs breed most mornings, tame deer give milk, and tame boars bite
+  raiders who come close. Mark a tame animal for hunting to slaughter it for meat and leather.
 - **Clothing and exposure:** colonists start in tunics. Research Tailoring to make tunics from cloth and warm
   parkas from leather at the crafting bench; clothes get a quality tier (Poor to Masterwork) from the
   crafter's skill, insulate more the better they're made, and wear out over weeks. Colonists change into
@@ -171,7 +175,8 @@ covers traits, line of sight, raids, bleeding and tending, disease, relationship
 the calendar, winter cold, frost and research. `src/sim/tech.test.ts` covers power, spoilage, cold storage and
 sun lamps, `src/sim/water.test.ts` covers bridges, fishing, ice, wading and battery charging, and
 `src/sim/playtest.test.ts` covers fixes from persona playtests (feeding the downed, raiders breaching walls,
-idle generators), and `src/sim/needs.test.ts` covers clothing, exposure, fine meals, food poisoning and saves.
+idle generators), `src/sim/needs.test.ts` covers clothing, exposure, fine meals, food poisoning and saves, and
+`src/sim/husbandry.test.ts` covers taming, herding, breeding, milk and guard animals.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,
 drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation:
