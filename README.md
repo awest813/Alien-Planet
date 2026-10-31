@@ -18,7 +18,7 @@ how nice their rooms are. Let mood drop too far for too long and a colonist will
 | Apply a tool          | Left-drag a rectangle (walls are placed as an outline)  |
 | Drop the current tool | Right-click or Esc                                      |
 | Select a colonist     | Click it on the map or in the colonist list             |
-| Save / load / new map | Menu button (the game also autosaves every dawn)        |
+| Save / load / new map | Menu button: four slots, delete, difficulty and seed    |
 | Work priorities       | Work button: click a cell to cycle 1 → 4 → off          |
 | Schedules             | Schedule button: pick a brush and paint hours           |
 | Draft for combat      | Q (selected colonist, or everyone), or the Draft button |
@@ -63,8 +63,9 @@ How the storytelling layer works:
   pauses; drafted colonists shoot anything within range and line of sight, undrafted ones defend themselves at
   close range. Raiders flee once half of them fall.
 - **Storyteller:** roughly once or twice a day it may send a raid, an illness, a wanderer who joins, a cold
-  snap, a gift of supplies from the friendly Meadow Kin, or crop blight. Notable moments go into the Story
-  screen.
+  snap, a gift of supplies from the friendly Meadow Kin, or crop blight. Each event pops up as a short
+  notification card and goes into the Story screen. Pick the difficulty when founding a colony: Peaceful (no
+  raids), Standard, or Harsh (bigger, harder-hitting raids).
 
 ## Architecture
 
@@ -120,14 +121,15 @@ covers traits, line of sight, raids, bleeding and tending, disease, relationship
 drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation:
 
 ```
-npx tsx scripts/balance.ts 20 8          # 20 days on 8 seeds
-npx tsx scripts/balance.ts 20 8 passive  # never draft during raids
-npx tsx scripts/balance.ts 20 4 trace    # print the colony state whenever someone dies
+npx tsx scripts/balance.ts 20 8                # 20 days on 8 seeds, standard difficulty
+npx tsx scripts/balance.ts 20 8 passive        # never draft during raids
+npx tsx scripts/balance.ts 20 8 harsh          # or peaceful
+npx tsx scripts/balance.ts 20 4 trace          # print the colony state whenever someone dies
 ```
 
-With the current tuning, early raids are manageable and late ones (6–7 raiders after day 15) can cost a colony
-a few colonists, but rarely everyone. First friendships appear around day 6–7, with a few rivalries and couples
-over 20 days.
+With the current tuning (8 seeds × 20 days), a defended Standard colony keeps everyone alive, an undefended
+one loses the odd colonist late on, and Harsh costs around one colonist in eight, with no colony wiped out.
+First friendships appear around day 6–7, with a few rivalries and couples over 20 days.
 
 ## Roadmap
 

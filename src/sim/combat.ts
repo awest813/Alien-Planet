@@ -14,10 +14,10 @@ export interface RaidState {
 }
 
 const WEAPONS: Record<Weapon, { range: number; cooldown: number; accuracy: number; damage: [number, number] }> = {
-  bow: { range: 7, cooldown: 55, accuracy: 0.55, damage: [0.08, 0.15] },
+  bow: { range: 7, cooldown: 55, accuracy: 0.55, damage: [0.09, 0.17] },
   knife: { range: 1, cooldown: 40, accuracy: 0.85, damage: [0.12, 0.2] },
 };
-const COLONIST_BOW = { range: 8, cooldown: 50, damage: [0.22, 0.32] as [number, number] };
+const COLONIST_BOW = { range: 8, cooldown: 60, damage: [0.17, 0.26] as [number, number] };
 const COLONIST_MELEE = { cooldown: 45, damage: [0.08, 0.14] as [number, number] };
 // Undrafted colonists shoot back at raiders this close; drafted ones use the full bow range.
 const SELF_DEFENCE_RANGE = 6;
@@ -194,7 +194,8 @@ function enemyAttack(sim: Simulation, e: Enemy, target: Colonist): void {
   const hit = sim.rng.next() < accuracy;
   recordShot(sim, e.tile, target.tile, hit, weapon.range > 1);
   if (hit) {
-    damage(sim, target, roll(sim, weapon.damage), e.weapon === 'bow' ? 'arrow' : 'cut');
+    const harsh = sim.story.difficulty === 'harsh' ? 1.2 : 1;
+    damage(sim, target, roll(sim, weapon.damage) * harsh, e.weapon === 'bow' ? 'arrow' : 'cut');
   }
   e.cooldown = weapon.cooldown;
 }
@@ -257,19 +258,24 @@ export function updateEnemies(sim: Simulation): void {
   sim.enemies = sim.enemies.filter((e) => e.hp > 0);
   if (raid && sim.enemies.length === 0) {
     sim.raid = null;
-    if (sim.living().length > 0) {
+    const standing = sim.living().filter((c) => !c.health.downed);
+    if (standing.length > 0) {
       sim.stats.raidsRepelled++;
       sim.addLog(
         `The raid is over. ${raid.killed} raider${raid.killed === 1 ? '' : 's'} fell. Colonists stand down.`,
         'good',
         true,
       );
-      for (const c of sim.living()) {
+      for (const c of standing) {
         sim.addThought(c, 'repelledRaid');
-        if (c.drafted) {
-          sim.endJob(c);
-          c.drafted = false;
-        }
+      }
+    } else if (sim.living().length > 0) {
+      sim.addLog('The raiders left the colony for dead.', 'danger', true);
+    }
+    for (const c of sim.living()) {
+      if (c.drafted) {
+        sim.endJob(c);
+        c.drafted = false;
       }
     }
   }
@@ -306,11 +312,16 @@ export function colonistCombat(sim: Simulation, c: Colonist): boolean {
     return false;
   }
   const w = sim.world;
+  const range = c.drafted ? COLONIST_BOW.range : SELF_DEFENCE_RANGE;
+  // The nearest enemy we can actually hit: adjacent, or in range with a clear shot.
   let nearest: Enemy | undefined;
   let nearestDist = Infinity;
   for (const e of sim.enemies) {
     const d = w.distance(c.tile, e.tile);
-    if (e.hp > 0 && d < nearestDist) {
+    if (e.hp <= 0 || d >= nearestDist) {
+      continue;
+    }
+    if (chebyshev(w, c.tile, e.tile) <= 1 || (d <= range && lineOfSight(w, c.tile, e.tile))) {
       nearest = e;
       nearestDist = d;
     }
@@ -319,10 +330,6 @@ export function colonistCombat(sim: Simulation, c: Colonist): boolean {
     return false;
   }
   const melee = chebyshev(w, c.tile, nearest.tile) <= 1;
-  const range = c.drafted ? COLONIST_BOW.range : SELF_DEFENCE_RANGE;
-  if (!melee && (nearestDist > range || !lineOfSight(w, c.tile, nearest.tile))) {
-    return false;
-  }
   if (!c.drafted && c.job) {
     // Drop whatever we were doing (waking up if need be) to fight.
     sim.endJob(c);

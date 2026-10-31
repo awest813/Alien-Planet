@@ -177,7 +177,8 @@ export function deserialize(data: SaveData): Simulation {
   sim.stats = structuredClone(data.stats);
   sim.log = data.log.map((entry) => ({ ...entry }));
   sim.storyLog = structuredClone(data.storyLog);
-  sim.story = structuredClone(data.story);
+  // Saves from before difficulty settings play on standard.
+  sim.story = { ...structuredClone(data.story), difficulty: data.story.difficulty ?? 'standard' };
   sim.enemies = structuredClone(data.enemies);
   sim.nextEnemyId = data.nextEnemyId;
   sim.raid = structuredClone(data.raid);

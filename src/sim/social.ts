@@ -89,7 +89,8 @@ function interact(sim: Simulation, a: Colonist, b: Colonist): void {
   const before = relationLabel(a, b);
   const chemistry = compatibility(sim, a, b);
   // Bad chemistry breeds insults; good chemistry, deep talks.
-  const insultChance = (traitValue(a, 'insultChance') ?? 0.04) + Math.max(0, -chemistry) * 0.08;
+  const traitInsults = traitValue(a, 'insultChance');
+  const insultChance = traitInsults === 0 ? 0 : (traitInsults ?? 0.04) + Math.max(0, -chemistry) * 0.08;
   const deepTalkChance = 0.06 + Math.max(0, chemistry) * 0.14;
   const roll = sim.rng.next();
   if (roll < insultChance) {

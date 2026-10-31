@@ -767,3 +767,104 @@ button.active.danger {
     grid-template-columns: minmax(0, 180px) 1fr 0;
   }
 }
+
+/* Audit polish: notifications, compact alerts, menu */
+.notices {
+  /* The middle grid cell: always below the top bar, between the side panels. */
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: center;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(460px, calc(100% - 32px));
+  pointer-events: none;
+}
+
+.notices > * {
+  pointer-events: auto;
+}
+
+.notices .toast {
+  position: static;
+  transform: none;
+}
+
+.notification {
+  width: 100%;
+  text-align: left;
+  background: var(--panel);
+  border-left: 3px solid var(--accent);
+  padding: 6px 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.notification.good {
+  border-left-color: var(--good);
+}
+
+.notification.warn {
+  border-left-color: var(--warn);
+}
+
+.notification.danger {
+  border-left-color: #ff5c5c;
+}
+
+.alerts li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alerts li.more {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.alerts li.more button {
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+.paused {
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  background: rgba(255, 209, 102, 0.2);
+  color: var(--accent);
+}
+
+.saves .tag {
+  margin-left: 6px;
+}
+
+.difficulties {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.difficulties button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 6px 8px;
+}
+
+.difficulties button span {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+@media (max-width: 720px) {
+  .difficulties {
+    grid-template-columns: 1fr;
+  }
+}

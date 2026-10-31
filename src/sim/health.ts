@@ -22,6 +22,8 @@ const FATAL_INJURIES = 1.6;
 const DOWNED_BLOOD_LOSS = 0.6;
 const BLOOD_REGEN_PER_HOUR = 0.06;
 const CLOT_PER_HOUR = 0.15;
+// Below this a wound has stopped bleeding.
+const CLOTTED = 0.005;
 
 export const healthyState = (): Health => ({ injuries: [], bloodLoss: 0, disease: null, downed: false, dead: false });
 
@@ -98,6 +100,9 @@ export function updateHealth(sim: Simulation, c: Colonist, hours: number): void 
   for (const injury of h.injuries) {
     if (injury.tended === 0) {
       injury.bleeding *= Math.max(0, 1 - CLOT_PER_HOUR * hours);
+      if (injury.bleeding < CLOTTED) {
+        injury.bleeding = 0;
+      }
     }
   }
   const restBonus = c.sleeping ? 1.5 : 1;

@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { ColonistView, SAVE_SLOTS, TOOLS, ToolDef, UiState, controller } from '../game/controller';
+import { ColonistView, SAVE_SLOTS, TOOLS, ToolDef, UiState, controller, slotLabel } from '../game/controller';
 import { SAVE_VERSION } from '../sim/serialize';
+import { DIFFICULTIES, Difficulty } from '../sim/storyteller';
 import { ScheduleSlot, WORK_TYPES, WorkTypeKey } from '../sim/types';
 
 const useUiState = (): UiState => useSyncExternalStore(controller.subscribe, controller.getState);
@@ -70,7 +71,19 @@ export function App() {
         <Inspector state={state} />
         <Toolbar state={state} />
       </div>
-      {state.toast && <div className="toast">{state.toast}</div>}
+      <div className="notices">
+        {state.toast && <div className="toast">{state.toast}</div>}
+        {state.notifications.map((n) => (
+          <button
+            key={n.id}
+            className={`notification ${n.tone}`}
+            onClick={() => controller.dismissNotification(n.id)}
+            title="Dismiss"
+          >
+            {n.text}
+          </button>
+        ))}
+      </div>
       {screen === 'menu' && <Menu state={state} onClose={close} />}
       {screen === 'help' && <HelpScreen onClose={close} />}
       {screen === 'story' && <StoryScreen state={state} onClose={close} />}
@@ -87,6 +100,7 @@ function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Screen) =>
       <span className="title">Colony Alpha</span>
       <span className="clock">
         {state.night ? '☾' : '☀'} Day {state.day} · {state.time} · {state.outdoorTemp}°C
+        {state.speed === 0 && <span className="paused">Paused</span>}
       </span>
       <div className="speeds">
         {SPEED_LABELS.map((label, index) => (
@@ -264,15 +278,7 @@ function SidePanel({ state }: { state: UiState }) {
   const phaseNames = ['Phase 1 · Shelter', 'Phase 2 · Living', 'Phase 3 · Story'];
   return (
     <div className="panel side">
-      {state.alerts.length > 0 && (
-        <ul className="alerts">
-          {state.alerts.map((alert) => (
-            <li key={alert.text} className={alert.tone}>
-              {alert.text}
-            </li>
-          ))}
-        </ul>
-      )}
+      <Alerts state={state} />
       {phases.map((objectives, index) => (
         <div key={index}>
           <h3>
@@ -579,53 +585,149 @@ function StoryScreen({ state, onClose }: { state: UiState; onClose: () => void }
   );
 }
 
+const MAX_ALERTS = 5;
+
+// Most urgent first; the rest fold away so objectives stay visible.
+function Alerts({ state }: { state: UiState }) {
+  const [expanded, setExpanded] = useState(false);
+  if (state.alerts.length === 0) {
+    return null;
+  }
+  const sorted = [...state.alerts].sort((a, b) => (a.tone === b.tone ? 0 : a.tone === 'danger' ? -1 : 1));
+  const shown = expanded ? sorted : sorted.slice(0, MAX_ALERTS);
+  const hidden = sorted.length - shown.length;
+  return (
+    <ul className="alerts">
+      {shown.map((alert) => (
+        <li key={alert.text} className={alert.tone} title={alert.text}>
+          {alert.text}
+        </li>
+      ))}
+      {(hidden > 0 || expanded) && sorted.length > MAX_ALERTS && (
+        <li className="more">
+          <button onClick={() => setExpanded(!expanded)}>{expanded ? 'Show fewer' : `${hidden} more…`}</button>
+        </li>
+      )}
+    </ul>
+  );
+}
+
+// Two-step button for actions that throw away progress.
+function ConfirmButton({
+  label,
+  confirm,
+  onConfirm,
+  disabled,
+}: {
+  label: string;
+  confirm: string;
+  onConfirm: () => void;
+  disabled?: boolean;
+}) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) {
+      return;
+    }
+    const timer = setTimeout(() => setArmed(false), 3000);
+    return () => clearTimeout(timer);
+  }, [armed]);
+  return (
+    <button
+      className={armed ? 'active danger' : ''}
+      disabled={disabled}
+      onClick={() => {
+        if (armed) {
+          setArmed(false);
+          onConfirm();
+        } else {
+          setArmed(true);
+        }
+      }}
+    >
+      {armed ? confirm : label}
+    </button>
+  );
+}
+
 function Menu({ state, onClose }: { state: UiState; onClose: () => void }) {
   const [seed, setSeed] = useState('');
+  const [difficulty, setDifficulty] = useState<Difficulty>('standard');
   const savesBySlot = new Map(state.saves.map((s) => [s.slot, s]));
+  const current = DIFFICULTIES.find((d) => d.key === state.difficulty);
   return (
     <Modal title="Colony menu" onClose={onClose}>
+      <p className="muted">
+        Day {state.day} · {state.colonists.filter((c) => !c.dead).length} colonists · {current?.label} · seed{' '}
+        {state.seed}
+      </p>
       <h3>Saves</h3>
       <table className="saves">
         <tbody>
           {SAVE_SLOTS.map((slot) => {
             const meta = savesBySlot.get(slot);
             const outdated = !!meta && meta.version !== SAVE_VERSION;
+            const details = meta
+              ? [
+                  `Day ${meta.day}, ${String(meta.hour).padStart(2, '0')}:00`,
+                  meta.colonists !== undefined ? `${meta.colonists} colonists` : null,
+                  new Date(meta.savedAt).toLocaleString(),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              : 'Empty';
             return (
               <tr key={slot}>
-                <td>{slot}</td>
+                <td>{slotLabel(slot)}</td>
                 <td className="muted">
-                  {meta ? `Day ${meta.day}, ${meta.hour}:00 · ${new Date(meta.savedAt).toLocaleString()}` : 'Empty'}
-                  {outdated && ' · from an older version'}
+                  {details}
+                  {outdated && <span className="tag warn">older version</span>}
                 </td>
                 <td>
-                  {slot !== 'autosave' && <button onClick={() => controller.save(slot)}>Save</button>}
-                  <button
+                  {slot !== 'autosave' &&
+                    (meta ? (
+                      <ConfirmButton label="Save" confirm="Overwrite?" onConfirm={() => controller.save(slot)} />
+                    ) : (
+                      <button onClick={() => controller.save(slot)}>Save</button>
+                    ))}
+                  <ConfirmButton
+                    label="Load"
+                    confirm="Lose current?"
                     disabled={!meta || outdated}
-                    onClick={() => {
+                    onConfirm={() => {
                       controller.load(slot);
                       onClose();
                     }}
-                  >
-                    Load
-                  </button>
+                  />
+                  {meta && (
+                    <ConfirmButton label="Delete" confirm="Delete?" onConfirm={() => controller.deleteSave(slot)} />
+                  )}
                 </td>
               </tr>
             );
           })}
         </tbody>
       </table>
-      <p className="muted">The game autosaves every dawn.</p>
+      <p className="muted">The game autosaves every dawn. Unsaved progress is lost when you load or start over.</p>
       <h3>New colony</h3>
+      <div className="difficulties">
+        {DIFFICULTIES.map((d) => (
+          <button key={d.key} className={difficulty === d.key ? 'active' : ''} onClick={() => setDifficulty(d.key)}>
+            <b>{d.label}</b>
+            <span>{d.description}</span>
+          </button>
+        ))}
+      </div>
       <div className="row">
         <input placeholder="Seed (blank for random)" value={seed} onChange={(e) => setSeed(e.target.value)} />
-        <button
-          onClick={() => {
-            controller.newColony(seed);
+        <ConfirmButton
+          label="Start"
+          confirm="Lose current?"
+          onConfirm={() => {
+            controller.newColony(seed, difficulty);
             onClose();
           }}
-        >
-          Start
-        </button>
+        />
       </div>
     </Modal>
   );

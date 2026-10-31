@@ -1,13 +1,14 @@
 import { impressivenessLabel } from '../sim/climate';
 import { FACTIONS, NONE, RECIPES, TRAITS, featureDef, featureId, itemDef, itemId, terrainDef } from '../sim/defs';
-import { bleedingOf, painOf } from '../sim/health';
+import { bleedingOf, needsBedRest, painOf } from '../sim/health';
 import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import { NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
 import { Command, DesignationKind, LogEntry, Needs, Priorities, ScheduleSlot, Skills } from '../sim/types';
 import { Designation, GROW_ZONE, STOCKPILE_ZONE } from '../sim/world';
-import { SaveMeta, listSaves, readSave, writeSave } from './save-store';
+import { Difficulty } from '../sim/storyteller';
+import { SaveMeta, deleteSave, listSaves, readSave, writeSave } from './save-store';
 
 export type Tool =
   | { kind: 'select' }
@@ -141,6 +142,8 @@ const DAILY_NUTRITION = 1.4;
 export const TICKS_PER_SECOND = 20;
 export const SAVE_SLOTS = ['autosave', 'slot-1', 'slot-2', 'slot-3'];
 
+export const slotLabel = (slot: string): string => (slot === 'autosave' ? 'Autosave' : `Slot ${slot.slice(5)}`);
+
 export interface ColonistView {
   id: number;
   name: string;
@@ -162,6 +165,13 @@ export interface ColonistView {
   relations: { name: string; opinion: number; label: string | null }[];
   drafted: boolean;
   dead: boolean;
+}
+
+// A story event shown briefly as a card, so major moments aren't missed.
+export interface Notification {
+  id: number;
+  text: string;
+  tone: LogEntry['tone'];
 }
 
 export interface RaidView {
@@ -213,6 +223,9 @@ export interface UiState {
   hoverColonist: number | null;
   saves: SaveMeta[];
   toast: string | null;
+  notifications: Notification[];
+  seed: number;
+  difficulty: Difficulty;
 }
 
 const toolId = (tool: Tool): string =>
@@ -237,6 +250,10 @@ export class GameController {
   private saves: SaveMeta[] = [];
   private toast: string | null = null;
   private toastTimer = 0;
+  private notifications: (Notification & { expires: number })[] = [];
+  private nextNotification = 0;
+  // How much of the story log has already been shown as notifications.
+  private storySeen = 0;
   // Tick at which each colonist last started idling, for the idle alert.
   private idleSince = new Map<number, number>();
   private state: UiState;
@@ -245,6 +262,7 @@ export class GameController {
   constructor() {
     this.sim = Simulation.newColony(Math.floor(Math.random() * 1e9));
     this.focusRequest = this.sim.colonists[0].tile;
+    this.storySeen = this.sim.storyLog.length;
     this.state = this.buildState();
     this.refreshSaves();
   }
@@ -287,12 +305,13 @@ export class GameController {
       } else if (event === 'raid') {
         // Give the player a moment to react.
         this.setSpeed(0);
-        this.notify('Raid! The game is paused. Draft your colonists with Q.');
+        this.notify('Game paused. Press Q to draft your colonists.');
       }
     }
     if (this.toast && (this.toastTimer -= deltaMs) <= 0) {
       this.toast = null;
     }
+    this.collectNotifications(now);
     this.sinceUiUpdate += deltaMs;
     if (this.sinceUiUpdate >= 200) {
       this.sinceUiUpdate = 0;
@@ -367,23 +386,64 @@ export class GameController {
     }
   }
 
-  public newColony(seedText: string): void {
+  public newColony(seedText: string, difficulty: Difficulty = 'standard'): void {
     const trimmed = seedText.trim();
     const seed =
       trimmed === '' ? Math.floor(Math.random() * 1e9) : /^\d+$/.test(trimmed) ? Number(trimmed) : hashSeed(trimmed);
-    this.replaceSim(Simulation.newColony(seed));
+    this.replaceSim(Simulation.newColony(seed, difficulty));
     this.notify(`New colony founded (seed ${seed}).`);
+  }
+
+  public async deleteSave(slot: string): Promise<void> {
+    try {
+      await deleteSave(slot);
+      await this.refreshSaves();
+      this.notify(`Deleted ${slotLabel(slot).toLowerCase()}.`);
+    } catch (error) {
+      console.error(error);
+      this.notify('Deleting failed.');
+    }
+  }
+
+  public dismissNotification(id: number): void {
+    this.notifications = this.notifications.filter((n) => n.id !== id);
+    this.publish();
+  }
+
+  // Turns new story entries into short-lived notification cards.
+  private collectNotifications(now: number): void {
+    const story = this.sim.storyLog;
+    const before = this.notifications.length;
+    // The story log is capped, so track entries by count and clamp if it was trimmed.
+    this.storySeen = Math.min(this.storySeen, story.length);
+    for (const entry of story.slice(this.storySeen)) {
+      this.notifications.push({ id: this.nextNotification++, text: entry.text, tone: entry.tone, expires: now + 8000 });
+    }
+    this.storySeen = story.length;
+    this.notifications = this.notifications.filter((n) => n.expires > now).slice(-4);
+    if (this.notifications.length !== before) {
+      this.publish();
+    }
   }
 
   public async save(slot: string, auto = false): Promise<void> {
     const sim = this.sim;
     try {
       await writeSave(
-        { slot, day: sim.day, hour: Math.floor(sim.hour), seed: sim.seed, savedAt: Date.now(), version: SAVE_VERSION },
+        {
+          slot,
+          day: sim.day,
+          hour: Math.floor(sim.hour),
+          seed: sim.seed,
+          savedAt: Date.now(),
+          version: SAVE_VERSION,
+          colonists: sim.living().length,
+          difficulty: sim.story.difficulty,
+        },
         serialize(sim),
       );
       await this.refreshSaves();
-      this.notify(auto ? 'Autosaved.' : `Saved to ${slot}.`);
+      this.notify(auto ? 'Autosaved.' : `Saved to ${slotLabel(slot).toLowerCase()}.`);
     } catch (error) {
       console.error(error);
       this.notify('Saving failed.');
@@ -394,11 +454,11 @@ export class GameController {
     try {
       const data = await readSave(slot);
       if (!data) {
-        this.notify(`Nothing saved in ${slot}.`);
+        this.notify(`Nothing saved in ${slotLabel(slot).toLowerCase()}.`);
         return;
       }
       this.replaceSim(deserialize(data));
-      this.notify(`Loaded ${slot}.`);
+      this.notify(`Loaded ${slotLabel(slot).toLowerCase()}.`);
     } catch (error) {
       console.error(error);
       this.notify('That save is from an older version and cannot be loaded.');
@@ -412,6 +472,9 @@ export class GameController {
     this.selectedColonist = null;
     this.accumulator = 0;
     this.focusRequest = sim.colonists[0].tile;
+    // Don't replay a loaded colony's history as notifications.
+    this.storySeen = sim.storyLog.length;
+    this.notifications = [];
     this.publish();
   }
 
@@ -517,6 +580,9 @@ export class GameController {
       hoverColonist: this.hoverColonist,
       saves: this.saves,
       toast: this.toast,
+      notifications: this.notifications.map(({ id, text, tone }) => ({ id, text, tone })),
+      seed: sim.seed,
+      difficulty: sim.story.difficulty,
     };
   }
 
@@ -591,6 +657,8 @@ export class GameController {
       const slot = c.schedule[Math.floor(sim.hour)];
       const isIdle =
         (slot === 'A' || slot === 'W') &&
+        raiders === 0 &&
+        !needsBedRest(c) &&
         !c.drafted &&
         !c.health.downed &&
         !sim.inMentalBreak(c) &&

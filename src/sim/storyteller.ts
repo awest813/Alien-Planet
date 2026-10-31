@@ -4,14 +4,32 @@ import { FACTIONS, NONE, featureDef, itemId } from './defs';
 import { infect } from './health';
 import type { Simulation } from './simulation';
 
+export type Difficulty = 'peaceful' | 'standard' | 'harsh';
+
+export const DIFFICULTIES: { key: Difficulty; label: string; description: string }[] = [
+  { key: 'peaceful', label: 'Peaceful', description: 'No raids. Illness and hardship still happen, more gently.' },
+  { key: 'standard', label: 'Standard', description: 'Raids grow over time. A well-defended colony usually holds.' },
+  { key: 'harsh', label: 'Harsh', description: 'Bigger, harder-hitting, more frequent raids. Expect losses.' },
+];
+
 export interface StoryState {
   lastEventTick: number;
   // Tick before which each event may not fire again.
   cooldowns: Record<string, number>;
   coldSnapUntil: number;
+  difficulty: Difficulty;
 }
 
-export const freshStory = (): StoryState => ({ lastEventTick: 0, cooldowns: {}, coldSnapUntil: 0 });
+export const freshStory = (difficulty: Difficulty = 'standard'): StoryState => ({
+  lastEventTick: 0,
+  cooldowns: {},
+  coldSnapUntil: 0,
+  difficulty,
+});
+
+// How strongly each difficulty leans on threats (raids, illness, cold, blight).
+const THREAT_WEIGHT: Record<Difficulty, number> = { peaceful: 0.5, standard: 1, harsh: 1.4 };
+const isThreat = (key: string) => key !== 'wanderer' && key !== 'supplies';
 
 interface EventDef {
   key: string;
@@ -35,11 +53,12 @@ const EVENTS: EventDef[] = [
     key: 'raid',
     minDay: 4,
     cooldownDays: 3,
-    weight: () => 3,
+    weight: (sim) => (sim.story.difficulty === 'peaceful' ? 0 : 3),
     run: (sim) => {
       const living = sim.living().length;
       // Two raiders on day 4, one more every three days, plus one for a big colony; never more than seven.
-      const count = Math.min(7, 2 + Math.floor((sim.day - 4) / 3) + (living > 6 ? 1 : 0));
+      const harsh = sim.story.difficulty === 'harsh' ? 2 : 0;
+      const count = Math.min(7 + harsh, 2 + harsh + Math.floor((sim.day - 4) / 3) + (living > 6 ? 1 : 0));
       return spawnRaid(sim, sim.rng.pick(hostileFactions()).id, count);
     },
   },
@@ -141,21 +160,26 @@ const EVENTS: EventDef[] = [
   },
 ];
 
+function weightOf(sim: Simulation, event: EventDef): number {
+  return event.weight(sim) * (isThreat(event.key) ? THREAT_WEIGHT[sim.story.difficulty ?? 'standard'] : 1);
+}
+
 // Called every tick; at most rolls once per in-game hour.
 export function updateStoryteller(sim: Simulation): void {
   const story = sim.story;
   if (sim.tick % TICKS_PER_HOUR !== 0 || sim.tick - story.lastEventTick < EVENT_GAP) {
     return;
   }
-  if (sim.living().length === 0 || sim.raid || sim.rng.next() >= HOURLY_CHANCE) {
+  const chance = HOURLY_CHANCE * (story.difficulty === 'harsh' ? 1.3 : 1);
+  if (sim.living().length === 0 || sim.raid || sim.rng.next() >= chance) {
     return;
   }
   const eligible = EVENTS.filter(
-    (e) => sim.day >= e.minDay && (story.cooldowns[e.key] ?? 0) <= sim.tick && e.weight(sim) > 0,
+    (e) => sim.day >= e.minDay && (story.cooldowns[e.key] ?? 0) <= sim.tick && weightOf(sim, e) > 0,
   );
-  let roll = sim.rng.next() * eligible.reduce((sum, e) => sum + e.weight(sim), 0);
+  let roll = sim.rng.next() * eligible.reduce((sum, e) => sum + weightOf(sim, e), 0);
   for (const event of eligible) {
-    roll -= event.weight(sim);
+    roll -= weightOf(sim, event);
     if (roll <= 0) {
       if (event.run(sim)) {
         story.lastEventTick = sim.tick;

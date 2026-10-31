@@ -159,3 +159,76 @@ describe('relationships and events', () => {
     expect(sim.storyLog.some((s) => s.text.includes('cold snap'))).toBe(true);
   });
 });
+
+describe('audit regressions', () => {
+  it('lets a light, untended wound stop bleeding so blood recovers', () => {
+    const sim = Simulation.newColony(41);
+    for (const c of sim.colonists) {
+      c.priorities.doctor = 0;
+    }
+    const c = sim.colonists[0];
+    damage(sim, c, 0.15, 'cut');
+    run(sim, HOUR * 30);
+    expect(bleedingOf(c)).toBe(0);
+    expect(c.health.bloodLoss).toBeLessThan(0.05);
+  });
+
+  it('uses medicine even when the doctor was carrying something', () => {
+    const sim = Simulation.newColony(42);
+    const [patient, doctor] = sim.colonists;
+    for (const c of sim.colonists) {
+      c.priorities.doctor = c === doctor ? 1 : 0;
+    }
+    sim.world.dropItemNear(doctor.tile, itemId('herbalMedicine'), 3);
+    doctor.carrying = { item: itemId('wood'), count: 5 };
+    damage(sim, patient, 0.3, 'cut');
+    const logs: string[] = [];
+    const addLog = sim.addLog.bind(sim);
+    sim.addLog = (text, tone, story) => {
+      logs.push(text);
+      addLog(text, tone, story);
+    };
+    run(sim, HOUR * 3);
+    expect(logs.some((l) => l.includes(`${doctor.name} tended`) && l.includes('herbal medicine'))).toBe(true);
+  });
+
+  it('does not count a raid that downs everyone as repelled', () => {
+    const sim = Simulation.newColony(43);
+    run(sim, HOUR);
+    triggerEvent(sim, 'raid');
+    for (const c of sim.colonists) {
+      // Enough to down even a tough colonist, not enough to kill anyone.
+      for (let k = 0; k < 3; k++) {
+        damage(sim, c, 0.5, 'bruise');
+      }
+      expect(c.health.downed).toBe(true);
+    }
+    for (let i = 0; i < 48 && sim.raid; i++) {
+      run(sim, HOUR);
+    }
+    expect(sim.raid).toBeNull();
+    expect(sim.stats.raidsRepelled).toBe(0);
+  });
+
+  it('never has a kind colonist insult anyone', () => {
+    const sim = Simulation.newColony(44);
+    const kind = sim.colonists[0];
+    kind.traits = ['kind', 'optimist'];
+    const logs: string[] = [];
+    const addLog = sim.addLog.bind(sim);
+    sim.addLog = (text, tone, story) => {
+      logs.push(text);
+      addLog(text, tone, story);
+    };
+    for (let i = 0; i < 3000; i++) {
+      updateSocial(sim);
+    }
+    expect(logs.filter((l) => l.startsWith(`${kind.name} insulted`))).toHaveLength(0);
+  });
+
+  it('sends no raids on peaceful difficulty', () => {
+    const sim = Simulation.newColony(45, 'peaceful');
+    run(sim, HOUR * 24 * 12);
+    expect(sim.storyLog.some((s) => s.text.startsWith('Raid!'))).toBe(false);
+  });
+});

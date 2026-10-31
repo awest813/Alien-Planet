@@ -1,19 +1,26 @@
 // Headless balance harness: an "autoplayer" runs a sensible colony on many seeds and prints
 // survival, combat, health, mood and social statistics.
 //
-//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive]
+//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive] [peaceful|harsh] [trace]
 //
-// "passive" never drafts during raids, to measure the worst case.
+// "passive" never drafts during raids, to measure the worst case; "peaceful" and "harsh" pick the
+// storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies.
 import { FEATURES, NONE, featureId, terrainDef } from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
 import { Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { mutualOpinion } from '../src/sim/social';
+import { Difficulty } from '../src/sim/storyteller';
 import { GROW_ZONE, STOCKPILE_ZONE } from '../src/sim/world';
 
 const days = Number(process.argv[2] ?? 20);
 const seeds = Number(process.argv[3] ?? 8);
 const passive = process.argv.includes('passive');
 const trace = process.argv.includes('trace');
+const difficulty: Difficulty = process.argv.includes('harsh')
+  ? 'harsh'
+  : process.argv.includes('peaceful')
+    ? 'peaceful'
+    : 'standard';
 
 const crop = (key: string) => GROW_ZONE + featureId(key);
 
@@ -82,7 +89,7 @@ interface Result {
 }
 
 function play(seed: number): Result {
-  const sim = Simulation.newColony(seed);
+  const sim = Simulation.newColony(seed, difficulty);
   const w = sim.world;
   const avoid = new Set<number>();
   const at = (x: number, y: number) => w.idx(x, y);
@@ -313,7 +320,7 @@ for (let s = 1; s <= seeds; s++) {
 }
 const sum = (f: (r: Result) => number) => results.reduce((n, r) => n + f(r), 0);
 console.log(
-  `\n${passive ? 'PASSIVE' : 'ACTIVE'} ${days} days × ${seeds} seeds in ${((performance.now() - started) / 1000).toFixed(1)}s\n` +
+  `\n${passive ? 'PASSIVE' : 'ACTIVE'} ${difficulty} ${days} days × ${seeds} seeds in ${((performance.now() - started) / 1000).toFixed(1)}s\n` +
     `  survivors ${sum((r) => r.living)}/${sum((r) => r.total)}, colonies wiped ${results.filter((r) => r.living === 0).length}\n` +
     `  raids ${sum((r) => r.raids)}, kills ${sum((r) => r.raidKills)}\n` +
     `  fever cases ${sum((r) => r.diseaseCases)}, fever deaths ${sum((r) => r.diseaseDeaths)}\n` +

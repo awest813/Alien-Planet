@@ -13,6 +13,8 @@ export interface SaveMeta {
   savedAt: number;
   // Save format version; missing on saves from before versions were recorded.
   version?: number;
+  colonists?: number;
+  difficulty?: string;
 }
 
 interface SaveRecord {
@@ -50,6 +52,10 @@ export async function writeSave(meta: SaveMeta, data: SaveData): Promise<void> {
 export async function readSave(slot: string): Promise<SaveData | null> {
   const record = await run<SaveRecord | undefined>('readonly', (store) => store.get(slot));
   return record?.data ?? null;
+}
+
+export async function deleteSave(slot: string): Promise<void> {
+  await run('readwrite', (store) => store.delete(slot));
 }
 
 export async function listSaves(): Promise<SaveMeta[]> {

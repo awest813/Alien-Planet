@@ -48,7 +48,7 @@ import { Pathfinder } from './pathfinding';
 import { PassRegions, Rooms, computePassRegions, computeRooms } from './regions';
 import { Rng } from './rng';
 import { relationLabel, rollTraits, socialThoughts, traitFactor, traitValue, updateSocial } from './social';
-import { StoryState, freshStory, updateStoryteller } from './storyteller';
+import { Difficulty, StoryState, freshStory, updateStoryteller } from './storyteller';
 import {
   Bill,
   Colonist,
@@ -197,6 +197,8 @@ export class Simulation {
   private rooms: Rooms;
   private roomContents: ReturnType<typeof measureRooms> = [];
   private cachedVersion = -1;
+  // Colonists who spent their last tick fighting, for activity labels.
+  private readonly fighting = new Set<number>();
   // Tick after which a starving colonist may search for food again.
   private readonly nextFoodSearch = new Map<number, number>();
   private contentsVersion = -1;
@@ -212,7 +214,7 @@ export class Simulation {
     this.wasNight = this.isNight();
   }
 
-  public static newColony(seed: number): Simulation {
+  public static newColony(seed: number, difficulty: Difficulty = 'standard'): Simulation {
     const { world, spawn } = generateWorld(MAP_SIZE, MAP_SIZE, seed);
     const rng = new Rng(seed ^ 0x9e3779b9);
     const names = [...COLONIST_NAMES];
@@ -232,6 +234,7 @@ export class Simulation {
     // Survival rations to tide the colony over until the first harvest.
     world.dropItemNear(spawn, itemId('meal'), 18);
     const sim = new Simulation(world, colonists, seed, rng);
+    sim.story = freshStory(difficulty);
     sim.addLog(
       'Five colonists have landed with a few days of rations. Designate work and they will get to it.',
       'info',
@@ -265,7 +268,9 @@ export class Simulation {
       return null;
     }
     const taken = new Set(this.colonists.map((c) => c.name));
-    const name = this.rng.pick(COLONIST_NAMES.filter((n) => !taken.has(n)));
+    const free = COLONIST_NAMES.filter((n) => !taken.has(n));
+    const name =
+      free.length > 0 ? this.rng.pick(free) : `${this.rng.pick(COLONIST_NAMES)} ${this.colonists.length + 1}`;
     const c = createColonist(this.colonists.length, name, edge, this.rng);
     for (const other of this.colonists) {
       introduce(c, other, this.rng);
@@ -539,7 +544,13 @@ export class Simulation {
       return 'Downed, waiting for a doctor';
     }
     if (c.drafted) {
+      if (this.fighting.has(c.id)) {
+        return 'Drafted: fighting';
+      }
       return c.path.length > 0 ? 'Drafted: moving' : 'Drafted';
+    }
+    if (this.fighting.has(c.id)) {
+      return 'Fighting back';
     }
     if (this.inMentalBreak(c)) {
       return 'Mental break: wandering in a daze';
@@ -969,8 +980,10 @@ export class Simulation {
     }
     // Fighting takes the whole tick; drafted colonists otherwise only follow move orders.
     if (colonistCombat(this, c)) {
+      this.fighting.add(c.id);
       return;
     }
+    this.fighting.delete(c.id);
     if (c.drafted) {
       if (c.path.length > 0) {
         this.move(c);
@@ -1463,13 +1476,20 @@ export class Simulation {
     if (w.isPassable(t)) {
       return;
     }
-    for (const other of this.colonists) {
+    const free = w.neighbors(t).find((n) => w.isPassable(n));
+    for (const other of this.living()) {
       if (other.tile === t) {
-        const free = w.neighbors(t).find((n) => w.isPassable(n));
         if (free !== undefined) {
           other.tile = free;
         }
         this.endJob(other);
+      }
+    }
+    for (const e of this.enemies) {
+      if (e.tile === t && free !== undefined) {
+        e.tile = free;
+        e.path = [];
+        e.moveProgress = 0;
       }
     }
   }
@@ -2020,6 +2040,7 @@ export class Simulation {
     )[0];
     const path = medicine !== undefined ? this.pathfinder.find(c.tile, [medicine]) : null;
     if (medicine !== undefined && path) {
+      this.dropCarried(c);
       this.reserve(c, `i${medicine}`);
       this.assign(c, this.makeJob('tend', -1, { source: medicine, item: MEDICINE, patient: patient.id }), path);
     } else {
@@ -2064,6 +2085,14 @@ export class Simulation {
         return;
       }
       job.stage = 2;
+    }
+    const adjacent =
+      patient === c ||
+      Math.max(Math.abs(w.xOf(c.tile) - w.xOf(patient.tile)), Math.abs(w.yOf(c.tile) - w.yOf(patient.tile))) <= 1;
+    if (!adjacent) {
+      // The patient wandered off: follow them.
+      job.stage = 1;
+      return;
     }
     job.progress += this.workSpeed(c, 'doctor');
     if (job.progress >= TEND_TICKS) {
