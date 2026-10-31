@@ -156,6 +156,7 @@ export function animalsAtDawn(sim: Simulation): void {
     const milk = ANIMALS[a.kind].milk;
     if (milk) {
       sim.world.dropItemNear(a.tile, itemId('milk'), milk);
+      sim.stats.produced.milk = (sim.stats.produced.milk ?? 0) + milk;
     }
   }
 }
@@ -279,7 +280,10 @@ export function hurtAnimal(sim: Simulation, a: Animal, amount: number, attacker:
     sim.world.dropItemNear(a.tile, itemId('leather'), def.leather);
     sim.stats.produced.rawMeat = (sim.stats.produced.rawMeat ?? 0) + def.meat;
     sim.stats.produced.leather = (sim.stats.produced.leather ?? 0) + def.leather;
-    sim.stats.hunted++;
+    // Slaughtering livestock isn't hunting.
+    if (!a.tame) {
+      sim.stats.hunted++;
+    }
     sim.addLog(`${attacker.name} brought down a ${def.name.toLowerCase()}.`, 'good');
     return;
   }

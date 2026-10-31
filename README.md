@@ -199,6 +199,7 @@ npx tsx scripts/balance.ts 26 8                # 26 days (through winter) on 8 s
 npx tsx scripts/balance.ts 20 8 passive        # never draft during raids
 npx tsx scripts/balance.ts 20 8 harsh          # or peaceful
 npx tsx scripts/balance.ts 20 4 trace          # print the colony state whenever someone dies
+npx tsx scripts/balance.ts 30 6 size=128       # on a Large map (size=96 for Medium)
 ```
 
 With the current tuning (8 seeds × 26 days, through the first winter), a Standard colony that farms enough

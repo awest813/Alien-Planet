@@ -18,6 +18,9 @@ export interface Settings {
   noticeSeconds: number;
   // Keyboard panning speed, as a multiple of normal.
   panSpeed: number;
+  // The last new colony's difficulty and map size, offered again next time.
+  newDifficulty: string;
+  newMapSize: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -29,6 +32,8 @@ export const DEFAULT_SETTINGS: Settings = {
   showMinimap: true,
   noticeSeconds: 8,
   panSpeed: 1,
+  newDifficulty: 'standard',
+  newMapSize: 64,
 };
 
 export const UI_SCALES = [

@@ -26,9 +26,11 @@ export function App() {
     onPlay: () => setScreen(helpSeen() ? null : 'help'),
     onSettings: () => setScreen('settings'),
     onHelp: () => setScreen('help'),
-    onTitle: () => {
-      setScreen(null);
-      controller.quitToTitle();
+    // The menu stays open (and the game paused) until the autosave is written.
+    onTitle: async () => {
+      if (await controller.quitToTitle()) {
+        setScreen(null);
+      }
     },
   };
 
@@ -95,7 +97,11 @@ export function App() {
   return (
     <div className="ui" style={scaled}>
       {onTitle ? (
-        <TitleScreen state={state} actions={actions} />
+        <>
+          <TitleScreen state={state} actions={actions} />
+          {/* Load and save messages ("older version", "could not be loaded") show here too. */}
+          <Notices state={state} />
+        </>
       ) : (
         <>
           <TopBar state={state} onOpen={setScreen} />

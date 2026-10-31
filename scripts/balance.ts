@@ -1,10 +1,11 @@
 // Headless balance harness: an "autoplayer" runs a sensible colony on many seeds and prints
 // survival, combat, health, mood and social statistics.
 //
-//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive] [peaceful|harsh] [trace]
+//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive] [peaceful|harsh] [trace] [size=64]
 //
 // "passive" never drafts during raids, to measure the worst case; "peaceful" and "harsh" pick the
-// storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies.
+// storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies;
+// "size=96" or "size=128" plays on a bigger map.
 import { FEATURES, NONE, RECIPES, featureId, itemDef, terrainDef } from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
 import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
@@ -16,6 +17,7 @@ const days = Number(process.argv[2] ?? 20);
 const seeds = Number(process.argv[3] ?? 8);
 const passive = process.argv.includes('passive');
 const trace = process.argv.includes('trace');
+const mapSize = Number(process.argv.find((a) => a.startsWith('size='))?.slice(5) ?? 64);
 const difficulty: Difficulty = process.argv.includes('harsh')
   ? 'harsh'
   : process.argv.includes('peaceful')
@@ -105,7 +107,7 @@ interface Result {
 }
 
 function play(seed: number): Result {
-  const sim = Simulation.newColony(seed, difficulty);
+  const sim = Simulation.newColony(seed, difficulty, mapSize);
   const w = sim.world;
   const avoid = new Set<number>();
   const at = (x: number, y: number) => w.idx(x, y);
@@ -161,8 +163,9 @@ function play(seed: number): Result {
 
   for (let hour = 0; hour < hours; hour++) {
     for (let t = 0; t < TICKS_PER_HOUR; t += 20) {
-      // Raid response, checked frequently like a player would.
-      if (!passive && sim.enemies.some((e) => !e.fleeing)) {
+      // Raid response, checked frequently like a player would: draft once the raiders close in
+      // (on a big map they can take hours to walk in from the edge).
+      if (!passive && sim.enemies.some((e) => !e.fleeing) && sim.raid?.arrivedTick !== undefined) {
         for (const c of sim.living()) {
           const fit = !c.health.downed && painOf(c) < 0.35;
           if (fit !== c.drafted) {
@@ -374,7 +377,7 @@ for (let s = 1; s <= seeds; s++) {
 }
 const sum = (f: (r: Result) => number) => results.reduce((n, r) => n + f(r), 0);
 console.log(
-  `\n${passive ? 'PASSIVE' : 'ACTIVE'} ${difficulty} ${days} days × ${seeds} seeds in ${((performance.now() - started) / 1000).toFixed(1)}s\n` +
+  `\n${passive ? 'PASSIVE' : 'ACTIVE'} ${difficulty} ${mapSize}×${mapSize} ${days} days × ${seeds} seeds in ${((performance.now() - started) / 1000).toFixed(1)}s\n` +
     `  survivors ${sum((r) => r.living)}/${sum((r) => r.total)}, colonies wiped ${results.filter((r) => r.living === 0).length}\n` +
     `  raids ${sum((r) => r.raids)}, kills ${sum((r) => r.raidKills)}\n` +
     `  fever cases ${sum((r) => r.diseaseCases)}, fever deaths ${sum((r) => r.diseaseDeaths)}\n` +

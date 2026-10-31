@@ -112,7 +112,7 @@ export interface SimTimers {
 }
 
 // Moments the UI reacts to: raids, deaths and collapses pause the game.
-export type SimEvent = 'dusk' | 'dawn' | 'raid' | 'death' | 'collapse';
+export type SimEvent = 'dusk' | 'dawn' | 'raid' | 'raidNear' | 'death' | 'collapse';
 
 // A notable moment in the colony's history, for the story screen.
 export interface StoryEntry {
@@ -476,6 +476,11 @@ export class Simulation {
 
   public step(): void {
     this.tick++;
+    // The interface drains these each frame; with nobody listening (tests, balance runs) keep
+    // only the latest few.
+    if (this.events.length > 64) {
+      this.events.splice(0, this.events.length - 64);
+    }
     this.ensureRegions();
 
     const night = this.isNight();
@@ -1519,7 +1524,10 @@ export class Simulation {
       const job = c.job?.type;
       // Starving colonists drop everything, sleep included, to eat. A failed food search is
       // retried a little later rather than every tick.
-      const starving = c.needs.food < 0.1 && job !== 'eat';
+      // Freezing (or heatstroke) kills in hours, hunger in days: someone in danger from the
+      // weather looks for shelter first.
+      const exposed = c.health.hypothermia > 0.5 || c.health.heatstroke > 0.5;
+      const starving = c.needs.food < 0.1 && job !== 'eat' && !(exposed && job === 'warmUp');
       if (starving && (this.nextFoodSearch.get(c.id) ?? 0) <= this.tick) {
         if (!this.tryEat(c)) {
           this.nextFoodSearch.set(c.id, this.tick + SLOW_TICKS);
@@ -1602,10 +1610,14 @@ export class Simulation {
     }
     const slot = c.schedule[Math.floor(this.hour)];
     const food = c.needs.food;
+    const h = c.health;
+    if ((h.hypothermia > 0.5 || h.heatstroke > 0.5) && this.tryWarmUp(c)) {
+      return;
+    }
     if (((food < 0.3 && slot !== 'W') || food < 0.15) && this.tryEat(c)) {
       return;
     }
-    if ((c.health.hypothermia > 0.3 || c.health.heatstroke > 0.3) && this.tryWarmUp(c)) {
+    if ((h.hypothermia > 0.3 || h.heatstroke > 0.3) && this.tryWarmUp(c)) {
       return;
     }
     if (c.weapon === 'bow' && this.tryEquip(c)) {

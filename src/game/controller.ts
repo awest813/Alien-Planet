@@ -378,7 +378,14 @@ export interface UiState {
   inPlay: boolean;
   // The most recent save this version can load, for Continue.
   latestSave: SaveMeta | null;
-  stats: { raidsRepelled: number; kills: number; tamed: number; wintersSurvived: number; built: number };
+  stats: {
+    raidsRepelled: number;
+    kills: number;
+    hunted: number;
+    tamed: number;
+    wintersSurvived: number;
+    built: number;
+  };
   notifications: Notification[];
   seed: number;
   difficulty: Difficulty;
@@ -471,12 +478,22 @@ export class GameController {
 
   // Back to the title screen; the colony is autosaved first (if autosave is on) so Continue
   // picks it up again.
-  public async quitToTitle(): Promise<void> {
+  // Returns whether the quit went ahead (a failed save keeps the player in their colony).
+  public async quitToTitle(): Promise<boolean> {
+    const version = this.simVersion;
     if (this.inPlay && this.settings.autosave && this.sim.living().length > 0) {
-      await this.save('autosave', true);
+      if (!(await this.save('autosave', true))) {
+        this.notify('Autosave failed, so the colony is still open. Save to a slot, or turn autosave off.');
+        return false;
+      }
+    }
+    // A different colony started while the save was writing: stay with that one.
+    if (this.simVersion !== version) {
+      return false;
     }
     this.inPlay = false;
     this.publish();
+    return true;
   }
 
   // ---- React store interface ----
@@ -514,6 +531,10 @@ export class GameController {
     for (const event of this.sim.events.splice(0)) {
       if (event === 'dawn') {
         this.autosave();
+      } else if (event === 'raidNear' && this.settings.pauseOnRaid) {
+        // On a big map the raid was announced hours ago; stop again as it arrives.
+        this.setSpeed(0);
+        this.notify('Game paused: the raiders are closing in.');
       } else if (event === 'raid' && this.settings.pauseOnRaid) {
         // Give the player a moment to react.
         this.setSpeed(0);
@@ -536,8 +557,11 @@ export class GameController {
     }
     this.collectNotifications(now);
     this.sinceUiUpdate += deltaMs;
-    if (this.sinceUiUpdate >= 200) {
+    this.sinceHoverUpdate += deltaMs;
+    if (this.sinceUiUpdate >= 200 || (this.hoverChanged && this.sinceHoverUpdate >= 80)) {
       this.sinceUiUpdate = 0;
+      this.sinceHoverUpdate = 0;
+      this.hoverChanged = false;
       this.publish();
     }
   }
@@ -604,9 +628,8 @@ export class GameController {
     const able = this.sim.living().filter((c) => !c.health.downed);
     const draft = able.some((c) => !c.drafted);
     for (const c of able) {
-      this.sim.apply({ type: 'draft', colonist: c.id, drafted: draft });
+      this.command({ type: 'draft', colonist: c.id, drafted: draft });
     }
-    this.publish();
   }
 
   // Sends the selected drafted colonist to a tile. Returns false if there was no one to order.
@@ -653,18 +676,24 @@ export class GameController {
     this.publish();
   }
 
+  // Hover changes as fast as the mouse moves; the card under it refreshes at most every 80 ms.
   public setHover(tile: number | null, colonist: number | null = null): void {
     if (tile !== this.hoverTile || colonist !== this.hoverColonist) {
       this.hoverTile = tile;
       this.hoverColonist = colonist;
-      this.publish();
+      this.hoverChanged = true;
     }
   }
+
+  private hoverChanged = false;
+  private sinceHoverUpdate = 0;
 
   // Set by the UI while a full-screen menu is open, so game hotkeys don't act behind it.
   public modalOpen = false;
 
   public newColony(seedText: string, difficulty: Difficulty = 'standard', size = MAP_SIZE): void {
+    // Offer the same choices next time.
+    this.setSettings({ newDifficulty: difficulty, newMapSize: size });
     const trimmed = seedText.trim();
     const seed =
       trimmed === '' ? Math.floor(Math.random() * 1e9) : /^\d+$/.test(trimmed) ? Number(trimmed) : hashSeed(trimmed);
@@ -715,7 +744,8 @@ export class GameController {
     }
   }
 
-  public async save(slot: string, auto = false): Promise<void> {
+  // Returns whether the save was written.
+  public async save(slot: string, auto = false): Promise<boolean> {
     const sim = this.sim;
     try {
       await writeSave(
@@ -728,6 +758,7 @@ export class GameController {
           version: SAVE_VERSION,
           colonists: sim.living().length,
           difficulty: sim.story.difficulty,
+          mapSize: sim.world.width,
         },
         serialize(sim),
       );
@@ -735,16 +766,23 @@ export class GameController {
       if (!auto) {
         this.notify(`Saved to ${slotLabel(slot).toLowerCase()}.`);
       }
+      return true;
     } catch (error) {
       console.error(error);
       this.notify('Saving failed.');
+      return false;
     }
   }
 
   // Returns whether the save loaded.
   public async load(slot: string): Promise<boolean> {
+    const version = this.simVersion;
     try {
       const data = await readSave(slot);
+      // The player started or loaded another colony while this was reading: keep that one.
+      if (this.simVersion !== version) {
+        return false;
+      }
       if (!data) {
         this.notify(`Nothing saved in ${slotLabel(slot).toLowerCase()}.`);
         return false;
@@ -768,10 +806,18 @@ export class GameController {
     this.sim = sim;
     this.simVersion++;
     this.idleSince.clear();
-    // A colony started from the fallen screen shouldn't sit paused.
+    // A colony started after the last one fell shouldn't sit paused: resume at the player's speed,
+    // now or (if a menu is holding the pause) when the menu closes.
     if (this.fallen) {
-      this.setSpeed(1);
+      if (this.heldSpeed !== null) {
+        this.heldSpeed = this.resumeSpeed;
+      } else {
+        this.setSpeed(this.resumeSpeed);
+      }
     }
+    // Tools and overlays belong to the old colony (its research, its map).
+    this.tool = { kind: 'select' };
+    this.overlay = 'none';
     this.fallen = false;
     this.selectedColonist = null;
     this.selectedTile = null;
@@ -960,6 +1006,7 @@ export class GameController {
       stats: {
         raidsRepelled: sim.stats.raidsRepelled,
         kills: sim.stats.kills,
+        hunted: sim.stats.hunted,
         tamed: sim.stats.tamed,
         wintersSurvived: sim.stats.wintersSurvived,
         built: sim.stats.built,
@@ -975,7 +1022,7 @@ export class GameController {
   // Alerts scan the map, so they're worked out once per game tick, not on every mouse move.
   private alertsFor(totals: ReturnType<Simulation['resourceTotals']>): Alert[] {
     // Orders given while paused change alerts too, so they count as well as ticks.
-    const key = `${this.simVersion}:${this.sim.tick}:${this.commandCount}`;
+    const key = `${this.simVersion}:${Math.floor(this.sim.tick / 20)}:${this.commandCount}`;
     if (key !== this.alertsKey) {
       this.alertsKey = key;
       this.alerts = this.buildAlerts(totals);

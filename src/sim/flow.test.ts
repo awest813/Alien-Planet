@@ -139,3 +139,31 @@ describe('full audit fixes', () => {
     expect(busy.length).toBeGreaterThan(0);
   });
 });
+
+describe('raid outcomes', () => {
+  it("doesn't count a raid that never reached the colony as repelled", () => {
+    const sim = Simulation.newColony(12, 'standard', 128);
+    expect(triggerEvent(sim, 'raid')).toBe(true);
+    // They have been out there for three days without getting close.
+    sim.raid!.startedTick = sim.tick - HOUR * 73;
+    for (let t = 0; t < HOUR * 6 && sim.raid; t++) {
+      sim.step();
+    }
+    expect(sim.raid).toBeNull();
+    expect(sim.stats.raidsRepelled).toBe(0);
+  });
+
+  it('keeps an overrun an overrun even if someone gets up before the raiders leave', () => {
+    const sim = Simulation.newColony(13);
+    expect(triggerEvent(sim, 'raid')).toBe(true);
+    sim.raid!.outcome = 'overrun';
+    for (const e of sim.enemies) {
+      e.fleeing = true;
+    }
+    for (let t = 0; t < HOUR * 6 && sim.raid; t++) {
+      sim.step();
+    }
+    expect(sim.stats.raidsRepelled).toBe(0);
+    expect(sim.storyLog.some((s) => s.text.startsWith('The raiders left the colony for dead'))).toBe(true);
+  });
+});

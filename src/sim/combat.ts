@@ -15,6 +15,9 @@ export interface RaidState {
   startedTick: number;
   // When the first raider came within reach of the colony (undefined while still on the way).
   arrivedTick?: number;
+  // How the raid ended, decided the moment it broke rather than when the last raider left the
+  // map (which can take hours on a big map): beaten off, gave up, or overran the colony.
+  outcome?: 'repelled' | 'withdrew' | 'overrun';
 }
 
 // Raiders this close to a colonist have arrived; the raid's time limit runs from then.
@@ -367,7 +370,10 @@ export function updateEnemies(sim: Simulation): void {
       continue;
     }
     if (!target) {
-      // Nobody left to fight: leave.
+      // Nobody left to fight: leave. Everyone downed is a defeat; nobody reachable, a withdrawal.
+      if (sim.raid && !sim.raid.outcome) {
+        sim.raid.outcome = sim.living().some((c) => !c.health.downed) ? 'withdrew' : 'overrun';
+      }
       e.fleeing = true;
       e.path = [];
       continue;
@@ -403,6 +409,11 @@ export function updateEnemies(sim: Simulation): void {
       fighting.some((e) => sim.living().some((c) => w.distance(e.tile, c.tile) <= ARRIVAL_RANGE))
     ) {
       raid.arrivedTick = sim.tick;
+      // On a big map raiders can take hours to walk in; say when they actually get close.
+      if (sim.tick - raid.startedTick > TICKS_PER_HOUR / 2) {
+        sim.addLog('The raiders are closing in on the colony!', 'danger', true);
+        sim.events.push('raidNear');
+      }
     }
     // On a big map the walk in doesn't eat into the raid's time; a raid that never gets close
     // gives up after twice the usual time.
@@ -410,19 +421,32 @@ export function updateEnemies(sim: Simulation): void {
       raid.arrivedTick !== undefined
         ? sim.tick - raid.arrivedTick > RAID_TIMEOUT
         : sim.tick - raid.startedTick > RAID_TIMEOUT * 2;
-    if (fighting.length > 0 && (raid.killed >= raid.initial * MORALE_BREAK || timedOut)) {
+    const broken = raid.killed >= raid.initial * MORALE_BREAK;
+    if (fighting.length > 0 && (broken || timedOut)) {
       for (const e of fighting) {
         e.fleeing = true;
         e.path = [];
       }
-      sim.addLog('The raiders are fleeing!', 'good');
+      raid.outcome ??= broken ? 'repelled' : 'withdrew';
+      sim.addLog(
+        broken
+          ? 'The raiders are fleeing!'
+          : raid.arrivedTick === undefined
+            ? 'The raiders turned back before reaching the colony.'
+            : 'The raiders are giving up and leaving.',
+        broken ? 'good' : 'info',
+      );
     }
   }
   sim.enemies = sim.enemies.filter((e) => e.hp > 0);
   if (raid && sim.enemies.length === 0) {
     sim.raid = null;
     const standing = sim.living().filter((c) => !c.health.downed);
-    if (standing.length > 0) {
+    // Every raider fell without the raid breaking first: that's a win too.
+    const outcome = raid.outcome ?? (standing.length > 0 ? 'repelled' : 'overrun');
+    if (outcome === 'withdrew') {
+      sim.addLog('The raiders have gone. Colonists stand down.', 'info', true);
+    } else if (outcome === 'repelled') {
       sim.stats.raidsRepelled++;
       sim.addLog(
         `The raid is over. ${raid.killed} raider${raid.killed === 1 ? '' : 's'} fell. Colonists stand down.`,

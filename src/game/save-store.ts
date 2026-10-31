@@ -15,6 +15,8 @@ export interface SaveMeta {
   version?: number;
   colonists?: number;
   difficulty?: string;
+  // Tiles per side.
+  mapSize?: number;
 }
 
 interface SaveRecord {

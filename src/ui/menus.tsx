@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { SAVE_SLOTS, UiState, controller, slotLabel } from '../game/controller';
+import { SaveMeta } from '../game/save-store';
 import { DEFAULT_SETTINGS, NOTICE_TIMES, PAN_SPEEDS, Settings, UI_SCALES, forgetHelp } from '../game/settings';
 import { SAVE_VERSION } from '../sim/serialize';
 import { MAP_SIZE, MAP_SIZES } from '../sim/simulation';
@@ -12,13 +13,17 @@ export interface MenuActions {
   onPlay: () => void;
   onSettings: () => void;
   onHelp: () => void;
-  onTitle: () => void;
+  onTitle: () => void | Promise<void>;
 }
 
-const saveDetails = (meta: { day: number; hour: number; colonists?: number; savedAt: number }) =>
+const saveDetails = (meta: SaveMeta) =>
   [
     `Day ${meta.day}, ${String(meta.hour).padStart(2, '0')}:00`,
     meta.colonists !== undefined ? `${meta.colonists} colonists` : null,
+    DIFFICULTIES.find((d) => d.key === meta.difficulty)?.label ?? null,
+    meta.mapSize !== undefined
+      ? `${MAP_SIZES.find((m) => m.size === meta.mapSize)?.label ?? `${meta.mapSize}×${meta.mapSize}`} map`
+      : null,
     new Date(meta.savedAt).toLocaleString(),
   ]
     .filter(Boolean)
@@ -27,8 +32,12 @@ const saveDetails = (meta: { day: number; hour: number; colonists?: number; save
 // Difficulty, map size and seed for a new colony.
 function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: () => void }) {
   const [seed, setSeed] = useState('');
-  const [difficulty, setDifficulty] = useState<Difficulty>('standard');
-  const [mapSize, setMapSize] = useState(MAP_SIZE);
+  // Start from whatever the player chose last time.
+  const last = controller.settings;
+  const [difficulty, setDifficulty] = useState<Difficulty>(
+    DIFFICULTIES.find((d) => d.key === last.newDifficulty)?.key ?? 'standard',
+  );
+  const [mapSize, setMapSize] = useState(MAP_SIZES.find((m) => m.size === last.newMapSize)?.size ?? MAP_SIZE);
   const start = () => {
     controller.newColony(seed, difficulty, mapSize);
     onStarted();
@@ -232,7 +241,8 @@ export function FallenScreen({ state, actions }: { state: UiState; actions: Menu
     ['Colonists', state.colonists.length],
     ['Winters survived', state.stats.wintersSurvived],
     ['Raids repelled', state.stats.raidsRepelled],
-    ['Raiders and animals brought down', state.stats.kills],
+    ['Raiders brought down', state.stats.kills],
+    ['Animals hunted', state.stats.hunted],
     ['Buildings built', state.stats.built],
     ['Animals tamed', state.stats.tamed],
     ['Goals reached', `${goals} of ${state.objectives.length}`],
