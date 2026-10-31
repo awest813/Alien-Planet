@@ -67,6 +67,15 @@ How the storytelling layer works:
   pauses; drafted colonists shoot anything within range and line of sight, undrafted ones defend themselves at
   close range. Raiders flee once half of them fall. Walling yourself in doesn't stop them: raiders who
   can't reach anyone smash through the nearest wall or door.
+- **Clothing and exposure:** colonists start in tunics. Research Tailoring to make tunics from cloth and warm
+  parkas from leather at the crafting bench; clothes get a quality tier (Poor to Masterwork) from the
+  crafter's skill, insulate more the better they're made, and wear out over weeks. Colonists change into
+  whatever in storage suits the weather best. Cold or heat beyond what they're wearing builds into
+  hypothermia or heatstroke: they go and warm up (or cool off), sleepers wake rather than freeze, and doctors
+  carry anyone who collapses somewhere safe. Left too long, exposure kills.
+- **Better food, worse food:** a cook with skill 6 or more can make fine meals (a mood boost). Meals carry
+  their cook's skill: poorly cooked meals, and raw meat or fish, sometimes cause food poisoning, which slows
+  a colonist down for half a day.
 - **Skills:** every skill (mining, construction, plants, cooking, crafting, medicine, combat) improves with
   practice, up to 20. Each colonist has a couple of passions (★ interested, ★★ burning) that speed learning and
   lift their mood while doing that work. Expert skills slowly rust without practice.
@@ -162,7 +171,7 @@ covers traits, line of sight, raids, bleeding and tending, disease, relationship
 the calendar, winter cold, frost and research. `src/sim/tech.test.ts` covers power, spoilage, cold storage and
 sun lamps, `src/sim/water.test.ts` covers bridges, fishing, ice, wading and battery charging, and
 `src/sim/playtest.test.ts` covers fixes from persona playtests (feeding the downed, raiders breaching walls,
-idle generators).
+idle generators), and `src/sim/needs.test.ts` covers clothing, exposure, fine meals, food poisoning and saves.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,
 drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation:

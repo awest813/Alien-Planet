@@ -641,6 +641,34 @@ function drawItem(c: Ctx, key: string): void {
       c.fillStyle = '#f0e0d0';
       c.fillRect(11, 9, 3, 2);
       break;
+    case 'fineMeal':
+      c.fillStyle = '#e8e2d0';
+      c.fillRect(2, 8, 12, 5);
+      c.fillStyle = '#c9c1a8';
+      c.fillRect(2, 12, 12, 1);
+      c.fillStyle = '#c4503a';
+      c.fillRect(4, 6, 4, 3);
+      c.fillStyle = '#7fbf5a';
+      c.fillRect(8, 6, 3, 3);
+      c.fillStyle = '#e8b04a';
+      c.fillRect(10, 7, 2, 2);
+      break;
+    case 'tunic':
+    case 'parka': {
+      const parka = key === 'parka';
+      c.fillStyle = parka ? '#8a5a32' : '#5d7fa8';
+      c.fillRect(4, 3, 8, 11);
+      c.fillRect(1, 4, 3, 7);
+      c.fillRect(12, 4, 3, 7);
+      c.fillStyle = parka ? '#e8dcc0' : '#41618a';
+      c.fillRect(5, 2, 6, 2);
+      if (parka) {
+        c.fillRect(1, 10, 3, 1);
+        c.fillRect(12, 10, 3, 1);
+        c.fillRect(4, 13, 8, 1);
+      }
+      break;
+    }
     case 'rawFish':
       c.fillStyle = '#6f8fa8';
       c.fillRect(3, 8, 8, 4);

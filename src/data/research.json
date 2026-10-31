@@ -69,5 +69,11 @@
     "cost": 2400,
     "requires": ["electricity"],
     "description": "Unlocks sun lamps: crops beneath them grow day and night, all year."
+  },
+  {
+    "key": "tailoring",
+    "name": "Tailoring",
+    "cost": 1400,
+    "description": "Unlocks tailoring tunics from cloth and warm parkas from leather."
   }
 ]

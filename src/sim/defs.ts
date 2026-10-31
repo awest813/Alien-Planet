@@ -36,6 +36,16 @@ export interface ItemDef {
   rawPenalty: boolean;
   // Days until it rots at room temperature (undefined: never rots).
   shelfLife?: number;
+  // A meal good enough to lift the mood.
+  fine: boolean;
+  // Clothing: how many degrees it widens the comfortable range, and how long it lasts.
+  apparel?: ApparelSpec;
+}
+
+export interface ApparelSpec {
+  cold: number;
+  heat: number;
+  wearDays: number;
 }
 
 export interface Cost {
@@ -108,6 +118,8 @@ export interface RecipeDef {
   work: number;
   defaultTarget: number;
   research?: string;
+  // Lowest skill a colonist needs to work this bill.
+  minSkill: number;
 }
 
 export interface ThoughtDef {
@@ -155,7 +167,12 @@ interface RawItem {
   nutrition?: number;
   rawPenalty?: boolean;
   shelfLife?: number;
+  fine?: boolean;
+  apparel?: ApparelSpec;
 }
+
+// Quality of food and goods made by an average hand (and of anything found or gifted).
+export const NORMAL_QUALITY = 6;
 
 // Id 0 is reserved for "none" for items and features.
 export const NONE = 0;
@@ -170,6 +187,8 @@ export const ITEMS: ItemDef[] = (itemsJson as RawItem[]).map((t, i) => ({
   nutrition: t.nutrition ?? 0,
   rawPenalty: !!t.rawPenalty,
   shelfLife: t.shelfLife,
+  fine: !!t.fine,
+  apparel: t.apparel,
 }));
 
 const itemIdByKey = new Map(ITEMS.map((item) => [item.key, item.id]));
@@ -243,6 +262,7 @@ export const RECIPES: RecipeDef[] = recipesJson.map((r, i) => ({
   work: r.work,
   defaultTarget: r.defaultTarget,
   research: 'research' in r ? (r.research as string) : undefined,
+  minSkill: 'minSkill' in r ? (r.minSkill as number) : 0,
 }));
 
 export const THOUGHTS: Record<string, ThoughtDef> = Object.fromEntries(

@@ -5,7 +5,7 @@
 //
 // "passive" never drafts during raids, to measure the worst case; "peaceful" and "harsh" pick the
 // storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies.
-import { FEATURES, NONE, featureId, terrainDef } from '../src/sim/defs';
+import { FEATURES, NONE, RECIPES, featureId, itemDef, terrainDef } from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
 import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { mutualOpinion } from '../src/sim/social';
@@ -26,6 +26,7 @@ const crop = (key: string) => GROW_ZONE + featureId(key);
 const RESEARCH_ORDER = [
   'hearths',
   'cropRotation',
+  'tailoring',
   'archery',
   'fieldMedicine',
   'insulation',
@@ -232,6 +233,11 @@ function play(seed: number): Result {
       hearthPlaced = true;
       sim.apply({ type: 'build', feature: featureId('hearth'), tiles: [at(hut.x + 7, hut.y + 4)] });
     }
+    // A parka for everyone before winter.
+    const parka = RECIPES.find((r) => r.key === 'tailorParka')!;
+    if (sim.bills[parka.id].target !== sim.living().length) {
+      sim.apply({ type: 'bill', recipe: parka.id, target: sim.living().length });
+    }
     // Hunt whatever wildlife is around once the colony is settled (leather becomes recurve bows).
     if (sim.day >= 3) {
       sim.apply({ type: 'hunt', rect: { x0: 0, y0: 0, x1: w.width - 1, y1: w.height - 1 }, add: true });
@@ -336,7 +342,9 @@ Simulation.prototype.addLog = function (this: Simulation, text, tone, story) {
     for (const c of this.colonists) {
       console.log(
         `      ${c.name}: ${this.describe(c)} | injuries ${c.health.injuries.map((i) => `${i.severity.toFixed(2)}${i.tended ? 't' : ''}`).join(',')} ` +
-          `blood ${c.health.bloodLoss.toFixed(2)} doctor prio ${c.priorities.doctor} drafted ${c.drafted}`,
+          `blood ${c.health.bloodLoss.toFixed(2)} doctor prio ${c.priorities.doctor} drafted ${c.drafted} ` +
+          `cold ${c.health.hypothermia.toFixed(2)} at ${this.temperatureAt(c.tile).toFixed(0)}°C ` +
+          `wearing ${c.apparel ? itemDef(c.apparel.item).key : 'nothing'} indoors ${this.isIndoors(c.tile)}`,
       );
     }
   }

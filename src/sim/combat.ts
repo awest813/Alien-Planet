@@ -188,39 +188,69 @@ function breach(sim: Simulation, e: Enemy): boolean {
   if (!goal) {
     return false;
   }
-  const breakable = (i: number) => w.feature[i] !== NONE && !!featureDef(w.feature[i]).build && w.blocksRoom(i);
-  const wall = w
-    .neighbors(e.tile, false)
-    .filter(breakable)
-    .sort((a, b) => w.distance(a, goal.tile) - w.distance(b, goal.tile))[0];
-  if (wall !== undefined && w.distance(wall, goal.tile) < w.distance(e.tile, goal.tile)) {
+  const region = sim.regionOf(e.tile);
+  if (e.breachTarget === undefined || !breakable(w, e.breachTarget) || e.repathAt <= sim.tick) {
+    e.breachTarget = breachWall(sim, region, sim.regionOf(goal.tile), goal.tile);
+    e.repathAt = sim.tick + 60;
+    e.path = [];
+  }
+  const wall = e.breachTarget;
+  if (wall === undefined) {
+    return false;
+  }
+  if (w.neighbors(wall, false).includes(e.tile)) {
     e.path = [];
     e.moveProgress = 0;
     if (e.cooldown <= 0) {
       e.cooldown = WEAPONS[e.weapon].cooldown;
-      w.progress[wall] += 10;
+      const damage = (sim.wallDamage.get(wall) ?? 0) + 10;
       const def = featureDef(w.feature[wall]);
-      if (w.progress[wall] >= def.build!.work) {
+      if (damage >= def.build!.work) {
+        sim.wallDamage.delete(wall);
         w.setFeature(wall, NONE);
         sim.addLog(`Raiders broke through a ${def.name.toLowerCase()}!`, 'danger');
+      } else {
+        sim.wallDamage.set(wall, damage);
       }
     }
     return true;
   }
-  // Get as close as possible on this side of the walls.
-  if (e.path.length === 0 || e.repathAt <= sim.tick) {
-    const region = sim.regionOf(e.tile);
-    const spot = sim.nearest(goal.tile, (i) => w.isPassable(i) && sim.regionOf(i) === region, 1)[0];
-    e.path = spot !== undefined && spot !== e.tile ? (sim.pathfinder.find(e.tile, [spot]) ?? []) : [];
-    e.repathAt = sim.tick + 30;
-    if (e.path.length === 0 && wall === undefined) {
+  if (e.path.length === 0) {
+    const spots = w.neighbors(wall, false).filter((n) => w.isPassable(n) && sim.regionOf(n) === region);
+    e.path = sim.pathfinder.find(e.tile, spots) ?? [];
+    if (e.path.length === 0) {
+      e.breachTarget = undefined;
       return false;
     }
   }
-  if (e.path.length > 0) {
-    moveEnemy(sim, e);
-  }
+  moveEnemy(sim, e);
   return true;
+}
+
+const breakable = (w: World, i: number) => w.feature[i] !== NONE && !!featureDef(w.feature[i]).build && w.blocksRoom(i);
+
+// The wall to break: one the raider can stand next to that opens straight into the colonists'
+// side, nearest them; failing that (thick or doubled walls), the wall on this side nearest them.
+function breachWall(sim: Simulation, region: number, goalRegion: number, goalTile: number): number | undefined {
+  const w = sim.world;
+  let best: number | undefined;
+  let bestScore = Infinity;
+  for (let i = 0; i < w.size; i++) {
+    if (!breakable(w, i)) {
+      continue;
+    }
+    const sides = w.neighbors(i, false);
+    if (!sides.some((n) => w.isPassable(n) && sim.regionOf(n) === region)) {
+      continue;
+    }
+    const opens = sides.some((n) => w.isPassable(n) && sim.regionOf(n) === goalRegion);
+    const score = w.distance(i, goalTile) + (opens ? 0 : 1000);
+    if (score < bestScore) {
+      best = i;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 function moveEnemy(sim: Simulation, e: Enemy): void {

@@ -174,5 +174,39 @@
     "label": "A quiet afternoon fishing",
     "mood": 2,
     "hours": 6
+  },
+  "ateFineMeal": {
+    "label": "Ate a fine meal",
+    "mood": 6,
+    "hours": 8
+  },
+  "foodPoisoning": {
+    "label": "Food poisoning",
+    "mood": -8
+  },
+  "chilled": {
+    "label": "Chilled",
+    "mood": -4
+  },
+  "hypothermic": {
+    "label": "Hypothermia",
+    "mood": -12
+  },
+  "overheated": {
+    "label": "Overheated",
+    "mood": -4
+  },
+  "heatstroke": {
+    "label": "Heatstroke",
+    "mood": -12
+  },
+  "tatteredApparel": {
+    "label": "Wearing tattered clothes",
+    "mood": -3
+  },
+  "newClothes": {
+    "label": "New clothes",
+    "mood": 3,
+    "hours": 12
   }
 }

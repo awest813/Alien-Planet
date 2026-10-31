@@ -1,5 +1,6 @@
 import diseasesJson from '../data/diseases.json';
 import { TICKS_PER_HOUR } from './constants';
+import { comfortRange } from './apparel';
 import { itemId } from './defs';
 import { FRIEND_OPINION, mutualOpinion, traitFactor, traitValue } from './social';
 import type { Simulation } from './simulation';
@@ -26,11 +27,28 @@ const CLOT_PER_HOUR = 0.15;
 // Below this a wound has stopped bleeding.
 const CLOTTED = 0.005;
 
-export const healthyState = (): Health => ({ injuries: [], bloodLoss: 0, disease: null, downed: false, dead: false });
+export const healthyState = (): Health => ({
+  injuries: [],
+  bloodLoss: 0,
+  disease: null,
+  downed: false,
+  dead: false,
+  hypothermia: 0,
+  heatstroke: 0,
+  poisoned: 0,
+});
+
+// Exposure builds up this fast per degree beyond the comfortable range, per hour.
+const EXPOSURE_PER_DEGREE_HOUR = 0.006;
+// And eases this fast per hour once comfortable again.
+const EXPOSURE_RECOVERY = 0.3;
+// Hours a bout of food poisoning lasts.
+export const POISONING_HOURS = 10;
 
 export function painOf(c: Colonist): number {
-  const injuries = c.health.injuries.reduce((sum, injury) => sum + injury.severity, 0);
-  return injuries + (c.health.disease?.severity ?? 0) * 0.4;
+  const h = c.health;
+  const injuries = h.injuries.reduce((sum, injury) => sum + injury.severity, 0);
+  return injuries + (h.disease?.severity ?? 0) * 0.4 + (h.hypothermia + h.heatstroke) * 0.6;
 }
 
 export function bleedingOf(c: Colonist): number {
@@ -49,7 +67,26 @@ export function needsBedRest(c: Colonist): boolean {
 
 // Work speed multiplier from pain and illness.
 export function healthFactor(c: Colonist): number {
-  return Math.max(0.3, 1 - painOf(c) * 0.5);
+  return Math.max(0.3, 1 - painOf(c) * 0.5) * (c.health.poisoned > 0 ? 0.65 : 1);
+}
+
+// Cold or heat beyond what a colonist's clothes can handle slowly builds into hypothermia or
+// heatstroke; it eases again somewhere comfortable.
+export function updateExposure(sim: Simulation, c: Colonist, hours: number): void {
+  const h = c.health;
+  if (h.dead) {
+    return;
+  }
+  const t = sim.temperatureAt(c.tile);
+  const { min, max } = comfortRange(c);
+  h.hypothermia =
+    t < min
+      ? Math.min(1, h.hypothermia + (min - t) * EXPOSURE_PER_DEGREE_HOUR * hours)
+      : Math.max(0, h.hypothermia - EXPOSURE_RECOVERY * hours);
+  h.heatstroke =
+    t > max
+      ? Math.min(1, h.heatstroke + (t - max) * EXPOSURE_PER_DEGREE_HOUR * hours)
+      : Math.max(0, h.heatstroke - EXPOSURE_RECOVERY * hours);
 }
 
 export function damage(sim: Simulation, c: Colonist, amount: number, kind: DamageKind): void {
@@ -110,6 +147,7 @@ export function updateHealth(sim: Simulation, c: Colonist, hours: number): void 
       }
     }
   }
+  h.poisoned = Math.max(0, h.poisoned - hours);
   const restBonus = c.sleeping ? 1.5 : 1;
   for (const injury of h.injuries) {
     const rate = injury.tended > 0 ? 0.015 + 0.03 * injury.tended : 0.004;
@@ -149,6 +187,10 @@ export function checkHealth(sim: Simulation, c: Colonist): void {
     die(sim, c, h.disease.label.toLowerCase());
     return;
   }
+  if (h.hypothermia >= 1 || h.heatstroke >= 1) {
+    die(sim, c, h.hypothermia >= 1 ? 'hypothermia' : 'heatstroke');
+    return;
+  }
   const threshold = traitValue(c, 'painThreshold') ?? DEFAULT_PAIN_THRESHOLD;
   // Once down, a colonist stays down until clearly better, rather than flickering at the threshold.
   const recovery = h.downed ? 0.75 : 1;
@@ -169,6 +211,10 @@ function die(sim: Simulation, c: Colonist, cause: string): void {
   if (c.weapon === 'recurveBow') {
     sim.world.dropItemNear(c.tile, itemId('recurveBow'), 1);
     c.weapon = 'bow';
+  }
+  if (c.apparel) {
+    sim.world.dropItemNear(c.tile, c.apparel.item, 1, c.apparel.wear, c.apparel.quality);
+    c.apparel = null;
   }
   c.health.dead = true;
   c.health.downed = false;

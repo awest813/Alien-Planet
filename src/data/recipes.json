@@ -15,6 +15,22 @@
     "defaultTarget": 10
   },
   {
+    "key": "cookFineMeal",
+    "name": "Cook fine meal",
+    "bench": "cooking",
+    "ingredient": {
+      "category": "rawFood",
+      "count": 10
+    },
+    "product": {
+      "item": "fineMeal",
+      "count": 1
+    },
+    "work": 220,
+    "defaultTarget": 4,
+    "minSkill": 6
+  },
+  {
     "key": "weaveCloth",
     "name": "Weave cloth",
     "bench": "crafting",
@@ -44,5 +60,37 @@
     "work": 300,
     "defaultTarget": 2,
     "research": "archery"
+  },
+  {
+    "key": "tailorTunic",
+    "name": "Tailor tunic",
+    "bench": "crafting",
+    "ingredient": {
+      "item": "cloth",
+      "count": 15
+    },
+    "product": {
+      "item": "tunic",
+      "count": 1
+    },
+    "work": 400,
+    "defaultTarget": 1,
+    "research": "tailoring"
+  },
+  {
+    "key": "tailorParka",
+    "name": "Tailor parka",
+    "bench": "crafting",
+    "ingredient": {
+      "item": "leather",
+      "count": 20
+    },
+    "product": {
+      "item": "parka",
+      "count": 1
+    },
+    "work": 600,
+    "defaultTarget": 2,
+    "research": "tailoring"
   }
 ]

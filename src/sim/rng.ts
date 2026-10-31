@@ -14,6 +14,10 @@ export class Rng {
     return min + Math.floor(this.next() * (max - min + 1));
   }
 
+  public chance(p: number): boolean {
+    return this.next() < p;
+  }
+
   public pick<T>(items: readonly T[]): T {
     return items[Math.floor(this.next() * items.length)];
   }

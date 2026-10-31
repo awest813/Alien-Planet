@@ -10,9 +10,18 @@ export interface PowerState {
   stored: number;
   capacity: number;
   powered: boolean;
+  // Generators are idling to save fuel: nothing else needs their power.
+  idle: boolean;
 }
 
-export const freshPower = (): PowerState => ({ supply: 0, demand: 0, stored: 0, capacity: 0, powered: true });
+export const freshPower = (): PowerState => ({
+  supply: 0,
+  demand: 0,
+  stored: 0,
+  capacity: 0,
+  powered: true,
+  idle: false,
+});
 
 // Solar output through the day: nothing at night, full strength at 13:00.
 export function daylight(hour: number): number {
@@ -49,6 +58,7 @@ export function updatePower(sim: Simulation, tiles: number[], hours: number): vo
   }
   // Generators idle (saving fuel) while everything else already covers demand and the batteries are full.
   const needed = demand > supply || state.stored < capacity;
+  state.idle = !needed && generators.length > 0;
   for (const i of generators) {
     const fuel = featureDef(w.feature[i]).power!.fuel!;
     if (needed && w.fuel[i] > 0) {

@@ -22,10 +22,11 @@ import {
   Skills,
   Stats,
   TimedThought,
+  WornApparel,
 } from './types';
 import { World } from './world';
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 interface SavedColonist {
   id: number;
@@ -51,6 +52,7 @@ interface SavedColonist {
   skillXp: Record<SkillKey, number>;
   passions: Record<SkillKey, Passion>;
   weapon: ColonistWeapon;
+  apparel: WornApparel | null;
   practicedAt?: Partial<Record<SkillKey, number>>;
 }
 
@@ -75,6 +77,7 @@ export interface SaveData {
     progress: Float32Array;
     growth: Float32Array;
     fresh: Float32Array;
+    quality: Float32Array;
     fuel: Float32Array;
     temperature: Float32Array;
   };
@@ -116,6 +119,7 @@ export function serialize(sim: Simulation): SaveData {
       progress: w.progress.slice(),
       growth: w.growth.slice(),
       fresh: w.fresh.slice(),
+      quality: w.quality.slice(),
       fuel: w.fuel.slice(),
       temperature: sim.tileTemperatures(),
     },
@@ -144,6 +148,7 @@ export function serialize(sim: Simulation): SaveData {
         skillXp: c.skillXp,
         passions: c.passions,
         weapon: c.weapon,
+        apparel: c.apparel,
         practicedAt: c.practicedAt,
       }),
     ),
@@ -181,6 +186,7 @@ export function deserialize(data: SaveData): Simulation {
   world.progress.set(layers.progress);
   world.growth.set(layers.growth);
   world.fresh.set(layers.fresh);
+  world.quality.set(layers.quality);
   world.fuel.set(layers.fuel);
   world.structureVersion++;
 

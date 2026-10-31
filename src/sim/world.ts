@@ -1,4 +1,5 @@
-import { MAX_COST_LINES, NONE, featureDef, itemDef, terrainDef } from './defs';
+import { MAX_COST_LINES, NONE, NORMAL_QUALITY, featureDef, itemDef, terrainDef } from './defs';
+import type { Carried } from './types';
 
 export const Designation = {
   NONE: 0,
@@ -39,8 +40,10 @@ export class World {
   public readonly delivered: Uint16Array;
   // Crop growth, 0..1.
   public readonly growth: Float32Array;
-  // Days of freshness left for a perishable stack.
+  // Days of freshness left for a perishable stack, or wear left (0..1) on clothing.
   public readonly fresh: Float32Array;
+  // Cook's skill for meals, craftsmanship for clothing (averaged when stacks merge).
+  public readonly quality: Float32Array;
   // Fuel held by a fuelled building (generators).
   public readonly fuel: Float32Array;
   // One item stack per tile.
@@ -69,6 +72,7 @@ export class World {
     this.delivered = new Uint16Array(this.size * MAX_COST_LINES);
     this.growth = new Float32Array(this.size);
     this.fresh = new Float32Array(this.size);
+    this.quality = new Float32Array(this.size);
     this.fuel = new Float32Array(this.size);
     this.itemType = new Uint8Array(this.size);
     this.itemCount = new Uint16Array(this.size);
@@ -239,22 +243,35 @@ export class World {
 
   // Adds to the tile's stack and returns whatever did not fit. `fresh` is how many days the
   // incoming items have left (new items are perfectly fresh); a merged stack averages the two.
-  public addItem(i: number, item: number, count: number, fresh?: number): number {
+  public addItem(i: number, item: number, count: number, fresh?: number, quality?: number): number {
     if (!this.canHoldItem(i, item)) {
       return count;
     }
-    const space = itemDef(item).stackLimit - (this.itemType[i] === item ? this.itemCount[i] : 0);
+    const def = itemDef(item);
+    const space = def.stackLimit - (this.itemType[i] === item ? this.itemCount[i] : 0);
     const added = Math.min(space, count);
-    const life = itemDef(item).shelfLife;
-    if (life !== undefined && added > 0) {
-      const incoming = fresh ?? life;
+    if (added > 0) {
       const existing = this.itemType[i] === item ? this.itemCount[i] : 0;
-      this.fresh[i] = (this.fresh[i] * existing + incoming * added) / (existing + added);
+      const merge = (old: number, incoming: number) => (old * existing + incoming * added) / (existing + added);
+      const life = def.shelfLife ?? (def.apparel ? 1 : undefined);
+      if (life !== undefined) {
+        this.fresh[i] = merge(this.fresh[i], fresh ?? life);
+      }
+      this.quality[i] = merge(this.quality[i], quality ?? NORMAL_QUALITY);
     }
     this.itemType[i] = item;
     this.itemCount[i] += added;
     this.markDirty(i);
     return count - added;
+  }
+
+  // Takes up to `count` from the stack, keeping its freshness and quality with the carried items.
+  public pickUp(i: number, count: number): Carried {
+    const item = this.itemType[i];
+    const def = itemDef(item);
+    const fresh = def.shelfLife !== undefined || def.apparel ? this.fresh[i] : undefined;
+    const quality = this.quality[i];
+    return { item, count: this.takeItem(i, count), fresh, quality };
   }
 
   public takeItem(i: number, count: number): number {
@@ -270,7 +287,7 @@ export class World {
   // Spreads items onto the nearest tiles that can hold them (breadth-first from `start`, including
   // diagonals so a walled-in corner still reaches open ground). Items are never destroyed: if
   // nothing can hold the rest, the nearest walkable tile takes it over its stack limit.
-  public dropItemNear(start: number, item: number, count: number, fresh?: number): void {
+  public dropItemNear(start: number, item: number, count: number, fresh?: number, quality?: number): void {
     // From the middle of deep water (a cancelled bridge), start from the nearest dry ground instead.
     if (!this.isPassable(start) && !this.neighbors(start).some((n) => this.isPassable(n))) {
       start = this.nearestPassable(start) ?? start;
@@ -282,7 +299,7 @@ export class World {
     let fallback = -1;
     for (let q = 0; q < queue.length && remaining > 0; q++) {
       const i = queue[q];
-      remaining = this.addItem(i, item, remaining, fresh);
+      remaining = this.addItem(i, item, remaining, fresh, quality);
       if (
         fallback < 0 &&
         this.isPassable(i) &&
@@ -301,8 +318,10 @@ export class World {
     }
     if (remaining > 0 && fallback >= 0) {
       const existing = this.itemType[fallback] === item ? this.itemCount[fallback] : 0;
-      const incoming = fresh ?? itemDef(item).shelfLife ?? 0;
+      const incoming = fresh ?? itemDef(item).shelfLife ?? (itemDef(item).apparel ? 1 : 0);
       this.fresh[fallback] = (this.fresh[fallback] * existing + incoming * remaining) / (existing + remaining);
+      this.quality[fallback] =
+        (this.quality[fallback] * existing + (quality ?? NORMAL_QUALITY) * remaining) / (existing + remaining);
       this.itemType[fallback] = item;
       this.itemCount[fallback] = existing + remaining;
       this.markDirty(fallback);

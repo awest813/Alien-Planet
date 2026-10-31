@@ -16,7 +16,8 @@ import { availableProjects, isAvailable } from '../sim/research';
 import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, yearOf } from '../sim/seasons';
 import { animalName } from '../sim/animals';
 import { COLONIST_WEAPONS } from '../sim/combat';
-import { bleedingOf, needsBedRest, painOf } from '../sim/health';
+import { POISONING_HOURS, bleedingOf, needsBedRest, painOf } from '../sim/health';
+import { comfortRange, qualityLabel } from '../sim/apparel';
 import { MAX_SKILL, SKILL_LABELS, xpToNext } from '../sim/skills';
 import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
@@ -231,6 +232,12 @@ export interface ColonistView {
   dead: boolean;
   skillList: { key: string; label: string; level: number; passion: number; progress: number }[];
   weapon: string;
+  // e.g. "Good parka (80%)".
+  apparel: string;
+  // Comfortable temperature range in what they're wearing.
+  comfort: string;
+  // Exposure and food poisoning, each 0..1.
+  conditions: { label: string; value: number }[];
 }
 
 // A story event shown briefly as a card, so major moments aren't missed.
@@ -282,6 +289,8 @@ export interface BillView {
   hasBench: boolean;
   // Research project that must be finished first, if any.
   locked: string | null;
+  // Skill a colonist needs to work it, e.g. "Cooking 6".
+  minSkill: string | null;
   step: number;
 }
 
@@ -716,6 +725,15 @@ export class GameController {
           progress: c.skills[key] >= MAX_SKILL ? 1 : c.skillXp[key] / xpToNext(c.skills[key]),
         })),
         weapon: COLONIST_WEAPONS[c.weapon].name,
+        apparel: c.apparel
+          ? `${qualityLabel(c.apparel.quality)} ${itemDef(c.apparel.item).name.toLowerCase()} (${Math.round(c.apparel.wear * 100)}%)`
+          : 'Nothing',
+        comfort: ((r) => `${Math.round(r.min)}°C to ${Math.round(r.max)}°C`)(comfortRange(c)),
+        conditions: [
+          { label: 'Hypothermia', value: c.health.hypothermia },
+          { label: 'Heatstroke', value: c.health.heatstroke },
+          { label: 'Food poisoning', value: c.health.poisoned / POISONING_HOURS },
+        ].filter((condition) => condition.value > 0.02),
       })),
       selectedColonist: this.selectedColonist,
       resources: totals.map((r) => ({ name: itemDef(r.item).name, stored: r.stored, total: r.total })),
@@ -742,6 +760,8 @@ export class GameController {
           recipeText: `${recipe.ingredient.count} ${input} → ${recipe.product.count} ${product.name.toLowerCase()}`,
           bench: recipe.bench === 'cooking' ? 'stove' : 'crafting bench',
           hasBench: sim.countFeature((f) => featureDef(f).workbench === recipe.bench) > 0,
+          minSkill:
+            recipe.minSkill > 0 ? `${recipe.bench === 'cooking' ? 'Cooking' : 'Crafting'} ${recipe.minSkill}` : null,
           locked:
             recipe.research && !sim.isResearched(recipe.research)
               ? (researchDef(recipe.research)?.name ?? recipe.research)
@@ -836,6 +856,12 @@ export class GameController {
     for (const c of sim.living()) {
       if (sim.inMentalBreak(c)) {
         alerts.push({ text: `${c.name} is having a mental break`, tone: 'danger' });
+      } else if (c.health.hypothermia > 0.4 || c.health.heatstroke > 0.4) {
+        const what = c.health.hypothermia > c.health.heatstroke ? 'hypothermia' : 'heatstroke';
+        alerts.push({
+          text: `${c.name} has ${what}: get them somewhere ${what === 'hypothermia' ? 'warm' : 'cool'}`,
+          tone: 'danger',
+        });
       } else if (c.needs.food <= 0) {
         alerts.push({ text: `${c.name} is starving`, tone: 'danger' });
       } else if (c.mood < 25) {
@@ -877,18 +903,27 @@ export class GameController {
         alerts.push({ text: `Blueprints need ${short} more ${def.name.toLowerCase()}${how}`, tone: 'warn' });
       }
     }
-    let freeSpots = 0;
+    // Full means no stockpile tile has room for any of the kinds of item lying outside.
+    const looseTypes = new Set<number>();
     let loose = 0;
     for (let i = 0; i < w.size; i++) {
-      if (sim.isStockpile(i)) {
-        if (w.itemType[i] === NONE && !sim.isIcebox(i)) {
-          freeSpots++;
-        }
-      } else if (w.itemType[i] !== NONE) {
+      if (w.itemType[i] !== NONE && !sim.isStockpile(i)) {
+        looseTypes.add(w.itemType[i]);
         loose++;
       }
     }
-    if (freeSpots === 0 && loose > 0 && w.zone.some((z) => z === STOCKPILE_ZONE)) {
+    let room = false;
+    for (let i = 0; i < w.size && loose > 0 && !room; i++) {
+      if (sim.isStockpile(i)) {
+        for (const type of looseTypes) {
+          if (w.canHoldItem(i, type)) {
+            room = true;
+            break;
+          }
+        }
+      }
+    }
+    if (!room && loose > 0 && w.zone.some((z) => z === STOCKPILE_ZONE)) {
       alerts.push({ text: `Stockpiles are full: ${loose} stacks lying outside. Zone more storage (Z).`, tone: 'warn' });
     }
     const ateRaw = sim.colonists.some((c) => c.thoughts.some((t) => t.key === 'ateRaw'));
@@ -957,7 +992,13 @@ export class GameController {
         details.push(
           `Fuel ${Math.floor(w.fuel[i])}/${def.power.fuel.capacity} ${itemDef(def.power.fuel.item).name.toLowerCase()}`,
         );
-        details.push(w.fuel[i] > 0 ? `Producing ${def.power.output} W` : 'Out of fuel');
+        details.push(
+          w.fuel[i] <= 0
+            ? 'Out of fuel'
+            : sim.power.idle
+              ? 'Idle, saving fuel: nothing needs the power'
+              : `Producing ${def.power.output} W`,
+        );
       } else if (def.power.solar) {
         details.push(`Producing up to ${def.power.output} W in daylight`);
       }
@@ -989,6 +1030,11 @@ export class GameController {
       details.push(w.growth[i] >= 1 ? 'Ready to harvest' : `${Math.floor(w.growth[i] * 100)}% grown`);
     }
     const item = w.itemType[i];
+    if (item !== NONE && itemDef(item).apparel) {
+      details.push(`${qualityLabel(w.quality[i])}, ${Math.round(w.fresh[i] * 100)}% condition`);
+    } else if (item !== NONE && itemDef(item).category === 'meal') {
+      details.push(`Cooked with ${qualityLabel(w.quality[i]).toLowerCase()} skill`);
+    }
     if (item !== NONE && itemDef(item).shelfLife !== undefined) {
       const frozen = sim.temperatureAt(i) <= 0 || (sim.isIcebox(i) && sim.power.powered);
       details.push(

@@ -230,6 +230,9 @@ function OverviewTab({ c }: { c: ColonistView }) {
     <>
       {c.carrying && <div className="muted">Carrying {c.carrying}</div>}
       <div className="muted">Weapon: {c.weapon}</div>
+      <div className="muted">
+        Wearing: {c.apparel} · comfortable {c.comfort}
+      </div>
       <h4>Needs</h4>
       {needs.map((n) => (
         <div key={n.label} className="stat">
@@ -251,7 +254,7 @@ function OverviewTab({ c }: { c: ColonistView }) {
 }
 
 function HealthTab({ c }: { c: ColonistView }) {
-  const healthy = c.injuries.length === 0 && !c.disease && c.bloodLoss < 0.05;
+  const healthy = c.injuries.length === 0 && !c.disease && c.bloodLoss < 0.05 && c.conditions.length === 0;
   return (
     <>
       {healthy && <div className="muted">Healthy.</div>}
@@ -262,6 +265,13 @@ function HealthTab({ c }: { c: ColonistView }) {
             {injury.tended ? <span className="muted">(tended)</span> : <span className="bad">(untended)</span>}
           </span>
           <span className="muted">{Math.round(injury.severity * 100)}%</span>
+        </div>
+      ))}
+      {c.conditions.map((condition) => (
+        <div key={condition.label} className="stat">
+          <span>{condition.label}</span>
+          <Bar value={condition.value} color="#7fc8ff" label={condition.label} />
+          <span className="num">{Math.round(condition.value * 100)}%</span>
         </div>
       ))}
       {c.bloodLoss >= 0.05 && (

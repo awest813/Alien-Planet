@@ -147,6 +147,7 @@ export function ProductionScreen({ state, onClose }: { state: UiState; onClose: 
                   {bill.recipeText} at a {bill.bench}
                   {!bill.hasBench && <span className="tag warn">no {bill.bench} yet</span>}
                   {bill.locked && <span className="tag warn">🔒 needs {bill.locked}</span>}
+                  {bill.minSkill && <span className="tag">needs {bill.minSkill}</span>}
                 </div>
               </td>
               <td className="muted">{bill.stock} in stock</td>
@@ -213,7 +214,9 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
         it's cold, so research <b>electricity</b> and <b>refrigeration</b> for generators, iceboxes and freezers, and{' '}
         <b>sun lamps</b> for indoor farming. Skills improve with practice, fastest where a colonist has a passion (★).
         Build <b>bridges</b> over water and <b>fishing spots</b> on the shore (hunters fish while food is short); in
-        hard frost the shallows freeze and can be walked across.
+        hard frost the shallows freeze and can be walked across. Research <b>tailoring</b> for parkas before winter:
+        cold beyond what colonists wear builds into hypothermia, and a skilled cook makes fine meals that rarely make
+        anyone sick.
       </p>
     </Modal>
   );

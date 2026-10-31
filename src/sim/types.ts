@@ -20,6 +20,8 @@ export type JobType =
   | 'refuel'
   | 'fish'
   | 'feed'
+  | 'warmUp'
+  | 'rescue'
   | 'wander';
 
 export interface Job {
@@ -104,8 +106,17 @@ export interface TimedThought {
 export interface Carried {
   item: number;
   count: number;
-  // Days of freshness left, for perishable food.
+  // Days of freshness left, for perishable food (wear left, for clothing).
   fresh?: number;
+  // Cook's skill for meals, craftsmanship for clothing.
+  quality?: number;
+}
+
+export interface WornApparel {
+  item: number;
+  quality: number;
+  // 1 when new, worn out at 0.
+  wear: number;
 }
 
 export interface Colonist {
@@ -154,6 +165,7 @@ export interface Colonist {
   skillXp: Record<SkillKey, number>;
   passions: Record<SkillKey, Passion>;
   weapon: ColonistWeapon;
+  apparel: WornApparel | null;
   // Tick each skill was last practised, for rust.
   practicedAt: Partial<Record<SkillKey, number>>;
 }
@@ -206,6 +218,11 @@ export interface Health {
   // Collapsed from pain or blood loss: can't move or work until it eases.
   downed: boolean;
   dead: boolean;
+  // 0..1 build-up from cold or heat beyond what clothing can handle; fatal at 1.
+  hypothermia: number;
+  heatstroke: number;
+  // Hours of food poisoning left.
+  poisoned: number;
 }
 
 export type Weapon = 'bow' | 'knife';
@@ -223,6 +240,8 @@ export interface Enemy {
   fleeing: boolean;
   // Tick when the enemy next re-plans its route.
   repathAt: number;
+  // Wall this raider is trying to break through to reach the colonists.
+  breachTarget?: number;
 }
 
 // A recent attack, kept briefly so the renderer can draw it.

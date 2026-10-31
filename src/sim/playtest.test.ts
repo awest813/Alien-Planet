@@ -40,6 +40,32 @@ describe('raids', () => {
     run(sim, HOUR * 8);
     expect(ring.some((t) => w.feature[t] === NONE)).toBe(true);
   });
+
+  it('find the built wall of a room backed by natural rock', () => {
+    const sim = Simulation.newColony(5);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 12);
+    const ring = outline(w, x - 2, y - 2, x + 2, y + 2);
+    // The north side is a solid rock face, three tiles thick.
+    for (let dy = -4; dy <= -2; dy++) {
+      for (let dx = -6; dx <= 6; dx++) {
+        w.setFeature(w.idx(x + dx, y + dy), featureId('rock'));
+      }
+    }
+    const walls = ring.filter((t) => w.feature[t] === NONE);
+    for (const t of walls) {
+      w.setFeature(t, featureId('woodWall'));
+    }
+    sim.colonists.forEach((c, k) => {
+      c.tile = w.idx(x - 1 + (k % 3), y - 1 + Math.floor(k / 3));
+      c.path = [];
+      c.job = null;
+    });
+    run(sim, 1);
+    expect(triggerEvent(sim, 'raid')).toBe(true);
+    run(sim, HOUR * 8);
+    expect(walls.some((t) => w.feature[t] === NONE)).toBe(true);
+  });
 });
 
 describe('generators', () => {
