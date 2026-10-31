@@ -1,3 +1,4 @@
+import type { Stance } from '../sim/types';
 import { useEffect, useState } from 'react';
 import { ColonistView, TOOLS, TOOL_GROUPS, TileView, ToolGroup, UiState, controller } from '../game/controller';
 import { PHASE_NAMES } from '../sim/simulation';
@@ -223,6 +224,29 @@ function ColonistCard({ c }: { c: ColonistView }) {
         </button>
       </div>
       <div className="activity">{c.activity}</div>
+      {c.drafted && (
+        <div className="stance" role="group" aria-label="Combat stance">
+          {STANCES.map((s) => (
+            <button
+              key={s.key}
+              className={c.stance === s.key ? 'active' : ''}
+              title={s.hint}
+              onClick={() => controller.setStance(c.id, s.key)}
+            >
+              {s.label}
+            </button>
+          ))}
+          {c.focus && (
+            <button
+              className="focus"
+              title="Stop concentrating on this raider"
+              onClick={() => controller.clearFocus(c.id)}
+            >
+              Target: {c.focus} ✕
+            </button>
+          )}
+        </div>
+      )}
       <div className="tabs" role="tablist">
         {tabs.map((t) => (
           <button
@@ -246,6 +270,12 @@ function ColonistCard({ c }: { c: ColonistView }) {
   );
 }
 
+const STANCES: { key: Stance; label: string; hint: string }[] = [
+  { key: 'cover', label: 'Take cover', hint: 'Move to nearby cover with a clear shot, then fight from there' },
+  { key: 'hold', label: 'Hold', hint: 'Stay exactly where ordered and shoot whatever comes in range' },
+  { key: 'charge', label: 'Charge', hint: 'Close in on the enemy (melee weapons are preferred when equipping)' },
+];
+
 function OverviewTab({ c }: { c: ColonistView }) {
   const needs = [
     { label: 'Food', value: c.needs.food, color: '#e0a050' },
@@ -256,7 +286,7 @@ function OverviewTab({ c }: { c: ColonistView }) {
     <>
       {c.carrying && <div className="muted">Carrying {c.carrying}</div>}
       <div className="muted">
-        Weapon: {c.weapon} · tools: {c.tool}
+        Weapon: {c.weapon} · armor: {c.armor} · tools: {c.tool}
       </div>
       <div className="muted">
         Wearing: {c.apparel} · comfortable {c.comfort}

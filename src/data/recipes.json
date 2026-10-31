@@ -170,5 +170,173 @@
         "count": 4
       }
     ]
+  },
+  {
+    "key": "makeKnife",
+    "name": "Make knife",
+    "bench": "crafting",
+    "product": {
+      "item": "knife",
+      "count": 1
+    },
+    "work": 120,
+    "defaultTarget": 0,
+    "ingredients": [
+      {
+        "item": "stone",
+        "count": 4
+      },
+      {
+        "item": "wood",
+        "count": 2
+      }
+    ]
+  },
+  {
+    "key": "makeClub",
+    "name": "Make club",
+    "bench": "crafting",
+    "product": {
+      "item": "club",
+      "count": 1
+    },
+    "work": 90,
+    "defaultTarget": 0,
+    "ingredients": [
+      {
+        "item": "wood",
+        "count": 12
+      }
+    ]
+  },
+  {
+    "key": "makeSpear",
+    "name": "Make spear",
+    "bench": "crafting",
+    "product": {
+      "item": "spear",
+      "count": 1
+    },
+    "work": 150,
+    "defaultTarget": 0,
+    "ingredients": [
+      {
+        "item": "wood",
+        "count": 8
+      },
+      {
+        "item": "stone",
+        "count": 4
+      }
+    ]
+  },
+  {
+    "key": "makeShortBow",
+    "name": "Make short bow",
+    "bench": "crafting",
+    "product": {
+      "item": "shortBow",
+      "count": 1
+    },
+    "work": 200,
+    "defaultTarget": 0,
+    "ingredients": [
+      {
+        "item": "wood",
+        "count": 12
+      },
+      {
+        "item": "leather",
+        "count": 2
+      }
+    ]
+  },
+  {
+    "key": "makeLongbow",
+    "name": "Make longbow",
+    "bench": "crafting",
+    "product": {
+      "item": "longbow",
+      "count": 1
+    },
+    "work": 420,
+    "defaultTarget": 1,
+    "ingredients": [
+      {
+        "item": "wood",
+        "count": 20
+      },
+      {
+        "item": "leather",
+        "count": 4
+      }
+    ],
+    "research": "longbows"
+  },
+  {
+    "key": "makeCrossbow",
+    "name": "Make crossbow",
+    "bench": "crafting",
+    "product": {
+      "item": "crossbow",
+      "count": 1
+    },
+    "work": 520,
+    "defaultTarget": 1,
+    "ingredients": [
+      {
+        "item": "wood",
+        "count": 15
+      },
+      {
+        "item": "stoneBlocks",
+        "count": 6
+      },
+      {
+        "item": "leather",
+        "count": 2
+      }
+    ],
+    "research": "crossbows"
+  },
+  {
+    "key": "makeLeatherArmor",
+    "name": "Make leather armor",
+    "bench": "crafting",
+    "product": {
+      "item": "leatherArmor",
+      "count": 1
+    },
+    "work": 500,
+    "defaultTarget": 1,
+    "ingredients": [
+      {
+        "item": "leather",
+        "count": 24
+      }
+    ],
+    "research": "armor"
+  },
+  {
+    "key": "makeScaleArmor",
+    "name": "Make scale armor",
+    "bench": "crafting",
+    "product": {
+      "item": "scaleArmor",
+      "count": 1
+    },
+    "work": 650,
+    "defaultTarget": 1,
+    "ingredients": [
+      {
+        "item": "stoneBlocks",
+        "count": 12
+      },
+      {
+        "item": "leather",
+        "count": 12
+      }
+    ],
+    "research": "scaleArmor"
   }
 ]

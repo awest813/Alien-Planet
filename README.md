@@ -76,10 +76,17 @@ How the storytelling layer works:
   or blood loss and a colonist collapses; too much and they die, and everyone grieves. Marsh fever is a race
   between severity and immunity that bed rest and tending tilt in the patient's favour. Doctors get out of bed
   for emergencies, and bring food to colonists too hurt to get up.
-- **Combat and raids:** raiders from hostile factions arrive at the map edge with bows or knives. The game
-  pauses; drafted colonists shoot anything within range and line of sight, undrafted ones defend themselves at
-  close range. Raiders flee once half of them fall. Walling yourself in doesn't stop them: raiders who
-  can't reach anyone smash through the nearest wall or door.
+- **Combat and raids:** raiders from hostile factions arrive at the map edge. The Rust Wardens favour bows, the
+  Ashen Howlers clubs and spears; later raids bring better bows, crossbows and armor. The game pauses. Archers on
+  both sides look for firing positions behind cover, keep to their range and are rattled (suppressed: worse aim)
+  by shots landing close; melee fighters charge. Badly wounded raiders may break and run, and the raid flees once
+  most of them are down or running. Undrafted colonists run indoors when raiders come close, and fight back only
+  when cornered. Walling yourself in doesn't stop them: raiders who can't reach anyone smash through the nearest
+  wall or door (clubs and spears break walls faster than bows).
+- **Drafted colonists:** pick a stance in the inspector: Take cover (the default: slip into nearby cover with a
+  clear shot), Hold (stay exactly where sent) or Charge (close in; chargers prefer melee weapons when equipping).
+  Right-click the map to send the selected colonist somewhere (they get there before stopping to shoot), or
+  right-click a raider to have the selected colonist, or everyone drafted, concentrate fire on them.
 - **Animal husbandry:** mark wild animals with the Tame tool; colonists with the Handle work type (and the
   Animals skill) calm them and try to win them over, harder for wilder animals, and a boar may lash out.
   Tame animals stay near the colony, pairs breed most mornings, tame deer give milk, and tame boars bite
@@ -103,9 +110,13 @@ How the storytelling layer works:
 - **Wildlife and hunting:** deer, hares and boars roam the map and herds wander in. Mark animals with the Hunt
   tool and colonists with the Hunt work type will track and shoot them for raw meat (cookable) and leather.
   Boars often turn on their hunter, and anyone nearby will fight an enraged animal.
-- **Gear and cover:** a crafting bench turns leather into recurve bows (longer range, harder hits), which
-  colonists pick up from storage. Sandbags halve the chance of being hit from the side they face, for
-  colonists and raiders alike.
+- **Weapons, armor and defenses:** one set of weapons for everyone, each with its own reach, rate, accuracy,
+  drop-off and armor piercing: fists, knife, club, spear, short bow, recurve bow, longbow (Longbows research) and
+  crossbow (Crossbows research). Leather and scale armor (Armor and Scale armor research) turn aside a share of
+  every blow, wear down as they do it, and scale armor slows its wearer. Colonists pick up clearly better weapons
+  and armor from storage, and fallen raiders drop some of their kit. Sandbags and embrasures (stone wall slots you
+  can shoot through but not walk through) cut the chance of being hit from the side they face; spike traps
+  (Traps research) wound the first raider to step on them and go back on the build list.
 - **Seasons:** a year is four six-day seasons, starting in early spring. Temperatures follow the year (warm
   summers, freezing winter nights). Crops don't grow in winter and hard frost kills anything left in the field,
   so plant enough in spring and summer and harvest before winter.
@@ -217,7 +228,9 @@ idle generators), `src/sim/needs.test.ts` covers clothing, exposure, fine meals,
 crafting, stonecutting, mending and saves, `src/sim/building.test.ts` covers floors, roofs and tool kits,
 `src/sim/husbandry.test.ts` covers taming, herding, breeding, milk and
 guard animals, `src/sim/weather.test.ts` covers weather, soaking, lightning, fire and firefighting, and
-`src/sim/trade.test.ts` covers caravans, buying and selling, goodwill and saving a visit.
+`src/sim/trade.test.ts` covers caravans, buying and selling, goodwill and saving a visit, and
+`src/sim/combat.test.ts` covers weapons, armor, raider loadouts and tactics, suppression, embrasures, traps,
+focus fire, taking cover and sheltering.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,
 puts its best researcher on research, drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation:

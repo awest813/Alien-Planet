@@ -24,6 +24,7 @@ export type JobType =
   | 'rescue'
   | 'tame'
   | 'extinguish'
+  | 'shelter'
   | 'wander';
 
 export interface Job {
@@ -173,9 +174,15 @@ export interface Colonist {
   // Experience towards the next level of each skill.
   skillXp: Record<SkillKey, number>;
   passions: Record<SkillKey, Passion>;
-  weapon: ColonistWeapon;
-  // Craftsmanship of the bow in hand: better bows hit harder.
+  // Key of the weapon in hand (see WEAPONS), and its craftsmanship: better-made weapons hit harder.
+  weapon: string;
   weaponQuality: number;
+  // Body armor worn over clothes.
+  armor: WornArmor | null;
+  // How a drafted colonist fights: find cover, stand fast, or close in.
+  stance: Stance;
+  // Raider this colonist was told to concentrate on (-1: their own choice).
+  focus: number;
   // A carried tool kit speeds up mining, chopping, building and farming, and wears out.
   tool: { quality: number; wear: number } | null;
   apparel: WornApparel | null;
@@ -183,7 +190,14 @@ export interface Colonist {
   practicedAt: Partial<Record<SkillKey, number>>;
 }
 
-export type ColonistWeapon = 'bow' | 'recurveBow';
+export type Stance = 'cover' | 'hold' | 'charge';
+
+export interface WornArmor {
+  item: number;
+  quality: number;
+  // Condition left, 1 (new) to 0 (falls apart).
+  wear: number;
+}
 
 export interface Animal {
   id: number;
@@ -241,8 +255,6 @@ export interface Health {
   poisoned: number;
 }
 
-export type Weapon = 'bow' | 'knife';
-
 export interface Enemy {
   id: number;
   name: string;
@@ -251,13 +263,25 @@ export interface Enemy {
   path: number[];
   moveProgress: number;
   hp: number;
-  weapon: Weapon;
+  // Key of the weapon carried (see WEAPONS).
+  weapon: string;
+  // Share of each blow turned aside by armor (0 without), and the armor item, dropped on defeat.
+  armor: number;
+  armorItem?: number;
+  // Fighting skill, on the colonists' Combat scale.
+  skill: number;
+  // Walking speed as a share of a colonist's.
+  speed: number;
+  // 0..1: rattled by shots landing close; spoils aim and sends them looking for cover.
+  suppression: number;
   cooldown: number;
   fleeing: boolean;
-  // Tick when the enemy next re-plans its route.
+  // Tick when the enemy next re-plans its route (and, for archers, its firing position).
   repathAt: number;
   // Wall this raider is trying to break through to reach the colonists.
   breachTarget?: number;
+  // Where a ranged raider has chosen to shoot from.
+  post?: number;
 }
 
 // A recent attack, kept briefly so the renderer can draw it.
@@ -297,6 +321,9 @@ export type Command =
   | { type: 'bill'; recipe: number; target: number }
   | { type: 'draft'; colonist: number; drafted: boolean }
   | { type: 'move'; colonist: number; tile: number }
+  | { type: 'stance'; colonist: number; stance: Stance }
+  // Concentrate fire on a raider (-1 to stop); colonist -1 means every drafted colonist.
+  | { type: 'focus'; colonist: number; enemy: number }
   | { type: 'hunt'; rect: Rect; add: boolean }
   | { type: 'tame'; rect: Rect; add: boolean }
   | { type: 'research'; project: string | null };

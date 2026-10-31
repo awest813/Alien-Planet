@@ -2,7 +2,7 @@ import diseasesJson from '../data/diseases.json';
 import { TICKS_PER_HOUR } from './constants';
 import { comfortRange } from './apparel';
 import { WET_CHILL, isWet } from './weather';
-import { itemId } from './defs';
+import { itemId, weaponDef } from './defs';
 import { FRIEND_OPINION, mutualOpinion, traitFactor, traitValue } from './social';
 import type { Simulation } from './simulation';
 import { Colonist, Health } from './types';
@@ -216,9 +216,14 @@ export function checkHealth(sim: Simulation, c: Colonist): void {
 function die(sim: Simulation, c: Colonist, cause: string): void {
   sim.endJob(c);
   sim.dropCarried(c);
-  if (c.weapon === 'recurveBow') {
-    sim.world.dropItemNear(c.tile, itemId('recurveBow'), 1, undefined, c.weaponQuality);
-    c.weapon = 'bow';
+  const weapon = weaponDef(c.weapon).item;
+  if (weapon !== undefined) {
+    sim.world.dropItemNear(c.tile, weapon, 1, undefined, c.weaponQuality);
+    c.weapon = 'fists';
+  }
+  if (c.armor) {
+    sim.world.dropItemNear(c.tile, c.armor.item, 1, c.armor.wear, c.armor.quality);
+    c.armor = null;
   }
   if (c.apparel) {
     sim.world.dropItemNear(c.tile, c.apparel.item, 1, c.apparel.wear, c.apparel.quality);

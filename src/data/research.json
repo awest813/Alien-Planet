@@ -10,7 +10,7 @@
     "name": "Fortifications",
     "cost": 1600,
     "requires": ["archery"],
-    "description": "Unlocks sandbags for cover."
+    "description": "Unlocks sandbags for cover and embrasures to shoot through."
   },
   {
     "key": "hearths",
@@ -75,5 +75,40 @@
     "name": "Tailoring",
     "cost": 1400,
     "description": "Unlocks tailoring tunics from cloth and warm parkas from leather."
+  },
+  {
+    "key": "longbows",
+    "name": "Longbows",
+    "cost": 1400,
+    "requires": ["archery"],
+    "description": "Unlocks the longbow: the longest reach of any bow."
+  },
+  {
+    "key": "crossbows",
+    "name": "Crossbows",
+    "cost": 2000,
+    "requires": ["longbows"],
+    "description": "Unlocks the crossbow: slow to load, but its bolts punch through armor."
+  },
+  {
+    "key": "armor",
+    "name": "Armor",
+    "cost": 1400,
+    "requires": ["tailoring"],
+    "description": "Unlocks leather armor, which turns aside a quarter of every blow."
+  },
+  {
+    "key": "scaleArmor",
+    "name": "Scale armor",
+    "cost": 2200,
+    "requires": ["armor"],
+    "description": "Unlocks scale armor of granite plates: heavy, but stops nearly half of every blow."
+  },
+  {
+    "key": "traps",
+    "name": "Traps",
+    "cost": 1200,
+    "requires": ["fortifications"],
+    "description": "Unlocks spike traps that wound the first raider to step on them."
   }
 ]

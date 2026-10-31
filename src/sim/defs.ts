@@ -5,6 +5,7 @@ import featuresJson from '../data/features.json';
 import itemsJson from '../data/items.json';
 import recipesJson from '../data/recipes.json';
 import researchJson from '../data/research.json';
+import weaponsJson from '../data/weapons.json';
 import terrainJson from '../data/terrain.json';
 import thoughtsJson from '../data/thoughts.json';
 import traitsJson from '../data/traits.json';
@@ -46,6 +47,10 @@ export interface ItemDef {
   apparel?: ApparelSpec;
   // A tool kit: carried by a worker, it speeds up physical work and wears out.
   tool: boolean;
+  // A weapon: the key of its entry in WEAPONS.
+  weapon?: string;
+  // Body armor: the share of each blow it turns aside, and how it slows its wearer.
+  armor?: { protection: number; speed: number };
 }
 
 export interface ApparelSpec {
@@ -114,6 +119,10 @@ export interface FeatureDef {
   build?: { cost: Cost[]; work: number };
   // Floors and roofs sit in their own layer, under or over whatever else is on the tile.
   layer?: 'floor' | 'roof';
+  // A wall that shots pass through (an embrasure).
+  seeThrough: boolean;
+  // Springs on the first raider to step on it.
+  trap: boolean;
 }
 
 export interface RecipeDef {
@@ -182,6 +191,8 @@ interface RawFeature {
   crop?: { item: string; count: number; growDays: number; sowWork: number; harvestWork: number };
   build?: { cost: { item: string; count: number }[]; work: number };
   layer?: 'floor' | 'roof';
+  seeThrough?: boolean;
+  trap?: boolean;
 }
 
 interface RawItem {
@@ -197,6 +208,8 @@ interface RawItem {
   foodKind?: 'meat' | 'veg' | 'dairy';
   value?: number;
   tool?: boolean;
+  weapon?: string;
+  armor?: { protection: number; speed: number };
 }
 
 // Quality of food and goods made by an average hand (and of anything found or gifted).
@@ -220,6 +233,8 @@ export const ITEMS: ItemDef[] = (itemsJson as RawItem[]).map((t, i) => ({
   foodKind: t.foodKind,
   value: t.value ?? 1,
   tool: !!t.tool,
+  weapon: t.weapon,
+  armor: t.armor,
 }));
 
 const itemIdByKey = new Map(ITEMS.map((item) => [item.key, item.id]));
@@ -275,6 +290,8 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
     work: f.build.work,
   },
   layer: f.layer,
+  seeThrough: !!f.seeThrough,
+  trap: !!f.trap,
 }));
 
 // Blueprints track delivered materials per cost line; no building needs more than this many.
@@ -362,9 +379,57 @@ export interface FactionDef {
   hostile: boolean;
   description: string;
   names: string[];
+  // What its raiders carry: weapons by weight, some only from a given day.
+  loadout: { weapon: string; weight: number; minDay?: number }[];
+  // Raiders' fighting skill (colonists' Combat skill on the same scale).
+  skill: number;
+  // Raiders' walking speed, as a share of a colonist's.
+  speed: number;
 }
 
-export const FACTIONS: FactionDef[] = factionsJson.map((f, i) => ({ ...f, id: i }));
+export const FACTIONS: FactionDef[] = (factionsJson as Omit<FactionDef, 'id' | 'loadout' | 'skill' | 'speed'>[]).map(
+  (f, i) => {
+    const raw = f as Partial<FactionDef>;
+    return { ...f, id: i, loadout: raw.loadout ?? [], skill: raw.skill ?? 4, speed: raw.speed ?? 0.9 };
+  },
+);
+
+// ---- Weapons ----
+
+export interface WeaponDef {
+  key: string;
+  name: string;
+  // The item it's made as (fists have none).
+  item?: number;
+  // Tiles; 1 is melee.
+  range: number;
+  // Ticks between attacks.
+  cooldown: number;
+  // Hit chance for an average fighter at point blank, and how much it drops per tile.
+  accuracy: number;
+  falloff: number;
+  // Damage per hit against a raider's 1.0 of health.
+  damage: [number, number];
+  // Share of armor it ignores.
+  pierce: number;
+}
+
+export const WEAPONS: WeaponDef[] = weaponsJson.map((w) => ({
+  key: w.key,
+  name: w.name,
+  item: 'item' in w && w.item ? resolveItem(w.item) : undefined,
+  range: w.range,
+  cooldown: w.cooldown,
+  accuracy: w.accuracy,
+  falloff: 'falloff' in w ? (w.falloff ?? 0) : 0,
+  damage: w.damage as [number, number],
+  pierce: w.pierce,
+}));
+const weaponByKey = new Map(WEAPONS.map((w) => [w.key, w]));
+export const weaponDef = (key: string): WeaponDef => weaponByKey.get(key) ?? weaponByKey.get('fists')!;
+export const isRanged = (key: string): boolean => weaponDef(key).range > 1;
+// Colonists land with these.
+export const STARTING_WEAPON = 'shortBow';
 
 export interface ResearchDef {
   key: string;

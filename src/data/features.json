@@ -622,5 +622,42 @@
       ],
       "work": 35
     }
+  },
+  {
+    "key": "embrasure",
+    "name": "Embrasure",
+    "blocksRoom": true,
+    "seeThrough": true,
+    "cover": 0.3,
+    "build": {
+      "cost": [
+        {
+          "item": "stoneBlocks",
+          "count": 6
+        }
+      ],
+      "work": 320
+    },
+    "research": "fortifications"
+  },
+  {
+    "key": "spikeTrap",
+    "name": "Spike trap",
+    "passable": true,
+    "trap": true,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 15
+        },
+        {
+          "item": "stone",
+          "count": 5
+        }
+      ],
+      "work": 140
+    },
+    "research": "traps"
   }
 ]

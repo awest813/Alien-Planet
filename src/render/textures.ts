@@ -395,6 +395,33 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillStyle = '#ff5c5c';
       c.fillRect(12, 5, 1, 1);
       break;
+    case 'embrasure':
+      // A block wall with a dark slit to shoot through.
+      c.fillStyle = '#8a8990';
+      c.fillRect(0, 0, 16, 16);
+      c.fillStyle = '#a4a3aa';
+      c.fillRect(0, 0, 16, 2);
+      c.fillRect(0, 8, 16, 1);
+      c.fillStyle = '#1c1c22';
+      c.fillRect(6, 3, 4, 10);
+      c.fillStyle = '#3a3a42';
+      c.fillRect(6, 3, 4, 1);
+      break;
+    case 'spikeTrap':
+      c.fillStyle = 'rgba(70, 50, 30, 0.45)';
+      c.fillRect(2, 2, 12, 12);
+      c.fillStyle = '#c9ced4';
+      for (const [x, y] of [
+        [4, 5],
+        [8, 4],
+        [11, 7],
+        [5, 10],
+        [9, 10],
+      ]) {
+        c.fillRect(x, y, 1, 2);
+        c.fillRect(x, y - 1, 1, 1);
+      }
+      break;
     case 'sandbags':
       c.fillStyle = 'rgba(0,0,0,0.25)';
       c.fillRect(1, 12, 14, 3);
@@ -794,6 +821,79 @@ function drawItem(c: Ctx, key: string): void {
       c.fillRect(14, 8, 1, 3);
       c.fillStyle = '#9a6a3a';
       c.fillRect(3, 7, 10, 2);
+      break;
+    case 'shortBow':
+      c.fillStyle = '#8a6038';
+      c.fillRect(5, 3, 2, 10);
+      c.fillRect(6, 2, 2, 1);
+      c.fillRect(6, 13, 2, 1);
+      c.fillStyle = '#e8e4da';
+      c.fillRect(8, 2, 1, 12);
+      break;
+    case 'longbow':
+      c.fillStyle = '#7a5434';
+      c.fillRect(5, 1, 2, 14);
+      c.fillRect(6, 0, 2, 1);
+      c.fillRect(6, 15, 2, 1);
+      c.fillStyle = '#e8e4da';
+      c.fillRect(9, 0, 1, 16);
+      break;
+    case 'crossbow':
+      c.fillStyle = '#6b4423';
+      c.fillRect(7, 3, 2, 11);
+      c.fillStyle = '#9aa0a6';
+      c.fillRect(2, 5, 12, 2);
+      c.fillStyle = '#e8e4da';
+      c.fillRect(2, 7, 1, 2);
+      c.fillRect(13, 7, 1, 2);
+      c.fillRect(3, 9, 10, 1);
+      break;
+    case 'knife':
+      c.fillStyle = '#c9ced4';
+      c.fillRect(7, 2, 2, 8);
+      c.fillRect(8, 1, 1, 1);
+      c.fillStyle = '#5a3a1f';
+      c.fillRect(6, 10, 4, 1);
+      c.fillRect(7, 11, 2, 4);
+      break;
+    case 'club':
+      c.fillStyle = '#7a5434';
+      c.fillRect(7, 6, 2, 9);
+      c.fillStyle = '#8a6038';
+      c.fillRect(5, 1, 6, 6);
+      c.fillStyle = '#6b4423';
+      c.fillRect(6, 2, 1, 1);
+      c.fillRect(9, 4, 1, 1);
+      break;
+    case 'spear':
+      c.fillStyle = '#7a5434';
+      c.fillRect(7, 4, 2, 12);
+      c.fillStyle = '#8c8b91';
+      c.fillRect(6, 1, 4, 4);
+      c.fillRect(7, 0, 2, 1);
+      break;
+    case 'leatherArmor':
+      c.fillStyle = '#8a5a34';
+      c.fillRect(3, 3, 10, 10);
+      c.fillRect(1, 3, 2, 4);
+      c.fillRect(13, 3, 2, 4);
+      c.fillStyle = '#6b4423';
+      c.fillRect(6, 3, 4, 2);
+      c.fillRect(3, 8, 10, 1);
+      break;
+    case 'scaleArmor':
+      c.fillStyle = '#8c8b91';
+      c.fillRect(3, 3, 10, 10);
+      c.fillRect(1, 3, 2, 4);
+      c.fillRect(13, 3, 2, 4);
+      c.fillStyle = '#b4b3ba';
+      for (let y = 4; y < 13; y += 3) {
+        for (let x = 3 + ((y / 3) % 2); x < 13; x += 3) {
+          c.fillRect(x, y, 2, 1);
+        }
+      }
+      c.fillStyle = '#6b6a70';
+      c.fillRect(6, 3, 4, 2);
       break;
     case 'recurveBow':
       c.fillStyle = '#6b4423';

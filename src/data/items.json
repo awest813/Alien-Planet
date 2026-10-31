@@ -80,7 +80,8 @@
     "key": "recurveBow",
     "name": "Recurve bow",
     "stackLimit": 1,
-    "value": 60
+    "value": 60,
+    "weapon": "recurveBow"
   },
   {
     "key": "rawFish",
@@ -155,5 +156,67 @@
     "stackLimit": 1,
     "value": 25,
     "tool": true
+  },
+  {
+    "key": "shortBow",
+    "name": "Short bow",
+    "stackLimit": 1,
+    "value": 20,
+    "weapon": "shortBow"
+  },
+  {
+    "key": "knife",
+    "name": "Knife",
+    "stackLimit": 1,
+    "value": 15,
+    "weapon": "knife"
+  },
+  {
+    "key": "club",
+    "name": "Club",
+    "stackLimit": 1,
+    "value": 10,
+    "weapon": "club"
+  },
+  {
+    "key": "spear",
+    "name": "Spear",
+    "stackLimit": 1,
+    "value": 25,
+    "weapon": "spear"
+  },
+  {
+    "key": "longbow",
+    "name": "Longbow",
+    "stackLimit": 1,
+    "value": 90,
+    "weapon": "longbow"
+  },
+  {
+    "key": "crossbow",
+    "name": "Crossbow",
+    "stackLimit": 1,
+    "value": 120,
+    "weapon": "crossbow"
+  },
+  {
+    "key": "leatherArmor",
+    "name": "Leather armor",
+    "stackLimit": 1,
+    "value": 70,
+    "armor": {
+      "protection": 0.25,
+      "speed": 1
+    }
+  },
+  {
+    "key": "scaleArmor",
+    "name": "Scale armor",
+    "stackLimit": 1,
+    "value": 130,
+    "armor": {
+      "protection": 0.45,
+      "speed": 0.92
+    }
   }
 ]

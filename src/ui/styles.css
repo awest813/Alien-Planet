@@ -1158,3 +1158,19 @@ button.primary:hover:not(:disabled) {
 .trade td.qty button {
   padding: 2px 6px;
 }
+
+/* Combat stance buttons for a drafted colonist. */
+.stance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+
+.stance button {
+  padding: 2px 8px;
+}
+
+.stance .focus {
+  border-color: #c0504d;
+}

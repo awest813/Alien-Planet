@@ -240,15 +240,17 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
         current tool.
       </p>
       <p className="muted">
-        Later, raiders come. The game pauses: press <b>Q</b> to draft everyone (or a selected colonist), then select a
-        drafted colonist and right-click to move them. Grow <b>healroot</b> (Y) for medicine and hunt (V) for meat and
-        leather, or forage berry bushes (G) for quick food. Winter comes every 24 days: crops stop and food rots unless
-        it's cold, so research <b>electricity</b> and <b>refrigeration</b> for generators, iceboxes and freezers, and{' '}
-        <b>sun lamps</b> for indoor farming. Skills improve with practice, fastest where a colonist has a passion (★).
-        Build <b>bridges</b> over water and <b>fishing spots</b> on the shore (hunters fish while food is short, and all
-        winter); in hard frost the shallows freeze and can be walked across. Research <b>tailoring</b> for parkas before
-        winter: cold beyond what colonists wear builds into hypothermia, and a skilled cook makes fine meals that rarely
-        make anyone sick. <b>Tame</b> deer for milk and boars as guards (Handle work type); tame pairs breed.
+        Later, raiders come. The game pauses: press <b>Q</b> to draft everyone (or a selected colonist), pick a stance
+        (take cover, hold, charge) in the inspector, right-click the map to move a drafted colonist, and right-click a
+        raider to concentrate fire on them. Better weapons, armor, embrasures and spike traps come with research. Grow{' '}
+        <b>healroot</b> (Y) for medicine and hunt (V) for meat and leather, or forage berry bushes (G) for quick food.
+        Winter comes every 24 days: crops stop and food rots unless it's cold, so research <b>electricity</b> and{' '}
+        <b>refrigeration</b> for generators, iceboxes and freezers, and <b>sun lamps</b> for indoor farming. Skills
+        improve with practice, fastest where a colonist has a passion (★). Build <b>bridges</b> over water and{' '}
+        <b>fishing spots</b> on the shore (hunters fish while food is short, and all winter); in hard frost the shallows
+        freeze and can be walked across. Research <b>tailoring</b> for parkas before winter: cold beyond what colonists
+        wear builds into hypothermia, and a skilled cook makes fine meals that rarely make anyone sick. <b>Tame</b> deer
+        for milk and boars as guards (Handle work type); tame pairs breed.
       </p>
       <p className="muted">
         Watch the weather in the top bar: rain chills anyone outside, droughts stunt crops, and storms bring lightning

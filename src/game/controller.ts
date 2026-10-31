@@ -14,11 +14,12 @@ import {
   itemId,
   researchDef,
   terrainDef,
+  weaponDef,
 } from '../sim/defs';
 import { availableProjects, isAvailable } from '../sim/research';
 import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, yearOf } from '../sim/seasons';
 import { animalName } from '../sim/animals';
-import { COLONIST_WEAPONS } from '../sim/combat';
+import { armorOf } from '../sim/combat';
 import { POISONING_HOURS, bleedingOf, needsBedRest, painOf } from '../sim/health';
 import { comfortRange, qualityLabel } from '../sim/apparel';
 import { MAX_SKILL, SKILL_LABELS, xpToNext } from '../sim/skills';
@@ -28,7 +29,17 @@ import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
 import { applyTrade, goodwillOf, prices, standingLabel, tradableItems, tradeOpen } from '../sim/trade';
 import { weatherDef } from '../sim/weather';
-import { Command, DesignationKind, LogEntry, Needs, Priorities, SKILL_KEYS, ScheduleSlot, Skills } from '../sim/types';
+import {
+  Command,
+  DesignationKind,
+  LogEntry,
+  Needs,
+  Priorities,
+  SKILL_KEYS,
+  ScheduleSlot,
+  Skills,
+  Stance,
+} from '../sim/types';
 import { Designation, GROW_ZONE, STOCKPILE_ZONE } from '../sim/world';
 import { Difficulty } from '../sim/storyteller';
 import { SaveMeta, deleteSave, listSaves, readSave, writeSave } from './save-store';
@@ -244,6 +255,14 @@ export const TOOLS: ToolDef[] = [
   build('airConditioner', 'Air conditioner', '', 'climate', 'Cools a room to 20°C in hot weather (200 W)'),
   build('freezer', 'Freezer unit', '', 'climate', 'Chills a room to −6°C: a walk-in freezer for food (300 W)'),
   build('sandbags', 'Sandbags', '', 'security', 'Cover: cuts the chance of being hit from that side to about a third'),
+  build(
+    'embrasure',
+    'Embrasure',
+    '',
+    'security',
+    'A stone wall slot: colonists shoot out through it while it shields them, and nobody walks through',
+  ),
+  build('spikeTrap', 'Spike trap', '', 'security', 'Wounds the first raider to step on it, then gets rebuilt'),
 ];
 
 export const SPEEDS = [0, 1, 2, 4];
@@ -308,6 +327,10 @@ export interface ColonistView {
   dead: boolean;
   skillList: { key: string; label: string; level: number; passion: number; progress: number }[];
   weapon: string;
+  armor: string;
+  // How they fight when drafted, and the raider they were told to concentrate on.
+  stance: Stance;
+  focus: string | null;
   tool: string;
   // e.g. "Good parka (80%)".
   apparel: string;
@@ -712,14 +735,34 @@ export class GameController {
     }
   }
 
-  // Sends the selected drafted colonist to a tile. Returns false if there was no one to order.
+  // Right-click with drafted colonists: on a raider, concentrate fire on them (the selected
+  // colonist, or everyone drafted if none is selected); elsewhere, send the selected colonist
+  // there. Returns false if there was no one to order.
   public orderMove(tile: number): boolean {
     const id = this.selectedColonist;
+    const raider = this.sim.enemies.find((e) => e.hp > 0 && e.tile === tile);
+    if (raider) {
+      const selected = id !== null && this.sim.colonists[id]?.drafted;
+      if (!selected && !this.sim.living().some((c) => c.drafted)) {
+        return false;
+      }
+      this.command({ type: 'focus', colonist: selected ? id : -1, enemy: raider.id });
+      this.notify(`${selected ? this.sim.colonists[id].name : 'Everyone drafted'} will concentrate on ${raider.name}.`);
+      return true;
+    }
     if (id === null || !this.sim.colonists[id]?.drafted) {
       return false;
     }
     this.command({ type: 'move', colonist: id, tile });
     return true;
+  }
+
+  public setStance(colonist: number, stance: Stance): void {
+    this.command({ type: 'stance', colonist, stance });
+  }
+
+  public clearFocus(colonist: number): void {
+    this.command({ type: 'focus', colonist, enemy: -1 });
   }
 
   public selectTile(tile: number | null): void {
@@ -1059,9 +1102,14 @@ export class GameController {
           progress: c.skills[key] >= MAX_SKILL ? 1 : c.skillXp[key] / xpToNext(c.skills[key]),
         })),
         weapon:
-          c.weapon === 'recurveBow'
-            ? `${qualityLabel(c.weaponQuality)} ${COLONIST_WEAPONS[c.weapon].name.toLowerCase()}`
-            : COLONIST_WEAPONS[c.weapon].name,
+          weaponDef(c.weapon).item !== undefined
+            ? `${qualityLabel(c.weaponQuality)} ${weaponDef(c.weapon).name.toLowerCase()}`
+            : weaponDef(c.weapon).name,
+        armor: c.armor
+          ? `${itemDef(c.armor.item).name} (${Math.round(armorOf(c).protection * 100)}%, ${Math.round(c.armor.wear * 100)}% condition)`
+          : 'None',
+        stance: c.stance,
+        focus: sim.enemies.find((e) => e.id === c.focus && e.hp > 0)?.name ?? null,
         tool: c.tool ? `${qualityLabel(c.tool.quality)} tool kit (${Math.round(c.tool.wear * 100)}%)` : 'None',
         apparel: c.apparel
           ? `${qualityLabel(c.apparel.quality)} ${itemDef(c.apparel.item).name.toLowerCase()} (${Math.round(c.apparel.wear * 100)}%)`
@@ -1454,6 +1502,24 @@ export class GameController {
     }
     if (w.fire[i] > 0) {
       details.push('On fire!');
+    }
+    for (const e of sim.enemies) {
+      if (e.tile === i && e.hp > 0) {
+        const kit = [
+          weaponDef(e.weapon).name.toLowerCase(),
+          e.armorItem !== undefined ? itemDef(e.armorItem).name.toLowerCase() : null,
+        ]
+          .filter(Boolean)
+          .join(', ');
+        const state = [
+          e.hp < 1 ? `hurt ${Math.round((1 - e.hp) * 100)}%` : null,
+          e.suppression > 0.5 ? 'pinned down' : null,
+          e.fleeing ? 'fleeing' : null,
+        ]
+          .filter(Boolean)
+          .join(', ');
+        details.push(`Raider ${e.name}: ${kit}${state ? ` · ${state}` : ''}`);
+      }
     }
     if (w.floor[i] !== NONE) {
       details.push(`Floor: ${featureDef(w.floor[i]).name.toLowerCase()}`);

@@ -17,14 +17,64 @@
       "Snag",
       "Rook-eye",
       "Pike"
-    ]
+    ],
+    "loadout": [
+      {
+        "weapon": "shortBow",
+        "weight": 5
+      },
+      {
+        "weapon": "knife",
+        "weight": 2
+      },
+      {
+        "weapon": "club",
+        "weight": 1
+      },
+      {
+        "weapon": "recurveBow",
+        "weight": 3,
+        "minDay": 16
+      },
+      {
+        "weapon": "crossbow",
+        "weight": 1,
+        "minDay": 32
+      }
+    ],
+    "skill": 4
   },
   {
     "key": "ashenHowlers",
     "name": "The Ashen Howlers",
     "hostile": true,
     "description": "Nomads who burn what they can't carry.",
-    "names": ["Cinder", "Wail", "Soot", "Ember", "Gristle", "Hollow", "Char", "Flint", "Rasp", "Sear"]
+    "names": ["Cinder", "Wail", "Soot", "Ember", "Gristle", "Hollow", "Char", "Flint", "Rasp", "Sear"],
+    "loadout": [
+      {
+        "weapon": "club",
+        "weight": 4
+      },
+      {
+        "weapon": "spear",
+        "weight": 3
+      },
+      {
+        "weapon": "shortBow",
+        "weight": 3
+      },
+      {
+        "weapon": "knife",
+        "weight": 1
+      },
+      {
+        "weapon": "longbow",
+        "weight": 1,
+        "minDay": 24
+      }
+    ],
+    "skill": 3,
+    "speed": 1.0
   },
   {
     "key": "meadowKin",

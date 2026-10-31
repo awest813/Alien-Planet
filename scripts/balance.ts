@@ -7,7 +7,8 @@
 // storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies;
 // "size=96" or "size=128" plays on a bigger map; "seed=N" replays one colony. With DEBUG=1 in the
 // environment, a trace also shows research, production, bills, rooms and heaters.
-import { FEATURES, NONE, RECIPES, featureId, itemDef, itemId, terrainDef } from '../src/sim/defs';
+import { colonistTarget, lineOfSight } from '../src/sim/combat';
+import { FEATURES, NONE, RECIPES, featureId, itemDef, itemId, terrainDef, weaponDef } from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
 import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { mutualOpinion } from '../src/sim/social';
@@ -179,9 +180,16 @@ function play(seed: number): Result {
           if (fit !== c.drafted) {
             sim.apply({ type: 'draft', colonist: c.id, drafted: fit });
           }
+          // Advance on the raiders only as far as the first spot in bow range with a clear shot
+          // (drafted colonists walking to a spot don't stop to shoot on the way).
           const target = sim.enemies.find((e) => !e.fleeing);
-          if (c.drafted && target && c.path.length === 0 && w.distance(c.tile, target.tile) > 6) {
-            sim.apply({ type: 'move', colonist: c.id, tile: target.tile });
+          const reach = weaponDef(c.weapon).range - 1;
+          if (c.drafted && target && c.path.length === 0 && !colonistTarget(sim, c)) {
+            const route = sim.pathfinder.find(c.tile, [target.tile]) ?? [];
+            const spot = route.find((i) => w.distance(i, target.tile) <= reach && lineOfSight(w, i, target.tile));
+            if (spot !== undefined) {
+              sim.apply({ type: 'move', colonist: c.id, tile: spot });
+            }
           }
         }
       }

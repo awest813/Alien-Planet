@@ -329,7 +329,7 @@ export class World {
     if (added > 0) {
       const existing = this.itemType[i] === item ? this.itemCount[i] : 0;
       const merge = (old: number, incoming: number) => (old * existing + incoming * added) / (existing + added);
-      const life = def.shelfLife ?? (def.apparel || def.tool ? 1 : undefined);
+      const life = def.shelfLife ?? (def.apparel || def.tool || def.armor ? 1 : undefined);
       if (life !== undefined) {
         this.fresh[i] = merge(this.fresh[i], fresh ?? life);
       }
@@ -345,7 +345,7 @@ export class World {
   public pickUp(i: number, count: number): Carried {
     const item = this.itemType[i];
     const def = itemDef(item);
-    const fresh = def.shelfLife !== undefined || def.apparel || def.tool ? this.fresh[i] : undefined;
+    const fresh = def.shelfLife !== undefined || def.apparel || def.tool || def.armor ? this.fresh[i] : undefined;
     const quality = this.quality[i];
     return { item, count: this.takeItem(i, count), fresh, quality };
   }
@@ -406,7 +406,10 @@ export class World {
     }
     if (remaining > 0 && fallback >= 0) {
       const existing = this.itemType[fallback] === item ? this.itemCount[fallback] : 0;
-      const incoming = fresh ?? itemDef(item).shelfLife ?? (itemDef(item).apparel || itemDef(item).tool ? 1 : 0);
+      const incoming =
+        fresh ??
+        itemDef(item).shelfLife ??
+        (itemDef(item).apparel || itemDef(item).tool || itemDef(item).armor ? 1 : 0);
       this.fresh[fallback] = (this.fresh[fallback] * existing + incoming * remaining) / (existing + remaining);
       this.quality[fallback] =
         (this.quality[fallback] * existing + (quality ?? NORMAL_QUALITY) * remaining) / (existing + remaining);

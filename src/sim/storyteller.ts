@@ -1,5 +1,5 @@
 import { herdArrives, wildCap, wildCount } from './animals';
-import { spawnRaid } from './combat';
+import { spawnRaid, weaponScore } from './combat';
 import { TICKS_PER_HOUR } from './constants';
 import { ANIMALS, FACTIONS, NONE, featureDef, itemId } from './defs';
 import { infect } from './health';
@@ -63,7 +63,9 @@ const EVENTS: EventDef[] = [
       // Two raiders on day 4 and one more every three days, plus extra for a big or well-armed colony.
       // The cap is seven at first (nine on harsh), rising by one every eight days after day 19.
       const harsh = sim.story.difficulty === 'harsh' ? 2 : 0;
-      const armed = sim.living().filter((c) => c.weapon === 'recurveBow').length;
+      const armed = sim
+        .living()
+        .filter((c) => weaponScore(c.weapon, c.weaponQuality) >= weaponScore('recurveBow', 4)).length;
       const cap = Math.min(9 + harsh, 7 + harsh + Math.max(0, Math.floor((sim.day - 19) / 8)));
       const size = 2 + harsh + Math.floor((sim.day - 4) / 3) + (living > 6 ? 1 : 0) + Math.floor(armed / 3);
       const count = Math.min(cap, size);

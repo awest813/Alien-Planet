@@ -28,6 +28,8 @@ import {
   BenchType,
   Ingredient,
   MENDABLE,
+  STARTING_WEAPON,
+  weaponDef,
   terrainId,
 } from './defs';
 import { animalName, animalsAtDawn, populateWildlife, updateAnimals } from './animals';
@@ -41,7 +43,17 @@ import {
   wornScore,
   TATTERED,
 } from './apparel';
-import { COLONIST_WEAPONS, RaidState, attackAnimal, canAttack, colonistCombat, updateEnemies } from './combat';
+import {
+  RaidState,
+  armorOf,
+  attackAnimal,
+  canAttack,
+  colonistCombat,
+  colonistTarget,
+  coverSpot,
+  updateEnemies,
+  weaponScore,
+} from './combat';
 import {
   COLONIST_COUNT,
   MAP_SIZE,
@@ -147,7 +159,10 @@ const JOB_FOR_DESIGNATION: Record<number, JobType> = {
 const WORK_JOBS = new Set<JobType>(['mine', 'chop', 'forage', 'construct', 'deconstruct', 'sow', 'harvestCrop']);
 const TEND_TICKS = 80;
 const MEDICINE = itemId('herbalMedicine');
-const RECURVE_BOW = itemId('recurveBow');
+// A stored weapon must be this much better (by weaponScore) before someone swaps theirs for it.
+const WEAPON_UPGRADE = 1.15;
+// Raiders this close send undrafted colonists running for shelter.
+const SHELTER_RANGE = 14;
 const TOOL_KIT = itemId('toolKit');
 // Work a tool kit speeds up (and wears down).
 const TOOL_WORK = new Set<JobType>(['mine', 'chop', 'forage', 'construct', 'deconstruct', 'sow', 'harvestCrop']);
@@ -227,8 +242,11 @@ function createColonist(id: number, name: string, tile: number, rng: Rng): Colon
     cooldown: 0,
     skillXp: emptyXp(),
     passions: rollPassions(rng),
-    weapon: 'bow',
+    weapon: STARTING_WEAPON,
     weaponQuality: NORMAL_QUALITY,
+    armor: null,
+    stance: 'cover',
+    focus: -1,
     tool: null,
     apparel: starterApparel(),
     practicedAt: {},
@@ -278,9 +296,6 @@ const FIRE_INTERRUPTS = new Set<JobType>([
   'tame',
   'wander',
 ]);
-
-// How much better (in quality points) a stored recurve bow must be before someone swaps theirs.
-const BOW_UPGRADE = 3;
 
 export class Simulation {
   public tick = 0;
@@ -740,6 +755,27 @@ export class Simulation {
         }
         break;
       }
+      case 'stance': {
+        const c = this.colonists[cmd.colonist];
+        if (c) {
+          c.stance = cmd.stance;
+          // A new stance takes effect at once, not after finishing the last one's walk.
+          if (c.drafted && c.path.length > 0 && c.path[c.path.length - 1] === c.draftTarget) {
+            c.path = [];
+            c.moveProgress = 0;
+          }
+        }
+        break;
+      }
+      case 'focus': {
+        const who = cmd.colonist >= 0 ? [this.colonists[cmd.colonist]] : this.living().filter((c) => c.drafted);
+        for (const c of who) {
+          if (c) {
+            c.focus = cmd.enemy;
+          }
+        }
+        break;
+      }
       case 'move': {
         const c = this.colonists[cmd.colonist];
         if (!c?.drafted || c.health.downed || c.health.dead || cmd.tile < 0 || cmd.tile >= w.size) {
@@ -929,9 +965,13 @@ export class Simulation {
         return prey ? `Hunting a ${animalName(prey).toLowerCase()}` : 'Hunting';
       }
       case 'equip':
-        return job.item === RECURVE_BOW
-          ? 'Picking up a recurve bow'
-          : `Changing into a ${itemDef(job.item).name.toLowerCase()}`;
+        return itemDef(job.item).weapon
+          ? `Picking up a ${itemDef(job.item).name.toLowerCase()}`
+          : itemDef(job.item).armor
+            ? `Putting on ${itemDef(job.item).name.toLowerCase()}`
+            : `Changing into a ${itemDef(job.item).name.toLowerCase()}`;
+      case 'shelter':
+        return 'Taking shelter from the raiders';
       case 'warmUp':
         return c.health.hypothermia >= c.health.heatstroke ? 'Warming up' : 'Cooling off';
       case 'rescue': {
@@ -1652,13 +1692,21 @@ export class Simulation {
       this.crawlToShelter(c);
       return;
     }
-    // Fighting takes the whole tick; drafted colonists otherwise only follow move orders.
-    if (colonistCombat(this, c)) {
+    // A drafted colonist on the way somewhere they were sent (by the player, or by their stance)
+    // gets there before they stop to shoot; otherwise fighting takes the whole tick.
+    const sent = c.drafted && c.path.length > 0 && c.path[c.path.length - 1] === c.draftTarget;
+    if (!sent && colonistCombat(this, c)) {
       this.fighting.add(c.id);
+      if (c.drafted) {
+        this.draftedTactics(c);
+      }
       return;
     }
     this.fighting.delete(c.id);
     if (c.drafted) {
+      if (!sent) {
+        this.draftedTactics(c);
+      }
       // Nothing to shoot at and dangerously cold (or hot): head for shelter.
       if (c.path.length === 0 && (c.health.hypothermia > 0.5 || c.health.heatstroke > 0.5)) {
         this.tryWarmUp(c);
@@ -1669,7 +1717,9 @@ export class Simulation {
       return;
     }
 
-    if (this.inMentalBreak(c)) {
+    if (this.tick % SLOW_TICKS === 0 && this.raidersNear(c) && this.tryShelter(c)) {
+      // Running for cover.
+    } else if (this.inMentalBreak(c)) {
       if (c.job && c.job.type !== 'wander' && c.job.type !== 'warmUp') {
         this.endJob(c);
       }
@@ -1779,7 +1829,7 @@ export class Simulation {
       return 0;
     }
     const diagonal = w.xOf(next) !== w.xOf(c.tile) && w.yOf(next) !== w.yOf(c.tile);
-    return MOVE_SPEED / (w.moveCost(next) * (diagonal ? Math.SQRT2 : 1));
+    return (MOVE_SPEED * armorOf(c).speed) / (w.moveCost(next) * (diagonal ? Math.SQRT2 : 1));
   }
 
   private move(c: Colonist): void {
@@ -1959,6 +2009,9 @@ export class Simulation {
         break;
       case 'extinguish':
         this.stepExtinguish(c, job);
+        break;
+      case 'shelter':
+        this.stepShelter(c, job);
         break;
       case 'hunt':
         this.stepHunt(c, job);
@@ -3130,7 +3183,8 @@ export class Simulation {
       // Meals carry the cook's skill (which decides how safe they are); clothes and bows get a
       // quality roll.
       const skill = bench === 'cooking' ? c.skills.cooking : c.skills.crafting;
-      const rolled = !!itemDef(product).apparel || product === RECURVE_BOW || product === TOOL_KIT;
+      const made = itemDef(product);
+      const rolled = !!made.apparel || !!made.weapon || !!made.armor || product === TOOL_KIT;
       const quality = rolled ? Math.max(0, Math.min(20, skill + this.rng.int(-2, 2))) : skill;
       w.dropItemNear(c.tile, product, recipe.product.count, fresh, quality);
       this.produce(product, recipe.product.count);
@@ -3409,7 +3463,7 @@ export class Simulation {
       return;
     }
     // Shoot from a little inside bow range; otherwise close in a few steps at a time.
-    if (canAttack(this, c, prey.tile, COLONIST_WEAPONS[c.weapon].range - 1)) {
+    if (canAttack(this, c, prey.tile, Math.max(1, weaponDef(c.weapon).range - 1))) {
       if (c.cooldown <= 0) {
         attackAnimal(this, c, prey);
       }
@@ -3620,28 +3674,39 @@ export class Simulation {
   }
 
   // Swap the starting short bow for a recurve bow lying in storage.
+  // Weapons and armor in storage: a colonist takes a clearly better weapon than the one in hand
+  // (melee weapons appeal to those told to charge), and armor if theirs is missing or clearly worse.
   private tryEquip(c: Colonist): boolean {
     const w = this.world;
-    if (!w.itemType.includes(RECURVE_BOW)) {
-      return false;
-    }
     const region = this.regionOf(c.tile);
-    // Anyone with a plain bow takes a recurve bow; someone who has one trades up for a clearly
-    // better-made one.
-    const better = (i: number) => c.weapon !== 'recurveBow' || w.quality[i] >= c.weaponQuality + BOW_UPGRADE;
-    const bow = this.nearestIn(
+    const melee = c.stance === 'charge';
+    const score = (key: string, quality: number) =>
+      weaponScore(key, quality) * (melee && weaponDef(key).range <= 1 ? 2.5 : 1);
+    const current = score(c.weapon, c.weaponQuality);
+    const armorValue = (item: number, wear: number) => itemDef(item).armor!.protection * (0.5 + 0.5 * wear);
+    const armorNow = c.armor ? armorValue(c.armor.item, c.armor.wear) : 0;
+    const kit = this.nearestIn(
       'items',
       c.tile,
-      (i) =>
-        w.itemType[i] === RECURVE_BOW && better(i) && this.regions.region[i] === region && !this.isReserved(`i${i}`, c),
+      (i) => {
+        const type = w.itemType[i];
+        if (type === NONE || this.regions.region[i] !== region || this.isReserved(`i${i}`, c)) {
+          return false;
+        }
+        const def = itemDef(type);
+        if (def.weapon) {
+          return score(def.weapon, w.quality[i]) > current * WEAPON_UPGRADE;
+        }
+        return !!def.armor && armorValue(type, w.fresh[i]) > armorNow * 1.25 + 0.02;
+      },
       1,
     )[0];
-    const path = bow !== undefined ? this.pathfinder.find(c.tile, [bow]) : null;
-    if (bow === undefined || !path) {
+    const path = kit !== undefined ? this.pathfinder.find(c.tile, [kit]) : null;
+    if (kit === undefined || !path) {
       return false;
     }
-    this.reserve(c, `i${bow}`);
-    this.assign(c, this.makeJob('equip', -1, { source: bow, item: RECURVE_BOW }), path);
+    this.reserve(c, `i${kit}`);
+    this.assign(c, this.makeJob('equip', -1, { source: kit, item: w.itemType[kit] }), path);
     return true;
   }
 
@@ -3651,16 +3716,27 @@ export class Simulation {
       this.endJob(c);
       return;
     }
-    if (job.item === RECURVE_BOW) {
-      const bow = w.pickUp(job.source, 1);
-      if (bow.count > 0) {
-        if (c.weapon === 'recurveBow') {
-          // Trading up: the old bow goes back on the floor for someone else.
-          w.dropItemNear(c.tile, RECURVE_BOW, 1, undefined, c.weaponQuality);
+    const def = itemDef(job.item);
+    if (def.weapon) {
+      const taken = w.pickUp(job.source, 1);
+      if (taken.count > 0) {
+        // The old weapon goes back on the floor for someone else (fists stay with their owner).
+        const old = weaponDef(c.weapon).item;
+        if (old !== undefined) {
+          w.dropItemNear(c.tile, old, 1, undefined, c.weaponQuality);
         }
-        c.weapon = 'recurveBow';
-        c.weaponQuality = bow.quality ?? NORMAL_QUALITY;
-        this.addLog(`${c.name} picked up a ${qualityLabel(c.weaponQuality).toLowerCase()} recurve bow.`);
+        c.weapon = def.weapon;
+        c.weaponQuality = taken.quality ?? NORMAL_QUALITY;
+        this.addLog(`${c.name} picked up a ${qualityLabel(c.weaponQuality).toLowerCase()} ${def.name.toLowerCase()}.`);
+      }
+    } else if (def.armor) {
+      const taken = w.pickUp(job.source, 1);
+      if (taken.count > 0) {
+        if (c.armor) {
+          w.dropItemNear(c.tile, c.armor.item, 1, c.armor.wear, c.armor.quality);
+        }
+        c.armor = { item: job.item, quality: taken.quality ?? NORMAL_QUALITY, wear: taken.fresh ?? 1 };
+        this.addLog(`${c.name} put on ${def.name.toLowerCase()}.`);
       }
     } else if (job.item === TOOL_KIT) {
       const kit = w.pickUp(job.source, 1);
@@ -3716,6 +3792,102 @@ export class Simulation {
     this.reserve(c, `i${best}`);
     this.assign(c, this.makeJob('equip', -1, { source: best, item: w.itemType[best] }), path);
     return true;
+  }
+
+  // A drafted colonist acting on their stance, now and then: archers taking cover slip into the
+  // nearest spot with cover and a clear shot; anyone told to charge (and anyone with a melee
+  // weapon who isn't holding) closes in on their target. Holding means staying put.
+  private draftedTactics(c: Colonist): void {
+    const w = this.world;
+    const melee = weaponDef(c.weapon).range <= 1;
+    const charging = c.stance === 'charge' || (melee && c.stance !== 'hold');
+    const every = charging ? 20 : 60;
+    if (
+      c.stance === 'hold' ||
+      c.path.length > 0 ||
+      (this.tick + c.id * 13) % every !== 0 ||
+      this.enemies.length === 0
+    ) {
+      return;
+    }
+    let goal: number[];
+    if (charging) {
+      const focus = this.enemies.find((e) => e.id === c.focus && e.hp > 0);
+      const target =
+        focus ??
+        this.enemies
+          .filter((e) => e.hp > 0 && this.regionOf(e.tile) === this.regionOf(c.tile))
+          .sort((a, b) => w.distance(c.tile, a.tile) - w.distance(c.tile, b.tile))[0];
+      if (!target) {
+        return;
+      }
+      const reach = melee ? 1.5 : weaponDef(c.weapon).range * 0.6;
+      if (w.distance(c.tile, target.tile) <= reach && (melee || colonistTarget(this, c))) {
+        return;
+      }
+      goal = w.neighbors(target.tile).filter((n) => w.isPassable(n));
+    } else {
+      const spot = coverSpot(this, c);
+      if (spot === undefined) {
+        return;
+      }
+      goal = [spot];
+    }
+    const path = goal.length > 0 ? this.pathfinder.find(c.tile, goal) : null;
+    if (path && path.length > 0) {
+      c.path = charging ? path.slice(0, 4) : path;
+      c.moveProgress = 0;
+      c.draftTarget = c.path[c.path.length - 1];
+    }
+  }
+
+  // Raiders on the way in, close enough to worry a colonist out in the open.
+  private raidersNear(c: Colonist): boolean {
+    if (!this.raid || c.drafted || this.isIndoors(c.tile)) {
+      return false;
+    }
+    const job = c.job?.type;
+    if (job === 'shelter' || job === 'rescue' || job === 'tend' || job === 'feed' || job === 'eat') {
+      return false;
+    }
+    const w = this.world;
+    return this.enemies.some((e) => e.hp > 0 && !e.fleeing && w.distance(e.tile, c.tile) <= SHELTER_RANGE);
+  }
+
+  // Undrafted colonists caught outside when raiders come close run indoors, to the room farthest
+  // from the raiders they can reach, and stay until the danger passes.
+  private tryShelter(c: Colonist): boolean {
+    const w = this.world;
+    const region = this.regionOf(c.tile);
+    const threats = this.enemies.filter((e) => e.hp > 0 && !e.fleeing);
+    const danger = (i: number) => Math.min(...threats.map((e) => w.distance(e.tile, i)));
+    const spot = this.nearest(
+      c.tile,
+      (i) => w.isPassable(i) && this.regions.region[i] === region && this.isIndoors(i) && danger(i) > 4,
+      1,
+      (i) => -Math.min(10, danger(i)) * 0.5,
+    )[0];
+    const path = spot !== undefined ? this.pathfinder.find(c.tile, [spot]) : null;
+    if (spot === undefined || !path) {
+      return false;
+    }
+    this.endJob(c);
+    this.assign(c, this.makeJob('shelter', spot, { wait: TICKS_PER_HOUR }), path);
+    this.addLog(`${c.name} is running for shelter from the raiders.`);
+    return true;
+  }
+
+  private stepShelter(c: Colonist, job: Job): void {
+    const w = this.world;
+    const near = this.enemies.some((e) => e.hp > 0 && !e.fleeing && w.distance(e.tile, c.tile) <= SHELTER_RANGE + 4);
+    // Stay put while raiders are about; check again every so often.
+    if (--job.wait <= 0 || !near) {
+      if (near) {
+        job.wait = TICKS_PER_HOUR;
+      } else {
+        this.endJob(c);
+      }
+    }
   }
 
   // Whether this colonist's own tile is outside what their clothes can handle (rain
@@ -4357,9 +4529,9 @@ export const OBJECTIVES: ObjectiveDef[] = [
   },
   {
     id: 'bow',
-    label: 'Research archery, then craft and equip a recurve bow',
+    label: 'Research archery, then craft and equip a recurve bow (or better)',
     phase: 4,
-    check: (s) => s.living().some((c) => c.weapon === 'recurveBow'),
+    check: (s) => s.living().some((c) => weaponScore(c.weapon, c.weaponQuality) >= weaponScore('recurveBow', 4)),
   },
   {
     id: 'sandbags',

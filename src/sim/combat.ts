@@ -1,14 +1,19 @@
 import { hurtAnimal } from './animals';
 import { qualityFactor } from './apparel';
-import { weatherDef } from './weather';
 import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
-import { FACTIONS, NONE, featureDef, itemDef, itemId } from './defs';
-import { damage } from './health';
+import { FACTIONS, NONE, NORMAL_QUALITY, WeaponDef, featureDef, itemDef, itemId, weaponDef } from './defs';
+import { damage, painOf } from './health';
 import { learn } from './skills';
 import { traitValue } from './social';
 import type { Simulation } from './simulation';
-import { Animal, Colonist, ColonistWeapon, Enemy, Weapon } from './types';
+import { Animal, Colonist, Enemy } from './types';
+import { weatherDef } from './weather';
 import { World } from './world';
+
+// Combat. Colonists and raiders share one weapon table (melee: fists, knives, clubs, spears;
+// ranged: bows and crossbows), each with its own range, rate, accuracy, drop-off and armor
+// piercing. Armor turns aside part of every blow. Archers look for firing positions behind
+// cover and are rattled (suppressed) by shots landing close; melee fighters charge.
 
 export interface RaidState {
   faction: number;
@@ -24,32 +29,34 @@ export interface RaidState {
 
 // Raiders this close to a colonist have arrived; the raid's time limit runs from then.
 const ARRIVAL_RANGE = 30;
-
-const WEAPONS: Record<Weapon, { range: number; cooldown: number; accuracy: number; damage: [number, number] }> = {
-  bow: { range: 7, cooldown: 55, accuracy: 0.55, damage: [0.09, 0.17] },
-  knife: { range: 1, cooldown: 40, accuracy: 0.85, damage: [0.12, 0.2] },
-};
-export const COLONIST_WEAPONS: Record<
-  ColonistWeapon,
-  { name: string; range: number; cooldown: number; damage: [number, number] }
-> = {
-  bow: { name: 'Short bow', range: 8, cooldown: 60, damage: [0.17, 0.26] },
-  recurveBow: { name: 'Recurve bow', range: 9, cooldown: 55, damage: [0.24, 0.34] },
-};
 // Combat experience per attack.
 const COMBAT_XP = 40;
-const COLONIST_MELEE = { cooldown: 45, damage: [0.08, 0.14] as [number, number] };
-// Undrafted colonists shoot back at raiders this close; drafted ones use the full bow range.
+// Undrafted colonists shoot back at raiders this close; drafted ones use their weapon's range.
 const SELF_DEFENCE_RANGE = 6;
-// Raiders give up after this long, or once this share of them has fallen.
-const RAID_TIMEOUT = TICKS_PER_HOUR * 36;
+// Raiders give up after this long at the colony, or once this share of them is out of the fight.
+const RAID_TIMEOUT = TICKS_PER_HOUR * 24;
 const MORALE_BREAK = 0.6;
 const SHOT_LIFETIME = 8;
+// Raiders' blows land softer on colonists than colonists' on raiders: colonists bleed and can be
+// patched up, raiders just fall.
+const RAIDER_HIT = 0.55;
+// Raiders are rougher shots than colonists of the same skill (they don't train together).
+const RAIDER_AIM = -0.08;
+// Suppression from a shot landing on or next to a raider, and how fast it wears off per tick.
+const SUPPRESS_MISS = 0.12;
+const SUPPRESS_HIT = 0.25;
+const SUPPRESS_DECAY = 0.006;
+// A raider this badly hurt may break and run on their own.
+const WOUNDED_FLEE = 0.35;
+// How often (ticks) archers rethink where to shoot from.
+const POST_RETHINK = 60;
+const FISTS = weaponDef('fists');
 
 const chebyshev = (w: World, a: number, b: number) =>
   Math.max(Math.abs(w.xOf(a) - w.xOf(b)), Math.abs(w.yOf(a) - w.yOf(b)));
 
-// Hit-chance multiplier for a target sheltering behind cover (sandbags) on the side facing the shooter.
+// Hit-chance multiplier for a target sheltering behind cover (sandbags, embrasures) on the side
+// facing the shooter.
 export function coverFactor(w: World, shooter: number, target: number): number {
   const ddx = w.xOf(shooter) - w.xOf(target);
   const ddy = w.yOf(shooter) - w.yOf(target);
@@ -76,7 +83,10 @@ export function coverFactor(w: World, shooter: number, target: number): number {
   return factor;
 }
 
-// Bresenham line between tile centres; walls, rock, and other solid tiles block it.
+const inCover = (w: World, from: number, at: number) => coverFactor(w, from, at) < 1;
+
+// Bresenham line between tile centres; walls, rock, and other solid tiles block it (embrasures
+// don't).
 export function lineOfSight(w: World, from: number, to: number): boolean {
   let x0 = w.xOf(from);
   let y0 = w.yOf(from);
@@ -92,7 +102,7 @@ export function lineOfSight(w: World, from: number, to: number): boolean {
       return true;
     }
     const i = w.idx(x0, y0);
-    if (i !== from && !w.isPassable(i)) {
+    if (i !== from && !w.isPassable(i) && !(w.feature[i] !== NONE && featureDef(w.feature[i]).seeThrough)) {
       return false;
     }
     const e2 = 2 * err;
@@ -115,7 +125,66 @@ function recordShot(sim: Simulation, from: number, to: number, hit: boolean, ran
   sim.shots.push({ from, to, hit, ranged, tick: sim.tick });
 }
 
+// Chance to hit: the weapon's accuracy, adjusted for skill, distance (ranged only), cover, the
+// weather and the shooter's nerve.
+function hitChance(
+  sim: Simulation,
+  weapon: WeaponDef,
+  skill: number,
+  from: number,
+  to: number,
+  bonus = 0,
+  suppression = 0,
+): number {
+  const w = sim.world;
+  if (weapon.range <= 1) {
+    return Math.min(0.95, weapon.accuracy + (skill - 5) * 0.015 + bonus);
+  }
+  const base = weapon.accuracy + (skill - 5) * 0.03 + bonus - w.distance(from, to) * weapon.falloff;
+  return (
+    Math.max(0.08, Math.min(0.95, base)) * coverFactor(w, from, to) * weatherDef(sim).aim * (1 - 0.5 * suppression)
+  );
+}
+
+// Damage after armor: armor turns aside its share, less against piercing weapons.
+export const throughArmor = (amount: number, armor: number, weapon: WeaponDef) =>
+  amount * (1 - armor * (1 - weapon.pierce));
+
+// The weapon actually used against a target this close: a bow at arm's length is a club.
+const weaponAt = (key: string, adjacent: boolean): WeaponDef => {
+  const weapon = weaponDef(key);
+  return adjacent && weapon.range > 1 ? FISTS : weapon;
+};
+
 // ---- Raids ----
+
+// Picks a raider's weapon from the faction's loadout (better kit turns up later in the game).
+function raiderWeapon(sim: Simulation, faction: number): string {
+  const options = FACTIONS[faction].loadout.filter((o) => (o.minDay ?? 0) <= sim.day);
+  if (options.length === 0) {
+    return 'shortBow';
+  }
+  let r = sim.rng.next() * options.reduce((sum, o) => sum + o.weight, 0);
+  for (const o of options) {
+    r -= o.weight;
+    if (r <= 0) {
+      return o.weapon;
+    }
+  }
+  return options[0].weapon;
+}
+
+// Armor turns up on raiders as the game goes on (sooner on harsh).
+function raiderArmor(sim: Simulation): number | undefined {
+  const harsh = sim.story.difficulty === 'harsh' ? 0.15 : 0;
+  const r = sim.rng.next();
+  const scale = Math.max(0, Math.min(0.35, (sim.day - 34) * 0.03 + harsh * 0.5));
+  if (r < scale) {
+    return itemId('scaleArmor');
+  }
+  const leather = Math.max(0, Math.min(0.5, (sim.day - 10) * 0.03 + harsh));
+  return r < scale + leather ? itemId('leatherArmor') : undefined;
+}
 
 export function spawnRaid(sim: Simulation, faction: number, count: number): boolean {
   const w = sim.world;
@@ -123,6 +192,7 @@ export function spawnRaid(sim: Simulation, faction: number, count: number): bool
   if (region === undefined) {
     return false;
   }
+  const def = FACTIONS[faction];
   const sides = ['north', 'south', 'west', 'east'];
   const start = sim.rng.int(0, 3);
   for (let s = 0; s < 4; s++) {
@@ -141,9 +211,11 @@ export function spawnRaid(sim: Simulation, faction: number, count: number): bool
     }
     const centre = sim.rng.pick(edge);
     const spots = edge.sort((a, b) => w.distance(a, centre) - w.distance(b, centre)).slice(0, count);
-    const names = [...FACTIONS[faction].names];
+    const names = [...def.names];
+    const skill = def.skill + (sim.story.difficulty === 'harsh' ? 1 : 0) + Math.floor(sim.day / 20);
     for (let n = 0; n < count; n++) {
       const name = names.length > 0 ? names.splice(sim.rng.int(0, names.length - 1), 1)[0] : 'Raider';
+      const armorItem = raiderArmor(sim);
       sim.enemies.push({
         id: sim.nextEnemyId++,
         name,
@@ -152,7 +224,12 @@ export function spawnRaid(sim: Simulation, faction: number, count: number): bool
         path: [],
         moveProgress: 0,
         hp: 1,
-        weapon: sim.rng.next() < 0.7 ? 'bow' : 'knife',
+        weapon: raiderWeapon(sim, faction),
+        armor: armorItem !== undefined ? itemDef(armorItem).armor!.protection : 0,
+        armorItem,
+        skill,
+        speed: def.speed * (armorItem !== undefined ? itemDef(armorItem).armor!.speed : 1),
+        suppression: 0,
         cooldown: 0,
         fleeing: false,
         repathAt: 0,
@@ -160,7 +237,7 @@ export function spawnRaid(sim: Simulation, faction: number, count: number): bool
     }
     sim.raid = { faction, initial: count, killed: 0, startedTick: sim.tick };
     sim.addLog(
-      `Raid! ${count} raiders from ${FACTIONS[faction].name} are coming from the ${side}. Draft your colonists.`,
+      `Raid! ${count} raiders from ${def.name} are coming from the ${side}. Draft your colonists.`,
       'danger',
       true,
     );
@@ -170,17 +247,22 @@ export function spawnRaid(sim: Simulation, faction: number, count: number): bool
   return false;
 }
 
+// Who a raider goes after: archers pick off the exposed and the wounded, melee fighters whoever
+// is nearest.
 function targetFor(sim: Simulation, e: Enemy): Colonist | undefined {
+  const w = sim.world;
   const region = sim.regionOf(e.tile);
+  const ranged = weaponDef(e.weapon).range > 1;
   let best: Colonist | undefined;
-  let bestDist = Infinity;
+  let bestScore = Infinity;
   for (const c of sim.living()) {
     if (c.health.downed || sim.regionOf(c.tile) !== region) {
       continue;
     }
-    const d = sim.world.distance(e.tile, c.tile);
-    if (d < bestDist) {
-      bestDist = d;
+    const d = w.distance(e.tile, c.tile);
+    const score = ranged ? d + (inCover(w, e.tile, c.tile) ? 3 : 0) - painOf(c) * 4 : d;
+    if (score < bestScore) {
+      bestScore = score;
       best = c;
     }
   }
@@ -219,8 +301,9 @@ function breach(sim: Simulation, e: Enemy): boolean {
     e.path = [];
     e.moveProgress = 0;
     if (e.cooldown <= 0) {
-      e.cooldown = WEAPONS[e.weapon].cooldown;
-      w.damage[wall] += 10;
+      e.cooldown = weaponDef(e.weapon).cooldown;
+      // Clubs and spears are better for battering than bows.
+      w.damage[wall] += weaponDef(e.weapon).range > 1 ? 8 : 14;
       const def = featureDef(w.feature[wall]);
       if (w.damage[wall] >= def.build!.work) {
         const feature = w.feature[wall];
@@ -295,6 +378,32 @@ export function plunder(sim: Simulation): string {
   return parts.length > 0 ? ` and carried off ${parts.join(', ')}` : '';
 }
 
+// A raider takes a wound; at zero they fall, dropping some of their kit. `by` names who (or
+// what) did it, for the log.
+export function woundEnemy(sim: Simulation, e: Enemy, amount: number, by: string): void {
+  if (e.hp <= 0) {
+    return;
+  }
+  e.hp -= amount;
+  if (e.hp > 0) {
+    return;
+  }
+  sim.stats.kills++;
+  if (sim.raid) {
+    sim.raid.killed++;
+  }
+  sim.addLog(`${by} brought down ${e.name}.`, 'good');
+  const w = sim.world;
+  const weapon = weaponDef(e.weapon);
+  // Some of a fallen raider's gear survives the fight.
+  if (weapon.item !== undefined && sim.rng.next() < 0.6) {
+    w.dropItemNear(e.tile, weapon.item, 1, undefined, sim.rng.int(NORMAL_QUALITY - 4, NORMAL_QUALITY + 2));
+  }
+  if (e.armorItem !== undefined && sim.rng.next() < 0.5) {
+    w.dropItemNear(e.tile, e.armorItem, 1, 0.3 + sim.rng.next() * 0.4, NORMAL_QUALITY - 2);
+  }
+}
+
 function moveEnemy(sim: Simulation, e: Enemy): void {
   const w = sim.world;
   const next = e.path[0];
@@ -304,12 +413,29 @@ function moveEnemy(sim: Simulation, e: Enemy): void {
     return;
   }
   const diagonal = w.xOf(next) !== w.xOf(e.tile) && w.yOf(next) !== w.yOf(e.tile);
-  e.moveProgress += (MOVE_SPEED * 0.9) / (w.moveCost(next) * (diagonal ? Math.SQRT2 : 1));
+  e.moveProgress += (MOVE_SPEED * e.speed) / (w.moveCost(next) * (diagonal ? Math.SQRT2 : 1));
   if (e.moveProgress >= 1) {
     e.tile = next;
     e.path.shift();
     e.moveProgress = 0;
+    springTrap(sim, e);
   }
+}
+
+// A spike trap springs on the first raider to step on it, then goes back on the build list.
+function springTrap(sim: Simulation, e: Enemy): void {
+  const w = sim.world;
+  const f = w.feature[e.tile];
+  if (f === NONE || !featureDef(f).trap || e.fleeing) {
+    return;
+  }
+  w.setFeature(e.tile, NONE);
+  sim.rebuild(e.tile, f);
+  sim.addLog(`${e.name} stepped on a spike trap!`, 'good');
+  recordShot(sim, e.tile, e.tile, true, false);
+  // Spikes find the gaps in armor.
+  woundEnemy(sim, e, (0.3 + sim.rng.next() * 0.15) * (1 - e.armor * 0.5), 'A spike trap');
+  e.suppression = 1;
 }
 
 function flee(sim: Simulation, e: Enemy): void {
@@ -343,19 +469,64 @@ function flee(sim: Simulation, e: Enemy): void {
 }
 
 function enemyAttack(sim: Simulation, e: Enemy, target: Colonist): void {
-  const weapon = WEAPONS[e.weapon];
-  const dist = sim.world.distance(e.tile, target.tile);
+  const adjacent = chebyshev(sim.world, e.tile, target.tile) <= 1;
+  const weapon = weaponAt(e.weapon, adjacent);
   const ranged = weapon.range > 1;
-  const accuracy = ranged
-    ? Math.max(0.15, weapon.accuracy - dist * 0.03) * coverFactor(sim.world, e.tile, target.tile) * weatherDef(sim).aim
-    : weapon.accuracy;
-  const hit = sim.rng.next() < accuracy;
+  const hit = sim.rng.next() < hitChance(sim, weapon, e.skill, e.tile, target.tile, RAIDER_AIM, e.suppression);
   recordShot(sim, e.tile, target.tile, hit, ranged);
   if (hit) {
     const harsh = sim.story.difficulty === 'harsh' ? 1.1 : 1;
-    damage(sim, target, roll(sim, weapon.damage) * harsh, e.weapon === 'bow' ? 'arrow' : 'cut');
+    const armor = target.armor ? itemDef(target.armor.item).armor!.protection : 0;
+    const dealt = throughArmor(roll(sim, weapon.damage) * RAIDER_HIT * harsh, armor, weapon);
+    if (target.armor) {
+      // Armor takes a beating doing its job.
+      target.armor.wear -= dealt * 0.6;
+      if (target.armor.wear <= 0) {
+        sim.addLog(`${target.name}'s ${itemDef(target.armor.item).name.toLowerCase()} has fallen apart.`, 'warn');
+        target.armor = null;
+      }
+    }
+    damage(sim, target, dealt, !ranged && weapon.key === 'club' ? 'bruise' : ranged ? 'arrow' : 'cut');
   }
   e.cooldown = weapon.cooldown;
+}
+
+// Somewhere for an archer to shoot from: in range of the target with a clear shot, at a
+// comfortable distance, behind cover if there's any nearby, and not right next to a colonist.
+function choosePost(sim: Simulation, e: Enemy, target: Colonist): number | undefined {
+  const w = sim.world;
+  const weapon = weaponDef(e.weapon);
+  const preferred = weapon.range * 0.7;
+  const region = sim.regionOf(e.tile);
+  const colonists = sim.living().filter((c) => !c.health.downed);
+  let best: number | undefined;
+  let bestScore = Infinity;
+  // A short breadth-first search over the tiles around the raider.
+  const steps = new Map<number, number>([[e.tile, 0]]);
+  const queue = [e.tile];
+  for (let q = 0; q < queue.length && q < 160; q++) {
+    const t = queue[q];
+    const s = steps.get(t)!;
+    const d = w.distance(t, target.tile);
+    if (d <= weapon.range - 0.5 && d >= 2.5 && lineOfSight(w, t, target.tile)) {
+      const crowded = colonists.some((c) => chebyshev(w, c.tile, t) <= 1);
+      const score = s * 0.7 + Math.abs(d - preferred) * 0.4 + (inCover(w, target.tile, t) ? -5 : 0) + (crowded ? 6 : 0);
+      if (score < bestScore) {
+        bestScore = score;
+        best = t;
+      }
+    }
+    if (s >= 6) {
+      continue;
+    }
+    for (const n of w.neighbors(t)) {
+      if (!steps.has(n) && w.isPassable(n) && sim.regionOf(n) === region) {
+        steps.set(n, s + 1);
+        queue.push(n);
+      }
+    }
+  }
+  return best;
 }
 
 export function updateEnemies(sim: Simulation): void {
@@ -365,8 +536,16 @@ export function updateEnemies(sim: Simulation): void {
       continue;
     }
     e.cooldown--;
+    e.suppression = Math.max(0, e.suppression - SUPPRESS_DECAY);
     if (e.fleeing) {
       flee(sim, e);
+      continue;
+    }
+    // Badly hurt and losing their nerve: some break and run on their own.
+    if (e.hp < WOUNDED_FLEE && e.repathAt <= sim.tick && sim.rng.next() < 0.2 + e.suppression * 0.3) {
+      e.fleeing = true;
+      e.path = [];
+      sim.addLog(`${e.name} is badly hurt and running for it.`, 'good');
       continue;
     }
     const target = targetFor(sim, e);
@@ -382,12 +561,30 @@ export function updateEnemies(sim: Simulation): void {
       e.path = [];
       continue;
     }
-    const weapon = WEAPONS[e.weapon];
-    const inRange =
-      weapon.range > 1
-        ? w.distance(e.tile, target.tile) <= weapon.range && lineOfSight(w, e.tile, target.tile)
-        : chebyshev(w, e.tile, target.tile) <= 1;
-    if (inRange) {
+    const weapon = weaponDef(e.weapon);
+    const adjacent = chebyshev(w, e.tile, target.tile) <= 1;
+    const ranged = weapon.range > 1;
+    const canShoot = ranged && w.distance(e.tile, target.tile) <= weapon.range && lineOfSight(w, e.tile, target.tile);
+    if (adjacent || canShoot) {
+      // An archer caught in the open, or pinned down, looks for a better spot now and then.
+      if (
+        ranged &&
+        !adjacent &&
+        e.repathAt <= sim.tick &&
+        (e.suppression > 0.5 || !inCover(w, target.tile, e.tile)) &&
+        e.path.length === 0
+      ) {
+        e.repathAt = sim.tick + POST_RETHINK;
+        const post = choosePost(sim, e, target);
+        if (post !== undefined && post !== e.tile && inCover(w, target.tile, post)) {
+          e.post = post;
+          e.path = sim.pathfinder.find(e.tile, [post]) ?? [];
+        }
+      }
+      if (e.path.length > 0 && !adjacent) {
+        moveEnemy(sim, e);
+        continue;
+      }
       e.path = [];
       e.moveProgress = 0;
       if (e.cooldown <= 0) {
@@ -396,9 +593,14 @@ export function updateEnemies(sim: Simulation): void {
       continue;
     }
     if (e.path.length === 0 || e.repathAt <= sim.tick) {
-      const goals = [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))];
+      e.repathAt = sim.tick + (ranged ? POST_RETHINK : 30);
+      // Archers close to within reach and pick a firing position; melee fighters charge.
+      const post =
+        ranged && w.distance(e.tile, target.tile) <= weapon.range + 6 ? choosePost(sim, e, target) : undefined;
+      e.post = post;
+      const goals =
+        post !== undefined ? [post] : [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))];
       e.path = sim.pathfinder.find(e.tile, goals) ?? [];
-      e.repathAt = sim.tick + 30;
     }
     if (e.path.length > 0) {
       moveEnemy(sim, e);
@@ -425,7 +627,8 @@ export function updateEnemies(sim: Simulation): void {
       raid.arrivedTick !== undefined
         ? sim.tick - raid.arrivedTick > RAID_TIMEOUT
         : sim.tick - raid.startedTick > RAID_TIMEOUT * 2;
-    const broken = raid.killed >= raid.initial * MORALE_BREAK;
+    // Broken once most of them are down or running.
+    const broken = fighting.length <= raid.initial * (1 - MORALE_BREAK);
     if (fighting.length > 0 && (broken || timedOut)) {
       for (const e of fighting) {
         e.fleeing = true;
@@ -469,6 +672,7 @@ export function updateEnemies(sim: Simulation): void {
         sim.endJob(c);
         c.drafted = false;
       }
+      c.focus = -1;
     }
   }
   sim.shots = sim.shots.filter((s) => sim.tick - s.tick < SHOT_LIFETIME);
@@ -476,43 +680,42 @@ export function updateEnemies(sim: Simulation): void {
 
 // ---- Colonists fighting back ----
 
-// One colonist attack at `target`; returns the damage dealt (0 on a miss).
-function colonistAttack(sim: Simulation, c: Colonist, target: number, ranged: boolean): number {
-  const weapon = COLONIST_WEAPONS[c.weapon];
-  const dist = sim.world.distance(c.tile, target);
-  const accuracy = ranged
-    ? Math.max(0.1, Math.min(0.95, 0.4 + c.skills.combat * 0.03 + (traitValue(c, 'accuracy') ?? 0) - dist * 0.025)) *
-      coverFactor(sim.world, c.tile, target) *
-      weatherDef(sim).aim
-    : 0.7 + c.skills.combat * 0.015;
-  const hit = sim.rng.next() < accuracy;
+// One colonist attack at `target`; returns the damage dealt before armor (0 on a miss).
+function colonistAttack(sim: Simulation, c: Colonist, target: number, weapon: WeaponDef): number {
+  const ranged = weapon.range > 1;
+  const hit =
+    sim.rng.next() <
+    hitChance(sim, weapon, c.skills.combat, c.tile, target, ranged ? (traitValue(c, 'accuracy') ?? 0) : 0);
   recordShot(sim, c.tile, target, hit, ranged);
-  c.cooldown = ranged ? weapon.cooldown : COLONIST_MELEE.cooldown;
+  c.cooldown = weapon.cooldown;
   learn(sim, c, 'combat', COMBAT_XP);
-  // A better-made bow hits harder (0.7× for poor work up to 1.3× for a masterwork).
-  return hit
-    ? roll(sim, ranged ? weapon.damage : COLONIST_MELEE.damage) * (ranged ? qualityFactor(c.weaponQuality) : 1)
-    : 0;
+  // A better-made weapon hits harder (0.7× for poor work up to 1.3× for a masterwork); fists are
+  // just fists.
+  const made = weapon === FISTS ? 1 : qualityFactor(c.weaponQuality);
+  return hit ? roll(sim, weapon.damage) * made : 0;
 }
 
-function attackEnemy(sim: Simulation, c: Colonist, e: Enemy, ranged: boolean): void {
-  const dealt = colonistAttack(sim, c, e.tile, ranged);
-  if (dealt > 0) {
-    e.hp -= dealt;
-    if (e.hp <= 0) {
-      sim.stats.kills++;
-      if (sim.raid) {
-        sim.raid.killed++;
+function attackEnemy(sim: Simulation, c: Colonist, e: Enemy): void {
+  const adjacent = chebyshev(sim.world, c.tile, e.tile) <= 1;
+  const weapon = weaponAt(c.weapon, adjacent);
+  const dealt = colonistAttack(sim, c, e.tile, weapon);
+  // Shots landing close rattle whoever they're aimed at (and anyone beside them).
+  if (weapon.range > 1) {
+    for (const other of sim.enemies) {
+      if (other.hp > 0 && chebyshev(sim.world, other.tile, e.tile) <= 1) {
+        other.suppression = Math.min(1, other.suppression + (dealt > 0 && other === e ? SUPPRESS_HIT : SUPPRESS_MISS));
       }
-      sim.addLog(`${c.name} brought down ${e.name}.`, 'good');
     }
+  }
+  if (dealt > 0) {
+    woundEnemy(sim, e, throughArmor(dealt, e.armor, weapon), c.name);
   }
 }
 
 // Hunting, or fending off an angry animal.
 export function attackAnimal(sim: Simulation, c: Colonist, a: Animal): void {
-  const melee = chebyshev(sim.world, c.tile, a.tile) <= 1;
-  const dealt = colonistAttack(sim, c, a.tile, !melee);
+  const adjacent = chebyshev(sim.world, c.tile, a.tile) <= 1;
+  const dealt = colonistAttack(sim, c, a.tile, weaponAt(c.weapon, adjacent));
   if (dealt > 0) {
     hurtAnimal(sim, a, dealt, c);
   }
@@ -524,12 +727,46 @@ export function canAttack(sim: Simulation, c: Colonist, target: number, range: n
   return chebyshev(w, c.tile, target) <= 1 || (w.distance(c.tile, target) <= range && lineOfSight(w, c.tile, target));
 }
 
-// Colonists shoot the nearest enemy in range (drafted ones from further away) and fight back in
+// How far a colonist reaches with what they're carrying: their weapon's range when drafted,
+// arm's length or a short bowshot when caught out undrafted.
+export function reachOf(c: Colonist): number {
+  const range = weaponDef(c.weapon).range;
+  return c.drafted ? range : Math.min(range, SELF_DEFENCE_RANGE);
+}
+
+// The raider a colonist should shoot at: the one they were told to focus on if they can, else
+// the best target in reach, favouring the wounded and the exposed.
+export function colonistTarget(sim: Simulation, c: Colonist): Enemy | undefined {
+  const w = sim.world;
+  const range = reachOf(c);
+  if (c.focus >= 0) {
+    const focus = sim.enemies.find((e) => e.id === c.focus && e.hp > 0);
+    if (focus && canAttack(sim, c, focus.tile, range)) {
+      return focus;
+    }
+  }
+  let best: Enemy | undefined;
+  let bestScore = Infinity;
+  for (const e of sim.enemies) {
+    if (e.hp <= 0 || !canAttack(sim, c, e.tile, range)) {
+      continue;
+    }
+    const score =
+      w.distance(c.tile, e.tile) - (1 - e.hp) * 3 + (inCover(w, c.tile, e.tile) ? 2 : 0) - (e.fleeing ? -2 : 0);
+    if (score < bestScore) {
+      bestScore = score;
+      best = e;
+    }
+  }
+  return best;
+}
+
+// Colonists shoot the best raider in reach (drafted ones from further away) and fight back in
 // melee. Returns true if the colonist spent this tick fighting (and so shouldn't move or work).
 export function colonistCombat(sim: Simulation, c: Colonist): boolean {
   c.cooldown--;
   const w = sim.world;
-  const range = c.drafted ? COLONIST_WEAPONS[c.weapon].range : SELF_DEFENCE_RANGE;
+  const range = reachOf(c);
   // Animals that have turned on someone are fair game for anyone nearby.
   // Enraged animals: always fight back if it's after you or right next to you; otherwise only
   // step in when free (not drafted for a raid, asleep, in bed, or doctoring).
@@ -553,29 +790,76 @@ export function colonistCombat(sim: Simulation, c: Colonist): boolean {
   if (sim.enemies.length === 0) {
     return false;
   }
-  // The nearest enemy we can actually hit: adjacent, or in range with a clear shot.
-  let nearest: Enemy | undefined;
-  let nearestDist = Infinity;
-  for (const e of sim.enemies) {
-    const d = w.distance(c.tile, e.tile);
-    if (e.hp <= 0 || d >= nearestDist) {
-      continue;
-    }
-    if (chebyshev(w, c.tile, e.tile) <= 1 || (d <= range && lineOfSight(w, c.tile, e.tile))) {
-      nearest = e;
-      nearestDist = d;
-    }
-  }
-  if (!nearest) {
+  const target = colonistTarget(sim, c);
+  if (!target) {
     return false;
   }
-  const melee = chebyshev(w, c.tile, nearest.tile) <= 1;
   if (!c.drafted && c.job) {
     // Drop whatever we were doing (waking up if need be) to fight.
     sim.endJob(c);
   }
   if (c.cooldown <= 0) {
-    attackEnemy(sim, c, nearest, !melee);
+    attackEnemy(sim, c, target);
   }
   return true;
+}
+
+// Whether a colonist at `tile` is sheltered from the nearest raider who could see them.
+export function coveredFrom(sim: Simulation, tile: number): boolean {
+  const w = sim.world;
+  const threats = sim.enemies.filter((e) => e.hp > 0 && !e.fleeing && lineOfSight(w, e.tile, tile));
+  return threats.length > 0 && threats.every((e) => inCover(w, e.tile, tile));
+}
+
+// A spot within a few steps where a drafted archer has cover from the raiders and still a clear
+// shot at one of them; undefined if there's nothing better than where they stand.
+export function coverSpot(sim: Simulation, c: Colonist): number | undefined {
+  const w = sim.world;
+  const range = weaponDef(c.weapon).range;
+  const threats = sim.enemies.filter((e) => e.hp > 0 && !e.fleeing);
+  if (threats.length === 0 || coveredFrom(sim, c.tile)) {
+    return undefined;
+  }
+  const region = sim.regionOf(c.tile);
+  const steps = new Map<number, number>([[c.tile, 0]]);
+  const queue = [c.tile];
+  let best: number | undefined;
+  let bestScore = Infinity;
+  for (let q = 0; q < queue.length && q < 80; q++) {
+    const t = queue[q];
+    const s = steps.get(t)!;
+    if (t !== c.tile) {
+      const shot = threats.some((e) => w.distance(t, e.tile) <= range && lineOfSight(w, t, e.tile));
+      const sheltered = threats.filter((e) => lineOfSight(w, e.tile, t)).every((e) => inCover(w, e.tile, t));
+      if (shot && sheltered && !sim.enemies.some((e) => chebyshev(w, e.tile, t) <= 1)) {
+        if (s < bestScore) {
+          bestScore = s;
+          best = t;
+        }
+      }
+    }
+    if (s >= 4) {
+      continue;
+    }
+    for (const n of w.neighbors(t)) {
+      if (!steps.has(n) && w.isPassable(n) && sim.regionOf(n) === region) {
+        steps.set(n, s + 1);
+        queue.push(n);
+      }
+    }
+  }
+  return best;
+}
+
+// The colonist's armor's protection and speed penalty (none without armor).
+export function armorOf(c: Colonist): { protection: number; speed: number } {
+  return c.armor ? itemDef(c.armor.item).armor! : { protection: 0, speed: 1 };
+}
+
+// How well a weapon of this make suits a colonist: rough damage per tick, with reach counting
+// for a lot (most of the colony's fighting is done from behind cover).
+export function weaponScore(key: string, quality: number): number {
+  const w = weaponDef(key);
+  const perHit = ((w.damage[0] + w.damage[1]) / 2) * qualityFactor(quality) * w.accuracy;
+  return (perHit / w.cooldown) * (w.range > 1 ? 1 + w.range / 8 : 0.9);
 }

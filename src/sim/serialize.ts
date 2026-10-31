@@ -9,7 +9,8 @@ import {
   Bill,
   Carried,
   Colonist,
-  ColonistWeapon,
+  Stance,
+  WornArmor,
   Enemy,
   Health,
   LogEntry,
@@ -28,7 +29,7 @@ import { Caravan } from './trade';
 import { WeatherState } from './weather';
 import { World } from './world';
 
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 
 interface SavedColonist {
   id: number;
@@ -53,8 +54,11 @@ interface SavedColonist {
   drafted: boolean;
   skillXp: Record<SkillKey, number>;
   passions: Record<SkillKey, Passion>;
-  weapon: ColonistWeapon;
+  weapon: string;
   weaponQuality: number;
+  armor: WornArmor | null;
+  stance: Stance;
+  focus: number;
   tool: { quality: number; wear: number } | null;
   apparel: WornApparel | null;
   // What they were doing in the moment: asleep, mid-cooldown, marching to a drafted spot.
@@ -179,6 +183,9 @@ export function serialize(sim: Simulation): SaveData {
         passions: c.passions,
         weapon: c.weapon,
         weaponQuality: c.weaponQuality,
+        armor: c.armor && { ...c.armor },
+        stance: c.stance,
+        focus: c.focus,
         tool: c.tool && { ...c.tool },
         apparel: c.apparel,
         sleeping: c.sleeping,
