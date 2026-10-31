@@ -886,3 +886,13 @@ button.active.danger {
 .passion {
   color: var(--accent);
 }
+
+.small {
+  font-size: 11px;
+}
+
+/* Dialogs scroll rather than overflow on short screens. */
+.modal {
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}

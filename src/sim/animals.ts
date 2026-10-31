@@ -1,4 +1,4 @@
-import { MOVE_SPEED } from './constants';
+import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
 import { ANIMALS, itemId } from './defs';
 import { damage } from './health';
 import type { Simulation } from './simulation';
@@ -7,6 +7,8 @@ import { Animal, Colonist } from './types';
 export const MAX_ANIMALS = 18;
 const BITE_COOLDOWN = 50;
 const WANDER_RADIUS = 6;
+// An enraged animal calms down after this long.
+const REVENGE_TICKS = TICKS_PER_HOUR * 2;
 
 const chebyshev = (sim: Simulation, a: number, b: number) =>
   Math.max(Math.abs(sim.world.xOf(a) - sim.world.xOf(b)), Math.abs(sim.world.yOf(a) - sim.world.yOf(b)));
@@ -35,6 +37,7 @@ function addAnimal(sim: Simulation, tile: number, kind = pickKind(sim)): Animal 
     revengeOn: -1,
     cooldown: 0,
     restUntil: 0,
+    revengeUntil: 0,
   };
   sim.animals.push(animal);
   return animal;
@@ -122,6 +125,7 @@ function wanderTarget(sim: Simulation, a: Animal, distance: number, from?: numbe
 
 export function updateAnimals(sim: Simulation): void {
   const w = sim.world;
+  const awake = sim.living().filter((c) => !c.sleeping);
   for (const a of sim.animals) {
     if (a.hp <= 0) {
       continue;
@@ -132,7 +136,14 @@ export function updateAnimals(sim: Simulation): void {
     // Revenge: chase and bite whoever hurt us, until they're down.
     if (a.revengeOn >= 0) {
       const target = sim.colonists[a.revengeOn];
-      if (!target || target.health.dead || target.health.downed) {
+      // Calm down once the target is down, out of reach, or after a while.
+      if (
+        !target ||
+        target.health.dead ||
+        target.health.downed ||
+        !(a.revengeUntil > sim.tick) ||
+        sim.regionOf(target.tile) !== sim.regionOf(a.tile)
+      ) {
         a.revengeOn = -1;
         a.path = [];
       } else if (chebyshev(sim, a.tile, target.tile) <= 1) {
@@ -149,10 +160,13 @@ export function updateAnimals(sim: Simulation): void {
         continue;
       } else if (a.path.length === 0 || sim.tick % 30 === 0) {
         pathTo(sim, a, [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))]);
+        if (a.path.length === 0) {
+          a.revengeOn = -1;
+        }
       }
     } else if (def.fleeRange > 0 && a.path.length === 0) {
       // Skittish animals keep their distance from people.
-      const near = sim.living().find((c) => w.distance(c.tile, a.tile) < def.fleeRange && !c.sleeping);
+      const near = awake.find((c) => w.distance(c.tile, a.tile) < def.fleeRange);
       if (near) {
         const to = wanderTarget(sim, a, WANDER_RADIUS, near.tile);
         if (to !== undefined) {
@@ -190,6 +204,7 @@ export function hurtAnimal(sim: Simulation, a: Animal, amount: number, attacker:
   }
   if (a.revengeOn < 0 && def.revengeChance && sim.rng.next() < def.revengeChance) {
     a.revengeOn = attacker.id;
+    a.revengeUntil = sim.tick + REVENGE_TICKS;
     a.path = [];
     sim.addLog(`The ${def.name.toLowerCase()} turned on ${attacker.name}!`, 'warn');
   } else if (def.fleeRange > 0) {

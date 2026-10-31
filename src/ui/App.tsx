@@ -519,21 +519,24 @@ function ProductionScreen({ state, onClose }: { state: UiState; onClose: () => v
   return (
     <Modal title="Production" onClose={onClose}>
       <p className="muted">
-        Colonists keep making each product until the colony holds the target amount. Meals need a stove, cloth needs a
-        crafting bench.
+        Colonists keep making each product until the colony holds the target amount (equipped bows don't count).
       </p>
       <table className="saves">
         <tbody>
           {state.bills.map((bill) => (
             <tr key={bill.recipe}>
-              <td>{bill.name}</td>
-              <td className="muted">
-                {bill.stock} {bill.product.toLowerCase()} in stock
-              </td>
               <td>
-                <button onClick={() => set(bill.recipe, bill.target - 5)}>−5</button>
+                {bill.name}
+                <div className="muted small">
+                  {bill.recipeText} at a {bill.bench}
+                  {!bill.hasBench && <span className="tag warn">no {bill.bench} yet</span>}
+                </div>
+              </td>
+              <td className="muted">{bill.stock} in stock</td>
+              <td>
+                <button onClick={() => set(bill.recipe, bill.target - bill.step)}>−{bill.step}</button>
                 <span className="target">Keep {bill.target}</span>
-                <button onClick={() => set(bill.recipe, bill.target + 5)}>+5</button>
+                <button onClick={() => set(bill.recipe, bill.target + bill.step)}>+{bill.step}</button>
               </td>
             </tr>
           ))}

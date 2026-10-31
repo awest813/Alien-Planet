@@ -49,6 +49,7 @@ interface SavedColonist {
   skillXp: Record<SkillKey, number>;
   passions: Record<SkillKey, Passion>;
   weapon: ColonistWeapon;
+  practicedAt?: Partial<Record<SkillKey, number>>;
 }
 
 // Plain structured-cloneable data, stored as-is in IndexedDB. Jobs and reservations
@@ -135,6 +136,7 @@ export function serialize(sim: Simulation): SaveData {
         skillXp: c.skillXp,
         passions: c.passions,
         weapon: c.weapon,
+        practicedAt: c.practicedAt,
       }),
     ),
     bills: structuredClone(sim.bills),
@@ -183,6 +185,7 @@ export function deserialize(data: SaveData): Simulation {
     restCold: 0,
     draftTarget: -1,
     cooldown: 0,
+    practicedAt: saved.practicedAt ?? {},
   }));
 
   const sim = new Simulation(world, colonists, data.seed, new Rng(data.rngState));

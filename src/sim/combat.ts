@@ -41,8 +41,12 @@ const chebyshev = (w: World, a: number, b: number) =>
 
 // Hit-chance multiplier for a target sheltering behind cover (sandbags) on the side facing the shooter.
 export function coverFactor(w: World, shooter: number, target: number): number {
-  const dx = Math.sign(w.xOf(shooter) - w.xOf(target));
-  const dy = Math.sign(w.yOf(shooter) - w.yOf(target));
+  const ddx = w.xOf(shooter) - w.xOf(target);
+  const ddy = w.yOf(shooter) - w.yOf(target);
+  // Only the sides the shot actually comes past: the main axis, plus the diagonal and the
+  // other axis when the angle is close to diagonal.
+  const dx = Math.abs(ddx) * 2 >= Math.abs(ddy) ? Math.sign(ddx) : 0;
+  const dy = Math.abs(ddy) * 2 >= Math.abs(ddx) ? Math.sign(ddy) : 0;
   const tx = w.xOf(target);
   const ty = w.yOf(target);
   let factor = 1;
@@ -51,7 +55,7 @@ export function coverFactor(w: World, shooter: number, target: number): number {
     [dx, 0],
     [0, dy],
   ]) {
-    if ((ox === 0 && oy === 0) || !w.inBounds(tx + ox, ty + oy)) {
+    if ((ox === 0 && oy === 0) || !w.inBounds(tx + ox, ty + oy) || w.idx(tx + ox, ty + oy) === shooter) {
       continue;
     }
     const f = w.feature[w.idx(tx + ox, ty + oy)];
@@ -371,7 +375,16 @@ export function colonistCombat(sim: Simulation, c: Colonist): boolean {
   const w = sim.world;
   const range = c.drafted ? COLONIST_WEAPONS[c.weapon].range : SELF_DEFENCE_RANGE;
   // Animals that have turned on someone are fair game for anyone nearby.
-  const beast = sim.animals.find((a) => a.hp > 0 && a.revengeOn >= 0 && canAttack(sim, c, a.tile, range));
+  // Enraged animals: always fight back if it's after you or right next to you; otherwise only
+  // step in when free (not drafted for a raid, asleep, in bed, or doctoring).
+  const busy = c.sleeping || c.job?.type === 'rest' || c.job?.type === 'tend' || (c.drafted && sim.enemies.length > 0);
+  const beast = sim.animals.find(
+    (a) =>
+      a.hp > 0 &&
+      a.revengeOn >= 0 &&
+      (a.revengeOn === c.id || chebyshev(w, c.tile, a.tile) <= 1 || !busy) &&
+      canAttack(sim, c, a.tile, range),
+  );
   if (beast) {
     if (!c.drafted && c.job) {
       sim.endJob(c);

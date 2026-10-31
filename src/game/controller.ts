@@ -212,6 +212,11 @@ export interface BillView {
   product: string;
   target: number;
   stock: number;
+  // What one batch consumes and makes, e.g. "6 raw food → 1 simple meal".
+  recipeText: string;
+  bench: string;
+  hasBench: boolean;
+  step: number;
 }
 
 export interface Alert {
@@ -585,12 +590,21 @@ export class GameController {
       })),
       bills: sim.bills.map((bill) => {
         const recipe = RECIPES[bill.recipe];
+        const input = recipe.ingredient.item
+          ? itemDef(recipe.ingredient.item).name.toLowerCase()
+          : (recipe.ingredient.category ?? '').replace(/([A-Z])/g, ' $1').toLowerCase();
+        const product = itemDef(recipe.product.item);
         return {
           recipe: bill.recipe,
           name: recipe.name,
-          product: itemDef(recipe.product.item).name,
+          product: product.name,
           target: bill.target,
           stock: totals[recipe.product.item - 1].total,
+          recipeText: `${recipe.ingredient.count} ${input} → ${recipe.product.count} ${product.name.toLowerCase()}`,
+          bench: recipe.bench === 'cooking' ? 'stove' : 'crafting bench',
+          hasBench: sim.countFeature((f) => featureDef(f).workbench === recipe.bench) > 0,
+          // Single items (bows) step by one; stackable goods by five.
+          step: product.stackLimit === 1 ? 1 : 5,
         };
       }),
       alerts: this.buildAlerts(totals),
@@ -635,6 +649,12 @@ export class GameController {
           text: `${c.name} has ${disease.label.toLowerCase()} (severity ${sev}%, immunity ${imm}%)`,
           tone: disease.severity > disease.immunity ? 'danger' : 'warn',
         });
+      }
+    }
+    for (const a of sim.animals) {
+      const victim = a.revengeOn >= 0 ? sim.colonists[a.revengeOn] : undefined;
+      if (victim && !victim.health.dead) {
+        alerts.push({ text: `A ${animalName(a).toLowerCase()} is attacking ${victim.name}`, tone: 'danger' });
       }
     }
     const hurt = sim.living().some((c) => c.health.injuries.length > 0 || c.health.disease || painOf(c) > 0);

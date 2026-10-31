@@ -1,3 +1,4 @@
+import { TICKS_PER_HOUR } from './constants';
 import { Rng } from './rng';
 import type { Simulation } from './simulation';
 import { Colonist, Passion, SKILL_KEYS, SkillKey } from './types';
@@ -38,8 +39,12 @@ export function rollPassions(rng: Rng): Record<SkillKey, Passion> {
 // Practice: `amount` is roughly one per tick of work.
 export function learn(sim: Simulation, c: Colonist, skill: SkillKey, amount = 1): void {
   const passion = c.passions[skill];
+  c.practicedAt[skill] = sim.tick;
   if (passion === 2) {
-    sim.addThought(c, 'passionWork');
+    const current = c.thoughts.find((t) => t.key === 'passionWork');
+    if (!current || current.expires - sim.tick < TICKS_PER_HOUR) {
+      sim.addThought(c, 'passionWork');
+    }
   }
   if (c.skills[skill] >= MAX_SKILL) {
     return;
@@ -58,10 +63,12 @@ export function learn(sim: Simulation, c: Colonist, skill: SkillKey, amount = 1)
   }
 }
 
-// Called once a day: expert skills lose a little progress (never a whole level).
-export function rustSkills(c: Colonist): void {
+// Called once a day: expert skills not practised in the last day lose a little progress
+// (never a whole level).
+export function rustSkills(c: Colonist, tick: number): void {
   for (const skill of SKILL_KEYS) {
-    if (c.skills[skill] >= RUST_LEVEL) {
+    const practiced = c.practicedAt[skill] ?? -Infinity;
+    if (c.skills[skill] >= RUST_LEVEL && tick - practiced > TICKS_PER_HOUR * 24) {
       c.skillXp[skill] = Math.max(0, c.skillXp[skill] - xpToNext(c.skills[skill]) * 0.1);
     }
   }

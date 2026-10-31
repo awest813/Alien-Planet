@@ -24,14 +24,19 @@ describe('skills', () => {
     expect(keen.skills.mining).toBeGreaterThan(plain.skills.mining);
   });
 
-  it('lets expert skills rust a little without losing levels', () => {
+  it('rusts only unpractised expert skills, never losing a level', () => {
     const sim = Simulation.newColony(2);
     const c = sim.colonists[0];
     c.skills.crafting = 12;
+    c.skills.mining = 12;
     c.skillXp.crafting = xpToNext(12) * 0.05;
-    rustSkills(c);
+    c.skillXp.mining = xpToNext(12) * 0.05;
+    sim.tick = HOUR * 48;
+    learn(sim, c, 'mining', 0);
+    rustSkills(c, sim.tick);
     expect(c.skills.crafting).toBe(12);
     expect(c.skillXp.crafting).toBe(0);
+    expect(c.skillXp.mining).toBeCloseTo(xpToNext(12) * 0.05);
   });
 });
 
@@ -44,6 +49,8 @@ describe('defences', () => {
     expect(coverFactor(w, w.idx(5, 0), target)).toBeLessThan(1);
     expect(coverFactor(w, w.idx(8, 1), target)).toBeLessThan(1);
     expect(coverFactor(w, w.idx(5, 9), target)).toBe(1);
+    // A shot from almost due east passes the east side, not the sandbags to the north.
+    expect(coverFactor(w, w.idx(9, 4), target)).toBe(1);
   });
 
   it('has colonists pick up a recurve bow from storage', () => {
@@ -96,5 +103,35 @@ describe('animals and hunting', () => {
     expect(copy.colonists[0].weapon).toBe('recurveBow');
     expect(copy.colonists[1].skillXp).toEqual(sim.colonists[1].skillXp);
     expect(copy.colonists[1].passions).toEqual(sim.colonists[1].passions);
+  });
+});
+
+describe('review regressions', () => {
+  it('pushes an animal aside when a wall is finished on its tile', () => {
+    const sim = Simulation.newColony(7);
+    // Boars don't run from people, so it stays put while the wall goes up around it.
+    const a = sim.animals.find((x) => x.kind === 'boar') ?? sim.animals[0];
+    a.restUntil = Number.MAX_SAFE_INTEGER;
+    a.path = [];
+    const w = sim.world;
+    const tile = a.tile;
+    w.dropItemNear(sim.colonists[0].tile, itemId('wood'), 50);
+    sim.apply({ type: 'build', feature: featureId('woodWall'), tiles: [tile] });
+    for (let i = 0; i < HOUR * 8 && w.feature[tile] !== featureId('woodWall'); i++) {
+      a.restUntil = Number.MAX_SAFE_INTEGER;
+      sim.step();
+    }
+    expect(w.feature[tile]).toBe(featureId('woodWall'));
+    expect(w.isPassable(a.tile)).toBe(true);
+  });
+
+  it('calms an enraged animal that cannot reach its target', () => {
+    const sim = Simulation.newColony(8);
+    const boar = sim.animals.find((x) => x.kind === 'boar') ?? sim.animals[0];
+    const target = sim.colonists[0];
+    boar.revengeOn = target.id;
+    boar.revengeUntil = sim.tick + HOUR * 2;
+    run(sim, HOUR * 3);
+    expect(boar.revengeOn).toBe(-1);
   });
 });

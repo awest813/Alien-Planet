@@ -169,6 +169,7 @@ function createColonist(id: number, name: string, tile: number, rng: Rng): Colon
     skillXp: emptyXp(),
     passions: rollPassions(rng),
     weapon: 'bow',
+    practicedAt: {},
   };
 }
 
@@ -839,7 +840,7 @@ export class Simulation {
   private onDawn(): void {
     let exposed = 0;
     for (const c of this.living()) {
-      rustSkills(c);
+      rustSkills(c, this.tick);
     }
     for (const c of this.colonists) {
       // Only colonists who were around for a good part of the night count (not late arrivals).
@@ -1546,6 +1547,13 @@ export class Simulation {
         e.tile = free;
         e.path = [];
         e.moveProgress = 0;
+      }
+    }
+    for (const a of this.animals) {
+      if (a.tile === t && free !== undefined) {
+        a.tile = free;
+        a.path = [];
+        a.moveProgress = 0;
       }
     }
   }

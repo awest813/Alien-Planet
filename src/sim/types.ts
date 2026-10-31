@@ -137,6 +137,8 @@ export interface Colonist {
   skillXp: Record<SkillKey, number>;
   passions: Record<SkillKey, Passion>;
   weapon: ColonistWeapon;
+  // Tick each skill was last practised, for rust.
+  practicedAt: Partial<Record<SkillKey, number>>;
 }
 
 export type ColonistWeapon = 'bow' | 'recurveBow';
@@ -155,6 +157,8 @@ export interface Animal {
   cooldown: number;
   // Tick when it next considers wandering somewhere.
   restUntil: number;
+  // Tick when its anger wears off.
+  revengeUntil: number;
 }
 
 export interface Injury {
