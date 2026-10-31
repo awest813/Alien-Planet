@@ -445,6 +445,7 @@ export function updateEnemies(sim: Simulation): void {
   sim.enemies = sim.enemies.filter((e) => e.hp > 0);
   if (raid && sim.enemies.length === 0) {
     sim.raid = null;
+    sim.rebuildAfterRaid();
     const standing = sim.living().filter((c) => !c.health.downed);
     // Every raider fell without the raid breaking first: that's a win too.
     const outcome = raid.outcome ?? (standing.length > 0 ? 'repelled' : 'overrun');

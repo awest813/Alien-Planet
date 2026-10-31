@@ -323,6 +323,51 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillRect(10, 9, 1, 2);
       c.fillRect(13, 9, 1, 2);
       break;
+    case 'woodFloor':
+      // Staggered planks.
+      for (let y = 0; y < 16; y += 4) {
+        c.fillStyle = (y / 4) % 2 ? '#9a7048' : '#a77a50';
+        c.fillRect(0, y, 16, 4);
+        c.fillStyle = '#7a5434';
+        c.fillRect(0, y + 3, 16, 1);
+        c.fillRect((y * 5) % 16, y, 1, 3);
+      }
+      break;
+    case 'stoneTiles':
+      c.fillStyle = '#a4a3a8';
+      c.fillRect(0, 0, 16, 16);
+      c.fillStyle = '#8c8b91';
+      c.fillRect(0, 7, 16, 1);
+      c.fillRect(7, 0, 1, 16);
+      c.fillRect(0, 15, 16, 1);
+      c.fillRect(15, 0, 1, 16);
+      c.fillStyle = '#b8b7bc';
+      c.fillRect(1, 1, 5, 1);
+      c.fillRect(9, 9, 5, 1);
+      break;
+    case 'carpet':
+      c.fillStyle = '#8c3a3a';
+      c.fillRect(0, 0, 16, 16);
+      c.fillStyle = '#a24848';
+      c.fillRect(2, 2, 12, 12);
+      c.fillStyle = '#d9b35a';
+      c.fillRect(7, 4, 2, 8);
+      c.fillRect(4, 7, 8, 2);
+      break;
+    case 'roof':
+      // Drawn over the map, so mostly see-through: a faint shade with diagonal battens.
+      c.fillStyle = 'rgba(25, 18, 12, 0.3)';
+      c.fillRect(0, 0, 16, 16);
+      c.fillStyle = 'rgba(200, 150, 95, 0.55)';
+      for (let k = -16; k < 16; k += 6) {
+        for (let t = 0; t < 16; t++) {
+          c.fillRect(k + t, t, 1, 1);
+        }
+      }
+      // A faint seam so neighbouring roof tiles read as one surface with a grain.
+      c.fillStyle = 'rgba(25, 18, 12, 0.25)';
+      c.fillRect(0, 15, 16, 1);
+      break;
     case 'bridge':
       c.fillStyle = 'rgba(0,0,0,0.25)';
       c.fillRect(0, 14, 16, 2);
@@ -626,6 +671,20 @@ function drawItem(c: Ctx, key: string): void {
       c.fillStyle = '#8a8990';
       c.fillRect(3, 8, 4, 1);
       c.fillRect(8, 6, 4, 1);
+      break;
+    case 'toolKit':
+      // A hammer across a saw.
+      c.fillStyle = '#b7bcc2';
+      c.fillRect(2, 10, 10, 3);
+      c.fillStyle = '#8c9197';
+      for (let x = 2; x < 12; x += 2) {
+        c.fillRect(x, 13, 1, 1);
+      }
+      c.fillStyle = '#7a5434';
+      c.fillRect(12, 10, 3, 3);
+      c.fillRect(7, 3, 2, 8);
+      c.fillStyle = '#6f757c';
+      c.fillRect(5, 2, 6, 3);
       break;
     case 'stoneBlocks':
       c.fillStyle = '#8a8990';

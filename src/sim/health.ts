@@ -224,6 +224,10 @@ function die(sim: Simulation, c: Colonist, cause: string): void {
     sim.world.dropItemNear(c.tile, c.apparel.item, 1, c.apparel.wear, c.apparel.quality);
     c.apparel = null;
   }
+  if (c.tool) {
+    sim.world.dropItemNear(c.tile, itemId('toolKit'), 1, c.tool.wear, c.tool.quality);
+    c.tool = null;
+  }
   c.health.dead = true;
   c.health.downed = false;
   c.drafted = false;

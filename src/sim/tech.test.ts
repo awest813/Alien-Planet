@@ -79,18 +79,24 @@ describe('cold storage and spoilage', () => {
     sim.syncClock();
     // Clear skies throughout: rain would cool the air and slow the rot.
     sim.weather = { kind: 'clear', until: Number.MAX_SAFE_INTEGER };
+    // No newcomers to haul the meat about: the wanderer event stays on cooldown.
+    sim.story.cooldowns.wanderer = Number.MAX_SAFE_INTEGER;
     // A couple of days past its shelf life, so a passing cold snap can't save the meat.
     const life = itemDef(itemId('rawMeat')).shelfLife!;
     const days = life + 2;
     for (let hour = 0; hour < 24 * days; hour++) {
-      // Newcomers who wander in would otherwise start hauling.
-      for (const c of sim.colonists) {
-        c.needs.food = 1;
-        c.priorities.hauling = 0;
-      }
       // Hauling (and so refuelling) is off, so keep the generator fed by hand.
       w.fuel[w.idx(x + 6, y)] = 75;
-      run(sim, HOUR);
+      for (let k = 0; k < HOUR / 10; k++) {
+        // Nobody hauls or cooks the meat (cooks reach for the food nearest spoiling), including
+        // newcomers who wander in partway through.
+        for (const c of sim.colonists) {
+          c.needs.food = 1;
+          c.priorities.hauling = 0;
+          c.priorities.cooking = 0;
+        }
+        run(sim, 10);
+      }
     }
     expect(w.itemType[warm]).not.toBe(itemId('rawMeat'));
     expect(w.itemType[icebox]).toBe(itemId('rawMeat'));

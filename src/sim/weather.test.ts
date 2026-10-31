@@ -89,6 +89,7 @@ describe('fire', () => {
 
   it('marks a building it destroys for rebuilding', () => {
     const { sim, w, x, y } = forest(10);
+    sim.weather = { kind: 'clear', until: forever };
     const wall = w.idx(x + 8, y + 8);
     w.setFeature(wall, featureId('woodWall'));
     for (const c of sim.colonists) {
@@ -147,6 +148,28 @@ describe('fire', () => {
     damage(sim, c, 0.1, 'burn');
     expect(c.health.injuries[0].label).toBe('Burn');
     expect(c.health.injuries[0].bleeding).toBe(0);
+  });
+
+  it('does not rebuild something that was marked for taking down', () => {
+    const { sim, w, x, y } = forest(11);
+    const wall = w.idx(x + 8, y + 8);
+    w.setFeature(wall, featureId('woodWall'));
+    sim.apply({ type: 'designate', kind: 'deconstruct', rect: { x0: x + 8, y0: y + 8, x1: x + 8, y1: y + 8 } });
+    w.setFeature(wall, NONE);
+    sim.rebuild(wall, featureId('woodWall'));
+    expect(w.blueprint[wall]).toBe(NONE);
+    expect(w.designation[wall]).toBe(0);
+  });
+
+  it('waits for a raid to end before rebuilding a breach', () => {
+    const { sim, w, x, y } = forest(12);
+    const wall = w.idx(x + 8, y + 8);
+    sim.raid = {} as NonNullable<Simulation['raid']>;
+    sim.rebuild(wall, featureId('woodWall'));
+    expect(w.blueprint[wall]).toBe(NONE);
+    sim.raid = null;
+    sim.rebuildAfterRaid();
+    expect(w.blueprint[wall]).toBe(featureId('woodWall'));
   });
 
   it('survives a save', () => {

@@ -18,10 +18,13 @@ interface PawnView {
 
 interface Layers {
   terrain: Phaser.Tilemaps.TilemapLayer;
+  floor: Phaser.Tilemaps.TilemapLayer;
+  floorPlan: Phaser.Tilemaps.TilemapLayer;
   zone: Phaser.Tilemaps.TilemapLayer;
   indoor: Phaser.Tilemaps.TilemapLayer;
   feature: Phaser.Tilemaps.TilemapLayer;
   items: Phaser.Tilemaps.TilemapLayer;
+  roof: Phaser.Tilemaps.TilemapLayer;
   blueprint: Phaser.Tilemaps.TilemapLayer;
   designation: Phaser.Tilemaps.TilemapLayer;
 }
@@ -121,6 +124,19 @@ export class ColonyScene extends Phaser.Scene {
     this.drawWater();
     this.drawFires();
     this.drawWeather();
+    this.showRoofs();
+  }
+
+  // Roofs stay out of the way: they only show while roofs are being built or taken down.
+  private showRoofs(): void {
+    const tool = controller.tool;
+    const visible =
+      (tool.kind === 'build' && featureDef(tool.feature).layer === 'roof') ||
+      (tool.kind === 'designate' && tool.designation === 'deconstruct') ||
+      tool.kind === 'cancel';
+    if (this.layers.roof.visible !== visible) {
+      this.layers.roof.setVisible(visible);
+    }
   }
 
   // Flickering flames on burning tiles in view.
@@ -273,10 +289,14 @@ export class ColonyScene extends Phaser.Scene {
     const layer = (name: string, depth: number) => map.createBlankLayer(name, tileset)!.setDepth(depth);
     this.layers = {
       terrain: layer('terrain', 0),
+      floor: layer('floor', 0.6),
+      // Planned floors show under furniture rather than over it.
+      floorPlan: layer('floorPlan', 0.7).setAlpha(0.55),
       zone: layer('zone', 1),
       indoor: layer('indoor', 2),
       feature: layer('feature', 3),
       items: layer('items', 4),
+      roof: layer('roof', 4.6),
       blueprint: layer('blueprint', 5).setAlpha(0.55),
       designation: layer('designation', 6),
     };
@@ -311,13 +331,18 @@ export class ColonyScene extends Phaser.Scene {
     const L = this.layers;
     const variant = hash2(x, y, 17) < 0.5 ? 0 : 1;
     this.put(L.terrain, x, y, Frames.terrain(world.terrain[i], variant));
+    this.put(L.floor, x, y, world.floor[i] !== NONE ? Frames.feature(world.floor[i]) : -1);
+    this.put(L.roof, x, y, world.roof[i] !== NONE ? Frames.feature(world.roof[i]) : -1);
     const zone = world.zone[i];
     this.put(L.zone, x, y, zone === 0 ? -1 : zone >= GROW_ZONE ? Frames.GROW_ZONE : Frames.ZONE);
     const f = world.feature[i];
     const featureFrame = f === NONE ? -1 : featureDef(f).crop ? Frames.crop(f, world.growth[i]) : Frames.feature(f);
     this.put(L.feature, x, y, featureFrame);
     this.put(L.items, x, y, world.itemType[i] !== NONE ? Frames.item(world.itemType[i]) : -1);
-    this.put(L.blueprint, x, y, world.blueprint[i] !== NONE ? Frames.blueprint(world.blueprint[i]) : -1);
+    const bp = world.blueprint[i];
+    const floorPlan = bp !== NONE && featureDef(bp).layer === 'floor';
+    this.put(L.blueprint, x, y, bp !== NONE && !floorPlan ? Frames.blueprint(bp) : -1);
+    this.put(L.floorPlan, x, y, floorPlan ? Frames.blueprint(bp) : -1);
     this.put(
       L.designation,
       x,

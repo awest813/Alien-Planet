@@ -56,6 +56,7 @@ export type ToolGroup =
   | 'orders'
   | 'zones'
   | 'structure'
+  | 'floors'
   | 'furniture'
   | 'production'
   | 'power'
@@ -67,6 +68,7 @@ export const TOOL_GROUPS: { key: ToolGroup; label: string }[] = [
   { key: 'orders', label: 'Orders' },
   { key: 'zones', label: 'Zones' },
   { key: 'structure', label: 'Structure' },
+  { key: 'floors', label: 'Floors' },
   { key: 'furniture', label: 'Furniture' },
   { key: 'production', label: 'Production' },
   { key: 'power', label: 'Power' },
@@ -204,6 +206,16 @@ export const TOOLS: ToolDef[] = [
     'Sturdier and prettier than granite: raiders take twice as long to break through',
   ),
   build('door', 'Door', 'o', 'structure', 'Click a wall gap to place a door'),
+  build(
+    'roof',
+    'Roof',
+    '',
+    'structure',
+    'Drag over an open area to keep the rain off (rooms are roofed already). Roofs only show while this tool is picked',
+  ),
+  build('woodFloor', 'Wood floor', '', 'floors', 'Faster to walk on, and a little prettier'),
+  build('stoneTiles', 'Stone tiles', '', 'floors', 'Fast underfoot and handsome; made from granite blocks'),
+  build('carpet', 'Carpet', '', 'floors', 'The prettiest floor; woven from cloth'),
   build('bridge', 'Bridge', '', 'structure', 'Walkway over shallow or deep water'),
   build('bed', 'Bed', 'e', 'furniture', 'Colonists sleep better in beds'),
   build('fineBed', 'Fine bed', '', 'furniture', 'Prettier, and colonists rest 25% faster'),
@@ -296,6 +308,7 @@ export interface ColonistView {
   dead: boolean;
   skillList: { key: string; label: string; level: number; passion: number; progress: number }[];
   weapon: string;
+  tool: string;
   // e.g. "Good parka (80%)".
   apparel: string;
   // Comfortable temperature range in what they're wearing.
@@ -1049,6 +1062,7 @@ export class GameController {
           c.weapon === 'recurveBow'
             ? `${qualityLabel(c.weaponQuality)} ${COLONIST_WEAPONS[c.weapon].name.toLowerCase()}`
             : COLONIST_WEAPONS[c.weapon].name,
+        tool: c.tool ? `${qualityLabel(c.tool.quality)} tool kit (${Math.round(c.tool.wear * 100)}%)` : 'None',
         apparel: c.apparel
           ? `${qualityLabel(c.apparel.quality)} ${itemDef(c.apparel.item).name.toLowerCase()} (${Math.round(c.apparel.wear * 100)}%)`
           : 'Nothing',
@@ -1276,6 +1290,7 @@ export class GameController {
       wood: 'chop trees (C)',
       stone: 'mine rock (M)',
       cloth: 'weave cotton at a crafting bench',
+      stoneBlocks: "cut granite at a stonecutter's table",
       leather: 'hunt animals (V)',
     };
     for (const [item, count] of outstanding) {
@@ -1440,8 +1455,14 @@ export class GameController {
     if (w.fire[i] > 0) {
       details.push('On fire!');
     }
+    if (w.floor[i] !== NONE) {
+      details.push(`Floor: ${featureDef(w.floor[i]).name.toLowerCase()}`);
+    }
+    if (w.roof[i] !== NONE) {
+      details.push('Roofed');
+    }
     const item = w.itemType[i];
-    if (item !== NONE && itemDef(item).apparel) {
+    if (item !== NONE && (itemDef(item).apparel || itemDef(item).tool)) {
       details.push(`${qualityLabel(w.quality[i])}, ${Math.round(w.fresh[i] * 100)}% condition`);
     } else if (item !== NONE && itemDef(item).category === 'meal') {
       details.push(`Cooked with ${qualityLabel(w.quality[i]).toLowerCase()} skill`);

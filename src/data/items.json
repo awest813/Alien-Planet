@@ -132,7 +132,7 @@
     "name": "Milk",
     "stackLimit": 30,
     "category": "rawFood",
-    "nutrition": 0.06,
+    "nutrition": 0.1,
     "shelfLife": 2,
     "foodKind": "dairy",
     "value": 1
@@ -148,5 +148,12 @@
     "name": "Silver",
     "stackLimit": 500,
     "value": 1
+  },
+  {
+    "key": "toolKit",
+    "name": "Tool kit",
+    "stackLimit": 1,
+    "value": 25,
+    "tool": true
   }
 ]

@@ -58,6 +58,9 @@ export class World {
   public readonly damage: Float32Array;
   // Hours left for a fire burning on the tile (0: not burning).
   public readonly fire: Float32Array;
+  // Built floor (a feature id with layer 'floor', or none) and roof (layer 'roof', or none).
+  public readonly floor: Uint8Array;
+  public readonly roof: Uint8Array;
   // Fuel held by a fuelled building (generators).
   public readonly fuel: Float32Array;
   // One item stack per tile.
@@ -98,6 +101,8 @@ export class World {
     this.quality = new Float32Array(this.size);
     this.damage = new Float32Array(this.size);
     this.fire = new Float32Array(this.size);
+    this.floor = new Uint8Array(this.size);
+    this.roof = new Uint8Array(this.size);
     this.fuel = new Float32Array(this.size);
     this.itemType = new Uint8Array(this.size);
     this.itemCount = new Uint16Array(this.size);
@@ -164,7 +169,8 @@ export class World {
     if (f !== NONE && featureDef(f).bridge) {
       return featureDef(f).moveCost;
     }
-    const base = terrainDef(this.terrain[i]).moveCost;
+    // A built floor is easier going than whatever ground is under it.
+    const base = this.floor[i] !== NONE ? featureDef(this.floor[i]).moveCost : terrainDef(this.terrain[i]).moveCost;
     return f === NONE ? base : base * featureDef(f).moveCost;
   }
 
@@ -224,6 +230,17 @@ export class World {
     this.markDirty(i);
   }
 
+  // Lays (or, with NONE, lifts) a floor or roof.
+  public setLayer(layer: 'floor' | 'roof', i: number, f: number): void {
+    if (this[layer][i] === f) {
+      return;
+    }
+    this[layer][i] = f;
+    this.progress[i] = 0;
+    this.featureVersion++;
+    this.markDirty(i);
+  }
+
   public setTerrain(i: number, t: number): void {
     this.terrain[i] = t;
     this.structureVersion++;
@@ -279,8 +296,14 @@ export class World {
 
   // ---- Items ----
 
+  // A planned building claims its tile; a planned floor or roof doesn't keep items off it.
+  public blueprintBlocks(i: number): boolean {
+    const bp = this.blueprint[i];
+    return bp !== NONE && !featureDef(bp).layer;
+  }
+
   public canHoldItem(i: number, item: number): boolean {
-    if (!this.isPassable(i) || this.blueprint[i] !== NONE) {
+    if (!this.isPassable(i) || this.blueprintBlocks(i)) {
       return false;
     }
     // Iceboxes only take food.
@@ -306,7 +329,7 @@ export class World {
     if (added > 0) {
       const existing = this.itemType[i] === item ? this.itemCount[i] : 0;
       const merge = (old: number, incoming: number) => (old * existing + incoming * added) / (existing + added);
-      const life = def.shelfLife ?? (def.apparel ? 1 : undefined);
+      const life = def.shelfLife ?? (def.apparel || def.tool ? 1 : undefined);
       if (life !== undefined) {
         this.fresh[i] = merge(this.fresh[i], fresh ?? life);
       }
@@ -322,7 +345,7 @@ export class World {
   public pickUp(i: number, count: number): Carried {
     const item = this.itemType[i];
     const def = itemDef(item);
-    const fresh = def.shelfLife !== undefined || def.apparel ? this.fresh[i] : undefined;
+    const fresh = def.shelfLife !== undefined || def.apparel || def.tool ? this.fresh[i] : undefined;
     const quality = this.quality[i];
     return { item, count: this.takeItem(i, count), fresh, quality };
   }
@@ -356,7 +379,7 @@ export class World {
       if (
         fallback < 0 &&
         this.isPassable(i) &&
-        this.blueprint[i] === NONE &&
+        !this.blueprintBlocks(i) &&
         (this.feature[i] === NONE || !featureDef(this.feature[i]).icebox || !!itemDef(item).nutrition) &&
         // One-per-tile things (bows, clothes) never pile up, even as a last resort.
         (this.itemType[i] === NONE || (this.itemType[i] === item && itemDef(item).stackLimit > 1))
@@ -375,7 +398,7 @@ export class World {
       let best = Infinity;
       for (let i = 0; i < this.size; i++) {
         const d = this.distance(start, i);
-        if (d < best && this.itemType[i] === NONE && this.isPassable(i) && this.blueprint[i] === NONE) {
+        if (d < best && this.itemType[i] === NONE && this.isPassable(i) && !this.blueprintBlocks(i)) {
           best = d;
           fallback = i;
         }
@@ -383,7 +406,7 @@ export class World {
     }
     if (remaining > 0 && fallback >= 0) {
       const existing = this.itemType[fallback] === item ? this.itemCount[fallback] : 0;
-      const incoming = fresh ?? itemDef(item).shelfLife ?? (itemDef(item).apparel ? 1 : 0);
+      const incoming = fresh ?? itemDef(item).shelfLife ?? (itemDef(item).apparel || itemDef(item).tool ? 1 : 0);
       this.fresh[fallback] = (this.fresh[fallback] * existing + incoming * remaining) / (existing + remaining);
       this.quality[fallback] =
         (this.quality[fallback] * existing + (quality ?? NORMAL_QUALITY) * remaining) / (existing + remaining);

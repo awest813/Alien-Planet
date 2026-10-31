@@ -555,5 +555,72 @@
       ],
       "work": 360
     }
+  },
+  {
+    "key": "woodFloor",
+    "name": "Wood floor",
+    "layer": "floor",
+    "passable": true,
+    "moveCost": 0.85,
+    "beauty": 0.2,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 3
+        }
+      ],
+      "work": 40
+    }
+  },
+  {
+    "key": "stoneTiles",
+    "name": "Stone tiles",
+    "layer": "floor",
+    "passable": true,
+    "moveCost": 0.8,
+    "beauty": 0.4,
+    "build": {
+      "cost": [
+        {
+          "item": "stoneBlocks",
+          "count": 2
+        }
+      ],
+      "work": 70
+    }
+  },
+  {
+    "key": "carpet",
+    "name": "Carpet",
+    "layer": "floor",
+    "passable": true,
+    "moveCost": 0.9,
+    "beauty": 0.7,
+    "build": {
+      "cost": [
+        {
+          "item": "cloth",
+          "count": 3
+        }
+      ],
+      "work": 50
+    },
+    "research": "tailoring"
+  },
+  {
+    "key": "roof",
+    "name": "Roof",
+    "layer": "roof",
+    "passable": true,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 2
+        }
+      ],
+      "work": 35
+    }
   }
 ]

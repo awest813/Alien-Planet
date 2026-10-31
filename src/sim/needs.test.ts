@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { comfortRange } from './apparel';
-import { featureId, itemId } from './defs';
+import { featureId, itemDef, itemId } from './defs';
 import { damage, healthFactor, updateExposure } from './health';
 import { deserialize, serialize } from './serialize';
 import { Simulation, START_HOUR } from './simulation';
@@ -107,6 +107,69 @@ describe('cooking', () => {
   it('needs a skilled cook for fine meals', () => {
     expect(kitchen(3).stockOf(itemId('fineMeal'))).toBe(0);
     expect(kitchen(10).stockOf(itemId('fineMeal'))).toBeGreaterThan(0);
+  });
+
+  // A stove with no food about but what the test lays out, and a hungry-for-work cook.
+  function bareKitchen(seed: number) {
+    const sim = Simulation.newColony(seed);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    for (const i of [...w.tilesWith('items')]) {
+      if (itemDef(w.itemType[i]).nutrition > 0) {
+        w.takeItem(i, w.itemCount[i]);
+      }
+    }
+    w.setFeature(w.idx(x + 3, y), featureId('stove'));
+    sim.bills[0].target = 30;
+    for (const c of sim.colonists) {
+      c.priorities.cooking = 1;
+    }
+    const fed = (hours: number) => {
+      for (let h = 0; h < hours; h++) {
+        for (const c of sim.colonists) {
+          c.needs.food = 1;
+        }
+        run(sim, HOUR);
+      }
+    };
+    return { sim, w, x, y, fed };
+  }
+
+  it('makes a meal from a mix of small stacks of different raw food', () => {
+    const { sim, w, x, y, fed } = bareKitchen(31);
+    w.addItem(w.idx(x - 3, y + 3), itemId('berries'), 3);
+    w.addItem(w.idx(x - 1, y + 3), itemId('potatoes'), 2);
+    w.addItem(w.idx(x + 1, y + 3), itemId('rawMeat'), 1);
+    fed(4);
+    expect(sim.stockOf(itemId('meal'))).toBe(1);
+    expect(sim.stockOf(itemId('berries')) + sim.stockOf(itemId('potatoes')) + sim.stockOf(itemId('rawMeat'))).toBe(0);
+  });
+
+  it('gives back exactly the food it gathered when a meal is abandoned', () => {
+    const { sim, w, x, y, fed } = bareKitchen(33);
+    w.addItem(w.idx(x - 3, y + 3), itemId('berries'), 3);
+    w.addItem(w.idx(x - 1, y + 3), itemId('potatoes'), 3);
+    // Wait for a cook to have both kinds in hand, then pull them off the job.
+    let cook;
+    for (let t = 0; t < HOUR * 3 && !cook; t++) {
+      sim.step();
+      cook = sim.colonists.find((c) => c.carrying?.mix?.length);
+    }
+    expect(cook).toBeDefined();
+    sim.endJob(cook!);
+    sim.dropCarried(cook!);
+    expect(sim.stockOf(itemId('berries'))).toBe(3);
+    expect(sim.stockOf(itemId('potatoes'))).toBe(3);
+    void fed;
+  });
+
+  it('cannot turn food on the turn into fresh meals', () => {
+    const { w, x, y, fed } = bareKitchen(32);
+    w.dropItemNear(w.idx(x - 3, y + 3), itemId('rawMeat'), 6, 0.3);
+    fed(4);
+    const meals = [...w.tilesWith('items')].filter((i) => w.itemType[i] === itemId('meal'));
+    expect(meals.length).toBeGreaterThan(0);
+    expect(meals.every((i) => w.fresh[i] <= 1)).toBe(true);
   });
 });
 

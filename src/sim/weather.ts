@@ -3,6 +3,7 @@ import { NONE, featureDef, itemDef, itemId } from './defs';
 import { damage } from './health';
 import { Season } from './seasons';
 import type { Simulation } from './simulation';
+import { Designation } from './world';
 
 // Weather comes in spells of hours (droughts last days). It shifts the temperature, soaks
 // colonists caught outside, speeds or stunts crops, thickens into fog that spoils aim, and
@@ -56,7 +57,10 @@ export const WET_CHILL = 3;
 // Called once an hour: when the current spell runs out, roll the next.
 export function updateWeather(sim: Simulation): void {
   const weather = sim.weather;
-  if (sim.tick < weather.until) {
+  // A spell that no longer fits ends early: droughts with the summer, snow once it thaws.
+  const thawed = weather.kind === 'snow' && sim.outdoorTemperature() - weatherDef(sim).temp > 2;
+  const outOfSeason = (weather.kind === 'drought' && sim.season !== 'Summer') || thawed;
+  if (sim.tick < weather.until && !outOfSeason) {
     if (weather.kind === 'storm') {
       lightning(sim);
     }
@@ -96,9 +100,10 @@ export function updateWeather(sim: Simulation): void {
 
 export const weatherDef = (sim: Simulation): WeatherDef => WEATHER[sim.weather.kind];
 
-// Whether someone (or something) on this tile is out in the rain (dry snow doesn't soak).
+// Whether someone (or something) on this tile is out in the rain (dry snow doesn't soak); a
+// roof or an enclosed room keeps it off.
 export function isWet(sim: Simulation, tile: number): boolean {
-  return weatherDef(sim).wet && !sim.isIndoors(tile);
+  return weatherDef(sim).wet && !sim.isRoofed(tile);
 }
 
 // ---- Fire ----
@@ -182,6 +187,7 @@ function burnOut(sim: Simulation, tile: number): void {
   const w = sim.world;
   w.fire[tile] = 0;
   sim.burning.delete(tile);
+  sim.dousing.delete(tile);
   const item = w.itemType[tile];
   if (item !== NONE && !FIREPROOF.has(itemDef(item).key)) {
     w.takeItem(tile, w.itemCount[tile]);
@@ -190,6 +196,10 @@ function burnOut(sim: Simulation, tile: number): void {
     const feature = w.feature[tile];
     const def = featureDef(feature);
     w.setFeature(tile, NONE);
+    // Orders to chop or harvest what's gone go with it (a building's are settled by rebuild()).
+    if (def.natural || def.crop) {
+      w.designation[tile] = Designation.NONE;
+    }
     // Trees and crops burning is expected; losing a building is worth a mention, and it goes
     // back on the build list.
     if (!def.natural && !def.crop) {
@@ -203,20 +213,26 @@ function burnOut(sim: Simulation, tile: number): void {
 function putOut(sim: Simulation, tile: number): void {
   sim.world.fire[tile] = 0;
   sim.burning.delete(tile);
+  sim.dousing.delete(tile);
   sim.world.markDirty(tile);
 }
 
+// How much beating at the flames puts a fire out (a healthy firefighter manages 0.04 a tick).
+const DOUSE_NEEDED = 1;
+
 // Called by a firefighter beating at the flames. Returns true once the fire is out.
+// Firefighting is its own race against the fire burning through the tile: it doesn't speed the
+// burning along.
 export function douse(sim: Simulation, tile: number, amount: number): boolean {
-  const w = sim.world;
-  if (w.fire[tile] <= 0) {
+  if (sim.world.fire[tile] <= 0) {
     return true;
   }
-  w.fire[tile] -= amount;
-  if (w.fire[tile] <= 0) {
+  const done = (sim.dousing.get(tile) ?? 0) + amount;
+  if (done >= DOUSE_NEEDED) {
     putOut(sim, tile);
     return true;
   }
+  sim.dousing.set(tile, done);
   return false;
 }
 
@@ -236,7 +252,7 @@ function lightning(sim: Simulation): void {
     return;
   }
   const tile = w.idx(x, y);
-  if (sim.isIndoors(tile)) {
+  if (sim.isRoofed(tile)) {
     return;
   }
   sim.lastLightning = sim.tick;

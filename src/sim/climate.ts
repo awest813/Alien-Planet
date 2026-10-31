@@ -51,6 +51,9 @@ export function measureRooms(world: World, rooms: Rooms): RoomContents[] {
   }));
   for (let i = 0; i < world.size; i++) {
     const room = rooms.room[i];
+    if (room >= 0 && world.floor[i] !== NONE) {
+      contents[room].beauty += featureDef(world.floor[i]).beauty;
+    }
     const f = world.feature[i];
     if (room < 0 || f === NONE) {
       continue;

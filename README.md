@@ -121,6 +121,15 @@ How the storytelling layer works:
   (chill a sealed room to −6°C). Food rots over days — faster when warm, not at all when frozen or in a running
   icebox — so a freezer room or iceboxes keep the harvest through winter. Haulers move perishable food into
   either automatically.
+- **Floors and roofs:** wood floors, stone tiles (from granite blocks) and carpet (from cloth, after Tailoring)
+  are laid under furniture without moving it. Floors are quicker to walk on than bare ground and add to a room's
+  beauty, and nothing grows on them. Enclosed rooms are roofed already; build a roof over an open area to make a
+  shelter from the rain (it keeps colonists dry, crops out of the weather and lightning off). Roofs are drawn only
+  while the Roof, Deconstruct or Cancel tool is picked; the tile inspector says whether a tile is roofed. Deconstructing a
+  tile takes down the building first, then the roof, then the floor.
+- **Tool kits:** a crafting bench turns wood and granite chunks into tool kits. Anyone who mines, builds, grows or
+  cuts plants picks one up from storage and works 30% faster at those jobs (more with a well-made kit, less with
+  a poor one) until it wears out after about 80 hours of use; the Production screen keeps two spares in stock.
 - **Weather:** clear skies, rain, storms, fog, summer droughts and winter snow come and go in spells (shown in the
   top bar). Rain soaks anyone outside, who feel the cold more and grumble about it; rain helps crops and
   droughts halve their growth; fog and rain spoil aim for both sides. Below freezing, rain falls as snow.
@@ -205,12 +214,13 @@ the calendar, winter cold, frost and research. `src/sim/tech.test.ts` covers pow
 sun lamps, `src/sim/water.test.ts` covers bridges, fishing, ice, wading and battery charging, and
 `src/sim/playtest.test.ts` covers fixes from persona playtests (feeding the downed, raiders breaching walls,
 idle generators), `src/sim/needs.test.ts` covers clothing, exposure, fine meals, food poisoning, multi-ingredient
-crafting, stonecutting, mending and saves, `src/sim/husbandry.test.ts` covers taming, herding, breeding, milk and
+crafting, stonecutting, mending and saves, `src/sim/building.test.ts` covers floors, roofs and tool kits,
+`src/sim/husbandry.test.ts` covers taming, herding, breeding, milk and
 guard animals, `src/sim/weather.test.ts` covers weather, soaking, lightning, fire and firefighting, and
 `src/sim/trade.test.ts` covers caravans, buying and selling, goodwill and saving a visit.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,
-drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation:
+puts its best researcher on research, drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation:
 
 ```
 npx tsx scripts/balance.ts 26 8                # 26 days (through winter) on 8 seeds, standard difficulty
@@ -218,6 +228,7 @@ npx tsx scripts/balance.ts 20 8 passive        # never draft during raids
 npx tsx scripts/balance.ts 20 8 harsh          # or peaceful
 npx tsx scripts/balance.ts 20 4 trace          # print the colony state whenever someone dies
 npx tsx scripts/balance.ts 30 6 size=128       # on a Large map (size=96 for Medium)
+npx tsx scripts/balance.ts 30 1 trace seed=7919 # replay one colony (DEBUG=1 adds rooms, bills, research)
 ```
 
 With the current tuning (8 seeds × 26 days, through the first winter), a Standard colony that farms enough

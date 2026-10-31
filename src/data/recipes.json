@@ -149,5 +149,26 @@
     "work": 260,
     "defaultTarget": 1,
     "research": "tailoring"
+  },
+  {
+    "key": "makeTools",
+    "name": "Make tool kits",
+    "bench": "crafting",
+    "product": {
+      "item": "toolKit",
+      "count": 1
+    },
+    "work": 180,
+    "defaultTarget": 2,
+    "ingredients": [
+      {
+        "item": "wood",
+        "count": 10
+      },
+      {
+        "item": "stone",
+        "count": 4
+      }
+    ]
   }
 ]

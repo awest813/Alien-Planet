@@ -255,7 +255,9 @@ function OverviewTab({ c }: { c: ColonistView }) {
   return (
     <>
       {c.carrying && <div className="muted">Carrying {c.carrying}</div>}
-      <div className="muted">Weapon: {c.weapon}</div>
+      <div className="muted">
+        Weapon: {c.weapon} · tools: {c.tool}
+      </div>
       <div className="muted">
         Wearing: {c.apparel} · comfortable {c.comfort}
       </div>

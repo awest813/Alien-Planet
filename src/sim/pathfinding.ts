@@ -4,6 +4,9 @@ const SQRT2 = Math.SQRT2;
 
 // A* over the tile grid with 8-way movement (no corner cutting).
 // Buffers are allocated once and reused between searches via a generation counter.
+// The cheapest a step can be (stone tiles).
+const MIN_STEP_COST = 0.8;
+
 export class Pathfinder {
   private readonly g: Float32Array;
   private readonly f: Float32Array;
@@ -47,7 +50,8 @@ export class Pathfinder {
       for (let k = 0; k < gx.length; k++) {
         const dx = Math.abs(x - gx[k]);
         const dy = Math.abs(y - gy[k]);
-        const h = Math.max(dx, dy) + (SQRT2 - 1) * Math.min(dx, dy);
+        // Floors make a step as cheap as 0.8, so scale down to stay a lower bound.
+        const h = (Math.max(dx, dy) + (SQRT2 - 1) * Math.min(dx, dy)) * MIN_STEP_COST;
         if (h < best) {
           best = h;
         }

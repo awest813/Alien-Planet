@@ -28,7 +28,7 @@ import { Caravan } from './trade';
 import { WeatherState } from './weather';
 import { World } from './world';
 
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
 
 interface SavedColonist {
   id: number;
@@ -55,6 +55,7 @@ interface SavedColonist {
   passions: Record<SkillKey, Passion>;
   weapon: ColonistWeapon;
   weaponQuality: number;
+  tool: { quality: number; wear: number } | null;
   apparel: WornApparel | null;
   // What they were doing in the moment: asleep, mid-cooldown, marching to a drafted spot.
   sleeping: boolean;
@@ -92,6 +93,8 @@ export interface SaveData {
     quality: Float32Array;
     damage: Float32Array;
     fire: Float32Array;
+    floor: Uint8Array;
+    roof: Uint8Array;
     fuel: Float32Array;
     // Float64, so room temperatures come back exactly.
     temperature: Float64Array;
@@ -109,6 +112,8 @@ export interface SaveData {
   caravan: Caravan | null;
   goodwill: Record<number, number>;
   nextVisitorId: number;
+  pendingRebuilds: [number, number][];
+  dousing: [number, number][];
   research: ResearchState;
   power: PowerState;
   raid: RaidState | null;
@@ -143,6 +148,8 @@ export function serialize(sim: Simulation): SaveData {
       quality: w.quality.slice(),
       damage: w.damage.slice(),
       fire: w.fire.slice(),
+      floor: w.floor.slice(),
+      roof: w.roof.slice(),
       fuel: w.fuel.slice(),
       temperature: sim.tileTemperatures(),
     },
@@ -172,6 +179,7 @@ export function serialize(sim: Simulation): SaveData {
         passions: c.passions,
         weapon: c.weapon,
         weaponQuality: c.weaponQuality,
+        tool: c.tool && { ...c.tool },
         apparel: c.apparel,
         sleeping: c.sleeping,
         restTicks: c.restTicks,
@@ -196,6 +204,8 @@ export function serialize(sim: Simulation): SaveData {
     caravan: structuredClone(sim.caravan),
     goodwill: { ...sim.goodwill },
     nextVisitorId: sim.nextVisitorId,
+    pendingRebuilds: sim.pendingRebuilds.map(([i, f]) => [i, f]),
+    dousing: [...sim.dousing],
     nextAnimalId: sim.nextAnimalId,
     research: structuredClone(sim.research),
     power: structuredClone(sim.power),
@@ -228,6 +238,8 @@ export function deserialize(data: SaveData): Simulation {
   world.quality.set(layers.quality);
   world.damage.set(layers.damage);
   world.fire.set(layers.fire);
+  world.floor.set(layers.floor);
+  world.roof.set(layers.roof);
   world.fuel.set(layers.fuel);
   world.structureVersion++;
 
@@ -254,6 +266,8 @@ export function deserialize(data: SaveData): Simulation {
   sim.caravan = structuredClone(data.caravan);
   sim.goodwill = { ...data.goodwill };
   sim.nextVisitorId = data.nextVisitorId;
+  sim.pendingRebuilds = data.pendingRebuilds.map(([i, f]) => [i, f]);
+  sim.dousing = new Map(data.dousing);
   sim.nextAnimalId = data.nextAnimalId;
   sim.research = structuredClone(data.research);
   sim.power = structuredClone(data.power);

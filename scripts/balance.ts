@@ -1,12 +1,13 @@
 // Headless balance harness: an "autoplayer" runs a sensible colony on many seeds and prints
 // survival, combat, health, mood and social statistics.
 //
-//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive] [peaceful|harsh] [trace] [size=64]
+//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive] [peaceful|harsh] [trace] [size=64] [seed=N]
 //
 // "passive" never drafts during raids, to measure the worst case; "peaceful" and "harsh" pick the
 // storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies;
-// "size=96" or "size=128" plays on a bigger map.
-import { FEATURES, NONE, RECIPES, featureId, itemDef, terrainDef } from '../src/sim/defs';
+// "size=96" or "size=128" plays on a bigger map; "seed=N" replays one colony. With DEBUG=1 in the
+// environment, a trace also shows research, production, bills, rooms and heaters.
+import { FEATURES, NONE, RECIPES, featureId, itemDef, itemId, terrainDef } from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
 import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { mutualOpinion } from '../src/sim/social';
@@ -102,6 +103,8 @@ interface Result {
   starvingByDay: Record<number, number>;
   objectives: number;
   research: number;
+  // Day Tailoring (and so parkas) arrived; -1 if never.
+  tailoringDay: number;
   frost: number;
   events: Record<string, number>;
 }
@@ -113,6 +116,11 @@ function play(seed: number): Result {
   const at = (x: number, y: number) => w.idx(x, y);
   const cx = w.xOf(sim.colonists[0].tile);
   const cy = w.yOf(sim.colonists[0].tile);
+
+  // Like a sensible player, make the best researcher research first, so tailoring (parkas) and
+  // hearths arrive well before winter.
+  const researcher = [...sim.colonists].sort((a, b) => b.skills.research - a.skills.research)[0];
+  sim.apply({ type: 'priority', colonist: researcher.id, work: 'research', value: 1 });
 
   // Day 1: chop and forage nearby, mine a little, a stockpile, and a 9x7 hut with a door, beds and a fire.
   sim.apply({ type: 'designate', rect: { x0: cx - 15, y0: cy - 15, x1: cx + 15, y1: cy + 15 }, kind: 'chop' });
@@ -329,6 +337,7 @@ function play(seed: number): Result {
     starvingByDay,
     objectives: Object.values(sim.objectivesDone).filter(Boolean).length,
     research: sim.research.done.length,
+    tailoringDay: tailoringDays.get(sim) ?? -1,
     frost: story.filter((s) => s.startsWith('Frost killed')).length,
     events,
   };
@@ -336,6 +345,8 @@ function play(seed: number): Result {
 
 // Mental breaks aren't story entries, so count them via a wrapped logger.
 const breakCounts = new WeakMap<Simulation, number>();
+// The day Tailoring arrives (the story log is capped, so early entries may be gone by the end).
+const tailoringDays = new WeakMap<Simulation, number>();
 // Buildings and plants lost to fire aren't story entries either.
 const burnCounts = new WeakMap<Simulation, number>();
 function countBreaks(sim: Simulation): number {
@@ -346,11 +357,53 @@ Simulation.prototype.addLog = function (this: Simulation, text, tone, story) {
   if (text.includes('in a daze')) {
     breakCounts.set(this, (breakCounts.get(this) ?? 0) + 1);
   }
+  if (text.startsWith('Research complete: Tailoring')) {
+    tailoringDays.set(this, this.day);
+  }
   if (text.startsWith('Fire destroyed')) {
     burnCounts.set(this, (burnCounts.get(this) ?? 0) + 1);
   }
   if (trace && text.includes('has died')) {
     console.log(`  --- trace day ${this.day} ${Math.floor(this.hour)}h: ${text}`);
+    const count = (key: string) => this.stockOf(itemId(key));
+    console.log(
+      `      outdoors ${this.outdoorTemperature().toFixed(0)}°C, parkas ${count('parka')} spare, leather ${count('leather')}, ` +
+        `wood ${count('wood')}, food ${count('meal') + count('potatoes') + count('rawMeat') + count('rawFish') + count('berries')}`,
+    );
+    if (process.env.DEBUG) {
+      console.log('      research', this.research.done.join(','), 'produced', JSON.stringify(this.stats.produced));
+      console.log(
+        '      ',
+        this.storyLog
+          .filter((e) => /Research complete|Winter/.test(e.text))
+          .map((e) => `d${e.day}: ${e.text.slice(0, 40)}`)
+          .join(' | '),
+      );
+      const rooms = new Map<number, string>();
+      for (const c of this.living()) {
+        const r = this.roomAt(c.tile);
+        if (r) {
+          rooms.set(
+            r.id,
+            `${r.role} size ${r.size} beds ${r.beds} heaters ${r.heaters} ${r.temperature.toFixed(0)}°C enclosed ${r.enclosed}`,
+          );
+        }
+      }
+      console.log('      rooms', [...rooms.values()].join(' | '));
+      console.log(
+        '      heaters',
+        this.countFeature((f) => FEATURES[f - 1]?.heater > 0),
+        'beds',
+        this.countFeature((f) => !!FEATURES[f - 1]?.bed),
+      );
+      console.log('      bills', JSON.stringify(this.bills.map((b) => [RECIPES[b.recipe].key, b.target])));
+      console.log(
+        '      jobs',
+        this.colonists
+          .map((c) => `${c.name}:${c.job?.type ?? '-'}:${c.priorities.crafting}:${c.skills.crafting}`)
+          .join(' '),
+      );
+    }
     for (const entry of this.log.slice(-14)) {
       console.log(`      ${entry.text}`);
     }
@@ -368,13 +421,16 @@ Simulation.prototype.addLog = function (this: Simulation, text, tone, story) {
 
 const results: Result[] = [];
 const started = performance.now();
-for (let s = 1; s <= seeds; s++) {
-  const r = play(s * 7919);
+// "seed=47514" replays just that colony.
+const onlySeed = Number(process.argv.find((a) => a.startsWith('seed='))?.slice(5) ?? 0);
+const seedList = onlySeed ? [onlySeed] : Array.from({ length: seeds }, (_, s) => (s + 1) * 7919);
+for (const seed of seedList) {
+  const r = play(seed);
   results.push(r);
   console.log(
     `seed ${String(r.seed).padStart(6)}  alive ${r.living}/${r.total}  raids ${r.raids} (kills ${r.raidKills})  ` +
       `fever ${r.diseaseCases} (deaths ${r.diseaseDeaths})  breaks ${r.breaks}  mood avg ${r.avgMood.toFixed(0)} min ${r.minMood.toFixed(0)}  ` +
-      `friends day ${r.friendDay}  rivals ${r.rivals} lovers ${r.lovers}  starving h ${r.starvingHours}  objectives ${r.objectives}/${OBJECTIVES.length}  research ${r.research}  frost ${r.frost}`,
+      `friends day ${r.friendDay}  rivals ${r.rivals} lovers ${r.lovers}  starving h ${r.starvingHours}  objectives ${r.objectives}/${OBJECTIVES.length}  research ${r.research} (tailoring day ${r.tailoringDay})  frost ${r.frost}`,
   );
   for (const d of r.deaths) {
     console.log(`    ${d}`);

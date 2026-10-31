@@ -81,6 +81,22 @@ describe('fishing', () => {
   });
 });
 
+describe('ice fishing', () => {
+  it('works through a frozen-over pond, at half the pace', () => {
+    const { sim, w, x, y } = waterColony(6);
+    for (let k = -2; k <= 2; k++) {
+      w.setTerrain(w.idx(x + 4, y + k), ICE);
+    }
+    const spot = w.idx(x + 3, y);
+    w.setFeature(spot, featureId('fishingSpot'));
+    const probe = sim as unknown as { canFishAt: (i: number) => boolean; iceFishing: (i: number) => boolean };
+    expect(probe.canFishAt(spot)).toBe(true);
+    expect(probe.iceFishing(spot)).toBe(true);
+    w.setTerrain(w.idx(x + 4, y), SHALLOW);
+    expect(probe.iceFishing(spot)).toBe(false);
+  });
+});
+
 describe('ice', () => {
   it('freezes the shallows in hard frost and thaws them in the warm', () => {
     const { sim, w, x, y } = waterColony(4);

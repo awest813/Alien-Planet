@@ -44,6 +44,8 @@ export interface ItemDef {
   value: number;
   // Clothing: how many degrees it widens the comfortable range, and how long it lasts.
   apparel?: ApparelSpec;
+  // A tool kit: carried by a worker, it speeds up physical work and wears out.
+  tool: boolean;
 }
 
 export interface ApparelSpec {
@@ -110,6 +112,8 @@ export interface FeatureDef {
   harvest?: { work: WorkType; amount: number; item: number; count: number };
   crop?: { item: number; count: number; growDays: number; sowWork: number; harvestWork: number };
   build?: { cost: Cost[]; work: number };
+  // Floors and roofs sit in their own layer, under or over whatever else is on the tile.
+  layer?: 'floor' | 'roof';
 }
 
 export interface RecipeDef {
@@ -177,6 +181,7 @@ interface RawFeature {
   harvest?: { work: string; amount: number; item: string; count: number };
   crop?: { item: string; count: number; growDays: number; sowWork: number; harvestWork: number };
   build?: { cost: { item: string; count: number }[]; work: number };
+  layer?: 'floor' | 'roof';
 }
 
 interface RawItem {
@@ -191,6 +196,7 @@ interface RawItem {
   apparel?: ApparelSpec;
   foodKind?: 'meat' | 'veg' | 'dairy';
   value?: number;
+  tool?: boolean;
 }
 
 // Quality of food and goods made by an average hand (and of anything found or gifted).
@@ -213,6 +219,7 @@ export const ITEMS: ItemDef[] = (itemsJson as RawItem[]).map((t, i) => ({
   apparel: t.apparel,
   foodKind: t.foodKind,
   value: t.value ?? 1,
+  tool: !!t.tool,
 }));
 
 const itemIdByKey = new Map(ITEMS.map((item) => [item.key, item.id]));
@@ -267,6 +274,7 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
     cost: f.build.cost.map((c) => ({ item: resolveItem(c.item), count: c.count })),
     work: f.build.work,
   },
+  layer: f.layer,
 }));
 
 // Blueprints track delivered materials per cost line; no building needs more than this many.

@@ -116,6 +116,9 @@ export interface Carried {
   quality?: number;
   // A crafter gathering a recipe carries one bundle per ingredient: these are the ones after the first.
   extra?: Carried[];
+  // A bundle gathered from different kinds of item (berries and potatoes for a meal): the parts,
+  // so setting it down gives back exactly what was picked up.
+  mix?: Carried[];
 }
 
 export interface WornApparel {
@@ -173,6 +176,8 @@ export interface Colonist {
   weapon: ColonistWeapon;
   // Craftsmanship of the bow in hand: better bows hit harder.
   weaponQuality: number;
+  // A carried tool kit speeds up mining, chopping, building and farming, and wears out.
+  tool: { quality: number; wear: number } | null;
   apparel: WornApparel | null;
   // Tick each skill was last practised, for rust.
   practicedAt: Partial<Record<SkillKey, number>>;

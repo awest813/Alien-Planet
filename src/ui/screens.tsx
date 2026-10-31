@@ -154,8 +154,8 @@ export function ProductionScreen({ state, onClose }: { state: UiState; onClose: 
   return (
     <Modal title="Production" onClose={onClose}>
       <p className="muted">
-        Colonists keep making each product until the colony holds the target amount (bows and clothes already in use
-        don't count).
+        Colonists keep making each product until the colony holds the target amount (bows, clothes and tool kits already
+        in use don't count, so the target is how many spares to keep).
       </p>
       <table className="saves">
         <tbody>
@@ -254,7 +254,9 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
         Watch the weather in the top bar: rain chills anyone outside, droughts stunt crops, and storms bring lightning
         that can start fires (haulers and builders put them out). When traders arrive, <b>Trade</b> lights up in the top
         bar: sell surplus from your stockpiles for silver and buy what you're short of. A stonecutter's table makes
-        blocks for block walls, and a crafting bench mends worn clothes once you know tailoring.
+        blocks for block walls, and a crafting bench mends worn clothes once you know tailoring. Lay <b>floors</b> for
+        faster walking and prettier rooms, put a <b>roof</b> over an open shelter to keep the rain off, and make{' '}
+        <b>tool kits</b> at the crafting bench: workers who carry one mine, build and farm faster.
       </p>
     </Modal>
   );
