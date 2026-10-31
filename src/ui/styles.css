@@ -868,3 +868,21 @@ button.active.danger {
     grid-template-columns: 1fr;
   }
 }
+
+/* Skills */
+.skill {
+  display: grid;
+  grid-template-columns: 1fr 20px 44px;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.skill-level {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.passion {
+  color: var(--accent);
+}

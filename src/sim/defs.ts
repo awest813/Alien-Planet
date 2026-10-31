@@ -1,3 +1,4 @@
+import animalsJson from '../data/animals.json';
 import colonistsJson from '../data/colonists.json';
 import factionsJson from '../data/factions.json';
 import featuresJson from '../data/features.json';
@@ -54,6 +55,8 @@ export interface FeatureDef {
   workbench?: BenchType;
   // Heat added to the room per climate update.
   heater: number;
+  // Hit-chance multiplier for someone sheltering behind it (sandbags).
+  cover: number;
   joy?: { kind: string; hoursToFull: number };
   harvest?: { work: WorkType; amount: number; item: number; count: number };
   crop?: { item: number; count: number; growDays: number; sowWork: number; harvestWork: number };
@@ -92,6 +95,7 @@ interface RawFeature {
   beauty?: number;
   workbench?: string;
   heater?: number;
+  cover?: number;
   joy?: { kind: string; hoursToFull: number };
   harvest?: { work: string; amount: number; item: string; count: number };
   crop?: { item: string; count: number; growDays: number; sowWork: number; harvestWork: number };
@@ -145,6 +149,7 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   beauty: f.beauty ?? 0,
   workbench: f.workbench as BenchType | undefined,
   heater: f.heater ?? 0,
+  cover: f.cover ?? 1,
   joy: f.joy,
   harvest: f.harvest && {
     work: f.harvest.work as WorkType,
@@ -230,6 +235,29 @@ export interface FactionDef {
 }
 
 export const FACTIONS: FactionDef[] = factionsJson.map((f, i) => ({ ...f, id: i }));
+
+export interface AnimalDef {
+  key: string;
+  name: string;
+  hp: number;
+  speed: number;
+  meat: number;
+  leather: number;
+  // Runs from colonists closer than this (0: never runs).
+  fleeRange: number;
+  // Relative spawn frequency.
+  weight: number;
+  // Chance to turn on whoever hurt it, and its bite damage.
+  revengeChance?: number;
+  bite?: [number, number];
+}
+
+export const ANIMALS: Record<string, AnimalDef> = Object.fromEntries(
+  Object.entries(animalsJson as unknown as Record<string, Omit<AnimalDef, 'key'>>).map(([key, a]) => [
+    key,
+    { key, ...a },
+  ]),
+);
 
 export const COLONIST_NAMES: string[] = colonistsJson.names;
 export const COLONIST_COLORS: string[] = colonistsJson.colors;

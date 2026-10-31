@@ -1,0 +1,100 @@
+import { describe, expect, it } from 'vitest';
+import { hurtAnimal } from './animals';
+import { coverFactor } from './combat';
+import { featureId, itemId, terrainId } from './defs';
+import { deserialize, serialize } from './serialize';
+import { Simulation } from './simulation';
+import { learn, rustSkills, xpToNext } from './skills';
+import { HOUR, run } from './test-helpers';
+import { World } from './world';
+
+describe('skills', () => {
+  it('levels up with practice, faster with a passion', () => {
+    const sim = Simulation.newColony(1);
+    const [plain, keen] = sim.colonists;
+    plain.skills.mining = 3;
+    keen.skills.mining = 3;
+    plain.passions.mining = 0;
+    keen.passions.mining = 2;
+    for (let i = 0; i < 2000; i++) {
+      learn(sim, plain, 'mining');
+      learn(sim, keen, 'mining');
+    }
+    expect(plain.skills.mining).toBeGreaterThan(3);
+    expect(keen.skills.mining).toBeGreaterThan(plain.skills.mining);
+  });
+
+  it('lets expert skills rust a little without losing levels', () => {
+    const sim = Simulation.newColony(2);
+    const c = sim.colonists[0];
+    c.skills.crafting = 12;
+    c.skillXp.crafting = xpToNext(12) * 0.05;
+    rustSkills(c);
+    expect(c.skills.crafting).toBe(12);
+    expect(c.skillXp.crafting).toBe(0);
+  });
+});
+
+describe('defences', () => {
+  it('gives cover only from the side the sandbags face', () => {
+    const w = new World(10, 10);
+    w.terrain.fill(terrainId('grass'));
+    w.feature[w.idx(5, 4)] = featureId('sandbags');
+    const target = w.idx(5, 5);
+    expect(coverFactor(w, w.idx(5, 0), target)).toBeLessThan(1);
+    expect(coverFactor(w, w.idx(8, 1), target)).toBeLessThan(1);
+    expect(coverFactor(w, w.idx(5, 9), target)).toBe(1);
+  });
+
+  it('has colonists pick up a recurve bow from storage', () => {
+    const sim = Simulation.newColony(3);
+    sim.world.dropItemNear(sim.colonists[0].tile, itemId('recurveBow'), 2);
+    run(sim, HOUR * 2);
+    expect(sim.colonists.filter((c) => c.weapon === 'recurveBow')).toHaveLength(2);
+    expect(sim.stockOf(itemId('recurveBow'))).toBe(0);
+  });
+});
+
+describe('animals and hunting', () => {
+  it('starts with wildlife and hunts marked animals for meat and leather', () => {
+    const sim = Simulation.newColony(4);
+    expect(sim.animals.length).toBeGreaterThan(5);
+    sim.apply({ type: 'hunt', rect: { x0: 0, y0: 0, x1: 63, y1: 63 }, add: true });
+    run(sim, HOUR * 12);
+    expect(sim.stats.hunted).toBeGreaterThan(0);
+    expect(sim.stockOf(itemId('leather'))).toBeGreaterThan(0);
+  });
+
+  it('can have a hurt boar turn on its attacker, who fights back', () => {
+    let turned = false;
+    for (let seed = 1; seed <= 10 && !turned; seed++) {
+      const sim = Simulation.newColony(seed);
+      const hunter = sim.colonists[0];
+      const boar = sim.animals.find((a) => a.kind === 'boar');
+      if (!boar) {
+        continue;
+      }
+      hurtAnimal(sim, boar, 0.1, hunter);
+      if (boar.revengeOn === hunter.id) {
+        turned = true;
+        run(sim, HOUR * 6);
+        // The fight resolves: the boar dies, or it stops once its target is down.
+        expect(!sim.animals.includes(boar) || boar.revengeOn === -1 || hunter.health.downed).toBe(true);
+      }
+    }
+    expect(turned).toBe(true);
+  });
+
+  it('saves and restores animals, skills and weapons', () => {
+    const sim = Simulation.newColony(6);
+    sim.colonists[0].weapon = 'recurveBow';
+    sim.colonists[1].skillXp.plants = 123;
+    sim.animals[0].hunted = true;
+    run(sim, HOUR);
+    const copy = deserialize(structuredClone(serialize(sim)));
+    expect(copy.animals).toEqual(sim.animals);
+    expect(copy.colonists[0].weapon).toBe('recurveBow');
+    expect(copy.colonists[1].skillXp).toEqual(sim.colonists[1].skillXp);
+    expect(copy.colonists[1].passions).toEqual(sim.colonists[1].passions);
+  });
+});

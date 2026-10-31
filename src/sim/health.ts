@@ -1,5 +1,6 @@
 import diseasesJson from '../data/diseases.json';
 import { TICKS_PER_HOUR } from './constants';
+import { itemId } from './defs';
 import { FRIEND_OPINION, mutualOpinion, traitFactor, traitValue } from './social';
 import type { Simulation } from './simulation';
 import { Colonist, Health } from './types';
@@ -161,6 +162,10 @@ export function checkHealth(sim: Simulation, c: Colonist): void {
 function die(sim: Simulation, c: Colonist, cause: string): void {
   sim.endJob(c);
   sim.dropCarried(c);
+  if (c.weapon === 'recurveBow') {
+    sim.world.dropItemNear(c.tile, itemId('recurveBow'), 1);
+    c.weapon = 'bow';
+  }
   c.health.dead = true;
   c.health.downed = false;
   c.drafted = false;

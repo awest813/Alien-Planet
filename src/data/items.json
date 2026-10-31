@@ -45,5 +45,23 @@
     "key": "herbalMedicine",
     "name": "Herbal medicine",
     "stackLimit": 25
+  },
+  {
+    "key": "rawMeat",
+    "name": "Raw meat",
+    "stackLimit": 50,
+    "category": "rawFood",
+    "nutrition": 0.1,
+    "rawPenalty": true
+  },
+  {
+    "key": "leather",
+    "name": "Leather",
+    "stackLimit": 50
+  },
+  {
+    "key": "recurveBow",
+    "name": "Recurve bow",
+    "stackLimit": 1
   }
 ]

@@ -237,5 +237,21 @@
       "sowWork": 50,
       "harvestWork": 60
     }
+  },
+  {
+    "key": "sandbags",
+    "name": "Sandbags",
+    "passable": true,
+    "moveCost": 2.5,
+    "cover": 0.5,
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 4
+        }
+      ],
+      "work": 60
+    }
   }
 ]

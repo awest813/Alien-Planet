@@ -1,0 +1,32 @@
+{
+  "deer": {
+    "name": "Deer",
+    "hp": 0.8,
+    "speed": 1.1,
+    "meat": 12,
+    "leather": 4,
+    "fleeRange": 4,
+    "weight": 5
+  },
+  "hare": {
+    "name": "Hare",
+    "hp": 0.35,
+    "speed": 1.25,
+    "meat": 4,
+    "leather": 1,
+    "fleeRange": 3,
+    "weight": 4
+  },
+  "boar": {
+    "name": "Boar",
+    "hp": 1.3,
+    "speed": 0.95,
+    "meat": 14,
+    "leather": 5,
+    "fleeRange": 0,
+    "weight": 3,
+    "revengeChance": 0.6,
+    "bite": [0.09, 0.17],
+    "description": "Fights back when hunted."
+  }
+}

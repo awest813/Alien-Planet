@@ -14,6 +14,8 @@ export type JobType =
   | 'sleep'
   | 'tend'
   | 'rest'
+  | 'hunt'
+  | 'equip'
   | 'wander';
 
 export interface Job {
@@ -46,6 +48,13 @@ export interface Skills {
   crafting: number;
 }
 
+export type SkillKey = keyof Skills;
+
+export const SKILL_KEYS: SkillKey[] = ['mining', 'construction', 'plants', 'cooking', 'crafting', 'medicine', 'combat'];
+
+// 0: no passion, 1: interested, 2: burning. Passions speed up learning.
+export type Passion = 0 | 1 | 2;
+
 // At equal priority, colonists pick work in this order.
 export const WORK_TYPES = [
   'doctor',
@@ -54,6 +63,7 @@ export const WORK_TYPES = [
   'growing',
   'mining',
   'plantCutting',
+  'hunting',
   'crafting',
   'hauling',
 ] as const;
@@ -123,6 +133,28 @@ export interface Colonist {
   draftTarget: number;
   // Ticks until the colonist can attack again.
   cooldown: number;
+  // Experience towards the next level of each skill.
+  skillXp: Record<SkillKey, number>;
+  passions: Record<SkillKey, Passion>;
+  weapon: ColonistWeapon;
+}
+
+export type ColonistWeapon = 'bow' | 'recurveBow';
+
+export interface Animal {
+  id: number;
+  kind: string;
+  tile: number;
+  path: number[];
+  moveProgress: number;
+  hp: number;
+  // Marked by the player for hunting.
+  hunted: boolean;
+  // Colonist id it is attacking, or -1.
+  revengeOn: number;
+  cooldown: number;
+  // Tick when it next considers wandering somewhere.
+  restUntil: number;
 }
 
 export interface Injury {
@@ -208,7 +240,8 @@ export type Command =
   | { type: 'schedule'; colonist: number; hour: number; slot: ScheduleSlot }
   | { type: 'bill'; recipe: number; target: number }
   | { type: 'draft'; colonist: number; drafted: boolean }
-  | { type: 'move'; colonist: number; tile: number };
+  | { type: 'move'; colonist: number; tile: number }
+  | { type: 'hunt'; rect: Rect; add: boolean };
 
 export interface LogEntry {
   tick: number;
@@ -223,6 +256,7 @@ export interface Stats {
   tended: number;
   raidsRepelled: number;
   kills: number;
+  hunted: number;
 }
 
 export type NightResult = 'pending' | 'success' | 'failed';

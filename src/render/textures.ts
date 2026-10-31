@@ -276,6 +276,24 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillRect(10, 9, 1, 2);
       c.fillRect(13, 9, 1, 2);
       break;
+    case 'sandbags':
+      c.fillStyle = 'rgba(0,0,0,0.25)';
+      c.fillRect(1, 12, 14, 3);
+      for (const [x, y] of [
+        [1, 8],
+        [6, 8],
+        [11, 8],
+        [3, 4],
+        [8, 4],
+      ]) {
+        c.fillStyle = '#a89068';
+        c.fillRect(x, y, 5, 4);
+        c.fillStyle = '#c4ab7f';
+        c.fillRect(x, y, 5, 1);
+        c.fillStyle = '#7d6a4a';
+        c.fillRect(x + 4, y + 1, 1, 3);
+      }
+      break;
     case 'campfire':
       c.fillStyle = '#5c5b60';
       [
@@ -345,6 +363,57 @@ function drawDesignation(c: Ctx, color: string, cross: boolean): void {
   }
 }
 
+// Simple side-on animals, facing right.
+function createAnimalTextures(scene: Phaser.Scene): void {
+  const draw = (key: string, paint: (c: Ctx) => void) => {
+    const texture = scene.textures.createCanvas(`animal-${key}`, TILE, TILE)!;
+    const ctx = texture.getContext();
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(3, 13, 10, 2);
+    paint(ctx);
+    texture.refresh();
+  };
+  draw('deer', (c) => {
+    c.fillStyle = '#a0703c';
+    c.fillRect(3, 6, 8, 4);
+    c.fillRect(10, 3, 3, 4);
+    c.fillStyle = '#7a5028';
+    c.fillRect(4, 10, 1, 4);
+    c.fillRect(9, 10, 1, 4);
+    c.fillStyle = '#e8d8c0';
+    c.fillRect(2, 6, 1, 2);
+    c.fillStyle = '#5a3818';
+    c.fillRect(10, 1, 1, 2);
+    c.fillRect(12, 1, 1, 2);
+    c.fillStyle = '#222';
+    c.fillRect(12, 4, 1, 1);
+  });
+  draw('hare', (c) => {
+    c.fillStyle = '#b8a890';
+    c.fillRect(5, 9, 6, 4);
+    c.fillRect(10, 7, 3, 3);
+    c.fillRect(10, 4, 1, 3);
+    c.fillRect(12, 4, 1, 3);
+    c.fillStyle = '#f0e8e0';
+    c.fillRect(4, 10, 1, 2);
+    c.fillStyle = '#222';
+    c.fillRect(12, 8, 1, 1);
+  });
+  draw('boar', (c) => {
+    c.fillStyle = '#4a3a34';
+    c.fillRect(2, 7, 10, 5);
+    c.fillRect(11, 8, 3, 3);
+    c.fillStyle = '#2e2420';
+    c.fillRect(3, 6, 7, 1);
+    c.fillRect(3, 12, 1, 2);
+    c.fillRect(10, 12, 1, 2);
+    c.fillStyle = '#f0e8d0';
+    c.fillRect(13, 10, 1, 1);
+    c.fillStyle = '#ff5c5c';
+    c.fillRect(12, 8, 1, 1);
+  });
+}
+
 function drawItem(c: Ctx, key: string): void {
   switch (key) {
     case 'wood':
@@ -400,6 +469,32 @@ function drawItem(c: Ctx, key: string): void {
         [6, 10],
       ].forEach(([x, y]) => c.fillRect(x, y, 4, 4));
       break;
+    case 'rawMeat':
+      c.fillStyle = '#8f2f3a';
+      c.fillRect(3, 7, 10, 6);
+      c.fillStyle = '#c4505f';
+      c.fillRect(4, 8, 7, 3);
+      c.fillStyle = '#f0e0d0';
+      c.fillRect(11, 9, 3, 2);
+      break;
+    case 'leather':
+      c.fillStyle = '#7a4e2a';
+      c.fillRect(2, 6, 12, 7);
+      c.fillRect(1, 7, 1, 4);
+      c.fillRect(14, 8, 1, 3);
+      c.fillStyle = '#9a6a3a';
+      c.fillRect(3, 7, 10, 2);
+      break;
+    case 'recurveBow':
+      c.fillStyle = '#6b4423';
+      c.fillRect(4, 2, 2, 2);
+      c.fillRect(3, 4, 2, 8);
+      c.fillRect(4, 12, 2, 2);
+      c.fillRect(6, 1, 2, 1);
+      c.fillRect(6, 14, 2, 1);
+      c.fillStyle = '#e8e4da';
+      c.fillRect(8, 1, 1, 14);
+      break;
     case 'herbalMedicine':
       c.fillStyle = '#e8e4da';
       c.fillRect(3, 6, 10, 8);
@@ -435,6 +530,8 @@ function drawItem(c: Ctx, key: string): void {
 }
 
 function createPawnTextures(scene: Phaser.Scene): void {
+  createAnimalTextures(scene);
+
   // Raiders: a hooded head over the same tintable body.
   const hood = scene.textures.createCanvas('raider-head', TILE, TILE)!;
   const r = hood.getContext();

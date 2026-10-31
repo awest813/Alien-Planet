@@ -1,11 +1,14 @@
 import { impressivenessLabel } from '../sim/climate';
 import { FACTIONS, NONE, RECIPES, TRAITS, featureDef, featureId, itemDef, itemId, terrainDef } from '../sim/defs';
+import { animalName } from '../sim/animals';
+import { COLONIST_WEAPONS } from '../sim/combat';
 import { bleedingOf, needsBedRest, painOf } from '../sim/health';
+import { MAX_SKILL, SKILL_LABELS, xpToNext } from '../sim/skills';
 import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import { NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
-import { Command, DesignationKind, LogEntry, Needs, Priorities, ScheduleSlot, Skills } from '../sim/types';
+import { Command, DesignationKind, LogEntry, Needs, Priorities, SKILL_KEYS, ScheduleSlot, Skills } from '../sim/types';
 import { Designation, GROW_ZONE, STOCKPILE_ZONE } from '../sim/world';
 import { Difficulty } from '../sim/storyteller';
 import { SaveMeta, deleteSave, listSaves, readSave, writeSave } from './save-store';
@@ -15,7 +18,8 @@ export type Tool =
   | { kind: 'designate'; designation: DesignationKind }
   | { kind: 'cancel' }
   | { kind: 'zone'; zone: number }
-  | { kind: 'build'; feature: number };
+  | { kind: 'build'; feature: number }
+  | { kind: 'hunt' };
 
 export interface ToolDef {
   id: string;
@@ -77,6 +81,14 @@ export const TOOLS: ToolDef[] = [
     hint: 'Drag over buildings to take them apart',
   },
   {
+    id: 'hunt',
+    label: 'Hunt',
+    hotkey: 'v',
+    tool: { kind: 'hunt' },
+    group: 'orders',
+    hint: 'Drag over animals to hunt them for meat and leather (boars fight back)',
+  },
+  {
     id: 'cancel',
     label: 'Cancel',
     hotkey: 'x',
@@ -128,6 +140,7 @@ export const TOOLS: ToolDef[] = [
   build('stoneWall', 'Granite wall', 'n', 'build', 'Drag a rectangle outline of walls (5 granite each)'),
   build('door', 'Door', 'o', 'build', 'Click a wall gap to place a door (10 wood)'),
   build('campfire', 'Campfire', 'f', 'build', 'Heats the room it is in (15 wood)'),
+  build('sandbags', 'Sandbags', '', 'build', 'Cover: halves the chance of being hit from that side (4 granite)'),
   build('bed', 'Bed', 'e', 'furniture', 'Colonists sleep better in beds (20 wood)'),
   build('table', 'Table', 'l', 'furniture', 'Colonists dislike eating without a table (20 wood)'),
   build('stove', 'Stove', 'k', 'furniture', 'Cooks meals from raw food (20 granite)'),
@@ -165,6 +178,8 @@ export interface ColonistView {
   relations: { name: string; opinion: number; label: string | null }[];
   drafted: boolean;
   dead: boolean;
+  skillList: { key: string; label: string; level: number; passion: number; progress: number }[];
+  weapon: string;
 }
 
 // A story event shown briefly as a card, so major moments aren't missed.
@@ -188,6 +203,7 @@ export interface TileView {
   orders: string[];
   temperature: number;
   room: string | null;
+  animal: string | null;
 }
 
 export interface BillView {
@@ -548,6 +564,14 @@ export class GameController {
           .sort((a, b) => b.opinion - a.opinion),
         drafted: c.drafted,
         dead: c.health.dead,
+        skillList: SKILL_KEYS.map((key) => ({
+          key,
+          label: SKILL_LABELS[key],
+          level: c.skills[key],
+          passion: c.passions[key],
+          progress: c.skills[key] >= MAX_SKILL ? 1 : c.skillXp[key] / xpToNext(c.skills[key]),
+        })),
+        weapon: COLONIST_WEAPONS[c.weapon].name,
       })),
       selectedColonist: this.selectedColonist,
       resources: totals.map((r) => ({ name: itemDef(r.item).name, stored: r.stored, total: r.total })),
@@ -710,6 +734,10 @@ export class GameController {
       feature += ` (${Math.floor(w.growth[i] * 100)}% grown)`;
     }
     const room = sim.roomAt(i);
+    const beast = sim.animals.find((a) => a.tile === i);
+    const animal = beast
+      ? `${animalName(beast)}${beast.hunted ? ' · marked for hunting' : ''}${beast.revengeOn >= 0 ? ' · enraged' : ''}`
+      : null;
     return {
       x: w.xOf(i),
       y: w.yOf(i),
@@ -718,6 +746,7 @@ export class GameController {
       items: w.itemType[i] !== NONE ? `${w.itemCount[i]} × ${itemDef(w.itemType[i]).name}` : null,
       orders,
       temperature: Math.round(sim.temperatureAt(i)),
+      animal,
       room:
         room && room.enclosed
           ? `${room.role} · ${impressivenessLabel(room.impressiveness)} (${room.impressiveness}) · ${room.size} tiles`

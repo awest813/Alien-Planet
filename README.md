@@ -23,6 +23,7 @@ how nice their rooms are. Let mood drop too far for too long and a colonist will
 | Schedules             | Schedule button: pick a brush and paint hours           |
 | Draft for combat      | Q (selected colonist, or everyone), or the Draft button |
 | Move drafted colonist | Select them, then right-click a tile                    |
+| Hunt                  | V, then drag over animals                               |
 | Production targets    | Production button: "keep N meals / cloth in stock"      |
 
 Objectives:
@@ -32,7 +33,8 @@ Objectives:
 - **Phase 2 – Living:** create a growing zone, harvest 24 potatoes, cook 5 meals at a stove, build a recreation
   spot, heat a bedroom with a campfire, and weave cloth for an armchair.
 - **Phase 3 – Story:** stock 5 herbal medicine, have a doctor tend someone, see two colonists become friends,
-  repel a raid, and reach day 12 with at least 4 colonists alive.
+  repel a raid, hunt an animal, equip a recurve bow, build sandbags, and reach day 12 with at least 4 colonists
+  alive.
 
 How the living simulation works:
 
@@ -62,6 +64,15 @@ How the storytelling layer works:
 - **Combat and raids:** raiders from hostile factions arrive at the map edge with bows or knives. The game
   pauses; drafted colonists shoot anything within range and line of sight, undrafted ones defend themselves at
   close range. Raiders flee once half of them fall.
+- **Skills:** every skill (mining, construction, plants, cooking, crafting, medicine, combat) improves with
+  practice, up to 20. Each colonist has a couple of passions (★ interested, ★★ burning) that speed learning and
+  lift their mood while doing that work. Expert skills slowly rust without practice.
+- **Wildlife and hunting:** deer, hares and boars roam the map and herds wander in. Mark animals with the Hunt
+  tool and colonists with the Hunt work type will track and shoot them for raw meat (cookable) and leather.
+  Boars often turn on their hunter, and anyone nearby will fight an enraged animal.
+- **Gear and cover:** a crafting bench turns leather into recurve bows (longer range, harder hits), which
+  colonists pick up from storage. Sandbags halve the chance of being hit from the side they face, for
+  colonists and raiders alike.
 - **Storyteller:** roughly once or twice a day it may send a raid, an illness, a wanderer who joins, a cold
   snap, a gift of supplies from the friendly Meadow Kin, or crop blight. Each event pops up as a short
   notification card and goes into the Story screen. Pick the difficulty when founding a colony: Peaceful (no
@@ -75,7 +86,7 @@ world is a set of flat typed arrays, so the simulation can later move into a Web
 ```
 src/
   data/       JSON definitions: terrain, items, features/buildings, recipes, thoughts, traits, factions,
-              diseases, colonist names
+              diseases, animals, colonist names
   sim/        Pure TypeScript simulation (no Phaser, no DOM)
     world.ts        Tile layers as typed arrays, item stacks, dirty-tile tracking
     worldgen.ts     Seeded fractal-noise terrain, rock, trees, berry bushes
@@ -85,7 +96,9 @@ src/
     social.ts       Traits, opinions, conversations, friends, rivals and lovers
     health.ts       Injuries, bleeding, healing, disease, tending, collapse and death
     combat.ts       Raiders, line of sight, ranged and melee attacks, morale
-    storyteller.ts  Random events with cooldowns
+    storyteller.ts  Random events with cooldowns and difficulty
+    skills.ts       Skill experience, passions, level-ups and rust
+    animals.ts      Wildlife: wandering, fleeing, revenge, herds, and hunting yields
     simulation.ts   Fixed-tick loop, needs and mood, colonist AI, job system, reservations, objectives
     serialize.ts    Save format
   game/       Glue between the simulation, renderer, and UI
@@ -115,7 +128,8 @@ npm test
 
 `src/sim/simulation.test.ts` covers world generation, pathfinding, room detection, item conservation, construction,
 farming and cooking, heating, save/load, and regression tests for fixed AI bugs. `src/sim/phase3.test.ts`
-covers traits, line of sight, raids, bleeding and tending, disease, relationships, and events.
+covers traits, line of sight, raids, bleeding and tending, disease, relationships, and events, and
+`src/sim/depth.test.ts` covers skills, cover, bows, hunting and wildlife.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,
 drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation:

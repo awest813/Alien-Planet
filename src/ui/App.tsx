@@ -20,6 +20,7 @@ const WORK_LABELS: Record<WorkTypeKey, string> = {
   growing: 'Grow',
   mining: 'Mine',
   plantCutting: 'Cut plants',
+  hunting: 'Hunt',
   crafting: 'Craft',
   hauling: 'Haul',
 };
@@ -264,11 +265,21 @@ function ColonistDetails({ c }: { c: ColonistView }) {
           <span className={r.opinion >= 0 ? 'good' : 'bad'}>{r.opinion > 0 ? `+${r.opinion}` : r.opinion}</span>
         </span>
       ))}
-      <span className="section">Skills</span>
-      <span className="skills">
-        Mining {c.skills.mining} · Construction {c.skills.construction} · Plants {c.skills.plants} · Cooking{' '}
-        {c.skills.cooking} · Crafting {c.skills.crafting} · Medicine {c.skills.medicine} · Combat {c.skills.combat}
-      </span>
+      <span className="section">Skills · {c.weapon}</span>
+      {c.skillList.map((s) => (
+        <span
+          key={s.key}
+          className="skill"
+          title={s.passion === 2 ? 'Burning passion: learns fast' : s.passion === 1 ? 'Interested: learns faster' : ''}
+        >
+          <span className="skill-name">
+            {s.label}
+            {s.passion > 0 && <span className="passion">{s.passion === 2 ? ' ★★' : ' ★'}</span>}
+          </span>
+          <span className="skill-level">{s.level}</span>
+          <Bar value={s.progress} color="#8fc3ff" label={`${s.label} progress`} />
+        </span>
+      ))}
     </span>
   );
 }
@@ -338,6 +349,7 @@ function Inspector({ state }: { state: UiState }) {
         <b>{tile.feature ?? tile.terrain}</b>
         {tile.feature && <span className="muted"> on {tile.terrain.toLowerCase()}</span>}
       </div>
+      {tile.animal && <div>{tile.animal}</div>}
       {tile.items && <div>{tile.items}</div>}
       {tile.orders.map((order) => (
         <div key={order} className="muted">
@@ -368,7 +380,7 @@ function Toolbar({ state }: { state: UiState }) {
                 title={t.hint}
               >
                 {t.label}
-                <kbd>{t.hotkey === 'Escape' ? 'Esc' : t.hotkey.toUpperCase()}</kbd>
+                {t.hotkey && <kbd>{t.hotkey === 'Escape' ? 'Esc' : t.hotkey.toUpperCase()}</kbd>}
               </button>
             ))}
           </div>
@@ -562,7 +574,9 @@ function HelpScreen({ onClose }: { onClose: () => void }) {
       <p className="muted">
         Later, raiders will come. The game pauses: press <b>Q</b> to draft everyone (or a selected colonist), select a
         drafted colonist and right-click to move them. Drafted colonists shoot raiders in range. Grow <b>healroot</b>{' '}
-        (Y) for medicine; doctors tend the wounded and sick.
+        (Y) for medicine; doctors tend the wounded and sick. Hunt animals (V) for meat and leather, craft leather into
+        recurve bows, and build sandbags for cover. Skills improve with practice, fastest where a colonist has a passion
+        (★).
       </p>
     </Modal>
   );

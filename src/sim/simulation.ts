@@ -23,7 +23,8 @@ import {
   matchesIngredient,
   terrainDef,
 } from './defs';
-import { RaidState, colonistCombat, updateEnemies } from './combat';
+import { animalName, populateWildlife, updateAnimals } from './animals';
+import { COLONIST_WEAPONS, RaidState, attackAnimal, canAttack, colonistCombat, updateEnemies } from './combat';
 import {
   COLONIST_COUNT,
   MAP_SIZE,
@@ -45,12 +46,14 @@ import {
   updateHealth,
 } from './health';
 import { Pathfinder } from './pathfinding';
+import { emptyXp, learn, rollPassions, rustSkills, skillFactor } from './skills';
 import { PassRegions, Rooms, computePassRegions, computeRooms } from './regions';
 import { Rng } from './rng';
 import { relationLabel, rollTraits, socialThoughts, traitFactor, traitValue, updateSocial } from './social';
 import { Difficulty, StoryState, freshStory, updateStoryteller } from './storyteller';
 import {
   Bill,
+  Animal,
   Colonist,
   Command,
   Enemy,
@@ -63,6 +66,7 @@ import {
   RoomInfo,
   ScheduleSlot,
   Shot,
+  SkillKey,
   Skills,
   Stats,
   WORK_TYPES,
@@ -108,6 +112,7 @@ const JOB_FOR_DESIGNATION: Record<number, JobType> = {
 const WORK_JOBS = new Set<JobType>(['mine', 'chop', 'forage', 'construct', 'deconstruct', 'sow', 'harvestCrop']);
 const TEND_TICKS = 80;
 const MEDICINE = itemId('herbalMedicine');
+const RECURVE_BOW = itemId('recurveBow');
 
 // Plants are worked from their own tile; rock, buildings, and workbenches from an adjacent one.
 const standsOn = (type: JobType): boolean =>
@@ -161,7 +166,23 @@ function createColonist(id: number, name: string, tile: number, rng: Rng): Colon
     drafted: false,
     draftTarget: -1,
     cooldown: 0,
+    skillXp: emptyXp(),
+    passions: rollPassions(rng),
+    weapon: 'bow',
   };
+}
+
+// Which skill a piece of work trains.
+function skillFor(type: JobType): SkillKey {
+  switch (type) {
+    case 'mine':
+      return 'mining';
+    case 'construct':
+    case 'deconstruct':
+      return 'construction';
+    default:
+      return 'plants';
+  }
 }
 
 // Strangers start with a mild, random impression of each other.
@@ -175,13 +196,15 @@ function introduce(a: Colonist, b: Colonist, rng: Rng): void {
 export class Simulation {
   public tick = 0;
   public readonly reservations = new Map<string, number>();
-  public stats: Stats = { produced: {}, hauled: 0, built: 0, tended: 0, raidsRepelled: 0, kills: 0 };
+  public stats: Stats = { produced: {}, hauled: 0, built: 0, tended: 0, raidsRepelled: 0, kills: 0, hunted: 0 };
   public log: LogEntry[] = [];
   public storyLog: StoryEntry[] = [];
   public story: StoryState = freshStory();
   public enemies: Enemy[] = [];
   public nextEnemyId = 0;
   public raid: RaidState | null = null;
+  public animals: Animal[] = [];
+  public nextAnimalId = 0;
   // Recent attacks, for the renderer.
   public shots: Shot[] = [];
   public firstNight: NightResult = 'pending';
@@ -235,6 +258,7 @@ export class Simulation {
     world.dropItemNear(spawn, itemId('meal'), 18);
     const sim = new Simulation(world, colonists, seed, rng);
     sim.story = freshStory(difficulty);
+    populateWildlife(sim, 10, spawn);
     sim.addLog(
       'Five colonists have landed with a few days of rations. Designate work and they will get to it.',
       'info',
@@ -349,6 +373,7 @@ export class Simulation {
       this.updateColonist(c);
     }
     updateEnemies(this);
+    updateAnimals(this);
 
     if (slow) {
       this.checkObjectives();
@@ -424,6 +449,16 @@ export class Simulation {
         c.draftTarget = -1;
         break;
       }
+      case 'hunt':
+        for (const a of this.animals) {
+          const x = w.xOf(a.tile);
+          const y = w.yOf(a.tile);
+          const { x0, y0, x1, y1 } = cmd.rect;
+          if (x >= Math.min(x0, x1) && x <= Math.max(x0, x1) && y >= Math.min(y0, y1) && y <= Math.max(y0, y1)) {
+            a.hunted = cmd.add;
+          }
+        }
+        break;
       case 'move': {
         const c = this.colonists[cmd.colonist];
         if (!c?.drafted || c.health.downed || c.health.dead || cmd.tile < 0 || cmd.tile >= w.size) {
@@ -607,6 +642,12 @@ export class Simulation {
       }
       case 'rest':
         return 'Resting in bed';
+      case 'hunt': {
+        const prey = this.animals.find((a) => a.id === job.patient);
+        return prey ? `Hunting a ${animalName(prey).toLowerCase()}` : 'Hunting';
+      }
+      case 'equip':
+        return 'Picking up a recurve bow';
     }
   }
 
@@ -797,6 +838,9 @@ export class Simulation {
 
   private onDawn(): void {
     let exposed = 0;
+    for (const c of this.living()) {
+      rustSkills(c);
+    }
     for (const c of this.colonists) {
       // Only colonists who were around for a good part of the night count (not late arrivals).
       if (c.nightTicks > TICKS_PER_HOUR * 2 && c.exposedTicks > c.nightTicks * 0.5) {
@@ -1078,6 +1122,9 @@ export class Simulation {
     if (((food < 0.3 && slot !== 'W') || food < 0.15) && this.tryEat(c)) {
       return;
     }
+    if (c.weapon === 'bow' && this.tryEquip(c)) {
+      return;
+    }
     if (needsBedRest(c)) {
       // The walking wounded patch up others (or, failing that, themselves) before lying down.
       if (c.priorities.doctor > 0 && (this.urgentPatient(c) || needsTending(this, c)) && this.tryTend(c)) {
@@ -1122,6 +1169,8 @@ export class Simulation {
         return this.tryDesignations(c, [Designation.MINE]);
       case 'plantCutting':
         return this.tryDesignations(c, [Designation.CHOP, Designation.FORAGE]);
+      case 'hunting':
+        return this.tryHunt(c);
       case 'cooking':
         return this.tryBill(c, 'cooking');
       case 'crafting':
@@ -1169,6 +1218,12 @@ export class Simulation {
         break;
       case 'tend':
         this.stepTend(c, job);
+        break;
+      case 'hunt':
+        this.stepHunt(c, job);
+        break;
+      case 'equip':
+        this.stepEquip(c, job);
         break;
       case 'wander':
         if (job.wait-- <= 0) {
@@ -1380,7 +1435,7 @@ export class Simulation {
                 : s.plants;
     const moodFactor = c.mood < 25 ? 0.85 : c.mood > 70 ? 1.1 : 1;
     const traits = traitFactor(c, 'workSpeed') * (plants ? traitFactor(c, 'plantSpeed') : 1);
-    return (0.5 + skill * 0.1) * moodFactor * traits * healthFactor(c);
+    return skillFactor(skill) * moodFactor * traits * healthFactor(c);
   }
 
   private stepWork(c: Colonist, job: Job): void {
@@ -1401,6 +1456,7 @@ export class Simulation {
       return;
     }
     w.progress[t] += this.workSpeed(c, job.type);
+    learn(this, c, skillFor(job.type));
     w.markDirty(t);
     if (w.progress[t] >= this.workAmount(job)) {
       this.completeWork(c, job);
@@ -1829,6 +1885,7 @@ export class Simulation {
       return;
     }
     job.progress += this.workSpeed(c, recipe.bench);
+    learn(this, c, recipe.bench === 'cooking' ? 'cooking' : 'crafting');
     if (job.progress >= recipe.work) {
       c.carrying = null;
       w.dropItemNear(c.tile, recipe.product.item, recipe.product.count);
@@ -2003,6 +2060,75 @@ export class Simulation {
     this.assign(c, this.makeJob(type, path.length > 0 || spot === c.tile ? spot : c.tile), path);
   }
 
+  // ---- Hunting and gear ----
+
+  private tryHunt(c: Colonist): boolean {
+    const w = this.world;
+    const region = this.regionOf(c.tile);
+    const prey = this.animals
+      .filter((a) => a.hunted && a.hp > 0 && this.regions.region[a.tile] === region && !this.isReserved(`h${a.id}`, c))
+      .sort((a, b) => w.distance(c.tile, a.tile) - w.distance(c.tile, b.tile))[0];
+    if (!prey) {
+      return false;
+    }
+    this.reserve(c, `h${prey.id}`);
+    this.assign(c, this.makeJob('hunt', -1, { patient: prey.id }), []);
+    return true;
+  }
+
+  private stepHunt(c: Colonist, job: Job): void {
+    const w = this.world;
+    const prey = this.animals.find((a) => a.id === job.patient);
+    if (!prey || prey.hp <= 0 || !prey.hunted) {
+      this.endJob(c);
+      return;
+    }
+    // Shoot from a little inside bow range; otherwise close in a few steps at a time.
+    if (canAttack(this, c, prey.tile, COLONIST_WEAPONS[c.weapon].range - 1)) {
+      if (c.cooldown <= 0) {
+        attackAnimal(this, c, prey);
+      }
+      return;
+    }
+    const goals = [prey.tile, ...w.neighbors(prey.tile)].filter((i) => w.isPassable(i));
+    const path = this.pathfinder.find(c.tile, goals);
+    if (!path || path.length === 0) {
+      this.endJob(c);
+      return;
+    }
+    c.path = path.slice(0, 6);
+  }
+
+  // Swap the starting short bow for a recurve bow lying in storage.
+  private tryEquip(c: Colonist): boolean {
+    const w = this.world;
+    if (!w.itemType.includes(RECURVE_BOW)) {
+      return false;
+    }
+    const region = this.regionOf(c.tile);
+    const bow = this.nearest(
+      c.tile,
+      (i) => w.itemType[i] === RECURVE_BOW && this.regions.region[i] === region && !this.isReserved(`i${i}`, c),
+      1,
+    )[0];
+    const path = bow !== undefined ? this.pathfinder.find(c.tile, [bow]) : null;
+    if (bow === undefined || !path) {
+      return false;
+    }
+    this.reserve(c, `i${bow}`);
+    this.assign(c, this.makeJob('equip', -1, { source: bow }), path);
+    return true;
+  }
+
+  private stepEquip(c: Colonist, job: Job): void {
+    const w = this.world;
+    if (c.tile === job.source && w.itemType[job.source] === RECURVE_BOW && w.takeItem(job.source, 1) > 0) {
+      c.weapon = 'recurveBow';
+      this.addLog(`${c.name} picked up a recurve bow.`);
+    }
+    this.endJob(c);
+  }
+
   // ---- Doctoring ----
 
   private urgentPatient(c: Colonist): boolean {
@@ -2095,6 +2221,7 @@ export class Simulation {
       return;
     }
     job.progress += this.workSpeed(c, 'doctor');
+    learn(this, c, 'medicine');
     if (job.progress >= TEND_TICKS) {
       const medicine = c.carrying?.item === MEDICINE;
       if (medicine) {
@@ -2287,6 +2414,24 @@ export const OBJECTIVES: ObjectiveDef[] = [
     label: 'Repel a raid (draft colonists with Q)',
     phase: 3,
     check: (s) => s.stats.raidsRepelled > 0,
+  },
+  {
+    id: 'hunt',
+    label: 'Hunt an animal for meat and leather',
+    phase: 3,
+    check: (s) => s.stats.hunted > 0,
+  },
+  {
+    id: 'bow',
+    label: 'Craft a recurve bow from leather and equip it',
+    phase: 3,
+    check: (s) => s.living().some((c) => c.weapon === 'recurveBow'),
+  },
+  {
+    id: 'sandbags',
+    label: 'Build sandbags for cover',
+    phase: 3,
+    check: (s) => s.countFeature((f) => FEATURES[f - 1].key === 'sandbags') > 0,
   },
   {
     id: 'survive',

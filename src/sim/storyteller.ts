@@ -1,6 +1,7 @@
+import { MAX_ANIMALS, herdArrives } from './animals';
 import { spawnRaid } from './combat';
 import { TICKS_PER_HOUR } from './constants';
-import { FACTIONS, NONE, featureDef, itemId } from './defs';
+import { ANIMALS, FACTIONS, NONE, featureDef, itemId } from './defs';
 import { infect } from './health';
 import type { Simulation } from './simulation';
 
@@ -29,7 +30,7 @@ export const freshStory = (difficulty: Difficulty = 'standard'): StoryState => (
 
 // How strongly each difficulty leans on threats (raids, illness, cold, blight).
 const THREAT_WEIGHT: Record<Difficulty, number> = { peaceful: 0.5, standard: 1, harsh: 1.4 };
-const isThreat = (key: string) => key !== 'wanderer' && key !== 'supplies';
+const isThreat = (key: string) => key !== 'wanderer' && key !== 'supplies' && key !== 'herd';
 
 interface EventDef {
   key: string;
@@ -46,6 +47,7 @@ const HOURLY_CHANCE = 1 / 14;
 const MAX_COLONISTS = 8;
 
 const hostileFactions = () => FACTIONS.filter((f) => f.hostile);
+const animalLabel = (kind: string) => (kind === 'deer' ? 'deer' : `${ANIMALS[kind].name.toLowerCase()}s`);
 const friendlyFaction = () => FACTIONS.find((f) => !f.hostile)!;
 
 const EVENTS: EventDef[] = [
@@ -104,6 +106,21 @@ const EVENTS: EventDef[] = [
           sim.addThought(other, 'welcomedNewcomer');
         }
       }
+      return true;
+    },
+  },
+  {
+    key: 'herd',
+    minDay: 2,
+    cooldownDays: 4,
+    weight: (sim) => (sim.animals.length < MAX_ANIMALS - 3 ? 1 : 0),
+    run: (sim) => {
+      const count = herdArrives(sim);
+      if (count === 0) {
+        return false;
+      }
+      const kind = sim.animals[sim.animals.length - 1];
+      sim.addLog(`A group of ${count} ${animalLabel(kind.kind)} has wandered onto the map.`, 'good', true);
       return true;
     },
   },

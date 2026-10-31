@@ -203,6 +203,10 @@ function play(seed: number): Result {
         sim.apply({ type: 'build', feature: featureId('armchair'), tiles: [at(hut.x + 1, hut.y + 5)] });
       }
     }
+    // Hunt whatever wildlife is around once the colony is settled (leather becomes recurve bows).
+    if (sim.day >= 3) {
+      sim.apply({ type: 'hunt', rect: { x0: 0, y0: 0, x1: w.width - 1, y1: w.height - 1 }, add: true });
+    }
     // A second field once the colony grows, as a player would.
     if (!secondFarm && sim.living().length >= 7) {
       secondFarm = true;

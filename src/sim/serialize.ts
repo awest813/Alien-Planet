@@ -3,23 +3,27 @@ import { Rng } from './rng';
 import { Simulation, StoryEntry } from './simulation';
 import { StoryState } from './storyteller';
 import {
+  Animal,
   Bill,
   Carried,
   Colonist,
+  ColonistWeapon,
   Enemy,
   Health,
   LogEntry,
   Needs,
   NightResult,
+  Passion,
   Priorities,
   ScheduleSlot,
+  SkillKey,
   Skills,
   Stats,
   TimedThought,
 } from './types';
 import { World } from './world';
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 interface SavedColonist {
   id: number;
@@ -42,6 +46,9 @@ interface SavedColonist {
   lover: number;
   health: Health;
   drafted: boolean;
+  skillXp: Record<SkillKey, number>;
+  passions: Record<SkillKey, Passion>;
+  weapon: ColonistWeapon;
 }
 
 // Plain structured-cloneable data, stored as-is in IndexedDB. Jobs and reservations
@@ -74,6 +81,8 @@ export interface SaveData {
   story: StoryState;
   enemies: Enemy[];
   nextEnemyId: number;
+  animals: Animal[];
+  nextAnimalId: number;
   raid: RaidState | null;
   firstNight: NightResult;
   objectivesDone: Record<string, boolean>;
@@ -123,6 +132,9 @@ export function serialize(sim: Simulation): SaveData {
         lover: c.lover,
         health: c.health,
         drafted: c.drafted,
+        skillXp: c.skillXp,
+        passions: c.passions,
+        weapon: c.weapon,
       }),
     ),
     bills: structuredClone(sim.bills),
@@ -132,6 +144,8 @@ export function serialize(sim: Simulation): SaveData {
     story: structuredClone(sim.story),
     enemies: structuredClone(sim.enemies),
     nextEnemyId: sim.nextEnemyId,
+    animals: structuredClone(sim.animals),
+    nextAnimalId: sim.nextAnimalId,
     raid: structuredClone(sim.raid),
     firstNight: sim.firstNight,
     objectivesDone: { ...sim.objectivesDone },
@@ -181,6 +195,8 @@ export function deserialize(data: SaveData): Simulation {
   sim.story = { ...structuredClone(data.story), difficulty: data.story.difficulty ?? 'standard' };
   sim.enemies = structuredClone(data.enemies);
   sim.nextEnemyId = data.nextEnemyId;
+  sim.animals = structuredClone(data.animals);
+  sim.nextAnimalId = data.nextAnimalId;
   sim.raid = structuredClone(data.raid);
   sim.firstNight = data.firstNight;
   sim.objectivesDone = { ...data.objectivesDone };

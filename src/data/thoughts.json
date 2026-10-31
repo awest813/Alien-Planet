@@ -139,5 +139,15 @@
     "label": "A newcomer joined us",
     "mood": 2,
     "hours": 24
+  },
+  "mauled": {
+    "label": "Mauled by an animal",
+    "mood": -4,
+    "hours": 24
+  },
+  "passionWork": {
+    "label": "Doing work I love",
+    "mood": 3,
+    "hours": 4
   }
 }

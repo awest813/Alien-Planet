@@ -1,9 +1,11 @@
+import { hurtAnimal } from './animals';
 import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
-import { FACTIONS } from './defs';
+import { FACTIONS, NONE, featureDef } from './defs';
 import { damage } from './health';
+import { learn } from './skills';
 import { traitValue } from './social';
 import type { Simulation } from './simulation';
-import { Colonist, Enemy, Weapon } from './types';
+import { Animal, Colonist, ColonistWeapon, Enemy, Weapon } from './types';
 import { World } from './world';
 
 export interface RaidState {
@@ -17,7 +19,15 @@ const WEAPONS: Record<Weapon, { range: number; cooldown: number; accuracy: numbe
   bow: { range: 7, cooldown: 55, accuracy: 0.55, damage: [0.09, 0.17] },
   knife: { range: 1, cooldown: 40, accuracy: 0.85, damage: [0.12, 0.2] },
 };
-const COLONIST_BOW = { range: 8, cooldown: 60, damage: [0.17, 0.26] as [number, number] };
+export const COLONIST_WEAPONS: Record<
+  ColonistWeapon,
+  { name: string; range: number; cooldown: number; damage: [number, number] }
+> = {
+  bow: { name: 'Short bow', range: 8, cooldown: 60, damage: [0.17, 0.26] },
+  recurveBow: { name: 'Recurve bow', range: 9, cooldown: 55, damage: [0.24, 0.34] },
+};
+// Combat experience per attack.
+const COMBAT_XP = 40;
 const COLONIST_MELEE = { cooldown: 45, damage: [0.08, 0.14] as [number, number] };
 // Undrafted colonists shoot back at raiders this close; drafted ones use the full bow range.
 const SELF_DEFENCE_RANGE = 6;
@@ -28,6 +38,29 @@ const SHOT_LIFETIME = 8;
 
 const chebyshev = (w: World, a: number, b: number) =>
   Math.max(Math.abs(w.xOf(a) - w.xOf(b)), Math.abs(w.yOf(a) - w.yOf(b)));
+
+// Hit-chance multiplier for a target sheltering behind cover (sandbags) on the side facing the shooter.
+export function coverFactor(w: World, shooter: number, target: number): number {
+  const dx = Math.sign(w.xOf(shooter) - w.xOf(target));
+  const dy = Math.sign(w.yOf(shooter) - w.yOf(target));
+  const tx = w.xOf(target);
+  const ty = w.yOf(target);
+  let factor = 1;
+  for (const [ox, oy] of [
+    [dx, dy],
+    [dx, 0],
+    [0, dy],
+  ]) {
+    if ((ox === 0 && oy === 0) || !w.inBounds(tx + ox, ty + oy)) {
+      continue;
+    }
+    const f = w.feature[w.idx(tx + ox, ty + oy)];
+    if (f !== NONE) {
+      factor = Math.min(factor, featureDef(f).cover);
+    }
+  }
+  return factor;
+}
 
 // Bresenham line between tile centres; walls, rock, and other solid tiles block it.
 export function lineOfSight(w: World, from: number, to: number): boolean {
@@ -190,9 +223,12 @@ function flee(sim: Simulation, e: Enemy): void {
 function enemyAttack(sim: Simulation, e: Enemy, target: Colonist): void {
   const weapon = WEAPONS[e.weapon];
   const dist = sim.world.distance(e.tile, target.tile);
-  const accuracy = weapon.range > 1 ? Math.max(0.15, weapon.accuracy - dist * 0.03) : weapon.accuracy;
+  const ranged = weapon.range > 1;
+  const accuracy = ranged
+    ? Math.max(0.15, weapon.accuracy - dist * 0.03) * coverFactor(sim.world, e.tile, target.tile)
+    : weapon.accuracy;
   const hit = sim.rng.next() < accuracy;
-  recordShot(sim, e.tile, target.tile, hit, weapon.range > 1);
+  recordShot(sim, e.tile, target.tile, hit, ranged);
   if (hit) {
     const harsh = sim.story.difficulty === 'harsh' ? 1.2 : 1;
     damage(sim, target, roll(sim, weapon.damage) * harsh, e.weapon === 'bow' ? 'arrow' : 'cut');
@@ -284,15 +320,25 @@ export function updateEnemies(sim: Simulation): void {
 
 // ---- Colonists fighting back ----
 
-function attackEnemy(sim: Simulation, c: Colonist, e: Enemy, ranged: boolean): void {
-  const dist = sim.world.distance(c.tile, e.tile);
+// One colonist attack at `target`; returns the damage dealt (0 on a miss).
+function colonistAttack(sim: Simulation, c: Colonist, target: number, ranged: boolean): number {
+  const weapon = COLONIST_WEAPONS[c.weapon];
+  const dist = sim.world.distance(c.tile, target);
   const accuracy = ranged
-    ? Math.max(0.1, Math.min(0.95, 0.45 + c.skills.combat * 0.05 + (traitValue(c, 'accuracy') ?? 0) - dist * 0.025))
-    : 0.75 + c.skills.combat * 0.02;
+    ? Math.max(0.1, Math.min(0.95, 0.4 + c.skills.combat * 0.03 + (traitValue(c, 'accuracy') ?? 0) - dist * 0.025)) *
+      coverFactor(sim.world, c.tile, target)
+    : 0.7 + c.skills.combat * 0.015;
   const hit = sim.rng.next() < accuracy;
-  recordShot(sim, c.tile, e.tile, hit, ranged);
-  if (hit) {
-    e.hp -= roll(sim, ranged ? COLONIST_BOW.damage : COLONIST_MELEE.damage);
+  recordShot(sim, c.tile, target, hit, ranged);
+  c.cooldown = ranged ? weapon.cooldown : COLONIST_MELEE.cooldown;
+  learn(sim, c, 'combat', COMBAT_XP);
+  return hit ? roll(sim, ranged ? weapon.damage : COLONIST_MELEE.damage) : 0;
+}
+
+function attackEnemy(sim: Simulation, c: Colonist, e: Enemy, ranged: boolean): void {
+  const dealt = colonistAttack(sim, c, e.tile, ranged);
+  if (dealt > 0) {
+    e.hp -= dealt;
     if (e.hp <= 0) {
       sim.stats.kills++;
       if (sim.raid) {
@@ -301,18 +347,43 @@ function attackEnemy(sim: Simulation, c: Colonist, e: Enemy, ranged: boolean): v
       sim.addLog(`${c.name} brought down ${e.name}.`, 'good');
     }
   }
-  c.cooldown = ranged ? COLONIST_BOW.cooldown : COLONIST_MELEE.cooldown;
+}
+
+// Hunting, or fending off an angry animal.
+export function attackAnimal(sim: Simulation, c: Colonist, a: Animal): void {
+  const melee = chebyshev(sim.world, c.tile, a.tile) <= 1;
+  const dealt = colonistAttack(sim, c, a.tile, !melee);
+  if (dealt > 0) {
+    hurtAnimal(sim, a, dealt, c);
+  }
+}
+
+// Whether a colonist could attack `target` from where they stand.
+export function canAttack(sim: Simulation, c: Colonist, target: number, range: number): boolean {
+  const w = sim.world;
+  return chebyshev(w, c.tile, target) <= 1 || (w.distance(c.tile, target) <= range && lineOfSight(w, c.tile, target));
 }
 
 // Colonists shoot the nearest enemy in range (drafted ones from further away) and fight back in
 // melee. Returns true if the colonist spent this tick fighting (and so shouldn't move or work).
 export function colonistCombat(sim: Simulation, c: Colonist): boolean {
   c.cooldown--;
+  const w = sim.world;
+  const range = c.drafted ? COLONIST_WEAPONS[c.weapon].range : SELF_DEFENCE_RANGE;
+  // Animals that have turned on someone are fair game for anyone nearby.
+  const beast = sim.animals.find((a) => a.hp > 0 && a.revengeOn >= 0 && canAttack(sim, c, a.tile, range));
+  if (beast) {
+    if (!c.drafted && c.job) {
+      sim.endJob(c);
+    }
+    if (c.cooldown <= 0) {
+      attackAnimal(sim, c, beast);
+    }
+    return true;
+  }
   if (sim.enemies.length === 0) {
     return false;
   }
-  const w = sim.world;
-  const range = c.drafted ? COLONIST_BOW.range : SELF_DEFENCE_RANGE;
   // The nearest enemy we can actually hit: adjacent, or in range with a clear shot.
   let nearest: Enemy | undefined;
   let nearestDist = Infinity;

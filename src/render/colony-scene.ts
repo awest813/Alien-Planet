@@ -3,7 +3,7 @@ import { TOOLS, Tool, controller } from '../game/controller';
 import { NONE, featureDef } from '../sim/defs';
 import { hash2 } from '../sim/rng';
 import { NIGHT_END, NIGHT_START } from '../sim/simulation';
-import { Colonist, Enemy } from '../sim/types';
+import { Animal, Colonist, Enemy } from '../sim/types';
 import { Designation, GROW_ZONE, World } from '../sim/world';
 import { Frames, TILE, TILESET_KEY, createTextures } from './textures';
 
@@ -35,6 +35,7 @@ const TOOL_COLORS: Record<string, number> = {
   cancel: 0xff5252,
   zone: 0xffd65c,
   build: 0x7fd0ff,
+  hunt: 0xff5c5c,
   select: 0xffffff,
 };
 
@@ -45,6 +46,7 @@ export class ColonyScene extends Phaser.Scene {
   private layers: Layers;
   private pawns = new Map<number, PawnView>();
   private raiders = new Map<number, Phaser.GameObjects.Container>();
+  private beasts = new Map<number, Phaser.GameObjects.Container>();
   private itemLabels = new Map<number, Phaser.GameObjects.Text>();
   private overlay: Phaser.GameObjects.Graphics;
   private preview: Phaser.GameObjects.Graphics;
@@ -91,6 +93,7 @@ export class ColonyScene extends Phaser.Scene {
     }
     this.syncPawns();
     this.syncRaiders();
+    this.syncAnimals();
     this.drawOverlay();
     this.updateCamera(delta);
     this.updateNight();
@@ -108,6 +111,8 @@ export class ColonyScene extends Phaser.Scene {
     this.pawns.clear();
     this.raiders.forEach((raider) => raider.destroy());
     this.raiders.clear();
+    this.beasts.forEach((beast) => beast.destroy());
+    this.beasts.clear();
 
     const map = this.make.tilemap({ width: world.width, height: world.height, tileWidth: TILE, tileHeight: TILE });
     const tileset = map.addTilesetImage(TILESET_KEY, TILESET_KEY, TILE, TILE, 0, 0)!;
@@ -306,6 +311,45 @@ export class ColonyScene extends Phaser.Scene {
     return this.add.container(0, 0, [body, head, label]).setDepth(Depth.PAWNS);
   }
 
+  private syncAnimals(): void {
+    const sim = controller.sim;
+    const world = sim.world;
+    const alive = new Set(sim.animals.map((a) => a.id));
+    for (const [id, beast] of this.beasts) {
+      if (!alive.has(id)) {
+        beast.destroy();
+        this.beasts.delete(id);
+      }
+    }
+    for (const a of sim.animals) {
+      let beast = this.beasts.get(a.id);
+      if (!beast) {
+        beast = this.createAnimal(a);
+        this.beasts.set(a.id, beast);
+      }
+      const to = a.path.length > 0 ? a.path[0] : a.tile;
+      const x = world.xOf(a.tile) + (world.xOf(to) - world.xOf(a.tile)) * a.moveProgress;
+      const y = world.yOf(a.tile) + (world.yOf(to) - world.yOf(a.tile)) * a.moveProgress;
+      beast.setPosition((x + 0.5) * TILE, (y + 0.5) * TILE);
+      // Face the direction of travel.
+      const body = beast.getAt(0) as Phaser.GameObjects.Image;
+      if (to !== a.tile) {
+        body.setFlipX(world.xOf(to) < world.xOf(a.tile));
+      }
+      body.setTint(a.revengeOn >= 0 ? 0xff8a8a : 0xffffff);
+      (beast.getAt(1) as Phaser.GameObjects.Graphics).setVisible(a.hunted);
+    }
+  }
+
+  private createAnimal(a: Animal): Phaser.GameObjects.Container {
+    const body = this.add.image(0, 0, `animal-${a.kind}`);
+    // A red crosshair over animals marked for hunting.
+    const marker = this.add.graphics();
+    marker.lineStyle(1, 0xff5c5c, 0.9).strokeCircle(0, -9, 3);
+    marker.lineBetween(-5, -9, -2, -9).lineBetween(2, -9, 5, -9).lineBetween(0, -14, 0, -11).lineBetween(0, -7, 0, -4);
+    return this.add.container(0, 0, [body, marker]).setDepth(Depth.PAWNS - 1);
+  }
+
   private syncRaiders(): void {
     const sim = controller.sim;
     const world = sim.world;
@@ -494,6 +538,10 @@ export class ColonyScene extends Phaser.Scene {
         break;
       case 'cancel':
         controller.command({ type: 'cancel', rect });
+        controller.command({ type: 'hunt', rect, add: false });
+        break;
+      case 'hunt':
+        controller.command({ type: 'hunt', rect, add: true });
         break;
       case 'zone':
         controller.command({ type: 'zone', rect, zone: tool.zone });
