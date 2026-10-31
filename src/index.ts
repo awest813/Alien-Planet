@@ -1,60 +1,37 @@
-import { App } from '@capacitor/app';
-import i18n from 'i18n-for-browser';
+import { App as CapacitorApp } from '@capacitor/app';
 import Phaser from 'phaser';
-import { Config } from './config';
-import en from './locales/en.json';
-import es from './locales/es.json';
-import { Util } from './util';
+import { createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import { controller } from './game/controller';
+import { ColonyScene } from './render/colony-scene';
+import { triggerEvent } from './sim/storyteller';
+import { App } from './ui/App';
+import './ui/styles.css';
 
-let game: Phaser.Game;
+// Phaser draws the world; React draws the management UI on top of it.
+new Phaser.Game({
+  type: Phaser.AUTO,
+  parent: 'game',
+  backgroundColor: '#10141c',
+  pixelArt: true,
+  roundPixels: true,
+  scale: {
+    mode: Phaser.Scale.RESIZE,
+    width: '100%',
+    height: '100%',
+  },
+  scene: [ColonyScene],
+});
 
-(async () => {
-  // Initialize font.
-  await initFont();
+createRoot(document.getElementById('ui')!).render(createElement(App));
 
-  // Load game instance.
-  game = new Phaser.Game(Config);
-
-  // Initialize locales.
-  await initLocales();
-
-  // Initialize events.
-  initEvents();
-})();
-
-async function initFont() {
-  const font = new FontFace('PressStart2P', `url(assets/fonts/PressStart2P.ttf)`);
-  const loadedFont = await font.load();
-  document.fonts.add(loadedFont);
-  await document.fonts.ready;
+// Handy for poking at the simulation from the browser console during development,
+// e.g. `colonyEvent(colony.sim, 'raid')`.
+if (import.meta.env.DEV) {
+  Object.assign(window, { colony: controller, colonyEvent: triggerEvent });
 }
 
-async function initLocales() {
-  // Initialize i18n.
-  await i18n.configure({
-    locales: {
-      en,
-      es,
-    },
-    defaultLocale: 'en',
-  });
-
-  // Get locale setting.
-  let locale = await Util.getStorage('locale', game.registry);
-
-  // Set to default locale if no locale setting is found.
-  if (!locale) {
-    locale = 'en';
-    Util.updateStorage('locale', locale, game.registry);
-  }
-
-  // Set game locale.
-  await i18n.setLocale(locale);
-}
-
-function initEvents() {
-  // Quit and minimize game when back button is pressed.
-  App.addListener('backButton', () => {
-    App.minimizeApp();
-  });
-}
+// Minimise instead of quitting when the Android back button is pressed.
+CapacitorApp.addListener('backButton', () => {
+  CapacitorApp.minimizeApp();
+});

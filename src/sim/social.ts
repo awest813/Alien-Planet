@@ -1,0 +1,139 @@
+import { TRAITS, TraitDef } from './defs';
+import { Rng } from './rng';
+import type { Simulation } from './simulation';
+import { Colonist } from './types';
+
+export const FRIEND_OPINION = 30;
+export const RIVAL_OPINION = -30;
+const LOVER_OPINION = 60;
+const BREAKUP_OPINION = 15;
+// Chance per slow update that two nearby colonists interact.
+const INTERACTION_CHANCE = 0.06;
+const INTERACTION_RANGE = 6;
+
+type NumericTraitField = 'workSpeed' | 'plantSpeed' | 'joyDecay' | 'foodDecay' | 'damageTaken' | 'opinionGiven';
+
+// Product of a multiplicative trait modifier across a colonist's traits (1 if none apply).
+export function traitFactor(c: Colonist, field: NumericTraitField): number {
+  return c.traits.reduce((product, key) => product * (TRAITS[key][field] ?? 1), 1);
+}
+
+export function traitValue<K extends keyof TraitDef>(c: Colonist, field: K): TraitDef[K] | undefined {
+  for (const key of c.traits) {
+    if (TRAITS[key][field] !== undefined) {
+      return TRAITS[key][field];
+    }
+  }
+  return undefined;
+}
+
+export function rollTraits(rng: Rng): string[] {
+  const keys = Object.keys(TRAITS);
+  const traits: string[] = [];
+  while (traits.length < 2) {
+    const key = rng.pick(keys);
+    const clashes = traits.some((t) => t === key || TRAITS[t].excludes === key || TRAITS[key].excludes === t);
+    if (!clashes) {
+      traits.push(key);
+    }
+  }
+  return traits;
+}
+
+// Opinions are one-way; relationships use the lower of the two.
+export function mutualOpinion(a: Colonist, b: Colonist): number {
+  return Math.min(a.opinions[b.id] ?? 0, b.opinions[a.id] ?? 0);
+}
+
+export function relationLabel(a: Colonist, b: Colonist): string | null {
+  if (a.lover === b.id) {
+    return 'Lover';
+  }
+  const opinion = mutualOpinion(a, b);
+  if (opinion >= FRIEND_OPINION) {
+    return 'Friend';
+  }
+  if (opinion <= RIVAL_OPINION) {
+    return 'Rival';
+  }
+  return null;
+}
+
+export function socialThoughts(sim: Simulation, c: Colonist): string[] {
+  const keys: string[] = [];
+  const others = sim.living().filter((o) => o.id !== c.id);
+  if (c.lover >= 0 && !sim.colonists[c.lover].health.dead) {
+    keys.push('hasLover');
+  }
+  if (others.some((o) => o.id !== c.lover && mutualOpinion(c, o) >= FRIEND_OPINION)) {
+    keys.push('hasFriend');
+  }
+  if (others.some((o) => mutualOpinion(c, o) <= RIVAL_OPINION)) {
+    keys.push('hasRival');
+  }
+  return keys;
+}
+
+function adjust(from: Colonist, to: Colonist, amount: number): void {
+  // `to` changes its opinion of `from`; kind people are liked faster.
+  const scaled = amount > 0 ? amount * traitFactor(from, 'opinionGiven') : amount;
+  to.opinions[from.id] = Math.max(-100, Math.min(100, (to.opinions[from.id] ?? 0) + scaled));
+}
+
+function interact(sim: Simulation, a: Colonist, b: Colonist): void {
+  const before = relationLabel(a, b);
+  const insultChance = traitValue(a, 'insultChance') ?? 0.06;
+  const roll = sim.rng.next();
+  if (roll < insultChance) {
+    adjust(a, b, -8);
+    sim.addThought(b, 'insulted');
+    sim.addLog(`${a.name} insulted ${b.name}.`, 'warn');
+  } else if (roll < insultChance + 0.15) {
+    adjust(a, b, 6);
+    adjust(b, a, 6);
+    sim.addThought(a, 'deepTalk');
+    sim.addThought(b, 'deepTalk');
+    if (a.lover < 0 && b.lover < 0 && mutualOpinion(a, b) >= LOVER_OPINION && sim.rng.next() < 0.25) {
+      a.lover = b.id;
+      b.lover = a.id;
+      sim.addLog(`${a.name} and ${b.name} have fallen in love.`, 'good', true);
+      return;
+    }
+  } else {
+    adjust(a, b, 3);
+    adjust(b, a, 3);
+  }
+
+  if (a.lover === b.id && mutualOpinion(a, b) < BREAKUP_OPINION) {
+    a.lover = -1;
+    b.lover = -1;
+    sim.addLog(`${a.name} and ${b.name} have broken up.`, 'warn', true);
+    return;
+  }
+  const after = relationLabel(a, b);
+  if (after !== before && after === 'Friend') {
+    sim.addLog(`${a.name} and ${b.name} have become friends.`, 'good', true);
+  } else if (after !== before && after === 'Rival') {
+    sim.addLog(`${a.name} and ${b.name} have become rivals.`, 'warn', true);
+  }
+}
+
+// Nearby, awake colonists occasionally talk, which slowly shifts their opinions of each other.
+export function updateSocial(sim: Simulation): void {
+  const w = sim.world;
+  const awake = sim.living().filter((c) => !c.sleeping && !c.health.downed && !sim.inMentalBreak(c));
+  for (let i = 0; i < awake.length; i++) {
+    for (let j = i + 1; j < awake.length; j++) {
+      const a = awake[i];
+      const b = awake[j];
+      if (w.distance(a.tile, b.tile) > INTERACTION_RANGE || sim.rng.next() >= INTERACTION_CHANCE) {
+        continue;
+      }
+      if (sim.rng.next() < 0.5) {
+        interact(sim, a, b);
+      } else {
+        interact(sim, b, a);
+      }
+    }
+  }
+}

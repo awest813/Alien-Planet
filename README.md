@@ -1,65 +1,129 @@
-# Phaser 4 TypeScript Template
+# Colony Alpha
 
-**A Phaser 4 + TypeScript + Vite template optimized for development and deployment of mobile and web games.**
+**An original colony simulation in the browser, built with Phaser 4, TypeScript, and React.**
 
-[Demo](#demo) |
-[Template features](#template-features) |
-[Installation](#installation) |
-[Development](#development) |
-[Mobile deployment](#mobile-deployment) |
-[Web deployment](#web-deployment)
+Five colonists land on a procedurally generated 64×64 map. You don't control them directly: you designate work
+(chop, mine, forage, build, farm, cook, haul to storage) and they decide who does what, around their own needs.
+They get hungry, tired and bored, and their mood reacts to what they eat, where they sleep, how warm they are and
+how nice their rooms are. Let mood drop too far for too long and a colonist will wander off in a daze.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://typescriptlang.org/)
-[![Phaser](https://img.shields.io/badge/Phaser-FF69B4)](https://phaser.io/)
-[![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
-[![Capacitor](https://img.shields.io/badge/Capacitor-119EFF?logo=capacitor&logoColor=white)](https://capacitorjs.com/)
+## Playing
 
----
+| Action                | Input                                                   |
+| --------------------- | ------------------------------------------------------- |
+| Pan                   | WASD / arrow keys, or right/middle-drag                 |
+| Zoom                  | Mouse wheel                                             |
+| Pause / speeds        | Space, `1` `2` `3` (or the top-bar buttons)             |
+| Tools                 | Toolbar, or hotkeys shown on each button                |
+| Apply a tool          | Left-drag a rectangle (walls are placed as an outline)  |
+| Drop the current tool | Right-click or Esc                                      |
+| Select a colonist     | Click it on the map or in the colonist list             |
+| Save / load / new map | Menu button (the game also autosaves every dawn)        |
+| Work priorities       | Work button: click a cell to cycle 1 → 4 → off          |
+| Schedules             | Schedule button: pick a brush and paint hours           |
+| Draft for combat      | Q (selected colonist, or everyone), or the Draft button |
+| Move drafted colonist | Select them, then right-click a tile                    |
+| Production targets    | Production button: "keep N meals / cloth in stock"      |
 
-This Phaser 4 template can be used by developers who want to build and deploy mobile games using [Phaser 4](https://phaser.io/) and [TypeScript](https://typescriptlang.org/). It includes a range of useful features such as mobile deployment with a custom app icon, responsive scaling for all screen sizes, persistent storage, multiple locales support, and debugging options.
+Objectives:
 
-A basic sample game is included to help you get started building your own.
+- **Phase 1 – Shelter:** chop 40 wood, designate a stockpile, haul 30 items, build an enclosed shelter, build a
+  bed, and survive the first night with everyone indoors.
+- **Phase 2 – Living:** create a growing zone, harvest 24 potatoes, cook 5 meals at a stove, build a recreation
+  spot, heat a bedroom with a campfire, and weave cloth for an armchair.
+- **Phase 3 – Story:** stock 5 herbal medicine, have a doctor tend someone, see two colonists become friends,
+  repel a raid, and reach day 12 with at least 4 colonists alive.
 
-A big thank you to
-[Kenney Assets](https://kenney.nl/assets/), [ansimuz](https://ansimuz.itch.io/), and
-[lukasfdahl](https://lukasfdahl.itch.io/) for providing the graphics and sounds for the game.
+How the living simulation works:
 
-## 💻 Demo <a id="demo"></a>
+- **Needs:** food, rest and recreation drain over time. Colonists eat when hungry (cooked meals first), sleep
+  during scheduled hours or when exhausted, and seek recreation (horseshoe pin, armchair, or a walk).
+- **Mood:** 50 plus the sum of current thoughts, such as "Ate a cooked meal" +4, "Ate without a table" −3,
+  "Slept in the cold" −5, "Slept in a nice bedroom" +4. Low mood slows work; very low mood can cause a break.
+- **Farming and production:** growing zones are sown and harvested automatically; crops grow by day, faster on
+  rich soil, and not below 5°C. Stoves turn raw food into meals and crafting benches turn cotton into cloth until
+  the production target is met.
+- **Work:** each colonist has a 1–4 priority per work type; within a priority, work types run left to right.
+- **Alerts:** the side panel warns about low food, missing beds, no shelter before nightfall, no stockpile,
+  and unhappy, starving or breaking colonists.
+- **Rooms and temperature:** enclosed rooms get a role (bedroom, barracks, kitchen, …) and an impressiveness
+  score from furniture beauty and size. Outdoor temperature follows a day/night cycle; rooms drift towards it
+  and campfires heat them.
 
-A demo of the game is available under https://michaelpwest.itch.io/phaser-typescript-template.
+How the storytelling layer works:
 
-## ✨ Template features <a id="template-features"></a>
+- **Traits and relationships:** every colonist has two traits (hard worker, optimist, glutton, tough,
+  sharpshooter, abrasive, …). Nearby colonists chat, have deep talks, or trade insults, which moves their
+  opinions of each other; friends, rivals and lovers emerge and affect mood.
+- **Health:** wounds bleed until a doctor tends them (better with herbal medicine from healroot). Too much pain
+  or blood loss and a colonist collapses; too much and they die, and everyone grieves. Marsh fever is a race
+  between severity and immunity that bed rest and tending tilt in the patient's favour. Doctors get out of bed
+  for emergencies.
+- **Combat and raids:** raiders from hostile factions arrive at the map edge with bows or knives. The game
+  pauses; drafted colonists shoot anything within range and line of sight, undrafted ones defend themselves at
+  close range. Raiders flee once half of them fall.
+- **Storyteller:** roughly once or twice a day it may send a raid, an illness, a wanderer who joins, a cold
+  snap, a gift of supplies from the friendly Meadow Kin, or crop blight. Notable moments go into the Story
+  screen.
 
-### Frameworks
+## Architecture
 
-- **TypeScript:** The game is fully written in [TypeScript](https://typescriptlang.org/).
-- **Phaser:** The game uses the [Phaser](https://phaser.io/) game development framework.
-- **Vite:** [Vite](https://vite.dev/) is used as the local development server, allowing for automatic reloading when files are modified.
-- **Code standards:** [ESLint](https://eslint.org/), [Prettier](https://prettier.io/), and [EditorConfig](https://editorconfig.org/) are used to keep the code adhering to its defined rules. When committing changes to Git, [lint-staged](https://github.com/lint-staged/lint-staged/) will confirm that everything is correct before allowing the commit.
+The simulation is completely separate from rendering. Colonists are plain data, not Phaser objects, and the whole
+world is a set of flat typed arrays, so the simulation can later move into a Web Worker without changing its code.
 
-### Game
+```
+src/
+  data/       JSON definitions: terrain, items, features/buildings, recipes, thoughts, traits, factions,
+              diseases, colonist names
+  sim/        Pure TypeScript simulation (no Phaser, no DOM)
+    world.ts        Tile layers as typed arrays, item stacks, dirty-tile tracking
+    worldgen.ts     Seeded fractal-noise terrain, rock, trees, berry bushes
+    pathfinding.ts  A* with 8-way movement and reusable buffers
+    regions.ts      Connectivity regions (O(1) reachability) and room detection
+    climate.ts      Outdoor temperature, room heating, room roles and impressiveness
+    social.ts       Traits, opinions, conversations, friends, rivals and lovers
+    health.ts       Injuries, bleeding, healing, disease, tending, collapse and death
+    combat.ts       Raiders, line of sight, ranged and melee attacks, morale
+    storyteller.ts  Random events with cooldowns
+    simulation.ts   Fixed-tick loop, needs and mood, colonist AI, job system, reservations, objectives
+    serialize.ts    Save format
+  game/       Glue between the simulation, renderer, and UI
+    controller.ts   Owns the sim, time controls, tools, UI snapshots
+    save-store.ts   IndexedDB save slots
+  render/     Phaser 4 scene: tilemap layers, colonist sprites, camera, input
+  ui/         React management UI (colonists, objectives, log, toolbar, menus)
+```
 
-Use the on-screen controls to move and jump the character. The game includes animations and sounds to demonstrate their implementation and includes start and end game functionality.
+- **Fixed-step simulation:** 20 ticks per second at 1× speed, driven from real elapsed time.
+- **Commands:** every player action goes through `Simulation.apply(command)`, which is the seam for a Worker.
+- **Jobs:** idle colonists first look after urgent needs, then walk their work priorities, pick the nearest
+  reachable target for each work type, and reserve it so two colonists never take the same job.
+- **Rendering:** the scene reads only tiles the simulation marked dirty, so a frame does almost no work when
+  nothing changes. All art is drawn procedurally at startup.
+- **Saves:** typed arrays are stored directly in IndexedDB. Jobs aren't saved; colonists pick new work on load.
 
-### Mobile Support
+In development the controller is exposed as `window.colony` for poking at the simulation from the console.
 
-- **Deploy to mobile:** [Capacitor by Ionic](https://capacitorjs.com/) is used for mobile deployment, with commands like `npm run deploy:ios` and `npm run deploy:android` available for simple mobile deployment.
-- **App icon:** An app icon can be added to `resources/icon.png` and will be generated in the necessary formats for iOS or Android when deploying to mobile.
-- **Persistent mobile storage:** Mobile storage is supported for saving data such as the selected locale.
-- **Scaling to mobile:** Any mobile device will scale and display the game correctly, setting up a playable area using a 9:16 aspect ratio.
+### Tests
 
-### Locales
+The simulation runs headlessly, so it is tested directly with [Vitest](https://vitest.dev/):
 
-- **Multiple locales:** English and Spanish translations have been added to the game. Additional locales can be added to the `src/locales/` directory and configured under `src/index.ts`.
+```
+npm test
+```
 
-### Debug
+`src/sim/simulation.test.ts` covers world generation, pathfinding, room detection, item conservation, construction,
+farming and cooking, heating, save/load, and regression tests for fixed AI bugs. `src/sim/phase3.test.ts`
+covers traits, line of sight, raids, bleeding and tending, disease, relationships, and events.
 
-Under `src/config/debug.ts` you can toggle the following debug options:
+## Roadmap
 
-- **Disable sound:** You can disable sounds by setting `disableSound: true`.
-- **FPS:** The game will be locked to 60 FPS and you can enable the FPS counter by setting `fps: true`.
-- **Physics:** You can enable physics graphics such as hit boxes by setting `physics: true`.
+- **Phase 1 – The playable colony** (done): procedural terrain, 5 autonomous colonists, mining, chopping,
+  hauling, building, stockpiles, time controls, save/load.
+- **Phase 2 – The living simulation** (done): hunger, sleep, recreation and moods; farming, cooking and crafting; job
+  priorities and work schedules; rooms, furniture and temperature.
+- **Phase 3 – The storytelling game** (done): relationships and traits; injuries, medicine and disease; combat, raids
+  and factions; dynamic events.
 
 ## 🛠️ Installation <a id="installation"></a>
 

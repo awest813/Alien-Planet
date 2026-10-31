@@ -1,0 +1,241 @@
+[
+  {
+    "key": "tree",
+    "name": "Tree",
+    "natural": true,
+    "passable": true,
+    "moveCost": 1.6,
+    "harvest": {
+      "work": "chop",
+      "amount": 120,
+      "item": "wood",
+      "count": 18
+    }
+  },
+  {
+    "key": "berryBush",
+    "name": "Berry bush",
+    "natural": true,
+    "passable": true,
+    "moveCost": 1.3,
+    "harvest": {
+      "work": "forage",
+      "amount": 60,
+      "item": "berries",
+      "count": 8
+    }
+  },
+  {
+    "key": "rock",
+    "name": "Granite",
+    "natural": true,
+    "blocksRoom": true,
+    "harvest": {
+      "work": "mine",
+      "amount": 220,
+      "item": "stone",
+      "count": 6
+    }
+  },
+  {
+    "key": "woodWall",
+    "name": "Wood wall",
+    "blocksRoom": true,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 5
+        }
+      ],
+      "work": 90
+    }
+  },
+  {
+    "key": "stoneWall",
+    "name": "Granite wall",
+    "blocksRoom": true,
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 5
+        }
+      ],
+      "work": 180
+    }
+  },
+  {
+    "key": "door",
+    "name": "Door",
+    "passable": true,
+    "moveCost": 1.5,
+    "blocksRoom": true,
+    "door": true,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 10
+        }
+      ],
+      "work": 100
+    }
+  },
+  {
+    "key": "bed",
+    "name": "Bed",
+    "passable": true,
+    "moveCost": 1.5,
+    "bed": true,
+    "beauty": 1,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 20
+        }
+      ],
+      "work": 150
+    }
+  },
+  {
+    "key": "potatoPlant",
+    "name": "Potato plant",
+    "passable": true,
+    "moveCost": 1.2,
+    "crop": {
+      "item": "potatoes",
+      "count": 8,
+      "growDays": 1.5,
+      "sowWork": 40,
+      "harvestWork": 50
+    }
+  },
+  {
+    "key": "cottonPlant",
+    "name": "Cotton plant",
+    "passable": true,
+    "moveCost": 1.2,
+    "crop": {
+      "item": "cotton",
+      "count": 6,
+      "growDays": 2,
+      "sowWork": 40,
+      "harvestWork": 60
+    }
+  },
+  {
+    "key": "stove",
+    "name": "Cooking stove",
+    "workbench": "cooking",
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 20
+        }
+      ],
+      "work": 160
+    }
+  },
+  {
+    "key": "craftingBench",
+    "name": "Crafting bench",
+    "workbench": "crafting",
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 30
+        }
+      ],
+      "work": 160
+    }
+  },
+  {
+    "key": "table",
+    "name": "Table",
+    "table": true,
+    "beauty": 2,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 20
+        }
+      ],
+      "work": 120
+    }
+  },
+  {
+    "key": "armchair",
+    "name": "Armchair",
+    "passable": true,
+    "moveCost": 1.5,
+    "beauty": 3,
+    "joy": {
+      "kind": "Relaxing in an armchair",
+      "hoursToFull": 2.5
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 10
+        },
+        {
+          "item": "cloth",
+          "count": 6
+        }
+      ],
+      "work": 130
+    }
+  },
+  {
+    "key": "horseshoePin",
+    "name": "Horseshoe pin",
+    "passable": true,
+    "beauty": 1,
+    "joy": {
+      "kind": "Pitching horseshoes",
+      "hoursToFull": 1.5
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 15
+        }
+      ],
+      "work": 100
+    }
+  },
+  {
+    "key": "campfire",
+    "name": "Campfire",
+    "heater": 12,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 15
+        }
+      ],
+      "work": 60
+    }
+  },
+  {
+    "key": "healrootPlant",
+    "name": "Healroot",
+    "passable": true,
+    "moveCost": 1.2,
+    "crop": {
+      "item": "herbalMedicine",
+      "count": 2,
+      "growDays": 2.5,
+      "sowWork": 50,
+      "harvestWork": 60
+    }
+  }
+]

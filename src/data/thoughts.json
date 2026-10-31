@@ -1,0 +1,143 @@
+{
+  "hungry": {
+    "label": "Hungry",
+    "mood": -6
+  },
+  "starving": {
+    "label": "Starving",
+    "mood": -20
+  },
+  "tired": {
+    "label": "Tired",
+    "mood": -5
+  },
+  "exhausted": {
+    "label": "Exhausted",
+    "mood": -14
+  },
+  "bored": {
+    "label": "Bored",
+    "mood": -5
+  },
+  "entertained": {
+    "label": "Entertained",
+    "mood": 3
+  },
+  "cold": {
+    "label": "Cold",
+    "mood": -5
+  },
+  "freezing": {
+    "label": "Freezing",
+    "mood": -12
+  },
+  "hot": {
+    "label": "Too hot",
+    "mood": -5
+  },
+  "ateMeal": {
+    "label": "Ate a cooked meal",
+    "mood": 4,
+    "hours": 12
+  },
+  "ateRaw": {
+    "label": "Ate raw food",
+    "mood": -5,
+    "hours": 8
+  },
+  "ateWithoutTable": {
+    "label": "Ate without a table",
+    "mood": -3,
+    "hours": 8
+  },
+  "niceDining": {
+    "label": "Ate in a nice room",
+    "mood": 3,
+    "hours": 8
+  },
+  "sleptOutside": {
+    "label": "Slept outside",
+    "mood": -4,
+    "hours": 12
+  },
+  "sleptOnGround": {
+    "label": "Slept on the ground",
+    "mood": -3,
+    "hours": 12
+  },
+  "sleptInCold": {
+    "label": "Slept in the cold",
+    "mood": -5,
+    "hours": 12
+  },
+  "niceBedroom": {
+    "label": "Slept in a nice bedroom",
+    "mood": 4,
+    "hours": 12
+  },
+  "sharedBedroom": {
+    "label": "Slept in a shared bedroom",
+    "mood": -2,
+    "hours": 12
+  },
+  "recoveredFromBreak": {
+    "label": "Let it all out",
+    "mood": 15,
+    "hours": 24
+  },
+  "sick": {
+    "label": "Sick",
+    "mood": -5
+  },
+  "inPain": {
+    "label": "In pain",
+    "mood": -6
+  },
+  "hasFriend": {
+    "label": "Has a friend in the colony",
+    "mood": 3
+  },
+  "hasRival": {
+    "label": "Has a rival in the colony",
+    "mood": -4
+  },
+  "hasLover": {
+    "label": "In love",
+    "mood": 6
+  },
+  "colonistDied": {
+    "label": "A colonist died",
+    "mood": -6,
+    "hours": 72
+  },
+  "friendDied": {
+    "label": "My friend died",
+    "mood": -12,
+    "hours": 120
+  },
+  "loverDied": {
+    "label": "My lover died",
+    "mood": -20,
+    "hours": 168
+  },
+  "insulted": {
+    "label": "Was insulted",
+    "mood": -4,
+    "hours": 12
+  },
+  "deepTalk": {
+    "label": "Had a good talk",
+    "mood": 3,
+    "hours": 12
+  },
+  "repelledRaid": {
+    "label": "We drove off the raiders",
+    "mood": 5,
+    "hours": 48
+  },
+  "welcomedNewcomer": {
+    "label": "A newcomer joined us",
+    "mood": 2,
+    "hours": 24
+  }
+}

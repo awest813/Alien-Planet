@@ -1,0 +1,49 @@
+[
+  {
+    "key": "wood",
+    "name": "Wood",
+    "stackLimit": 75
+  },
+  {
+    "key": "stone",
+    "name": "Granite chunks",
+    "stackLimit": 25
+  },
+  {
+    "key": "berries",
+    "name": "Berries",
+    "stackLimit": 50,
+    "category": "rawFood",
+    "nutrition": 0.1
+  },
+  {
+    "key": "potatoes",
+    "name": "Potatoes",
+    "stackLimit": 50,
+    "category": "rawFood",
+    "nutrition": 0.1,
+    "rawPenalty": true
+  },
+  {
+    "key": "meal",
+    "name": "Simple meal",
+    "stackLimit": 10,
+    "category": "meal",
+    "nutrition": 0.9
+  },
+  {
+    "key": "cotton",
+    "name": "Cotton",
+    "stackLimit": 50
+  },
+  {
+    "key": "cloth",
+    "name": "Cloth",
+    "stackLimit": 50
+  },
+  {
+    "key": "herbalMedicine",
+    "name": "Herbal medicine",
+    "stackLimit": 25
+  }
+]

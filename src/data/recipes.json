@@ -1,0 +1,20 @@
+[
+  {
+    "key": "cookMeal",
+    "name": "Cook simple meal",
+    "bench": "cooking",
+    "ingredient": { "category": "rawFood", "count": 6 },
+    "product": { "item": "meal", "count": 1 },
+    "work": 120,
+    "defaultTarget": 10
+  },
+  {
+    "key": "weaveCloth",
+    "name": "Weave cloth",
+    "bench": "crafting",
+    "ingredient": { "item": "cotton", "count": 6 },
+    "product": { "item": "cloth", "count": 4 },
+    "work": 160,
+    "defaultTarget": 20
+  }
+]

@@ -1,0 +1,36 @@
+[
+  {
+    "key": "rustWardens",
+    "name": "The Rust Wardens",
+    "hostile": true,
+    "description": "Scavenger raiders who strip outposts for scrap.",
+    "names": [
+      "Grub",
+      "Vex",
+      "Harrow",
+      "Tallow",
+      "Crake",
+      "Mott",
+      "Scour",
+      "Brine",
+      "Kettle",
+      "Snag",
+      "Rook-eye",
+      "Pike"
+    ]
+  },
+  {
+    "key": "ashenHowlers",
+    "name": "The Ashen Howlers",
+    "hostile": true,
+    "description": "Nomads who burn what they can't carry.",
+    "names": ["Cinder", "Wail", "Soot", "Ember", "Gristle", "Hollow", "Char", "Flint", "Rasp", "Sear"]
+  },
+  {
+    "key": "meadowKin",
+    "name": "The Meadow Kin",
+    "hostile": false,
+    "description": "Farmers from the valley who trade and sometimes help.",
+    "names": ["Bryony", "Tansy", "Corin", "Linden", "Sorrel", "Hazel", "Rowan", "Yarrow", "Briar", "Fennel"]
+  }
+]

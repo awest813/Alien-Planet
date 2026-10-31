@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "vitest run --testTimeout=30000",
     "generate-logo:android": "npx @capacitor/assets generate --android",
     "generate-logo:ios": "npx @capacitor/assets generate --ios",
     "deploy:android": "npm run generate-logo:android && npm run build && cap run android",
@@ -24,6 +25,8 @@
     "i18n-for-browser": "3.0.0",
     "phaser": "4.1.0",
     "phaser4-rex-plugins": "4.0.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "typescript": "6.0.3",
     "vite": "8.0.10"
   },
@@ -31,6 +34,8 @@
     "@capacitor/assets": "3.0.5",
     "@eslint/js": "10.0.1",
     "@types/node": "25.6.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "eslint": "10.3.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-prettier": "5.5.5",
@@ -39,6 +44,7 @@
     "jiti": "2.7.0",
     "lint-staged": "16.4.0",
     "prettier": "3.8.3",
-    "typescript-eslint": "8.59.2"
+    "typescript-eslint": "8.59.2",
+    "vitest": "5.0.3"
   }
 }

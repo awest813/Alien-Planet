@@ -1,0 +1,8 @@
+{
+  "marshFever": {
+    "label": "Marsh fever",
+    "description": "Fatal if it outpaces immunity. Bed rest and tending slow it down.",
+    "severityPerHour": 0.032,
+    "immunityPerHour": 0.036
+  }
+}

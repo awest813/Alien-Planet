@@ -1,0 +1,72 @@
+{
+  "hardWorker": {
+    "label": "Hard worker",
+    "description": "Works 20% faster.",
+    "workSpeed": 1.2,
+    "excludes": "lazy"
+  },
+  "lazy": {
+    "label": "Lazy",
+    "description": "Works 20% slower, but gets bored less.",
+    "workSpeed": 0.8,
+    "joyDecay": 0.7,
+    "excludes": "hardWorker"
+  },
+  "optimist": {
+    "label": "Optimist",
+    "description": "Always sees the bright side (+6 mood).",
+    "mood": 6,
+    "excludes": "pessimist"
+  },
+  "pessimist": {
+    "label": "Pessimist",
+    "description": "Expects the worst (-6 mood).",
+    "mood": -6,
+    "excludes": "optimist"
+  },
+  "glutton": {
+    "label": "Glutton",
+    "description": "Gets hungry 40% faster.",
+    "foodDecay": 1.4
+  },
+  "ironStomach": {
+    "label": "Iron stomach",
+    "description": "Doesn't mind raw food.",
+    "ignoresRawFood": true
+  },
+  "tough": {
+    "label": "Tough",
+    "description": "Takes 40% less damage.",
+    "damageTaken": 0.6,
+    "excludes": "wimp"
+  },
+  "wimp": {
+    "label": "Wimp",
+    "description": "Collapses from pain more easily.",
+    "painThreshold": 0.5,
+    "excludes": "tough"
+  },
+  "sharpshooter": {
+    "label": "Sharpshooter",
+    "description": "Much more accurate with a bow.",
+    "accuracy": 0.2
+  },
+  "greenThumb": {
+    "label": "Green thumb",
+    "description": "Plants and harvests 30% faster.",
+    "plantSpeed": 1.3
+  },
+  "kind": {
+    "label": "Kind",
+    "description": "Never insults anyone; others warm to them faster.",
+    "insultChance": 0,
+    "opinionGiven": 1.5,
+    "excludes": "abrasive"
+  },
+  "abrasive": {
+    "label": "Abrasive",
+    "description": "Often insults people.",
+    "insultChance": 0.35,
+    "excludes": "kind"
+  }
+}
