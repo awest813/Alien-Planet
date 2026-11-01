@@ -161,6 +161,8 @@ const TEND_TICKS = 80;
 const MEDICINE = itemId('herbalMedicine');
 // A stored weapon must be this much better (by weaponScore) before someone swaps theirs for it.
 const WEAPON_UPGRADE = 1.15;
+// A different kind of weapon (a longbow over a recurve) only needs to be somewhat better.
+const NEW_WEAPON_UPGRADE = 1.03;
 // Raiders this close send undrafted colonists running for shelter.
 const SHELTER_RANGE = 14;
 const TOOL_KIT = itemId('toolKit');
@@ -339,6 +341,12 @@ export class Simulation {
   // Standing with each faction, -100..100 (missing: the starting value).
   public goodwill: Record<number, number> = {};
   public nextVisitorId = 0;
+  // Drafted colonists walking where the player sent them (not where their stance took them).
+  private ordered = new Set<number>();
+  // When each drafted colonist next rethinks their stance (straight away on being drafted).
+  private nextTactics = new Map<number, number>();
+  // Earliest tick each colonist may look for shelter again after finding none.
+  private nextShelterSearch = new Map<number, number>();
   // Buildings lost in a raid, to go back on the build list once it's over: [tile, feature].
   public pendingRebuilds: [number, number][] = [];
   // Earliest tick each colonist next considers changing clothes.
@@ -725,6 +733,8 @@ export class Simulation {
         this.endJob(c);
         c.drafted = cmd.drafted;
         c.draftTarget = -1;
+        this.nextTactics.delete(c.id);
+        this.ordered.delete(c.id);
         break;
       }
       case 'research': {
@@ -760,7 +770,12 @@ export class Simulation {
         if (c) {
           c.stance = cmd.stance;
           // A new stance takes effect at once, not after finishing the last one's walk.
-          if (c.drafted && c.path.length > 0 && c.path[c.path.length - 1] === c.draftTarget) {
+          if (
+            c.drafted &&
+            !this.ordered.has(c.id) &&
+            c.path.length > 0 &&
+            c.path[c.path.length - 1] === c.draftTarget
+          ) {
             c.path = [];
             c.moveProgress = 0;
           }
@@ -787,6 +802,7 @@ export class Simulation {
           c.path = path;
           c.moveProgress = 0;
           c.draftTarget = path.at(-1) ?? c.tile;
+          this.ordered.add(c.id);
         }
         break;
       }
@@ -1695,7 +1711,12 @@ export class Simulation {
     // A drafted colonist on the way somewhere they were sent (by the player, or by their stance)
     // gets there before they stop to shoot; otherwise fighting takes the whole tick.
     const sent = c.drafted && c.path.length > 0 && c.path[c.path.length - 1] === c.draftTarget;
-    if (!sent && colonistCombat(this, c)) {
+    if (c.drafted && c.path.length === 0) {
+      this.ordered.delete(c.id);
+    }
+    // On the way somewhere, they still hit back at anyone right next to them.
+    const cornered = sent && this.enemies.some((e) => e.hp > 0 && this.world.distance(e.tile, c.tile) < 1.5);
+    if ((!sent || cornered) && colonistCombat(this, c)) {
       this.fighting.add(c.id);
       if (c.drafted) {
         this.draftedTactics(c);
@@ -1720,7 +1741,7 @@ export class Simulation {
     if (this.tick % SLOW_TICKS === 0 && this.raidersNear(c) && this.tryShelter(c)) {
       // Running for cover.
     } else if (this.inMentalBreak(c)) {
-      if (c.job && c.job.type !== 'wander' && c.job.type !== 'warmUp') {
+      if (c.job && c.job.type !== 'wander' && c.job.type !== 'warmUp' && c.job.type !== 'shelter') {
         this.endJob(c);
       }
     } else {
@@ -1803,7 +1824,8 @@ export class Simulation {
         job !== 'rest' &&
         job !== 'tend' &&
         job !== 'warmUp' &&
-        job !== 'rescue'
+        job !== 'rescue' &&
+        job !== 'shelter'
       ) {
         this.endJob(c);
         this.startSleep(c);
@@ -3443,6 +3465,10 @@ export class Simulation {
 
   private tryHunt(c: Colonist): boolean {
     const w = this.world;
+    // Deer and hares don't wait for a spear: hunting takes a bow.
+    if (weaponDef(c.weapon).range <= 1) {
+      return false;
+    }
     const region = this.regionOf(c.tile);
     const prey = this.animals
       .filter((a) => a.hunted && a.hp > 0 && this.regions.region[a.tile] === region && !this.isReserved(`h${a.id}`, c))
@@ -3695,7 +3721,9 @@ export class Simulation {
         }
         const def = itemDef(type);
         if (def.weapon) {
-          return score(def.weapon, w.quality[i]) > current * WEAPON_UPGRADE;
+          return (
+            score(def.weapon, w.quality[i]) > current * (def.weapon === c.weapon ? WEAPON_UPGRADE : NEW_WEAPON_UPGRADE)
+          );
         }
         return !!def.armor && armorValue(type, w.fresh[i]) > armorNow * 1.25 + 0.02;
       },
@@ -3805,18 +3833,20 @@ export class Simulation {
     if (
       c.stance === 'hold' ||
       c.path.length > 0 ||
-      (this.tick + c.id * 13) % every !== 0 ||
+      (this.nextTactics.get(c.id) ?? 0) > this.tick ||
       this.enemies.length === 0
     ) {
       return;
     }
+    this.nextTactics.set(c.id, this.tick + every);
     let goal: number[];
     if (charging) {
-      const focus = this.enemies.find((e) => e.id === c.focus && e.hp > 0);
+      const region = this.regionOf(c.tile);
+      const focus = this.enemies.find((e) => e.id === c.focus && e.hp > 0 && this.regionOf(e.tile) === region);
       const target =
         focus ??
         this.enemies
-          .filter((e) => e.hp > 0 && this.regionOf(e.tile) === this.regionOf(c.tile))
+          .filter((e) => e.hp > 0 && !e.fleeing && this.regionOf(e.tile) === region)
           .sort((a, b) => w.distance(c.tile, a.tile) - w.distance(c.tile, b.tile))[0];
       if (!target) {
         return;
@@ -3859,16 +3889,28 @@ export class Simulation {
   private tryShelter(c: Colonist): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
+    if ((this.nextShelterSearch.get(c.id) ?? 0) > this.tick) {
+      return false;
+    }
     const threats = this.enemies.filter((e) => e.hp > 0 && !e.fleeing);
-    const danger = (i: number) => Math.min(...threats.map((e) => w.distance(e.tile, i)));
+    const danger = (i: number) => {
+      let d = Infinity;
+      for (const e of threats) {
+        d = Math.min(d, w.distance(e.tile, i));
+      }
+      return d;
+    };
+    // Of the nearest indoor spots, the one farthest from the raiders.
     const spot = this.nearest(
       c.tile,
-      (i) => w.isPassable(i) && this.regions.region[i] === region && this.isIndoors(i) && danger(i) > 4,
-      1,
-      (i) => -Math.min(10, danger(i)) * 0.5,
-    )[0];
+      (i) => w.isPassable(i) && this.regions.region[i] === region && this.isIndoors(i),
+      8,
+    )
+      .filter((i) => danger(i) > 4)
+      .sort((a, b) => danger(b) - danger(a))[0];
     const path = spot !== undefined ? this.pathfinder.find(c.tile, [spot]) : null;
     if (spot === undefined || !path) {
+      this.nextShelterSearch.set(c.id, this.tick + TICKS_PER_HOUR / 2);
       return false;
     }
     this.endJob(c);

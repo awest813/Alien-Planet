@@ -50,6 +50,8 @@ const SUPPRESS_DECAY = 0.006;
 const WOUNDED_FLEE = 0.35;
 // How often (ticks) archers rethink where to shoot from.
 const POST_RETHINK = 60;
+// How often (ticks) a badly hurt raider weighs running for it.
+const NERVE_CHECK = 60;
 const FISTS = weaponDef('fists');
 
 const chebyshev = (w: World, a: number, b: number) =>
@@ -87,7 +89,10 @@ const inCover = (w: World, from: number, at: number) => coverFactor(w, from, at)
 
 // Bresenham line between tile centres; walls, rock, and other solid tiles block it (embrasures
 // don't).
-export function lineOfSight(w: World, from: number, to: number): boolean {
+export function lineOfSight(w: World, a: number, b: number): boolean {
+  // Traced the same way whichever end it starts from, so seeing is always mutual.
+  const from = Math.min(a, b);
+  const to = Math.max(a, b);
   let x0 = w.xOf(from);
   let y0 = w.yOf(from);
   const x1 = w.xOf(to);
@@ -542,11 +547,14 @@ export function updateEnemies(sim: Simulation): void {
       continue;
     }
     // Badly hurt and losing their nerve: some break and run on their own.
-    if (e.hp < WOUNDED_FLEE && e.repathAt <= sim.tick && sim.rng.next() < 0.2 + e.suppression * 0.3) {
-      e.fleeing = true;
-      e.path = [];
-      sim.addLog(`${e.name} is badly hurt and running for it.`, 'good');
-      continue;
+    if (e.hp < WOUNDED_FLEE && (e.nerveCheckAt ?? 0) <= sim.tick) {
+      e.nerveCheckAt = sim.tick + NERVE_CHECK;
+      if (sim.rng.next() < 0.2 + e.suppression * 0.3) {
+        e.fleeing = true;
+        e.path = [];
+        sim.addLog(`${e.name} is badly hurt and running for it.`, 'good');
+        continue;
+      }
     }
     const target = targetFor(sim, e);
     if (!target && breach(sim, e)) {
@@ -581,7 +589,8 @@ export function updateEnemies(sim: Simulation): void {
           e.path = sim.pathfinder.find(e.tile, [post]) ?? [];
         }
       }
-      if (e.path.length > 0 && !adjacent) {
+      const toPost = e.post !== undefined && e.path.length > 0 && e.path[e.path.length - 1] === e.post;
+      if (toPost && !adjacent) {
         moveEnemy(sim, e);
         continue;
       }
@@ -807,8 +816,9 @@ export function colonistCombat(sim: Simulation, c: Colonist): boolean {
 // Whether a colonist at `tile` is sheltered from the nearest raider who could see them.
 export function coveredFrom(sim: Simulation, tile: number): boolean {
   const w = sim.world;
-  const threats = sim.enemies.filter((e) => e.hp > 0 && !e.fleeing && lineOfSight(w, e.tile, tile));
-  return threats.length > 0 && threats.every((e) => inCover(w, e.tile, tile));
+  return sim.enemies
+    .filter((e) => e.hp > 0 && !e.fleeing && lineOfSight(w, e.tile, tile))
+    .every((e) => inCover(w, e.tile, tile));
 }
 
 // A spot within a few steps where a drafted archer has cover from the raiders and still a clear
@@ -817,7 +827,9 @@ export function coverSpot(sim: Simulation, c: Colonist): number | undefined {
   const w = sim.world;
   const range = weaponDef(c.weapon).range;
   const threats = sim.enemies.filter((e) => e.hp > 0 && !e.fleeing);
-  if (threats.length === 0 || coveredFrom(sim, c.tile)) {
+  const shot = (t: number) => threats.some((e) => w.distance(t, e.tile) <= range && lineOfSight(w, t, e.tile));
+  // Already sheltered and with a shot: stay put.
+  if (threats.length === 0 || (shot(c.tile) && coveredFrom(sim, c.tile))) {
     return undefined;
   }
   const region = sim.regionOf(c.tile);
@@ -829,9 +841,7 @@ export function coverSpot(sim: Simulation, c: Colonist): number | undefined {
     const t = queue[q];
     const s = steps.get(t)!;
     if (t !== c.tile) {
-      const shot = threats.some((e) => w.distance(t, e.tile) <= range && lineOfSight(w, t, e.tile));
-      const sheltered = threats.filter((e) => lineOfSight(w, e.tile, t)).every((e) => inCover(w, e.tile, t));
-      if (shot && sheltered && !sim.enemies.some((e) => chebyshev(w, e.tile, t) <= 1)) {
+      if (shot(t) && coveredFrom(sim, t) && !sim.enemies.some((e) => chebyshev(w, e.tile, t) <= 1)) {
         if (s < bestScore) {
           bestScore = s;
           best = t;
@@ -860,6 +870,6 @@ export function armorOf(c: Colonist): { protection: number; speed: number } {
 // for a lot (most of the colony's fighting is done from behind cover).
 export function weaponScore(key: string, quality: number): number {
   const w = weaponDef(key);
-  const perHit = ((w.damage[0] + w.damage[1]) / 2) * qualityFactor(quality) * w.accuracy;
+  const perHit = ((w.damage[0] + w.damage[1]) / 2) * qualityFactor(quality) * w.accuracy * (1 + w.pierce * 0.3);
   return (perHit / w.cooldown) * (w.range > 1 ? 1 + w.range / 8 : 0.9);
 }

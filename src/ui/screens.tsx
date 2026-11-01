@@ -143,6 +143,10 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
   const [painting, setPainting] = useState(false);
   const paint = (colonist: number, hour: number) =>
     controller.command({ type: 'schedule', colonist, hour, slot: brush });
+  const living = state.colonists.filter((c) => !c.dead);
+  // The "Everyone" row paints an hour for the whole colony.
+  const paintAll = (hour: number) => living.forEach((c) => paint(c.id, hour));
+  const now = parseInt(state.time, 10);
   return (
     <Modal title="Schedule" onClose={onClose} wide>
       <div className="row">
@@ -155,19 +159,38 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
             {SLOT_LABELS[slot]}
           </button>
         ))}
-        <span className="muted">Pick a brush, then click or drag across hours.</span>
+        <span className="muted">
+          Pick a brush, then click or drag across hours. The Everyone row sets the whole colony.
+        </span>
       </div>
       <table className="grid schedule" onMouseLeave={() => setPainting(false)} onMouseUp={() => setPainting(false)}>
         <thead>
           <tr>
             <th />
             {Array.from({ length: 24 }, (_, h) => (
-              <th key={h}>{h}</th>
+              <th key={h} className={h === now ? 'now' : ''} title={h === now ? 'Now' : undefined}>
+                {h}
+              </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {state.colonists.map((c) => (
+          <tr className="everyone">
+            <td className="row-label muted">Everyone</td>
+            {Array.from({ length: 24 }, (_, hour) => (
+              <td
+                key={hour}
+                className={`hour slot-all ${hour === now ? 'now' : ''}`}
+                title={`${hour}:00 · set for everyone`}
+                onMouseDown={() => {
+                  setPainting(true);
+                  paintAll(hour);
+                }}
+                onMouseEnter={() => painting && paintAll(hour)}
+              />
+            ))}
+          </tr>
+          {living.map((c) => (
             <tr key={c.id}>
               <td className="row-label">
                 <span className="swatch" style={{ background: c.color }} /> {c.name}
@@ -175,7 +198,7 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
               {c.schedule.map((slot, hour) => (
                 <td
                   key={hour}
-                  className={`hour slot-${slot}`}
+                  className={`hour slot-${slot} ${hour === now ? 'now' : ''}`}
                   title={`${hour}:00 ${SLOT_LABELS[slot]}`}
                   onMouseDown={() => {
                     setPainting(true);
@@ -325,6 +348,8 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
   );
 }
 
+const researchRank = (p: UiState['research'][number]) => (p.current ? 0 : p.done ? 3 : p.available ? 1 : 2);
+
 export function ResearchScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
   return (
     <Modal title={`Research · year ${state.year}`} onClose={onClose}>
@@ -334,27 +359,30 @@ export function ResearchScreen({ state, onClose }: { state: UiState; onClose: ()
           : 'Build a research bench (Production) first, then pick a project.'}
       </p>
       <ul className="research">
-        {state.research.map((p) => (
-          <li key={p.key} className={p.done ? 'done' : p.current ? 'current' : p.available ? '' : 'locked'}>
-            <div className="research-head">
-              <b>{p.name}</b>
-              <span className="muted">{p.done ? 'Done' : `${Math.round(p.progress * p.cost)}/${p.cost}`}</span>
-              {!p.done && p.available && (
-                <button
-                  className={p.current ? 'active' : ''}
-                  onClick={() => controller.setResearch(p.current ? null : p.key)}
-                >
-                  {p.current ? 'Researching' : 'Research'}
-                </button>
-              )}
-            </div>
-            <div className="muted small">
-              {p.description}
-              {!p.available && !p.done && p.requires.length > 0 && ` Requires ${p.requires.join(', ')}.`}
-            </div>
-            {!p.done && <Bar value={p.progress} color="#8fc3ff" label={`${p.name} progress`} />}
-          </li>
-        ))}
+        {[...state.research]
+          // What can be picked now first, then what's locked, with finished projects at the bottom.
+          .sort((a, b) => researchRank(a) - researchRank(b))
+          .map((p) => (
+            <li key={p.key} className={p.done ? 'done' : p.current ? 'current' : p.available ? '' : 'locked'}>
+              <div className="research-head">
+                <b>{p.name}</b>
+                <span className="muted">{p.done ? 'Done' : `${Math.round(p.progress * p.cost)}/${p.cost}`}</span>
+                {!p.done && p.available && (
+                  <button
+                    className={p.current ? 'active' : ''}
+                    onClick={() => controller.setResearch(p.current ? null : p.key)}
+                  >
+                    {p.current ? 'Researching' : 'Research'}
+                  </button>
+                )}
+              </div>
+              <div className="muted small">
+                {p.description}
+                {!p.available && !p.done && p.requires.length > 0 && ` Requires ${p.requires.join(', ')}.`}
+              </div>
+              {!p.done && <Bar value={p.progress} color="#8fc3ff" label={`${p.name} progress`} />}
+            </li>
+          ))}
       </ul>
     </Modal>
   );

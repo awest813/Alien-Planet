@@ -167,6 +167,113 @@ describe('raiders', () => {
   });
 });
 
+describe('combat review fixes', () => {
+  it('has archers coming in from afar stop and shoot rather than walk up and punch', () => {
+    const { sim, w, x, y } = field(21);
+    for (const c of sim.colonists) {
+      c.tile = w.idx(x - 6, y);
+      c.priorities = Object.fromEntries(Object.keys(c.priorities).map((k) => [k, 0])) as typeof c.priorities;
+      c.schedule.fill('A');
+    }
+    const e = raider(sim, w.idx(x + 10, y), 'shortBow', { hp: 50 });
+    let ranged = 0;
+    let melee = 0;
+    for (let t = 0; t < 600; t++) {
+      for (const c of sim.colonists) {
+        c.path = [];
+        c.job = null;
+        c.tile = w.idx(x - 6, y);
+      }
+      const before = sim.shots.length;
+      sim.step();
+      for (const shot of sim.shots.slice(before)) {
+        if (shot.from === e.tile) {
+          if (shot.ranged) {
+            ranged++;
+          } else {
+            melee++;
+          }
+        }
+      }
+    }
+    expect(ranged).toBeGreaterThan(0);
+    expect(melee).toBe(0);
+  });
+
+  it('sees the same both ways', () => {
+    const w = new World(24, 24);
+    w.terrain.fill(terrainId('grass'));
+    for (let i = 0; i < w.size; i += 7) {
+      w.feature[i] = featureId('stoneWall');
+    }
+    for (let a = 0; a < w.size; a += 13) {
+      for (let b = 0; b < w.size; b += 17) {
+        expect(lineOfSight(w, a, b)).toBe(lineOfSight(w, b, a));
+      }
+    }
+  });
+
+  it('trades a recurve bow for a longbow of the same make', () => {
+    const { sim, w, x, y } = field(22);
+    for (const c of sim.colonists) {
+      c.weapon = 'recurveBow';
+      c.weaponQuality = 10;
+    }
+    w.dropItemNear(w.idx(x + 2, y), itemId('longbow'), 1, undefined, 10);
+    run(sim, 300);
+    expect(sim.colonists.some((c) => c.weapon === 'longbow')).toBe(true);
+  });
+
+  it('keeps colonists in shelter through a sleep slot while raiders are near', () => {
+    const { sim, w, x, y } = field(23);
+    const hut = { x0: x - 8, y0: y - 3, x1: x - 4, y1: y + 1 };
+    for (const i of outline(w, hut.x0, hut.y0, hut.x1, hut.y1)) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    w.setFeature(w.idx(hut.x1, y - 1), featureId('door'));
+    const c = sim.colonists[0];
+    c.tile = w.idx(x, y);
+    c.schedule.fill('S');
+    c.needs.rest = 0.5;
+    raider(sim, w.idx(x + 10, y), 'club', { hp: 50, repathAt: forever });
+    let sheltered = false;
+    for (let t = 0; t < 400; t++) {
+      for (const e of sim.enemies) {
+        e.path = [];
+      }
+      sim.step();
+      sheltered ||= c.job?.type === 'shelter';
+      if (sheltered && t > 100) {
+        break;
+      }
+    }
+    expect(sheltered).toBe(true);
+    expect(sim.isIndoors(c.tile) || c.job?.type === 'shelter').toBe(true);
+  });
+
+  it("keeps a player's move order when the stance changes", () => {
+    const { sim, w, x, y } = field(24);
+    const c = sim.colonists[0];
+    sim.apply({ type: 'draft', colonist: c.id, drafted: true });
+    sim.apply({ type: 'move', colonist: c.id, tile: w.idx(x + 8, y) });
+    expect(c.path.length).toBeGreaterThan(0);
+    sim.apply({ type: 'stance', colonist: c.id, stance: 'hold' });
+    expect(c.path.length).toBeGreaterThan(0);
+  });
+
+  it('leaves hunting to those with something that shoots', () => {
+    const { sim } = field(25);
+    for (const c of sim.colonists) {
+      c.weapon = 'spear';
+    }
+    for (const a of sim.animals) {
+      a.hunted = true;
+    }
+    run(sim, 200);
+    expect(sim.colonists.some((c) => c.job?.type === 'hunt')).toBe(false);
+  });
+});
+
 describe('defenses', () => {
   it('embrasures block movement but not shots, and shelter whoever is behind', () => {
     const w = new World(10, 10);
@@ -216,7 +323,8 @@ describe('colonist tactics', () => {
     }
     c.tile = w.idx(x, y);
     w.setFeature(w.idx(x + 2, y + 1), featureId('sandbags'));
-    const e = raider(sim, w.idx(x + 8, y + 1), 'club', { hp: 50 });
+    // A raider who stays put, so the test is about the colonist.
+    const e = raider(sim, w.idx(x + 8, y + 1), 'club', { hp: 50, speed: 0 });
     e.repathAt = forever;
     sim.apply({ type: 'draft', colonist: c.id, drafted: true });
     expect(coverSpot(sim, c)).toBe(w.idx(x + 1, y + 1));

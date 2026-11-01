@@ -283,6 +283,8 @@ export interface Enemy {
   breachTarget?: number;
   // Where a ranged raider has chosen to shoot from.
   post?: number;
+  // Next tick a badly hurt raider weighs whether to run for it.
+  nerveCheckAt?: number;
 }
 
 // A recent attack, kept briefly so the renderer can draw it.

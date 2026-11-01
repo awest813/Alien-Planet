@@ -1427,3 +1427,28 @@ button.big {
   padding: 8px 22px;
   font-size: 14px;
 }
+
+/* Schedule: the hour it is now, and the paint-everyone row. */
+.schedule th.now {
+  color: var(--accent);
+}
+
+.schedule td.now {
+  box-shadow:
+    inset 2px 0 0 var(--accent),
+    inset -2px 0 0 var(--accent);
+}
+
+.schedule .slot-all {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.schedule .slot-all:hover {
+  background: rgba(255, 209, 102, 0.3);
+}
+
+.objectives .goal-how {
+  margin: 2px 0 4px 18px;
+  font-size: 12px;
+  color: var(--muted);
+}

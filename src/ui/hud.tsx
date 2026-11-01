@@ -534,6 +534,8 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
   const [allAlerts, setAllAlerts] = useState(false);
   // Phases the player has unfolded; the current one is always open.
   const [unfolded, setUnfolded] = useState<Set<string>>(new Set());
+  // A goal with no tool or screen, opened to show how it's done.
+  const [explained, setExplained] = useState<string | null>(null);
   const danger = state.alerts.filter((a) => a.tone === 'danger').length;
   const phases = PHASE_NAMES.map((name, index) => ({
     name,
@@ -639,13 +641,18 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
                               <button
                                 className="goal"
                                 title={o.how || undefined}
-                                onClick={() => startGoal(o, onOpen)}
-                                disabled={!o.tool && !o.screen}
+                                aria-expanded={!o.tool && !o.screen ? explained === o.id : undefined}
+                                onClick={() =>
+                                  o.tool || o.screen
+                                    ? startGoal(o, onOpen)
+                                    : setExplained(explained === o.id ? null : o.id)
+                                }
                               >
                                 <span className="check">{o.failed ? '✖' : '○'}</span>
                                 {o.label}
                                 {o.progress && <span className="muted"> {o.progress}</span>}
                               </button>
+                              {explained === o.id && o.how && o !== next && <div className="goal-how">{o.how}</div>}
                             </li>
                           ))}
                       </ul>
