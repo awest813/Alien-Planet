@@ -94,8 +94,9 @@ How the storytelling layer works:
   right-click a raider to have the selected colonist, or everyone drafted, concentrate fire on them.
 - **Animal husbandry:** mark wild animals with the Tame tool; colonists with the Handle work type (and the
   Animals skill) calm them and try to win them over, harder for wilder animals, and a boar may lash out.
-  Tame animals stay near the colony, pairs breed most mornings, tame deer give milk, and tame boars bite
-  raiders who come close. Mark a tame animal for hunting to slaughter it for meat and leather.
+  Tame animals stay near the colony, pairs breed most mornings, and each morning tame deer give milk, muskoxen
+  shed wool (spun into cloth at the crafting bench) and grouse lay eggs (cooked like meat). Tame boars and
+  wolves bite raiders who come close. Mark a tame animal for hunting to slaughter it for meat and leather.
 - **Clothing and exposure:** colonists start in tunics. Research Tailoring to make tunics from cloth and warm
   parkas from leather at the crafting bench; clothes get a quality tier (Poor to Masterwork) from the
   crafter's skill, insulate more the better they're made, and wear out over weeks. Colonists change into
@@ -112,9 +113,11 @@ How the storytelling layer works:
 - **Skills:** every skill (mining, construction, plants, cooking, crafting, medicine, combat) improves with
   practice, up to 20. Each colonist has a couple of passions (★ interested, ★★ burning) that speed learning and
   lift their mood while doing that work. Expert skills slowly rust without practice.
-- **Wildlife and hunting:** deer, hares and boars roam the map and herds wander in. Mark animals with the Hunt
-  tool and colonists with the Hunt work type will track and shoot them for raw meat (cookable) and leather.
-  Boars often turn on their hunter, and anyone nearby will fight an enraged animal.
+- **Wildlife and hunting:** deer, hares, boars, muskoxen, grouse, foxes and wolves roam the map, and herds
+  wander in, each species in its own numbers. Mark animals with the Hunt tool and colonists with the Hunt work
+  type will track and shoot them for raw meat (cookable) and leather. Boars and wolves often turn on their
+  hunter, and anyone nearby will fight an enraged animal. Wolves and foxes hunt the smaller animals but leave
+  people alone: a hungry predator runs down a deer, hare or grouse, and its kill leaves raw meat behind.
 - **Weapons, armor and defenses:** one set of weapons for everyone, each with its own reach, rate, accuracy,
   drop-off and armor piercing: fists, knife, club, spear, short bow, recurve bow, longbow (Longbows research) and
   crossbow (Crossbows research). Leather and scale armor (Armor and Scale armor research) turn aside a share of
@@ -166,7 +169,7 @@ How the storytelling layer works:
 - **Sun lamps:** crops beneath them grow day and night, all year, so a heated greenhouse can farm in winter.
 - **Storyteller:** roughly once or twice a day it may send something. Threats (more often on Harsh, rarer on
   Peaceful): raids, marsh fever, cold snaps, summer heat waves, crop blight, eclipses that darken the sky and
-  solar panels for a few hours, and packs of maddened boars that hunt colonists down one after another. Good
+  solar panels for a few hours, and packs of maddened boars or wolves (more likely at night) that hunt colonists down one after another. Good
   fortune: wanderers and wounded refugees asking to join, herds, trade caravans and gifts from the friendly Meadow
   Kin, meteorites that scatter silver and stone (and may start a fire), auroras that lift everyone's mood, a
   colonist struck by inspiration (40% faster work for a day), and bumper crops. Each event pops up as a short
@@ -196,7 +199,7 @@ src/
     seasons.ts      The calendar and seasonal temperature
     research.ts     Research state, availability and unlocks
     power.ts        The colony power grid: generators, solar, batteries
-    animals.ts      Wildlife: wandering, fleeing, revenge, herds, and hunting yields
+    animals.ts      Wildlife: wandering, fleeing, predators, revenge, herds, produce and hunting yields
     simulation.ts   Fixed-tick loop, needs and mood, colonist AI, job system, reservations, objectives
     serialize.ts    Save format
   game/       Glue between the simulation, renderer, and UI
@@ -237,7 +240,8 @@ sun lamps, `src/sim/water.test.ts` covers bridges, fishing, ice, wading and batt
 idle generators), `src/sim/needs.test.ts` covers clothing, exposure, fine meals, food poisoning, multi-ingredient
 crafting, stonecutting, mending and saves, `src/sim/building.test.ts` covers floors, roofs and tool kits,
 `src/sim/husbandry.test.ts` covers taming, herding, breeding, milk and
-guard animals, `src/sim/weather.test.ts` covers weather, soaking, lightning, fire and firefighting, and
+guard animals, `src/sim/wildlife.test.ts` covers the species, herd sizes, predators, wool, eggs and manhunter
+wolves, `src/sim/weather.test.ts` covers weather, soaking, lightning, fire and firefighting, and
 `src/sim/trade.test.ts` covers caravans, buying and selling, goodwill and saving a visit, and
 `src/sim/combat.test.ts` covers weapons, armor, raider loadouts and tactics, suppression, embrasures, traps,
 focus fire, taking cover and sheltering.

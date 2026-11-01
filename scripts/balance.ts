@@ -1,7 +1,7 @@
 // Headless balance harness: an "autoplayer" runs a sensible colony on many seeds and prints
 // survival, combat, health, mood and social statistics.
 //
-//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive] [peaceful|harsh] [trace] [size=64] [seed=N]
+//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K]
 //
 // "passive" never drafts during raids, to measure the worst case; "peaceful" and "harsh" pick the
 // storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies;
@@ -162,6 +162,7 @@ function play(seed: number): Result {
   let hearthPlaced = false;
   let fishingPlaced = false;
   let extraBeds = 0;
+  let chopRadius = 15;
   let friendDay = -1;
   let starvingHours = 0;
   const starvingByDay: Record<number, number> = {};
@@ -262,6 +263,15 @@ function play(seed: number): Result {
     const parka = RECIPES.find((r) => r.key === 'tailorParka')!;
     if (sim.bills[parka.id].target !== sim.living().length) {
       sim.apply({ type: 'bill', recipe: parka.id, target: sim.living().length });
+    }
+    // Running short of wood: chop further out, like a player would on a map with few trees nearby.
+    if (Math.floor(sim.hour) === 6 && sim.stockOf(itemId('wood')) < 40 && chopRadius < w.width) {
+      chopRadius += 8;
+      sim.apply({
+        type: 'designate',
+        rect: { x0: cx - chopRadius, y0: cy - chopRadius, x1: cx + chopRadius, y1: cy + chopRadius },
+        kind: 'chop',
+      });
     }
     // Hunt whatever wildlife is around once the colony is settled (leather becomes recurve bows).
     if (sim.day >= 3) {
@@ -441,7 +451,9 @@ const results: Result[] = [];
 const started = performance.now();
 // "seed=47514" replays just that colony.
 const onlySeed = Number(process.argv.find((a) => a.startsWith('seed='))?.slice(5) ?? 0);
-const seedList = onlySeed ? [onlySeed] : Array.from({ length: seeds }, (_, s) => (s + 1) * 7919);
+// "start=25" skips the first 25 seeds, so a long batch can be split across processes.
+const startAt = Number(process.argv.find((a) => a.startsWith('start='))?.slice(6) ?? 0);
+const seedList = onlySeed ? [onlySeed] : Array.from({ length: seeds }, (_, s) => (startAt + s + 1) * 7919);
 for (const seed of seedList) {
   const r = play(seed);
   results.push(r);

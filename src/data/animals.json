@@ -9,7 +9,12 @@
     "weight": 5,
     "wildness": 0.2,
     "breedChance": 0.25,
-    "milk": 5
+    "plural": "deer",
+    "group": [3, 5],
+    "produce": {
+      "item": "milk",
+      "count": 5
+    }
   },
   "hare": {
     "name": "Hare",
@@ -20,7 +25,9 @@
     "fleeRange": 3,
     "weight": 4,
     "wildness": 0.1,
-    "breedChance": 0.45
+    "breedChance": 0.45,
+    "plural": "hares",
+    "group": [2, 4]
   },
   "boar": {
     "name": "Boar",
@@ -35,6 +42,81 @@
     "description": "Fights back when hunted.",
     "wildness": 0.35,
     "breedChance": 0.3,
-    "guard": true
+    "guard": true,
+    "plural": "boars",
+    "group": [2, 4]
+  },
+  "wolf": {
+    "name": "Wolf",
+    "plural": "wolves",
+    "hp": 1.0,
+    "speed": 1.2,
+    "meat": 8,
+    "leather": 4,
+    "fleeRange": 0,
+    "weight": 1.6,
+    "revengeChance": 0.85,
+    "bite": [0.12, 0.2],
+    "description": "Hunts deer and hares, and fights back hard when hunted.",
+    "wildness": 0.55,
+    "breedChance": 0.2,
+    "guard": true,
+    "group": [2, 4],
+    "preys": ["deer", "hare", "grouse"]
+  },
+  "fox": {
+    "name": "Fox",
+    "plural": "foxes",
+    "hp": 0.5,
+    "speed": 1.2,
+    "meat": 4,
+    "leather": 2,
+    "fleeRange": 5,
+    "weight": 1.5,
+    "revengeChance": 0.2,
+    "bite": [0.05, 0.1],
+    "description": "A small hunter of hares and grouse; shy of people.",
+    "wildness": 0.4,
+    "breedChance": 0.25,
+    "group": [1, 2],
+    "preys": ["hare", "grouse"]
+  },
+  "muskox": {
+    "name": "Muskox",
+    "plural": "muskoxen",
+    "hp": 2.2,
+    "speed": 0.8,
+    "meat": 24,
+    "leather": 8,
+    "fleeRange": 2,
+    "weight": 2,
+    "revengeChance": 0.3,
+    "bite": [0.1, 0.16],
+    "description": "Big, slow and shaggy. Tame ones shed wool every morning.",
+    "wildness": 0.3,
+    "breedChance": 0.2,
+    "group": [3, 6],
+    "produce": {
+      "item": "wool",
+      "count": 6
+    }
+  },
+  "grouse": {
+    "name": "Grouse",
+    "plural": "grouse",
+    "hp": 0.3,
+    "speed": 1.0,
+    "meat": 3,
+    "leather": 0,
+    "fleeRange": 3,
+    "weight": 3,
+    "description": "A plump ground bird. Tame ones lay eggs.",
+    "wildness": 0.15,
+    "breedChance": 0.5,
+    "group": [3, 6],
+    "produce": {
+      "item": "egg",
+      "count": 2
+    }
   }
 }

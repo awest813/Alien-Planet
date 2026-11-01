@@ -666,6 +666,68 @@ function createAnimalTextures(scene: Phaser.Scene): void {
     c.fillStyle = '#222';
     c.fillRect(12, 8, 1, 1);
   });
+  draw('wolf', (c) => {
+    c.fillStyle = '#7d7f86';
+    c.fillRect(2, 7, 9, 4);
+    c.fillRect(10, 5, 4, 4);
+    c.fillStyle = '#5b5d63';
+    c.fillRect(11, 3, 1, 2);
+    c.fillRect(13, 3, 1, 2);
+    c.fillRect(1, 6, 2, 2);
+    c.fillRect(3, 11, 1, 3);
+    c.fillRect(9, 11, 1, 3);
+    c.fillStyle = '#d8d8dc';
+    c.fillRect(12, 8, 2, 1);
+    c.fillStyle = '#ffd166';
+    c.fillRect(12, 6, 1, 1);
+  });
+  draw('fox', (c) => {
+    c.fillStyle = '#d0702c';
+    c.fillRect(4, 8, 7, 3);
+    c.fillRect(10, 6, 3, 3);
+    c.fillRect(1, 7, 3, 2);
+    c.fillStyle = '#f2ece2';
+    c.fillRect(1, 7, 1, 1);
+    c.fillRect(11, 9, 2, 1);
+    c.fillStyle = '#3a2418';
+    c.fillRect(10, 5, 1, 1);
+    c.fillRect(12, 5, 1, 1);
+    c.fillRect(5, 11, 1, 3);
+    c.fillRect(9, 11, 1, 3);
+    c.fillStyle = '#222';
+    c.fillRect(12, 7, 1, 1);
+  });
+  draw('muskox', (c) => {
+    c.fillStyle = '#4e3a2c';
+    c.fillRect(1, 5, 11, 7);
+    c.fillRect(11, 7, 3, 4);
+    c.fillStyle = '#3a2a1f';
+    c.fillRect(1, 11, 11, 1);
+    c.fillRect(2, 12, 1, 2);
+    c.fillRect(10, 12, 1, 2);
+    c.fillStyle = '#d8ccb0';
+    c.fillRect(11, 6, 3, 1);
+    c.fillRect(13, 7, 1, 2);
+    c.fillStyle = '#111';
+    c.fillRect(12, 8, 1, 1);
+  });
+  draw('grouse', (c) => {
+    c.fillStyle = '#8a6a48';
+    c.fillRect(5, 8, 6, 4);
+    c.fillRect(9, 6, 3, 3);
+    c.fillStyle = '#5e4630';
+    c.fillRect(3, 8, 2, 2);
+    c.fillRect(6, 9, 3, 1);
+    c.fillStyle = '#d23c2c';
+    c.fillRect(10, 5, 1, 1);
+    c.fillStyle = '#e0a040';
+    c.fillRect(12, 7, 1, 1);
+    c.fillStyle = '#222';
+    c.fillRect(10, 7, 1, 1);
+    c.fillStyle = '#c08040';
+    c.fillRect(7, 12, 1, 2);
+    c.fillRect(9, 12, 1, 2);
+  });
   draw('boar', (c) => {
     c.fillStyle = '#4a3a34';
     c.fillRect(2, 7, 10, 5);
@@ -715,6 +777,23 @@ function drawItem(c: Ctx, key: string): void {
       c.fillRect(7, 3, 2, 8);
       c.fillStyle = '#6f757c';
       c.fillRect(5, 2, 6, 3);
+      break;
+    case 'wool':
+      c.fillStyle = '#e6e0d2';
+      c.fillRect(3, 7, 10, 6);
+      c.fillRect(5, 5, 6, 2);
+      c.fillStyle = '#c9c1b0';
+      c.fillRect(4, 9, 2, 2);
+      c.fillRect(9, 8, 2, 2);
+      c.fillRect(7, 11, 2, 1);
+      break;
+    case 'egg':
+      c.fillStyle = '#efe6d2';
+      c.fillRect(6, 5, 4, 8);
+      c.fillRect(5, 7, 6, 5);
+      c.fillStyle = '#c9b48a';
+      c.fillRect(7, 8, 1, 1);
+      c.fillRect(9, 10, 1, 1);
       break;
     case 'stoneBlocks':
       c.fillStyle = '#8a8990';

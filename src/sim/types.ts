@@ -221,6 +221,9 @@ export interface Animal {
   revengeUntil: number;
   // Part of a pack gone mad: it goes after one colonist after another until its fury runs out.
   manhunter?: boolean;
+  // A wild predator's current prey (an animal id), and when it'll next be hungry.
+  chasing?: number;
+  fedUntil?: number;
 }
 
 export interface Injury {

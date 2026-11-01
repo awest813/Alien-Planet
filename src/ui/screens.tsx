@@ -339,6 +339,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             Grow <b>healroot</b> for medicine, hunt and fish for meat and leather, forage berries for quick food.
           </li>
           <li>
+            <b>Tame</b> animals for their produce: deer give milk, muskoxen wool (spin it into cloth), grouse eggs.
+            Wolves hunt deer and hares but leave people alone unless hunted themselves.
+          </li>
+          <li>
             Weather matters: rain chills, droughts stunt crops, storms start fires. Traders visit now and then: open{' '}
             <b>Trade</b> in the top bar.
           </li>

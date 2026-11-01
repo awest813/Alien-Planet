@@ -1,5 +1,5 @@
 import { MAP_SIZE, MOVE_SPEED, TICKS_PER_HOUR } from './constants';
-import { ANIMALS, itemId } from './defs';
+import { ANIMALS, itemDef, itemId } from './defs';
 import { damage } from './health';
 import type { Simulation } from './simulation';
 import { Animal, Colonist } from './types';
@@ -79,7 +79,8 @@ export function herdArrives(sim: Simulation): number {
     return 0;
   }
   const kind = pickKind(sim);
-  const count = Math.min(wildCap(sim) - wildCount(sim), sim.rng.int(3, 5));
+  const [least, most] = ANIMALS[kind].group;
+  const count = Math.min(wildCap(sim) - wildCount(sim), sim.rng.int(least, most));
   for (let n = 0; n < count; n++) {
     addAnimal(sim, edge, kind);
   }
@@ -102,6 +103,78 @@ function standDownAfterPack(sim: Simulation): void {
       }
     }
   }
+}
+
+// How long a predator that has eaten leaves other animals alone, and how far it looks for prey.
+const FED_TICKS = TICKS_PER_HOUR * 30;
+const HUNT_RANGE = 18;
+const PREY_BITE = 2.5;
+
+// A hungry wild predator looks for prey now and then, runs it down and eats; the carcass leaves
+// raw meat behind for anyone who wants it. Returns true while it's busy hunting.
+function stalk(sim: Simulation, a: Animal): boolean {
+  const w = sim.world;
+  const def = ANIMALS[a.kind];
+  if ((a.fedUntil ?? 0) > sim.tick || !def.preys || !def.bite) {
+    return false;
+  }
+  let prey = a.chasing !== undefined ? sim.animals.find((p) => p.id === a.chasing && p.hp > 0) : undefined;
+  if (!prey) {
+    a.chasing = undefined;
+    // Looking around is occasional, not every tick.
+    if ((sim.tick + a.id * 7) % 30 !== 0) {
+      return false;
+    }
+    const region = sim.regionOf(a.tile);
+    prey = sim.animals
+      .filter(
+        (p) =>
+          p.hp > 0 &&
+          !p.tame &&
+          def.preys!.includes(p.kind) &&
+          w.distance(p.tile, a.tile) <= HUNT_RANGE &&
+          sim.regionOf(p.tile) === region,
+      )
+      .sort((x, y) => w.distance(x.tile, a.tile) - w.distance(y.tile, a.tile))[0];
+    if (!prey) {
+      return false;
+    }
+    a.chasing = prey.id;
+  }
+  if (chebyshev(sim, a.tile, prey.tile) <= 1) {
+    a.path = [];
+    if (a.cooldown <= 0) {
+      a.cooldown = BITE_COOLDOWN;
+      const hit = sim.rng.next() < 0.7;
+      sim.shots.push({ from: a.tile, to: prey.tile, hit, ranged: false, tick: sim.tick });
+      if (hit) {
+        // Hunting animals go for the throat: far harder than a bite in a scuffle.
+        prey.hp -= (def.bite[0] + sim.rng.next() * (def.bite[1] - def.bite[0])) * PREY_BITE;
+        if (prey.hp <= 0) {
+          // What the predator doesn't eat is left for the taking.
+          const left = Math.floor(ANIMALS[prey.kind].meat / 2);
+          if (left > 0) {
+            w.dropItemNear(prey.tile, itemId('rawMeat'), left);
+          }
+          a.chasing = undefined;
+          a.fedUntil = sim.tick + FED_TICKS;
+          a.restUntil = sim.tick + TICKS_PER_HOUR * 2;
+        }
+      }
+    }
+    return true;
+  }
+  if (a.path.length === 0 || sim.tick % 30 === 0) {
+    pathTo(sim, a, [prey.tile, ...w.neighbors(prey.tile).filter((n) => w.isPassable(n))]);
+    if (a.path.length === 0 || w.distance(prey.tile, a.tile) > HUNT_RANGE * 2) {
+      // Lost it: try again later.
+      a.chasing = undefined;
+      a.fedUntil = sim.tick + TICKS_PER_HOUR * 6;
+      return false;
+    }
+  }
+  move(sim, a);
+  return true;
 }
 
 // The nearest colonist a raging animal can reach and still has to bring down.
@@ -192,7 +265,7 @@ const MAX_TAME = 14;
 
 export const wildCount = (sim: Simulation) => sim.animals.filter((a) => !a.tame).length;
 
-// Each morning tame pairs may have young, and tame milkers give milk.
+// Each morning tame pairs may have young, and tame animals give their produce (milk, wool, eggs).
 export function animalsAtDawn(sim: Simulation): void {
   const tame = sim.animals.filter((a) => a.tame && a.hp > 0);
   const born: string[] = [];
@@ -211,10 +284,11 @@ export function animalsAtDawn(sim: Simulation): void {
     sim.addLog(`New ${born.length > 1 ? 'young' : 'young one'} in the herd: ${born.join(', ')}.`, 'good');
   }
   for (const a of tame) {
-    const milk = ANIMALS[a.kind].milk;
-    if (milk) {
-      sim.world.dropItemNear(a.tile, itemId('milk'), milk);
-      sim.stats.produced.milk = (sim.stats.produced.milk ?? 0) + milk;
+    const produce = ANIMALS[a.kind].produce;
+    if (produce) {
+      sim.world.dropItemNear(a.tile, produce.item, produce.count);
+      const key = itemDef(produce.item).key;
+      sim.stats.produced[key] = (sim.stats.produced[key] ?? 0) + produce.count;
     }
   }
 }
@@ -311,11 +385,15 @@ export function updateAnimals(sim: Simulation): void {
       }
     } else if (a.tame && guard(sim, a)) {
       continue;
+    } else if (def.preys && !a.tame && !a.taming && stalk(sim, a)) {
+      continue;
     } else if (def.fleeRange > 0 && !a.tame && !a.taming && a.path.length === 0) {
-      // Skittish animals keep their distance from people.
-      const near = awake.find((c) => w.distance(c.tile, a.tile) < def.fleeRange);
-      if (near) {
-        const to = wanderTarget(sim, a, WANDER_RADIUS, near.tile);
+      // Skittish animals keep their distance from people, and from anything hunting them.
+      const near =
+        awake.find((c) => w.distance(c.tile, a.tile) < def.fleeRange)?.tile ??
+        sim.animals.find((p) => p.chasing === a.id && p.hp > 0 && w.distance(p.tile, a.tile) < 6)?.tile;
+      if (near !== undefined) {
+        const to = wanderTarget(sim, a, WANDER_RADIUS, near);
         if (to !== undefined) {
           pathTo(sim, a, [to]);
         }
@@ -346,7 +424,9 @@ export function hurtAnimal(sim: Simulation, a: Animal, amount: number, attacker:
   a.hp -= amount;
   if (a.hp <= 0) {
     sim.world.dropItemNear(a.tile, itemId('rawMeat'), def.meat);
-    sim.world.dropItemNear(a.tile, itemId('leather'), def.leather);
+    if (def.leather > 0) {
+      sim.world.dropItemNear(a.tile, itemId('leather'), def.leather);
+    }
     sim.stats.produced.rawMeat = (sim.stats.produced.rawMeat ?? 0) + def.meat;
     sim.stats.produced.leather = (sim.stats.produced.leather ?? 0) + def.leather;
     // Slaughtering livestock isn't hunting.

@@ -114,6 +114,8 @@ describe('cooking', () => {
     const sim = Simulation.newColony(seed);
     const w = sim.world;
     const { x, y } = clearAround(sim, 10);
+    // No wildlife either: a predator's kill would leave extra meat about.
+    sim.animals = [];
     for (const i of [...w.tilesWith('items')]) {
       if (itemDef(w.itemType[i]).nutrition > 0) {
         w.takeItem(i, w.itemCount[i]);

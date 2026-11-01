@@ -67,7 +67,7 @@ const HOURLY_CHANCE = 1 / 14;
 const MAX_COLONISTS = 8;
 
 const hostileFactions = () => FACTIONS.filter((f) => f.hostile);
-const animalLabel = (kind: string) => (kind === 'deer' ? 'deer' : `${ANIMALS[kind].name.toLowerCase()}s`);
+const animalLabel = (kind: string) => ANIMALS[kind].plural;
 const friendlyFaction = () => FACTIONS.find((f) => !f.hostile)!;
 
 const EVENTS: EventDef[] = [
@@ -269,12 +269,14 @@ const EVENTS: EventDef[] = [
     run: (sim) => {
       // Two boars at first, one more every twelve days (and one more on harsh), never more than five.
       const count = Math.min(5, 2 + Math.floor(sim.day / 12) + (sim.story.difficulty === 'harsh' ? 1 : 0));
-      const arrived = manhuntersArrive(sim, 'boar', count);
+      // Boars by day; wolves are more likely after dark.
+      const kind = sim.rng.next() < (sim.isNight() ? 0.7 : 0.35) ? 'wolf' : 'boar';
+      const arrived = manhuntersArrive(sim, kind, count);
       if (arrived === 0) {
         return false;
       }
       sim.addLog(
-        `A pack of ${arrived} maddened boars is charging the colony! Draft colonists and fight them off.`,
+        `A pack of ${arrived} maddened ${ANIMALS[kind].plural} is charging the colony! Draft colonists and fight them off.`,
         'danger',
         true,
       );

@@ -460,16 +460,28 @@ export interface AnimalDef {
   wildness: number;
   // Chance per day that a tame pair has young.
   breedChance: number;
-  // Milk a tame one gives each morning.
-  milk?: number;
+  // What a tame one gives each morning (milk, wool, eggs).
+  produce?: { item: number; count: number };
+  // Plural name, for herds in the log.
+  plural: string;
+  // How many arrive together.
+  group: [number, number];
+  // Wild predators hunt these kinds.
+  preys?: string[];
   // Tame ones bite raiders who come close.
   guard?: boolean;
 }
 
+type RawAnimal = Omit<AnimalDef, 'key' | 'produce'> & { produce?: { item: string; count: number } };
+
 export const ANIMALS: Record<string, AnimalDef> = Object.fromEntries(
-  Object.entries(animalsJson as unknown as Record<string, Omit<AnimalDef, 'key'>>).map(([key, a]) => [
+  Object.entries(animalsJson as unknown as Record<string, RawAnimal>).map(([key, a]) => [
     key,
-    { key, ...a },
+    {
+      ...a,
+      key,
+      produce: a.produce && { item: resolveItem(a.produce.item), count: a.produce.count },
+    },
   ]),
 );
 

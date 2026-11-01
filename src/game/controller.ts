@@ -195,7 +195,7 @@ export const TOOLS: ToolDef[] = [
     hotkey: '',
     tool: { kind: 'tame' },
     group: 'orders',
-    hint: 'Drag over wild animals to tame them: deer give milk, boars guard the colony, pairs breed',
+    hint: 'Drag over wild animals to tame them: deer give milk, muskoxen wool, grouse eggs; boars and wolves guard the colony; pairs breed',
   },
   {
     id: 'cancel',

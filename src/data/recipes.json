@@ -56,6 +56,23 @@
     ]
   },
   {
+    "key": "spinWool",
+    "name": "Spin wool",
+    "bench": "crafting",
+    "product": {
+      "item": "cloth",
+      "count": 4
+    },
+    "work": 140,
+    "defaultTarget": 20,
+    "ingredients": [
+      {
+        "item": "wool",
+        "count": 6
+      }
+    ]
+  },
+  {
     "key": "craftBow",
     "name": "Craft recurve bow",
     "bench": "crafting",

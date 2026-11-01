@@ -218,5 +218,21 @@
       "protection": 0.45,
       "speed": 0.92
     }
+  },
+  {
+    "key": "wool",
+    "name": "Wool",
+    "stackLimit": 50,
+    "value": 2
+  },
+  {
+    "key": "egg",
+    "name": "Egg",
+    "stackLimit": 30,
+    "nutrition": 0.1,
+    "shelfLife": 6,
+    "category": "rawFood",
+    "foodKind": "meat",
+    "value": 1
   }
 ]
