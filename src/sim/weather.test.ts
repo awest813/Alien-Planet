@@ -50,6 +50,10 @@ describe('fire', () => {
     const sim = Simulation.newColony(seed);
     const w = sim.world;
     const { x, y } = clearAround(sim, 12);
+    // High summer, in a drought that won't break.
+    while (sim.season !== 'Summer') {
+      sim.tick += HOUR * 24;
+    }
     sim.weather = { kind: 'drought', until: forever };
     return { sim, w, x, y };
   }

@@ -224,6 +224,12 @@ export interface Animal {
   // A wild predator's current prey (an animal id), and when it'll next be hungry.
   chasing?: number;
   fedUntil?: number;
+  // A wild animal moving on: it walks off the map and is gone.
+  leaving?: boolean;
+  // Snapped at its handler during a taming attempt: only the handler fends it off.
+  lashOut?: boolean;
+  // A predator that lost its quarry waits until then before hunting again.
+  huntAgainAt?: number;
 }
 
 export interface Injury {

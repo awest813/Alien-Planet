@@ -2,7 +2,8 @@
 
 **An original colony simulation in the browser, built with Phaser 4, TypeScript, and React.**
 
-Five colonists land on a procedurally generated 64×64 map. You don't control them directly: you designate work
+A handful of colonists land on a procedurally generated map: three on a small 64×64 valley (room for six), four on a
+medium 96×96 one (room for nine) or five on a large 128×128 frontier (room for twelve). You don't control them directly: you designate work
 (chop, mine, forage, build, farm, cook, haul to storage) and they decide who does what, around their own needs.
 They get hungry, tired and bored, and their mood reacts to what they eat, where they sleep, how warm they are and
 how nice their rooms are. Let mood drop too far for too long and a colonist will wander off in a daze.
@@ -117,7 +118,10 @@ How the storytelling layer works:
   wander in, each species in its own numbers. Mark animals with the Hunt tool and colonists with the Hunt work
   type will track and shoot them for raw meat (cookable) and leather. Boars and wolves often turn on their
   hunter, and anyone nearby will fight an enraged animal. Wolves and foxes hunt the smaller animals but leave
-  people alone: a hungry predator runs down a deer, hare or grouse, and its kill leaves raw meat behind.
+  people alone: a hungry predator runs down a deer, hare or grouse, the pack shares the kill, and it
+  leaves raw meat behind. Wildlife comes and goes: when the map gets crowded the herd that has been around
+  longest moves on, predators with nothing left to hunt leave, and a maddened pack whose fury is spent goes
+  back where it came from. Wounded animals mend slowly.
 - **Weapons, armor and defenses:** one set of weapons for everyone, each with its own reach, rate, accuracy,
   drop-off and armor piercing: fists, knife, club, spear, short bow, recurve bow, longbow (Longbows research) and
   crossbow (Crossbows research). Leather and scale armor (Armor and Scale armor research) turn aside a share of
@@ -129,7 +133,7 @@ How the storytelling layer works:
   summers, freezing winter nights). Crops don't grow in winter and hard frost kills anything left in the field,
   so plant enough in spring and summer and harvest before winter.
 - **Research:** build a research bench, pick a project in the Research screen, and colonists with the Research
-  work type study it (training the Intellectual skill). Twelve projects unlock the recurve bow, sandbags, the
+  work type study it (training the Intellectual skill). Seventeen projects unlock the recurve bow, sandbags, the
   stone hearth, the fine bed, tailoring and all the electrical tech below, or improve insulation, crop growth and
   doctoring.
 - **Power:** the colony shares one grid. Wood-fired generators (kept fuelled by haulers) and solar panels (daytime

@@ -152,7 +152,8 @@ export function updateHealth(sim: Simulation, c: Colonist, hours: number): void 
     }
   }
   h.poisoned = Math.max(0, h.poisoned - hours);
-  const restBonus = c.sleeping ? 1.5 : 1;
+  // Lying still, asleep or downed, helps the body mend.
+  const restBonus = c.sleeping || h.downed ? 1.5 : 1;
   for (const injury of h.injuries) {
     const rate = injury.tended > 0 ? 0.015 + 0.03 * injury.tended : 0.004;
     injury.severity -= rate * restBonus * hours;

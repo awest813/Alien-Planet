@@ -30,7 +30,7 @@ import { Caravan } from './trade';
 import { WeatherState } from './weather';
 import { World } from './world';
 
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 
 interface SavedColonist {
   id: number;

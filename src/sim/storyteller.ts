@@ -1,6 +1,6 @@
 import { herdArrives, manhuntersArrive, wildCap, wildCount } from './animals';
 import { spawnRaid, weaponScore } from './combat';
-import { TICKS_PER_HOUR } from './constants';
+import { TICKS_PER_HOUR, populationFor } from './constants';
 import { ANIMALS, FACTIONS, NONE, featureDef, itemId, terrainDef } from './defs';
 import { damage, infect } from './health';
 import { caravanArrives, goodwillOf } from './trade';
@@ -64,7 +64,15 @@ const DAY = TICKS_PER_HOUR * 24;
 // Minimum gap between any two events, and the hourly chance of one once that has passed.
 const EVENT_GAP = TICKS_PER_HOUR * 10;
 const HOURLY_CHANCE = 1 / 14;
-const MAX_COLONISTS = 8;
+// Raids and packs are sized for a colony of six: in proportion for a smaller one, and more, though
+// not proportionally more, for a bigger one.
+const threatScale = (sim: Simulation) => {
+  const living = sim.living().length;
+  return living <= 6 ? Math.max(living, 2) / 6 : Math.sqrt(living / 6);
+};
+
+// Newcomers stop asking to join once the colony fills its valley.
+const roomToGrow = (sim: Simulation) => sim.living().length < populationFor(sim.world.width).maxColonists;
 
 const hostileFactions = () => FACTIONS.filter((f) => f.hostile);
 const animalLabel = (kind: string) => ANIMALS[kind].plural;
@@ -78,16 +86,16 @@ const EVENTS: EventDef[] = [
     threat: true,
     weight: (sim) => (sim.story.difficulty === 'peaceful' ? 0 : 3),
     run: (sim) => {
-      const living = sim.living().length;
-      // Two raiders on day 4 and one more every three days, plus extra for a big or well-armed colony.
-      // The cap is seven at first (nine on harsh), rising by one every eight days after day 19.
+      // Two raiders on day 4 and one more every three days, plus extra for a well-armed colony. The cap
+      // is seven at first (nine on harsh), rising by one every eight days after day 19; then all of it
+      // scaled to the colony's size.
       const harsh = sim.story.difficulty === 'harsh' ? 2 : 0;
       const armed = sim
         .living()
         .filter((c) => weaponScore(c.weapon, c.weaponQuality) >= weaponScore('recurveBow', 4)).length;
       const cap = Math.min(9 + harsh, 7 + harsh + Math.max(0, Math.floor((sim.day - 19) / 8)));
-      const size = 2 + harsh + Math.floor((sim.day - 4) / 3) + (living > 6 ? 1 : 0) + Math.floor(armed / 3);
-      const count = Math.min(cap, size);
+      const size = 2 + harsh + Math.floor((sim.day - 4) / 3) + Math.floor(armed / 3);
+      const count = Math.max(2, Math.round(Math.min(cap, size) * threatScale(sim)));
       return spawnRaid(sim, sim.rng.pick(hostileFactions()).id, count);
     },
   },
@@ -122,9 +130,9 @@ const EVENTS: EventDef[] = [
     key: 'wanderer',
     minDay: 2,
     cooldownDays: 6,
-    weight: (sim) => (sim.living().length < MAX_COLONISTS ? 1 : 0),
+    weight: (sim) => (roomToGrow(sim) ? 1 : 0),
     run: (sim) => {
-      const c = sim.addWanderer();
+      const c = roomToGrow(sim) ? sim.addWanderer() : undefined;
       if (!c) {
         return false;
       }
@@ -147,8 +155,17 @@ const EVENTS: EventDef[] = [
       if (count === 0) {
         return false;
       }
-      const kind = sim.animals[sim.animals.length - 1];
-      sim.addLog(`A group of ${count} ${animalLabel(kind.kind)} has wandered onto the map.`, 'good', true);
+      const kind = sim.animals[sim.animals.length - 1].kind;
+      // Predators are news, not good news.
+      if (ANIMALS[kind].preys) {
+        sim.addLog(
+          `A pack of ${count} ${animalLabel(kind)} has come into the valley to hunt. They leave people alone unless provoked.`,
+          'warn',
+          true,
+        );
+      } else {
+        sim.addLog(`A group of ${count} ${animalLabel(kind)} has wandered onto the map.`, 'good', true);
+      }
       return true;
     },
   },
@@ -268,7 +285,8 @@ const EVENTS: EventDef[] = [
     weight: (sim) => (sim.story.difficulty === 'peaceful' ? 0 : 0.7),
     run: (sim) => {
       // Two boars at first, one more every twelve days (and one more on harsh), never more than five.
-      const count = Math.min(5, 2 + Math.floor(sim.day / 12) + (sim.story.difficulty === 'harsh' ? 1 : 0));
+      const base = Math.min(5, 2 + Math.floor(sim.day / 12) + (sim.story.difficulty === 'harsh' ? 1 : 0));
+      const count = Math.max(2, Math.round(base * threatScale(sim)));
       // Boars by day; wolves are more likely after dark.
       const kind = sim.rng.next() < (sim.isNight() ? 0.7 : 0.35) ? 'wolf' : 'boar';
       const arrived = manhuntersArrive(sim, kind, count);
@@ -340,9 +358,9 @@ const EVENTS: EventDef[] = [
     key: 'refugee',
     minDay: 4,
     cooldownDays: 8,
-    weight: (sim) => (sim.living().length < MAX_COLONISTS ? 0.6 : 0),
+    weight: (sim) => (roomToGrow(sim) ? 0.6 : 0),
     run: (sim) => {
-      const c = sim.addWanderer();
+      const c = roomToGrow(sim) ? sim.addWanderer() : undefined;
       if (!c) {
         return false;
       }

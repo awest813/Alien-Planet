@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { NONE, featureId, itemId, terrainId } from './defs';
+import { NONE, RECIPES, featureId, itemId, terrainId } from './defs';
 import { Pathfinder } from './pathfinding';
 import { computeRooms } from './regions';
 import { deserialize, serialize } from './serialize';
-import { Simulation } from './simulation';
+import { MAP_SIZES, Simulation } from './simulation';
 import { HOUR, clearAround, outline, run, totalItems } from './test-helpers';
 import { GROW_ZONE, STOCKPILE_ZONE, World } from './world';
 
@@ -31,10 +31,11 @@ describe('world generation', () => {
     expect(a.colonists.map((c) => c.name)).toEqual(b.colonists.map((c) => c.name));
   });
 
-  it('lands five colonists on dry, walkable ground', () => {
+  it('lands three, four or five colonists, by map size, on dry, walkable ground', () => {
     for (let seed = 1; seed <= 20; seed++) {
-      const sim = Simulation.newColony(seed);
-      expect(sim.colonists).toHaveLength(5);
+      const size = MAP_SIZES[seed % MAP_SIZES.length];
+      const sim = Simulation.newColony(seed, 'standard', size.size);
+      expect(sim.colonists).toHaveLength(size.colonists);
       for (const c of sim.colonists) {
         expect(sim.world.isPassable(c.tile)).toBe(true);
         expect(sim.world.terrain[c.tile]).not.toBe(terrainId('shallowWater'));
@@ -173,6 +174,8 @@ describe('colony behaviour', () => {
     });
     sim.apply({ type: 'zone', rect: { x0: x + 2, y0: y + 3, x1: x + 5, y1: y + 5 }, zone: STOCKPILE_ZONE });
     sim.apply({ type: 'build', feature: featureId('stove'), tiles: [w.idx(x + 3, y - 3)] });
+    // Cook beyond the landing rations.
+    sim.apply({ type: 'bill', recipe: RECIPES.find((r) => r.key === 'cookMeal')!.id, target: 60 });
     run(sim, HOUR * 24 * 3);
     expect(sim.stats.produced.potatoes ?? 0).toBeGreaterThanOrEqual(24);
     expect(sim.stats.produced.meal ?? 0).toBeGreaterThan(0);

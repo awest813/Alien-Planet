@@ -59,7 +59,10 @@ export function updateWeather(sim: Simulation): void {
   const weather = sim.weather;
   // A spell that no longer fits ends early: droughts with the summer, snow once it thaws.
   const thawed = weather.kind === 'snow' && sim.outdoorTemperature() - weatherDef(sim).temp > 2;
-  const outOfSeason = (weather.kind === 'drought' && sim.season !== 'Summer') || thawed;
+  // And rain that runs into a freezing night turns to snow.
+  const frozen =
+    (weather.kind === 'rain' || weather.kind === 'storm') && sim.outdoorTemperature() - weatherDef(sim).temp < 0;
+  const outOfSeason = (weather.kind === 'drought' && sim.season !== 'Summer') || thawed || frozen;
   if (sim.tick < weather.until && !outOfSeason) {
     if (weather.kind === 'storm') {
       lightning(sim);

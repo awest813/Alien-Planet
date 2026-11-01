@@ -150,6 +150,11 @@
     "mood": 3,
     "hours": 4
   },
+  "interestingWork": {
+    "label": "Doing interesting work",
+    "mood": 1,
+    "hours": 4
+  },
   "researchDone": {
     "label": "We made a breakthrough",
     "mood": 3,

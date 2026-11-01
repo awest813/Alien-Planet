@@ -28,7 +28,7 @@ describe('floors', () => {
     sim.apply({ type: 'build', feature: featureId('door'), tiles: [w.idx(hut.x0, hut.y0 + 2)] });
     const bed = w.idx(hut.x0 + 2, hut.y0 + 2);
     sim.apply({ type: 'build', feature: featureId('bed'), tiles: [bed] });
-    run(sim, HOUR * 10);
+    run(sim, HOUR * 16);
     expect(w.feature[bed]).toBe(featureId('bed'));
     const before = sim.roomAt(bed)!.impressiveness;
     const inside: number[] = [];
@@ -38,7 +38,7 @@ describe('floors', () => {
       }
     }
     sim.apply({ type: 'build', feature: featureId('woodFloor'), tiles: inside });
-    run(sim, HOUR * 10);
+    run(sim, HOUR * 16);
     expect(inside.every((i) => w.floor[i] === featureId('woodFloor'))).toBe(true);
     // The bed is still there, on top of the floor.
     expect(w.feature[bed]).toBe(featureId('bed'));

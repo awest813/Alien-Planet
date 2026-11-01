@@ -3,7 +3,7 @@ import { lineOfSight } from './combat';
 import { TRAITS, featureId, itemId, terrainId } from './defs';
 import { bleedingOf, damage, infect } from './health';
 import { deserialize, serialize } from './serialize';
-import { Simulation } from './simulation';
+import { MAP_SIZES, Simulation } from './simulation';
 import { compatibility, mutualOpinion, updateSocial } from './social';
 import { triggerEvent } from './storyteller';
 import { HOUR, run } from './test-helpers';
@@ -143,11 +143,12 @@ describe('relationships and events', () => {
 
   it('lets a wanderer join the colony', () => {
     const sim = Simulation.newColony(4);
+    const landed = sim.colonists.length;
     expect(triggerEvent(sim, 'wanderer')).toBe(true);
-    expect(sim.colonists).toHaveLength(6);
-    const newcomer = sim.colonists[5];
-    expect(newcomer.id).toBe(5);
-    expect(Object.keys(newcomer.opinions)).toHaveLength(5);
+    expect(sim.colonists).toHaveLength(landed + 1);
+    const newcomer = sim.colonists[landed];
+    expect(newcomer.id).toBe(landed);
+    expect(Object.keys(newcomer.opinions)).toHaveLength(landed);
     run(sim, HOUR * 4);
     expect(newcomer.health.dead).toBe(false);
   });
@@ -224,6 +225,30 @@ describe('audit regressions', () => {
       updateSocial(sim);
     }
     expect(logs.filter((l) => l.startsWith(`${kind.name} insulted`))).toHaveLength(0);
+  });
+
+  it('stops newcomers joining once the colony fills its map', () => {
+    for (const size of MAP_SIZES) {
+      const sim = Simulation.newColony(5, 'standard', size.size);
+      expect(sim.colonists).toHaveLength(size.colonists);
+      for (let n = 0; n < 20; n++) {
+        triggerEvent(sim, 'wanderer');
+      }
+      expect(sim.living()).toHaveLength(size.maxColonists);
+    }
+  });
+
+  it('sizes raids to the colony: fewer raiders for a small one', () => {
+    const raiders = (colonists: number) => {
+      const sim = Simulation.newColony(6, 'standard', 128);
+      // Everyone past the first few is away (dead, for the count).
+      sim.colonists.slice(colonists).forEach((c) => (c.health.dead = true));
+      sim.tick = HOUR * 24 * 16;
+      triggerEvent(sim, 'raid');
+      return sim.enemies.length;
+    };
+    expect(raiders(3)).toBeLessThan(raiders(5));
+    expect(raiders(2)).toBeGreaterThanOrEqual(2);
   });
 
   it('sends no raids on peaceful difficulty', () => {

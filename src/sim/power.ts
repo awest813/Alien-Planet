@@ -57,8 +57,13 @@ export function updatePower(sim: Simulation, tiles: number[], hours: number): vo
     demand += power.draw;
     capacity += power.storage;
   }
-  // Generators idle (saving fuel) while everything else already covers demand and the batteries are full.
-  const needed = demand > supply || state.stored < capacity;
+  // Generators idle (saving fuel) while everything else already covers demand and the batteries are
+  // full, and when even running flat out they couldn't power the grid and there's no battery to charge.
+  let flatOut = supply;
+  for (const i of generators) {
+    flatOut += w.fuel[i] > 0 ? featureDef(w.feature[i]).power!.output : 0;
+  }
+  const needed = (demand > supply || state.stored < capacity) && (flatOut >= demand || state.stored < capacity);
   state.idle = !needed && generators.length > 0;
   for (const i of generators) {
     const fuel = featureDef(w.feature[i]).power!.fuel!;

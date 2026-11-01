@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { animalsAtDawn, herdArrives } from './animals';
+import { animalsAtDawn, herdArrives, wildCap } from './animals';
 import { ANIMALS, featureId, itemId, matchesIngredient } from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
@@ -121,6 +121,70 @@ describe('wildlife variety', () => {
       }
     }
     expect(kinds.has('wolf')).toBe(true);
+  });
+
+  it('has a pack share its kill', () => {
+    const { sim, w, x, y } = field(18);
+    for (const c of sim.colonists) {
+      c.tile = w.idx(x - 13, y - 13);
+      c.schedule.fill('S');
+    }
+    const hunter = place(sim, 'wolf', w.idx(x + 2, y));
+    const packmate = place(sim, 'wolf', w.idx(x + 2, y + 1), { fedUntil: sim.tick + 1e6 });
+    const deer = place(sim, 'deer', w.idx(x + 5, y));
+    for (let t = 0; t < 2000 && deer.hp > 0; t++) {
+      sim.step();
+    }
+    expect(deer.hp).toBeLessThanOrEqual(0);
+    // Hungry again (just now, not for days, or they'd move on): the packmate eats from the next kill.
+    packmate.fedUntil = sim.tick;
+    hunter.fedUntil = sim.tick;
+    hunter.tile = w.idx(x + 2, y);
+    hunter.path = [];
+    packmate.tile = w.idx(x + 2, y + 1);
+    packmate.restUntil = sim.tick + 1e6;
+    const second = place(sim, 'deer', w.idx(x + 5, y));
+    for (let t = 0; t < 2000 && second.hp > 0; t++) {
+      sim.step();
+    }
+    expect(second.hp).toBeLessThanOrEqual(0);
+    expect(packmate.fedUntil).toBeGreaterThan(sim.tick);
+  });
+
+  it('sends predators with nothing left to hunt off the map, leaving nothing behind', () => {
+    const { sim, w, x, y } = field(19);
+    const wolf = place(sim, 'wolf', w.idx(x + 3, y), { fedUntil: 0 });
+    sim.tick += 3 * 24 * 200;
+    animalsAtDawn(sim);
+    expect(wolf.leaving).toBe(true);
+    const meat = sim.stockOf(itemId('rawMeat'));
+    for (let t = 0; t < 8000 && sim.animals.includes(wolf); t++) {
+      sim.step();
+    }
+    expect(sim.animals.includes(wolf)).toBe(false);
+    expect(sim.stockOf(itemId('rawMeat'))).toBe(meat);
+  });
+
+  it('sends the longest-staying herd away when the map is crowded, but not animals marked for work', () => {
+    const { sim, w, x, y } = field(20);
+    const first = [0, 1, 2].map((n) => place(sim, 'deer', w.idx(x + 4 + n, y + 4)));
+    first[2].hunted = true;
+    while (sim.animals.length < wildCap(sim)) {
+      place(sim, 'muskox', w.idx(x - 6 + (sim.animals.length % 5), y - 6));
+    }
+    animalsAtDawn(sim);
+    expect(first[0].leaving && first[1].leaving).toBe(true);
+    expect(first[2].leaving).toBeFalsy();
+    expect(sim.animals.filter((a) => a.kind === 'muskox').some((a) => a.leaving)).toBe(false);
+  });
+
+  it('brings no second pack of predators while one is about', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const { sim, w, x, y } = field(seed);
+      place(sim, 'wolf', w.idx(x + 3, y));
+      herdArrives(sim);
+      expect(sim.animals.slice(1).every((a) => !ANIMALS[a.kind].preys)).toBe(true);
+    }
   });
 
   it('keeps a predator’s hunt through a save', () => {

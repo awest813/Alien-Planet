@@ -473,6 +473,20 @@ function flee(sim: Simulation, e: Enemy): void {
   moveEnemy(sim, e);
 }
 
+// How much of a blow gets through a colonist's armor; the armor takes a beating doing its job.
+export function armorTakes(sim: Simulation, target: Colonist, amount: number, pierce = 0): number {
+  if (!target.armor) {
+    return amount;
+  }
+  const dealt = amount * (1 - itemDef(target.armor.item).armor!.protection * (1 - pierce));
+  target.armor.wear -= dealt * 0.6;
+  if (target.armor.wear <= 0) {
+    sim.addLog(`${target.name}'s ${itemDef(target.armor.item).name.toLowerCase()} has fallen apart.`, 'warn');
+    target.armor = null;
+  }
+  return dealt;
+}
+
 function enemyAttack(sim: Simulation, e: Enemy, target: Colonist): void {
   const adjacent = chebyshev(sim.world, e.tile, target.tile) <= 1;
   const weapon = weaponAt(e.weapon, adjacent);
@@ -481,16 +495,7 @@ function enemyAttack(sim: Simulation, e: Enemy, target: Colonist): void {
   recordShot(sim, e.tile, target.tile, hit, ranged);
   if (hit) {
     const harsh = sim.story.difficulty === 'harsh' ? 1.1 : 1;
-    const armor = target.armor ? itemDef(target.armor.item).armor!.protection : 0;
-    const dealt = throughArmor(roll(sim, weapon.damage) * RAIDER_HIT * harsh, armor, weapon);
-    if (target.armor) {
-      // Armor takes a beating doing its job.
-      target.armor.wear -= dealt * 0.6;
-      if (target.armor.wear <= 0) {
-        sim.addLog(`${target.name}'s ${itemDef(target.armor.item).name.toLowerCase()} has fallen apart.`, 'warn');
-        target.armor = null;
-      }
-    }
+    const dealt = armorTakes(sim, target, roll(sim, weapon.damage) * RAIDER_HIT * harsh, weapon.pierce);
     damage(sim, target, dealt, !ranged && weapon.key === 'club' ? 'bruise' : ranged ? 'arrow' : 'cut');
   }
   e.cooldown = weapon.cooldown;
@@ -677,7 +682,7 @@ export function updateEnemies(sim: Simulation): void {
       sim.addLog(`The raiders left the colony for dead${plunder(sim)}.`, 'danger', true);
     }
     for (const c of sim.living()) {
-      if (c.drafted) {
+      if (c.drafted && !sim.story.manhuntersActive) {
         sim.endJob(c);
         c.drafted = false;
       }
@@ -784,7 +789,7 @@ export function colonistCombat(sim: Simulation, c: Colonist): boolean {
     (a) =>
       a.hp > 0 &&
       a.revengeOn >= 0 &&
-      (a.revengeOn === c.id || chebyshev(w, c.tile, a.tile) <= 1 || !busy) &&
+      (a.lashOut ? a.revengeOn === c.id : a.revengeOn === c.id || chebyshev(w, c.tile, a.tile) <= 1 || !busy) &&
       canAttack(sim, c, a.tile, range),
   );
   if (beast) {

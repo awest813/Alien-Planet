@@ -136,7 +136,9 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     screen: 'production',
   },
   parkas: { how: 'Research Tailoring; crafters then make parkas from leather (see Production).', screen: 'research' },
-  population: { how: 'Wanderers ask to join now and then; keep the colony comfortable and fed.' },
+  population: {
+    how: 'Wanderers ask to join now and then until the valley is full (6 on a small map, 9 medium, 12 large); keep the colony comfortable and fed.',
+  },
   secondWinter: { how: 'Everything from the first winter, with a bigger colony.' },
 };
 
@@ -1650,7 +1652,7 @@ export class GameController {
     const room = sim.roomAt(i);
     const beast = sim.animals.find((a) => a.tile === i);
     const animal = beast
-      ? `${beast.tame ? 'Tame ' + animalName(beast).toLowerCase() : animalName(beast)}${beast.taming ? ' · to be tamed' : ''}${beast.hunted ? ' · marked for hunting' : ''}${beast.revengeOn >= 0 ? ' · enraged' : ''}`
+      ? `${beast.tame ? 'Tame ' + animalName(beast).toLowerCase() : animalName(beast)}${beast.taming ? ' · to be tamed' : ''}${beast.hunted ? ' · marked for hunting' : ''}${beast.revengeOn >= 0 ? ' · enraged' : ''}${beast.leaving && !beast.hunted && !beast.taming ? ' · moving on' : ''}`
       : null;
     return {
       x: w.xOf(i),

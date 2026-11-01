@@ -42,10 +42,11 @@ export function rollPassions(rng: Rng): Record<SkillKey, Passion> {
 export function learn(sim: Simulation, c: Colonist, skill: SkillKey, amount = 1): void {
   const passion = c.passions[skill];
   c.practicedAt[skill] = sim.tick;
-  if (passion === 2) {
-    const current = c.thoughts.find((t) => t.key === 'passionWork');
+  if (passion > 0) {
+    const key = passion === 2 ? 'passionWork' : 'interestingWork';
+    const current = c.thoughts.find((t) => t.key === key);
     if (!current || current.expires - sim.tick < TICKS_PER_HOUR) {
-      sim.addThought(c, 'passionWork');
+      sim.addThought(c, key);
     }
   }
   if (c.skills[skill] >= MAX_SKILL) {

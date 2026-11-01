@@ -30,6 +30,10 @@ export interface Caravan {
 }
 
 export const STARTING_GOODWILL = 20;
+
+// Silver changing hands for a deal, rounded in the traders' favour (so a single cheap item can't be
+// sold for double its price).
+export const dealBalance = (cost: number, income: number) => Math.ceil(cost) - Math.floor(income);
 // How long a caravan stays, counted from when it sets out.
 const VISIT_HOURS = 30;
 // Traders this close to home have arrived and are open for business.
@@ -240,7 +244,7 @@ export function applyTrade(sim: Simulation, buy: [number, number][], sell: [numb
   }
   const cost = buy.reduce((sum, [item, n]) => sum + n * price.buy(item), 0);
   const income = sell.reduce((sum, [item, n]) => sum + n * price.sell(item), 0);
-  const balance = Math.round(cost - income);
+  const balance = dealBalance(cost, income);
   if (balance > colonyStock(sim, silver)) {
     return 'Not enough silver in the stockpiles.';
   }

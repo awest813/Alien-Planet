@@ -265,8 +265,8 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Welcome to Colony Alpha" onClose={onClose}>
       <p>
-        Five colonists have crash-landed. You don't steer them directly: you give orders, and they decide who does what
-        between eating, sleeping and taking breaks.
+        A handful of colonists have crash-landed. You don't steer them directly: you give orders, and they decide who
+        does what between eating, sleeping and taking breaks.
       </p>
       <ol className="help-steps big">
         <li>

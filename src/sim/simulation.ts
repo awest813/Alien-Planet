@@ -1,12 +1,4 @@
-import {
-  COMFORT_MAX,
-  COMFORT_MIN,
-  CROP_MIN_TEMP,
-  describeRoom,
-  measureRooms,
-  outdoorTemperature,
-  updateRoomTemperatures,
-} from './climate';
+import { CROP_MIN_TEMP, describeRoom, measureRooms, outdoorTemperature, updateRoomTemperatures } from './climate';
 import {
   ANIMALS,
   COLONIST_COLORS,
@@ -55,7 +47,6 @@ import {
   weaponScore,
 } from './combat';
 import {
-  COLONIST_COUNT,
   MAP_SIZE,
   MOVE_SPEED,
   NIGHT_END,
@@ -63,6 +54,7 @@ import {
   SLOW_TICKS,
   START_HOUR,
   TICKS_PER_HOUR,
+  populationFor,
 } from './constants';
 import {
   bleedingOf,
@@ -120,7 +112,7 @@ import {
 import { Designation, GROW_ZONE, TileKind, World, growZoneCrop } from './world';
 import { generateWorld } from './worldgen';
 
-export { COLONIST_COUNT, MAP_SIZE, MAP_SIZES, NIGHT_END, NIGHT_START, START_HOUR, TICKS_PER_HOUR } from './constants';
+export { MAP_SIZE, MAP_SIZES, NIGHT_END, NIGHT_START, START_HOUR, TICKS_PER_HOUR, populationFor } from './constants';
 const LOG_LIMIT = 60;
 const STORY_LIMIT = 200;
 
@@ -453,7 +445,8 @@ export class Simulation {
     const spots = [spawn, ...world.neighbors(spawn)].filter(
       (i) => world.isPassable(i) && terrainDef(world.terrain[i]).buildable,
     );
-    for (let id = 0; id < COLONIST_COUNT; id++) {
+    const { colonists: landing } = populationFor(size);
+    for (let id = 0; id < landing; id++) {
       const name = names.splice(rng.int(0, names.length - 1), 1)[0];
       const c = createColonist(id, name, spots[id % spots.length], rng);
       for (const other of colonists) {
@@ -462,15 +455,15 @@ export class Simulation {
       colonists.push(c);
     }
     // Survival rations to tide the colony over until the first harvest.
-    world.dropItemNear(spawn, itemId('meal'), 18);
+    world.dropItemNear(spawn, itemId('meal'), 4 * landing);
     // A little silver for the first traders who come by.
     world.dropItemNear(spawn, itemId('silver'), 100);
     const sim = new Simulation(world, colonists, seed, rng);
     sim.story = freshStory(difficulty);
-    // Ten animals on the standard map, more on bigger ones.
-    populateWildlife(sim, Math.round((10 * world.size) / (MAP_SIZE * MAP_SIZE)), spawn);
+    // Eight animals on the standard map, more on bigger ones.
+    populateWildlife(sim, Math.round((8 * world.size) / (MAP_SIZE * MAP_SIZE)), spawn);
     sim.addLog(
-      'Five colonists have landed with a few days of rations. Designate work and they will get to it.',
+      `${NUMBER_WORDS[landing] ?? landing} colonists have landed with a few days of rations. Designate work and they will get to it.`,
       'info',
       true,
     );
@@ -747,7 +740,7 @@ export class Simulation {
         break;
       case 'draft': {
         const c = this.colonists[cmd.colonist];
-        if (!c || c.health.dead || (cmd.drafted && c.health.downed)) {
+        if (!c || c.health.dead || (cmd.drafted && (c.health.downed || this.inMentalBreak(c)))) {
           break;
         }
         this.endJob(c);
@@ -839,8 +832,24 @@ export class Simulation {
 
   public temperatureAt(i: number): number {
     this.ensureRegions();
-    const room = this.rooms.room[i];
+    const room = this.doorway(i) ?? this.rooms.room[i];
     return room >= 0 && this.rooms.enclosed[room] ? this.roomTemps[room] : this.outdoorTemperature();
+  }
+
+  // A door belongs to the room it opens into: standing in the doorway is as warm (and as dry) as
+  // just inside. Undefined for anything but a door into an enclosed room.
+  private doorway(i: number): number | undefined {
+    const f = this.world.feature[i];
+    if (f === NONE || !featureDef(f).door) {
+      return undefined;
+    }
+    for (const n of this.world.neighbors(i, false)) {
+      const room = this.rooms.room[n];
+      if (room >= 0 && this.rooms.enclosed[room]) {
+        return room;
+      }
+    }
+    return undefined;
   }
 
   public roomAt(i: number): RoomInfo | null {
@@ -1593,12 +1602,14 @@ export class Simulation {
     } else if (joy > 0.8) {
       keys.push('entertained');
     }
+    // Cold and heat as felt in what they're wearing.
     const temp = this.temperatureAt(c.tile);
-    if (temp < 0) {
+    const comfort = comfortRange(c);
+    if (temp < Math.min(0, comfort.min - 8)) {
       keys.push('freezing');
-    } else if (temp < COMFORT_MIN) {
+    } else if (temp < comfort.min) {
       keys.push('cold');
-    } else if (temp > COMFORT_MAX) {
+    } else if (temp > comfort.max) {
       keys.push('hot');
     }
     if (c.health.disease) {
@@ -1641,7 +1652,8 @@ export class Simulation {
     if (!c.sleeping) {
       n.joy = Math.max(0, n.joy - JOY_DECAY * traitFactor(c, 'joyDecay'));
     }
-    if (c.sleeping) {
+    // Lying still, asleep or downed, is resting.
+    if (c.sleeping || c.health.downed) {
       const f = this.world.feature[c.tile];
       const bed = f !== NONE && featureDef(f).bed ? featureDef(f) : undefined;
       n.rest = Math.min(1, n.rest + (bed ? REST_GAIN_BED * bed.restGain : REST_GAIN_GROUND));
@@ -1676,8 +1688,9 @@ export class Simulation {
     if ((c.job?.type === 'sleep' || c.job?.type === 'rest') && c.sleeping) {
       this.wakeUp(c);
     }
-    // A craft abandoned halfway: set down what was gathered so it's back within everyone's reach.
-    if (c.job?.type === 'craft' && c.carrying?.extra?.length) {
+    // A craft abandoned halfway: set down what was gathered (a mixed bundle part by part) so it's
+    // back within everyone's reach.
+    if (c.job?.type === 'craft' && (c.carrying?.extra?.length || c.carrying?.mix)) {
       this.dropCarried(c);
     }
     for (const key of c.reserved) {
@@ -1786,8 +1799,8 @@ export class Simulation {
       const job = c.job?.type;
       // Starving colonists drop everything, sleep included, to eat. A failed food search is
       // retried a little later rather than every tick.
-      // Freezing (or heatstroke) kills in hours, hunger in days: someone in danger from the
-      // weather looks for shelter first.
+      // Freezing (or heatstroke) kills in hours, while hunger only grinds the mood down: someone in
+      // danger from the weather looks for shelter first.
       const exposed = c.health.hypothermia > 0.5 || c.health.heatstroke > 0.5;
       const starving = c.needs.food < 0.1 && job !== 'eat' && !(exposed && job === 'warmUp');
       if (starving && (this.nextFoodSearch.get(c.id) ?? 0) <= this.tick) {
@@ -2206,19 +2219,20 @@ export class Simulation {
     return f === NONE || (!!layer && !featureDef(f).harvest && !(layer === 'floor' && featureDef(f).crop));
   }
 
-  // What deconstructing this tile takes down: the building, else the roof, else the floor.
+  // What deconstructing this tile takes down: the building, else the roof, else the floor. A crop or
+  // tree under a roof stays put while the roof comes off.
   private deconstructTarget(i: number): number {
     const w = this.world;
     const f = w.feature[i];
-    if (f !== NONE) {
-      return featureDef(f).build ? f : NONE;
+    if (f !== NONE && featureDef(f).build) {
+      return f;
     }
-    return w.roof[i] !== NONE ? w.roof[i] : w.floor[i];
+    return w.roof[i] !== NONE ? w.roof[i] : f === NONE ? w.floor[i] : NONE;
   }
 
   // Whether this tile keeps the weather off: an enclosed room, or a built roof.
   public isRoofed(i: number): boolean {
-    return this.world.roof[i] !== NONE || this.isIndoors(i);
+    return this.world.roof[i] !== NONE || this.isIndoors(i) || this.doorway(i) !== undefined;
   }
 
   private sowable(i: number): boolean {
@@ -2955,8 +2969,9 @@ export class Simulation {
 
   // Puts away whatever the colonist is holding: a blueprint that needs it, a stockpile, or the floor.
   private tryStash(c: Colonist): boolean {
-    // Half-gathered recipe ingredients: set them down for the haulers.
-    if (c.carrying?.extra?.length) {
+    // Half-gathered recipe ingredients: set them down for the haulers (a stockpile would take a
+    // mixed bundle as all one kind).
+    if (c.carrying?.extra?.length || c.carrying?.mix) {
       this.dropCarried(c);
       return false;
     }
@@ -3452,7 +3467,12 @@ export class Simulation {
     // Put down whatever we were carrying; haulers pick it up later.
     this.dropCarried(c);
     const region = this.regionOf(c.tile);
-    const free = (i: number) => this.regions.region[i] === region && !this.isReserved(`b${i}`, c);
+    const lyingThere = new Set(
+      this.living()
+        .filter((o) => o.health.downed)
+        .map((o) => o.tile),
+    );
+    const free = (i: number) => this.regions.region[i] === region && !this.isReserved(`b${i}`, c) && !lyingThere.has(i);
     const isBed = (i: number) => w.feature[i] !== NONE && featureDef(w.feature[i]).bed;
     const spot =
       this.nearestIn('buildings', c.tile, (i) => isBed(i) && this.isIndoors(i) && free(i), 1)[0] ??
@@ -3761,6 +3781,7 @@ export class Simulation {
       this.addLog(`${c.name} tamed a ${def.name.toLowerCase()}.`, 'good');
     } else if (def.revengeChance && this.rng.chance(def.revengeChance * 0.3)) {
       animal.revengeOn = c.id;
+      animal.lashOut = true;
       animal.revengeUntil = this.tick + TICKS_PER_HOUR;
       this.addLog(`The ${def.name.toLowerCase()} lashed out at ${c.name}!`, 'warn');
     }
@@ -3849,7 +3870,10 @@ export class Simulation {
       if (old) {
         w.dropItemNear(c.tile, old.item, 1, old.wear, old.quality);
       }
-      this.addThought(c, 'newClothes');
+      // Only clearly better clothes are a treat, not the morning swap back into a parka.
+      if (!old || c.apparel.quality > old.quality || c.apparel.wear > old.wear + 0.25) {
+        this.addThought(c, 'newClothes');
+      }
     }
     this.endJob(c);
   }
@@ -4021,15 +4045,17 @@ export class Simulation {
     }
     this.nextWarmSearch.set(c.id, this.tick + TICKS_PER_HOUR);
     const { min, max } = comfortRange(c);
+    // As it feels: rain chills anyone standing out in it.
+    const felt = (i: number) => this.temperatureAt(i) - (isWet(this, i) ? WET_CHILL : 0);
     const ok = (i: number) => {
-      const t = this.temperatureAt(i);
+      const t = felt(i);
       return t >= min && t <= max;
     };
     const region = this.regionOf(c.tile);
     const reachable = (i: number) => w.isPassable(i) && this.regions.region[i] === region;
     // Nowhere comfortable: at least get somewhere better than here.
     const gap = (i: number) => {
-      const t = this.temperatureAt(i);
+      const t = felt(i);
       return t < min ? min - t : t > max ? t - max : 0;
     };
     const spot = ok(c.tile)
@@ -4100,7 +4126,7 @@ export class Simulation {
     if (!this.isIndoors(p.tile)) {
       return true;
     }
-    // Already indoors: only worth moving if there's somewhere comfortable to take them.
+    // Already indoors: only worth moving if there's somewhere comfortable indoors to take them.
     if (this.comfortableFor(p, p.tile)) {
       return false;
     }
@@ -4108,7 +4134,11 @@ export class Simulation {
     return (
       this.nearest(
         p.tile,
-        (i) => this.world.isPassable(i) && this.regions.region[i] === region && this.comfortableFor(p, i),
+        (i) =>
+          this.world.isPassable(i) &&
+          this.regions.region[i] === region &&
+          this.isIndoors(i) &&
+          this.comfortableFor(p, i),
         1,
       ).length > 0
     );
@@ -4131,7 +4161,12 @@ export class Simulation {
     const bed = this.nearestIn(
       'buildings',
       patient.tile,
-      (i) => w.feature[i] !== NONE && featureDef(w.feature[i]).bed && open(i) && this.comfortableFor(patient, i),
+      (i) =>
+        w.feature[i] !== NONE &&
+        featureDef(w.feature[i]).bed &&
+        open(i) &&
+        this.isIndoors(i) &&
+        this.comfortableFor(patient, i),
       1,
     )[0];
     if (bed !== undefined) {
@@ -4139,7 +4174,7 @@ export class Simulation {
     }
     // Someone already indoors only moves somewhere comfortable, never just sideways.
     if (this.isIndoors(patient.tile)) {
-      return this.nearest(patient.tile, (i) => open(i) && this.comfortableFor(patient, i), 1)[0];
+      return this.nearest(patient.tile, (i) => open(i) && this.isIndoors(i) && this.comfortableFor(patient, i), 1)[0];
     }
     const range = comfortRange(patient);
     const comfort = (i: number) => {
@@ -4274,12 +4309,16 @@ export class Simulation {
       return false;
     }
     this.reserve(c, `t${patient.id}`);
-    const medicine = this.nearestIn(
-      'items',
-      c.tile,
-      (i) => w.itemType[i] === MEDICINE && this.regions.region[i] === region && !this.isReserved(`i${i}`, c),
-      1,
-    )[0];
+    // Medicine helps with wounds; an illness only needs looking after.
+    const wounded = patient.health.injuries.some((injury) => injury.tended === 0);
+    const medicine = wounded
+      ? this.nearestIn(
+          'items',
+          c.tile,
+          (i) => w.itemType[i] === MEDICINE && this.regions.region[i] === region && !this.isReserved(`i${i}`, c),
+          1,
+        )[0]
+      : undefined;
     const path = medicine !== undefined ? this.pathfinder.find(c.tile, [medicine]) : null;
     if (medicine !== undefined && path) {
       this.dropCarried(c);
@@ -4438,7 +4477,7 @@ export class Simulation {
     if (outside) {
       c.restOutside++;
     }
-    if (this.temperatureAt(c.tile) < COMFORT_MIN) {
+    if (this.temperatureAt(c.tile) < comfortRange(c).min) {
       c.restCold++;
     }
   }
@@ -4490,6 +4529,8 @@ export class Simulation {
     this.assign(c, this.makeJob('wander', c.tile, { wait: this.rng.int(20, 40) }), []);
   }
 }
+
+const NUMBER_WORDS: Record<number, string> = { 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six' };
 
 export interface ObjectiveDef {
   id: string;
@@ -4661,9 +4702,9 @@ export const OBJECTIVES: ObjectiveDef[] = [
   },
   {
     id: 'survive',
-    label: 'Reach day 12 with at least 4 colonists alive',
+    label: 'Reach day 12, losing no more than one colonist',
     phase: 3,
-    check: (s) => s.day >= 12 && s.living().length >= 4,
+    check: (s) => s.day >= 12 && s.living().length >= populationFor(s.world.width).colonists - 1,
     progress: (s) => `day ${Math.min(12, s.day)}/12`,
   },
   {
@@ -4701,10 +4742,10 @@ export const OBJECTIVES: ObjectiveDef[] = [
   },
   {
     id: 'population',
-    label: 'Grow the colony to 8 colonists',
+    label: 'Grow the colony to full strength',
     phase: 5,
-    check: (s) => s.living().length >= 8,
-    progress: (s) => `${s.living().length}/8`,
+    check: (s) => s.living().length >= populationFor(s.world.width).maxColonists,
+    progress: (s) => `${s.living().length}/${populationFor(s.world.width).maxColonists}`,
   },
   {
     id: 'secondWinter',

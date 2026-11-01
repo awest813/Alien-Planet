@@ -1,12 +1,13 @@
 // Headless balance harness: an "autoplayer" runs a sensible colony on many seeds and prints
 // survival, combat, health, mood and social statistics.
 //
-//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K]
+//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K] [nohunt]
 //
 // "passive" never drafts during raids, to measure the worst case; "peaceful" and "harsh" pick the
 // storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies;
-// "size=96" or "size=128" plays on a bigger map; "seed=N" replays one colony. With DEBUG=1 in the
-// environment, a trace also shows research, production, bills, rooms and heaters.
+// "size=96" or "size=128" plays on a bigger map; "seed=N" replays one colony; "start=K" skips the
+// first K seeds; "nohunt" leaves the wildlife alone. With DEBUG=1 in the environment, a trace also
+// shows research, production, bills, rooms and heaters.
 import { colonistTarget, lineOfSight } from '../src/sim/combat';
 import { FEATURES, NONE, RECIPES, featureId, itemDef, itemId, terrainDef, weaponDef } from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
@@ -19,6 +20,7 @@ const days = Number(process.argv[2] ?? 20);
 const seeds = Number(process.argv[3] ?? 8);
 const passive = process.argv.includes('passive');
 const trace = process.argv.includes('trace');
+const noHunt = process.argv.includes('nohunt');
 const mapSize = Number(process.argv.find((a) => a.startsWith('size='))?.slice(5) ?? 64);
 const difficulty: Difficulty = process.argv.includes('harsh')
   ? 'harsh'
@@ -128,6 +130,9 @@ function play(seed: number): Result {
   sim.apply({ type: 'designate', rect: { x0: cx - 20, y0: cy - 20, x1: cx + 20, y1: cy + 20 }, kind: 'forage' });
   sim.apply({ type: 'designate', rect: { x0: cx - 10, y0: cy - 10, x1: cx + 10, y1: cy + 10 }, kind: 'mine' });
   const hut = findSite(sim, 9, 7, avoid);
+  // Up to twelve beds in two rows, clear of the door, fire and armchair.
+  const bedSlots = [...[1, 2, 3, 4, 5, 6, 7].map((k) => [k, 1]), ...[1, 2, 3, 4, 5].map((k) => [k, 2])];
+  let bedsBuilt = 0;
   if (hut) {
     claim(avoid, sim, hut.x, hut.y, 9, 7);
     const walls: number[] = [];
@@ -143,8 +148,9 @@ function play(seed: number): Result {
     sim.apply({
       type: 'build',
       feature: featureId('bed'),
-      tiles: [1, 2, 3, 4, 5].map((k) => at(hut.x + k, hut.y + 1)),
+      tiles: bedSlots.slice(0, sim.colonists.length).map(([bx, by]) => at(hut.x + bx, hut.y + by)),
     });
+    bedsBuilt = sim.colonists.length;
     sim.apply({ type: 'build', feature: featureId('campfire'), tiles: [at(hut.x + 7, hut.y + 3)] });
   }
   const stock = findSite(sim, 5, 3, avoid);
@@ -161,7 +167,6 @@ function play(seed: number): Result {
   let secondFarm = false;
   let hearthPlaced = false;
   let fishingPlaced = false;
-  let extraBeds = 0;
   let chopRadius = 15;
   let friendDay = -1;
   let starvingHours = 0;
@@ -273,8 +278,17 @@ function play(seed: number): Result {
         kind: 'chop',
       });
     }
+    // Out of wood: someone other than the researcher chops first until there's a stock again.
+    const lumberjack = sim.living().find((c) => c.id !== researcher.id && !c.health.downed);
+    if (lumberjack) {
+      const wood = sim.stockOf(itemId('wood'));
+      const want = wood < 20 ? 1 : wood > 80 ? 3 : lumberjack.priorities.plantCutting;
+      if (want !== lumberjack.priorities.plantCutting) {
+        sim.apply({ type: 'priority', colonist: lumberjack.id, work: 'plantCutting', value: want });
+      }
+    }
     // Hunt whatever wildlife is around once the colony is settled (leather becomes recurve bows).
-    if (sim.day >= 3) {
+    if (sim.day >= 3 && !noHunt) {
       sim.apply({ type: 'hunt', rect: { x0: 0, y0: 0, x1: w.width - 1, y1: w.height - 1 }, add: true });
     }
     // A couple of fishing spots on the nearest shore, for food through the winter.
@@ -298,9 +312,10 @@ function play(seed: number): Result {
       }
     }
     // A bed for every newcomer, while there's room in the hut.
-    if (hut && sim.colonists.length > 5 + extraBeds && extraBeds < 2) {
-      sim.apply({ type: 'build', feature: featureId('bed'), tiles: [at(hut.x + 6 + extraBeds, hut.y + 1)] });
-      extraBeds++;
+    if (hut && sim.colonists.length > bedsBuilt && bedsBuilt < bedSlots.length) {
+      const [bx, by] = bedSlots[bedsBuilt];
+      sim.apply({ type: 'build', feature: featureId('bed'), tiles: [at(hut.x + bx, hut.y + by)] });
+      bedsBuilt++;
     }
 
     for (const c of sim.living()) {

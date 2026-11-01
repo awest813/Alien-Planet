@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, NOTICE_TIMES, PAN_SPEEDS, Settings, UI_SCALES, forget
 import { SAVE_VERSION } from '../sim/serialize';
 import { MAP_SIZE, MAP_SIZES } from '../sim/simulation';
 import { DIFFICULTIES, Difficulty } from '../sim/storyteller';
+import { dealBalance } from '../sim/trade';
 import { ConfirmButton, Modal } from './screens';
 
 // What a menu can ask the app to do.
@@ -142,7 +143,7 @@ export function TitleScreen({ state, actions }: { state: UiState; actions: MenuA
     <div className="title-screen">
       <div className="panel title-panel" role="dialog" aria-modal="true" aria-label="Colony Alpha">
         <h1>Colony Alpha</h1>
-        <p className="muted tagline">Five colonists, a strange valley, and a winter coming.</p>
+        <p className="muted tagline">A handful of colonists, a strange valley, and a winter coming.</p>
         {view === 'main' && (
           <div className="title-buttons">
             {latest && (
@@ -409,7 +410,7 @@ export function TradeScreen({ state, onClose }: { state: UiState; onClose: () =>
   }
   const cost = trade.theirs.reduce((sum, line) => sum + (buy[line.item] ?? 0) * line.price, 0);
   const income = trade.ours.reduce((sum, line) => sum + (sell[line.item] ?? 0) * line.price, 0);
-  const balance = Math.round(cost - income);
+  const balance = dealBalance(cost, income);
   const problem = !trade.open
     ? 'The traders are not open for business.'
     : balance > trade.silver

@@ -1,11 +1,12 @@
 import { MAP_SIZE, MOVE_SPEED, TICKS_PER_HOUR } from './constants';
 import { ANIMALS, itemDef, itemId } from './defs';
+import { armorTakes, woundEnemy } from './combat';
 import { damage } from './health';
 import type { Simulation } from './simulation';
 import { Animal, Colonist } from './types';
 
 // Wild animals on the standard 64×64 map; bigger maps hold proportionally more.
-export const MAX_ANIMALS = 18;
+export const MAX_ANIMALS = 14;
 
 export const wildCap = (sim: Simulation) => Math.round((MAX_ANIMALS * sim.world.size) / (MAP_SIZE * MAP_SIZE));
 const BITE_COOLDOWN = 50;
@@ -13,11 +14,16 @@ const WANDER_RADIUS = 6;
 // An enraged animal calms down after this long.
 const REVENGE_TICKS = TICKS_PER_HOUR * 2;
 
+const onEdge = (sim: Simulation, i: number) => {
+  const w = sim.world;
+  return w.xOf(i) === 0 || w.yOf(i) === 0 || w.xOf(i) === w.width - 1 || w.yOf(i) === w.height - 1;
+};
+
 const chebyshev = (sim: Simulation, a: number, b: number) =>
   Math.max(Math.abs(sim.world.xOf(a) - sim.world.xOf(b)), Math.abs(sim.world.yOf(a) - sim.world.yOf(b)));
 
-function pickKind(sim: Simulation): string {
-  const kinds = Object.values(ANIMALS);
+function pickKind(sim: Simulation, allow: (key: string) => boolean = () => true): string {
+  const kinds = Object.values(ANIMALS).filter((a) => allow(a.key));
   let roll = sim.rng.next() * kinds.reduce((sum, a) => sum + a.weight, 0);
   for (const a of kinds) {
     roll -= a.weight;
@@ -44,6 +50,9 @@ function addAnimal(sim: Simulation, tile: number, kind = pickKind(sim)): Animal 
     restUntil: 0,
     revengeUntil: 0,
   };
+  if (ANIMALS[kind].preys) {
+    animal.fedUntil = sim.tick;
+  }
   sim.animals.push(animal);
   return animal;
 }
@@ -68,17 +77,15 @@ export function herdArrives(sim: Simulation): number {
   const w = sim.world;
   const edge = sim.nearest(
     w.idx(sim.rng.int(0, w.width - 1), sim.rng.pick([0, w.height - 1])),
-    (i) => {
-      const x = w.xOf(i);
-      const y = w.yOf(i);
-      return (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) && sim.regionOf(i) === region;
-    },
+    (i) => onEdge(sim, i) && sim.regionOf(i) === region,
     1,
   )[0];
   if (edge === undefined) {
     return 0;
   }
-  const kind = pickKind(sim);
+  // One pack of predators at a time is plenty.
+  const predatorsAbout = sim.animals.some((a) => !a.tame && a.hp > 0 && ANIMALS[a.kind].preys);
+  const kind = pickKind(sim, (key) => !predatorsAbout || !ANIMALS[key].preys);
   const [least, most] = ANIMALS[kind].group;
   const count = Math.min(wildCap(sim) - wildCount(sim), sim.rng.int(least, most));
   for (let n = 0; n < count; n++) {
@@ -106,7 +113,7 @@ function standDownAfterPack(sim: Simulation): void {
 }
 
 // How long a predator that has eaten leaves other animals alone, and how far it looks for prey.
-const FED_TICKS = TICKS_PER_HOUR * 30;
+const FED_TICKS = TICKS_PER_HOUR * 48;
 const HUNT_RANGE = 18;
 const PREY_BITE = 2.5;
 
@@ -115,7 +122,7 @@ const PREY_BITE = 2.5;
 function stalk(sim: Simulation, a: Animal): boolean {
   const w = sim.world;
   const def = ANIMALS[a.kind];
-  if ((a.fedUntil ?? 0) > sim.tick || !def.preys || !def.bite) {
+  if ((a.fedUntil ?? 0) > sim.tick || (a.huntAgainAt ?? 0) > sim.tick || !def.preys || !def.bite) {
     return false;
   }
   let prey = a.chasing !== undefined ? sim.animals.find((p) => p.id === a.chasing && p.hp > 0) : undefined;
@@ -156,9 +163,15 @@ function stalk(sim: Simulation, a: Animal): boolean {
           if (left > 0) {
             w.dropItemNear(prey.tile, itemId('rawMeat'), left);
           }
-          a.chasing = undefined;
-          a.fedUntil = sim.tick + FED_TICKS;
-          a.restUntil = sim.tick + TICKS_PER_HOUR * 2;
+          // The whole pack shares the kill.
+          for (const p of sim.animals) {
+            if (p === a || (p.kind === a.kind && !p.tame && p.revengeOn < 0 && w.distance(p.tile, a.tile) <= 10)) {
+              p.chasing = undefined;
+              p.fedUntil = sim.tick + FED_TICKS;
+              p.restUntil = sim.tick + TICKS_PER_HOUR * 2;
+              p.path = [];
+            }
+          }
         }
       }
     }
@@ -167,9 +180,9 @@ function stalk(sim: Simulation, a: Animal): boolean {
   if (a.path.length === 0 || sim.tick % 30 === 0) {
     pathTo(sim, a, [prey.tile, ...w.neighbors(prey.tile).filter((n) => w.isPassable(n))]);
     if (a.path.length === 0 || w.distance(prey.tile, a.tile) > HUNT_RANGE * 2) {
-      // Lost it: try again later.
+      // Lost it: try again later, no less hungry.
       a.chasing = undefined;
-      a.fedUntil = sim.tick + TICKS_PER_HOUR * 6;
+      a.huntAgainAt = sim.tick + TICKS_PER_HOUR * 6;
       return false;
     }
   }
@@ -196,11 +209,7 @@ export function manhuntersArrive(sim: Simulation, kind: string, count: number): 
   }
   const edge = sim.nearest(
     w.idx(sim.rng.int(0, w.width - 1), sim.rng.pick([0, w.height - 1])),
-    (i) => {
-      const x = w.xOf(i);
-      const y = w.yOf(i);
-      return (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) && sim.regionOf(i) === region;
-    },
+    (i) => onEdge(sim, i) && sim.regionOf(i) === region,
     1,
   )[0];
   // Nobody they could reach (everyone down, or the colony cut off): they don't come at all.
@@ -283,6 +292,13 @@ export function animalsAtDawn(sim: Simulation): void {
   if (born.length > 0) {
     sim.addLog(`New ${born.length > 1 ? 'young' : 'young one'} in the herd: ${born.join(', ')}.`, 'good');
   }
+  moveOn(sim);
+  // Wounds mend, a quarter of an animal's health a day.
+  for (const a of sim.animals) {
+    if (a.hp > 0) {
+      a.hp = Math.min(ANIMALS[a.kind].hp, a.hp + ANIMALS[a.kind].hp * 0.25);
+    }
+  }
   for (const a of tame) {
     const produce = ANIMALS[a.kind].produce;
     if (produce) {
@@ -291,6 +307,59 @@ export function animalsAtDawn(sim: Simulation): void {
       sim.stats.produced[key] = (sim.stats.produced[key] ?? 0) + produce.count;
     }
   }
+}
+
+// Wild animals don't stay for good. Predators with nothing left to hunt move on, and when the map is
+// crowded the herd that has been around longest wanders off, making room for newcomers.
+function moveOn(sim: Simulation): void {
+  // Animals shut in somewhere (a pen, an island) can't leave, and don't hold up the rest.
+  const outside = sim.outsideRegion();
+  const free = (a: Animal) =>
+    a.hp > 0 &&
+    !a.tame &&
+    !a.taming &&
+    !a.hunted &&
+    !a.leaving &&
+    !a.manhunter &&
+    a.revengeOn < 0 &&
+    (outside === undefined || sim.regionOf(a.tile) === outside);
+  for (const a of sim.animals) {
+    if (free(a) && ANIMALS[a.kind].preys && (a.fedUntil ?? 0) < sim.tick - TICKS_PER_HOUR * 48) {
+      a.leaving = true;
+    }
+  }
+  if (wildCount(sim) < wildCap(sim) * 0.75) {
+    return;
+  }
+  const oldest = sim.animals.filter(free).sort((x, y) => x.id - y.id)[0];
+  for (const a of sim.animals) {
+    if (oldest && free(a) && a.kind === oldest.kind && sim.world.distance(a.tile, oldest.tile) <= 12) {
+      a.leaving = true;
+    }
+  }
+}
+
+// A wild animal moving on heads for the nearest edge of the map and leaves it.
+function leave(sim: Simulation, a: Animal): void {
+  if (onEdge(sim, a.tile)) {
+    // Gone: removed with the fallen at the end of the update, but leaving nothing behind.
+    a.hp = 0;
+    return;
+  }
+  if (a.path.length === 0 || !onEdge(sim, a.path[a.path.length - 1])) {
+    const region = sim.regionOf(a.tile);
+    pathTo(
+      sim,
+      a,
+      sim.nearest(a.tile, (i) => onEdge(sim, i) && sim.regionOf(i) === region, 3),
+    );
+    if (a.path.length === 0) {
+      // Hemmed in: it stays after all.
+      a.leaving = false;
+      return;
+    }
+  }
+  move(sim, a);
 }
 
 // Tame boars bite raiders who come within reach.
@@ -306,14 +375,9 @@ function guard(sim: Simulation, a: Animal): boolean {
   const hit = sim.rng.next() < 0.7;
   sim.shots.push({ from: a.tile, to: raider.tile, hit, ranged: false, tick: sim.tick });
   if (hit) {
-    raider.hp -= def.bite[0] + sim.rng.next() * (def.bite[1] - def.bite[0]);
-    if (raider.hp <= 0) {
-      sim.addLog(`A tame ${def.name.toLowerCase()} brought down ${raider.name}!`, 'good');
-      sim.stats.kills++;
-      if (sim.raid) {
-        sim.raid.killed++;
-      }
-    }
+    // Teeth don't get through armor any better than a club.
+    const bite = (def.bite[0] + sim.rng.next() * (def.bite[1] - def.bite[0])) * (1 - raider.armor);
+    woundEnemy(sim, raider, bite, `A tame ${def.name.toLowerCase()}`);
   }
   // The raider fights back.
   if (raider.hp > 0 && sim.rng.next() < 0.6) {
@@ -334,7 +398,7 @@ export function updateAnimals(sim: Simulation): void {
   standDownAfterPack(sim);
   const w = sim.world;
   const awake = sim.living().filter((c) => !c.sleeping);
-  const home = sim.living()[0]?.tile;
+  const home = sim.homeTile() ?? sim.living()[0]?.tile;
   for (const a of sim.animals) {
     if (a.hp <= 0) {
       continue;
@@ -354,6 +418,7 @@ export function updateAnimals(sim: Simulation): void {
         sim.regionOf(target.tile) !== sim.regionOf(a.tile)
       ) {
         a.revengeOn = -1;
+        a.lashOut = false;
         a.path = [];
         // A manhunter turns on the next colonist it can reach, until its fury runs out.
         if (a.manhunter) {
@@ -361,7 +426,9 @@ export function updateAnimals(sim: Simulation): void {
           if (next) {
             a.revengeOn = next.id;
           } else {
+            // Its fury spent, it goes back where it came from.
             a.manhunter = false;
+            a.leaving = true;
           }
         }
       } else if (chebyshev(sim, a.tile, target.tile) <= 1) {
@@ -370,7 +437,12 @@ export function updateAnimals(sim: Simulation): void {
           const hit = sim.rng.next() < 0.75;
           sim.shots.push({ from: a.tile, to: target.tile, hit, ranged: false, tick: sim.tick });
           if (hit) {
-            damage(sim, target, def.bite[0] + sim.rng.next() * (def.bite[1] - def.bite[0]), 'cut');
+            damage(
+              sim,
+              target,
+              armorTakes(sim, target, def.bite[0] + sim.rng.next() * (def.bite[1] - def.bite[0])),
+              'cut',
+            );
             sim.addThought(target, 'mauled');
           }
           a.cooldown = BITE_COOLDOWN;
@@ -380,10 +452,14 @@ export function updateAnimals(sim: Simulation): void {
         pathTo(sim, a, [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))]);
         if (a.path.length === 0) {
           a.revengeOn = -1;
+          a.leaving ||= !!a.manhunter;
           a.manhunter = false;
         }
       }
     } else if (a.tame && guard(sim, a)) {
+      continue;
+    } else if (a.leaving && !a.tame && !a.taming && !a.hunted) {
+      leave(sim, a);
       continue;
     } else if (def.preys && !a.tame && !a.taming && stalk(sim, a)) {
       continue;
@@ -429,8 +505,8 @@ export function hurtAnimal(sim: Simulation, a: Animal, amount: number, attacker:
     }
     sim.stats.produced.rawMeat = (sim.stats.produced.rawMeat ?? 0) + def.meat;
     sim.stats.produced.leather = (sim.stats.produced.leather ?? 0) + def.leather;
-    // Slaughtering livestock isn't hunting.
-    if (!a.tame) {
+    // Slaughtering livestock, or fending off an angry animal, isn't hunting.
+    if (!a.tame && a.hunted) {
       sim.stats.hunted++;
     }
     sim.addLog(`${attacker.name} brought down a ${def.name.toLowerCase()}.`, 'good');
