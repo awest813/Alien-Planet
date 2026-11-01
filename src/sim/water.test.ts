@@ -100,6 +100,9 @@ describe('ice fishing', () => {
 describe('ice', () => {
   it('freezes the shallows in hard frost and thaws them in the warm', () => {
     const { sim, w, x, y } = waterColony(4);
+    // Nothing from the storyteller (a heat wave would thaw the test pond) and steady skies.
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    sim.weather = { kind: 'clear', until: Number.MAX_SAFE_INTEGER };
     const pond: number[] = [];
     for (let dy = -2; dy <= 2; dy++) {
       for (let dx = 3; dx <= 7; dx++) {
@@ -108,6 +111,8 @@ describe('ice', () => {
         pond.push(i);
       }
     }
+    // A cold snap makes sure of hard frost, whatever the seed's winter is like.
+    sim.story.coldSnapUntil = Number.MAX_SAFE_INTEGER;
     const cold = findHour(sim, (t) => t < -6);
     sim.tick = (cold - START_HOUR) * HOUR - 1;
     run(sim, HOUR * 4);
@@ -115,6 +120,7 @@ describe('ice', () => {
     expect(frozen).toBeGreaterThan(0);
     expect(w.isPassable(pond[0])).toBe(true);
 
+    sim.story.coldSnapUntil = 0;
     const warm = findHour(sim, (t) => t > 12, cold);
     sim.tick = (warm - START_HOUR) * HOUR - 1;
     run(sim, HOUR * 24);

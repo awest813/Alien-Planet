@@ -161,12 +161,17 @@ How the storytelling layer works:
 - **Water:** shallow water is slow to wade through and leaves colonists soaked (a small mood hit); deep water
   is impassable until you build a bridge over it. Fishing spots on the shore let hunters catch raw fish while
   the colony is short of food. In hard frost the shallows freeze from the shore inwards and can be walked
-  across; frozen water can't be fished, and the ice melts again when it warms up.
+  across; frozen water can still be fished through the ice, at half the pace, and the ice melts again when it
+  warms up.
 - **Sun lamps:** crops beneath them grow day and night, all year, so a heated greenhouse can farm in winter.
-- **Storyteller:** roughly once or twice a day it may send a raid, an illness, a wanderer who joins, a cold
-  snap, a trade caravan or a gift of supplies from the friendly Meadow Kin, or crop blight. Each event pops up as a short
+- **Storyteller:** roughly once or twice a day it may send something. Threats (more often on Harsh, rarer on
+  Peaceful): raids, marsh fever, cold snaps, summer heat waves, crop blight, eclipses that darken the sky and
+  solar panels for a few hours, and packs of maddened boars that hunt colonists down one after another. Good
+  fortune: wanderers and wounded refugees asking to join, herds, trade caravans and gifts from the friendly Meadow
+  Kin, meteorites that scatter silver and stone (and may start a fire), auroras that lift everyone's mood, a
+  colonist struck by inspiration (40% faster work for a day), and bumper crops. Each event pops up as a short
   notification card and goes into the Story screen. Pick the difficulty when founding a colony: Peaceful (no
-  raids), Standard, or Harsh (bigger, harder-hitting raids).
+  raids or manhunters), Standard, or Harsh (bigger, harder-hitting raids).
 
 ## Architecture
 

@@ -1,5 +1,6 @@
 import { NONE, featureDef } from './defs';
 import type { Simulation } from './simulation';
+import { eclipseOn } from './storyteller';
 
 // The colony shares a single power grid: every generator feeds it, every consumer draws
 // from it, and batteries smooth out the gaps. If supply and storage can't cover demand,
@@ -38,7 +39,7 @@ export function updatePower(sim: Simulation, tiles: number[], hours: number): vo
   let supply = 0;
   let demand = 0;
   let capacity = 0;
-  const sun = daylight(sim.hour) * (sim.season === 'Winter' ? WINTER_SOLAR : 1);
+  const sun = eclipseOn(sim) ? 0 : daylight(sim.hour) * (sim.season === 'Winter' ? WINTER_SOLAR : 1);
   const generators: number[] = [];
   for (const i of tiles) {
     const f = w.feature[i];

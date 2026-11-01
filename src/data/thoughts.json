@@ -217,5 +217,15 @@
   "rainedOn": {
     "label": "Caught out in the weather",
     "mood": -2
+  },
+  "sawAurora": {
+    "label": "Saw the aurora",
+    "mood": 5,
+    "hours": 24
+  },
+  "inspired": {
+    "label": "Inspired: working faster",
+    "mood": 6,
+    "hours": 24
   }
 }

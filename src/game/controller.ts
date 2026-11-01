@@ -41,7 +41,7 @@ import {
   Stance,
 } from '../sim/types';
 import { Designation, GROW_ZONE, STOCKPILE_ZONE } from '../sim/world';
-import { Difficulty } from '../sim/storyteller';
+import { Difficulty, coldSnapOn, eclipseOn, heatWaveOn } from '../sim/storyteller';
 import { SaveMeta, deleteSave, listSaves, readSave, writeSave } from './save-store';
 import { Settings, loadSettings, storeSettings } from './settings';
 
@@ -694,6 +694,9 @@ export class GameController {
         // On a big map the raid was announced hours ago; stop again as it arrives.
         this.setSpeed(0);
         this.notify('Game paused: the raiders are closing in.');
+      } else if (event === 'manhunters' && this.settings.pauseOnRaid) {
+        this.setSpeed(0);
+        this.notify('Game paused: maddened animals are coming. Press Q to draft your colonists.');
       } else if (event === 'raid' && this.settings.pauseOnRaid) {
         // Give the player a moment to react.
         this.setSpeed(0);
@@ -1349,7 +1352,8 @@ export class GameController {
       }
     }
     for (const a of sim.animals) {
-      const victim = a.revengeOn >= 0 ? sim.colonists[a.revengeOn] : undefined;
+      // A manhunter pack has its own alert.
+      const victim = a.revengeOn >= 0 && !a.manhunter ? sim.colonists[a.revengeOn] : undefined;
       if (victim && !victim.health.dead) {
         alerts.push({
           text: `A ${animalName(a).toLowerCase()} is attacking ${victim.name}`,
@@ -1377,8 +1381,23 @@ export class GameController {
     ) {
       alerts.push({ text: 'No research project selected', tone: 'warn' });
     }
-    if (sim.tick < sim.story.coldSnapUntil) {
+    if (coldSnapOn(sim)) {
       alerts.push({ text: 'Cold snap: keep colonists warm indoors', tone: 'warn' });
+    }
+    if (heatWaveOn(sim)) {
+      const hours = Math.ceil(((sim.story.heatWaveUntil ?? 0) - sim.tick) / TICKS_PER_HOUR);
+      alerts.push({ text: `Heat wave for ${hours} more hours: keep colonists cool indoors`, tone: 'warn' });
+    }
+    if (eclipseOn(sim) && sim.countFeature((f) => !!featureDef(f).power?.solar) > 0) {
+      alerts.push({ text: 'Eclipse: solar panels are dark until the sun comes back', tone: 'warn' });
+    }
+    const manhunters = sim.animals.filter((a) => a.manhunter && a.hp > 0 && a.revengeOn >= 0);
+    if (manhunters.length > 0) {
+      alerts.push({
+        text: `${manhunters.length} maddened animal${manhunters.length > 1 ? 's are' : ' is'} hunting colonists: draft and fight (Q)`,
+        tone: 'danger',
+        tile: manhunters[0].tile,
+      });
     }
     for (const c of sim.living()) {
       if (sim.inMentalBreak(c)) {

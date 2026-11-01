@@ -110,7 +110,8 @@ export function caravanArrives(sim: Simulation): boolean {
     leaveAt: sim.tick + VISIT_HOURS * TICKS_PER_HOUR,
     leaving: false,
   };
-  sim.addLog(`Traders from ${faction.name} are on their way to the colony.`, 'good', true);
+  // Just a log line: the card comes when they arrive and trade opens.
+  sim.addLog(`Traders from ${faction.name} are on their way to the colony.`, 'good');
   return true;
 }
 

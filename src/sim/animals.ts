@@ -86,6 +86,64 @@ export function herdArrives(sim: Simulation): number {
   return count;
 }
 
+// When the last of a manhunter pack is down or has calmed, colonists drafted to fight it stand
+// down (unless raiders are about too).
+function standDownAfterPack(sim: Simulation): void {
+  if (!sim.story.manhuntersActive || sim.animals.some((a) => a.manhunter && a.hp > 0 && a.revengeOn >= 0)) {
+    return;
+  }
+  sim.story.manhuntersActive = false;
+  sim.addLog('The maddened animals are dealt with. Colonists stand down.', 'good', true);
+  if (!sim.raid) {
+    for (const c of sim.living()) {
+      if (c.drafted) {
+        sim.endJob(c);
+        c.drafted = false;
+      }
+    }
+  }
+}
+
+// The nearest colonist a raging animal can reach and still has to bring down.
+function nearestPrey(sim: Simulation, a: Animal): Colonist | undefined {
+  const region = sim.regionOf(a.tile);
+  return sim
+    .living()
+    .filter((c) => !c.health.downed && sim.regionOf(c.tile) === region)
+    .sort((x, y) => sim.world.distance(a.tile, x.tile) - sim.world.distance(a.tile, y.tile))[0];
+}
+
+// A pack of animals driven mad (by hunger, disease or something stranger) comes for the colony.
+// Returns how many arrived.
+export function manhuntersArrive(sim: Simulation, kind: string, count: number): number {
+  const region = sim.outsideRegion();
+  const w = sim.world;
+  if (region === undefined) {
+    return 0;
+  }
+  const edge = sim.nearest(
+    w.idx(sim.rng.int(0, w.width - 1), sim.rng.pick([0, w.height - 1])),
+    (i) => {
+      const x = w.xOf(i);
+      const y = w.yOf(i);
+      return (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) && sim.regionOf(i) === region;
+    },
+    1,
+  )[0];
+  // Nobody they could reach (everyone down, or the colony cut off): they don't come at all.
+  if (edge === undefined || !sim.living().some((c) => !c.health.downed && sim.regionOf(c.tile) === region)) {
+    return 0;
+  }
+  for (let n = 0; n < count; n++) {
+    const a = addAnimal(sim, edge, kind);
+    a.manhunter = true;
+    a.revengeOn = nearestPrey(sim, a)!.id;
+    // Their fury lasts most of a day.
+    a.revengeUntil = sim.tick + TICKS_PER_HOUR * 16;
+  }
+  return count;
+}
+
 function pathTo(sim: Simulation, a: Animal, goals: number[]): void {
   a.path = sim.pathfinder.find(a.tile, goals) ?? [];
   a.moveProgress = 0;
@@ -199,6 +257,7 @@ function guard(sim: Simulation, a: Animal): boolean {
 }
 
 export function updateAnimals(sim: Simulation): void {
+  standDownAfterPack(sim);
   const w = sim.world;
   const awake = sim.living().filter((c) => !c.sleeping);
   const home = sim.living()[0]?.tile;
@@ -222,6 +281,15 @@ export function updateAnimals(sim: Simulation): void {
       ) {
         a.revengeOn = -1;
         a.path = [];
+        // A manhunter turns on the next colonist it can reach, until its fury runs out.
+        if (a.manhunter) {
+          const next = a.revengeUntil > sim.tick ? nearestPrey(sim, a) : undefined;
+          if (next) {
+            a.revengeOn = next.id;
+          } else {
+            a.manhunter = false;
+          }
+        }
       } else if (chebyshev(sim, a.tile, target.tile) <= 1) {
         a.path = [];
         if (a.cooldown <= 0 && def.bite) {
@@ -238,6 +306,7 @@ export function updateAnimals(sim: Simulation): void {
         pathTo(sim, a, [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))]);
         if (a.path.length === 0) {
           a.revengeOn = -1;
+          a.manhunter = false;
         }
       }
     } else if (a.tame && guard(sim, a)) {

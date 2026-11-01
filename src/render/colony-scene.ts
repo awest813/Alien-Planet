@@ -6,6 +6,7 @@ import { NIGHT_END, NIGHT_START } from '../sim/simulation';
 import { Animal, Colonist, Enemy } from '../sim/types';
 import { Designation, GROW_ZONE, World } from '../sim/world';
 import { Frames, TILE, TILESET_KEY, createTextures } from './textures';
+import { auroraOn, eclipseOn } from '../sim/storyteller';
 
 interface PawnView {
   root: Phaser.GameObjects.Container;
@@ -165,6 +166,21 @@ export class ColonyScene extends Phaser.Scene {
     }
   }
 
+  // An aurora: slow green and violet curtains rippling across the top of the night sky.
+  private drawAurora(g: Phaser.GameObjects.Graphics, v: Phaser.Geom.Rectangle, now: number): void {
+    const sim = controller.sim;
+    if (!auroraOn(sim) || !sim.isNight()) {
+      return;
+    }
+    const bands = 24;
+    for (let k = 0; k < bands; k++) {
+      const x = v.x + (k / bands) * v.width;
+      const wave = Math.sin(now / 1400 + k * 0.6) * 0.5 + 0.5;
+      const height = v.height * (0.25 + 0.2 * wave);
+      g.fillStyle(k % 3 === 0 ? 0x9a6bff : 0x55ffaa, 0.06 + 0.06 * wave).fillRect(x, v.y, v.width / bands + 1, height);
+    }
+  }
+
   // Rain, snow, fog and storm flashes over whatever part of the map is in view.
   private drawWeather(): void {
     const g = this.weatherFx;
@@ -172,6 +188,7 @@ export class ColonyScene extends Phaser.Scene {
     const sim = controller.sim;
     const kind = sim.weather.kind;
     if (kind === 'clear') {
+      this.drawAurora(g, this.cameras.main.worldView, this.time.now);
       return;
     }
     const cam = this.cameras.main;
@@ -208,6 +225,7 @@ export class ColonyScene extends Phaser.Scene {
     } else if (kind === 'drought') {
       g.fillStyle(0xffa040, 0.08).fillRect(v.x, v.y, v.width, v.height);
     }
+    this.drawAurora(g, v, now);
   }
 
   // Drifting glints on open water, and foam where it meets the shore.
@@ -687,6 +705,10 @@ export class ColonyScene extends Phaser.Scene {
       dark = 1 - (hour - NIGHT_END);
     } else {
       dark = 0;
+    }
+    // An eclipse brings dusk in the middle of the day.
+    if (eclipseOn(controller.sim)) {
+      dark = Math.max(dark, 0.85);
     }
     this.night.setFillStyle(0x0a1230, dark * 0.55);
     this.drawGlow(dark);

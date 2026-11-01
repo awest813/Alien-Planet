@@ -174,7 +174,9 @@ function play(seed: number): Result {
     for (let t = 0; t < TICKS_PER_HOUR; t += 20) {
       // Raid response, checked frequently like a player would: draft once the raiders close in
       // (on a big map they can take hours to walk in from the edge).
-      if (!passive && sim.enemies.some((e) => !e.fleeing) && sim.raid?.arrivedTick !== undefined) {
+      // Maddened animals get the same answer as raiders.
+      const manhunters = sim.animals.some((a) => a.manhunter && a.hp > 0 && a.revengeOn >= 0);
+      if (!passive && ((sim.enemies.some((e) => !e.fleeing) && sim.raid?.arrivedTick !== undefined) || manhunters)) {
         for (const c of sim.living()) {
           const fit = !c.health.downed && painOf(c) < 0.35;
           if (fit !== c.drafted) {
@@ -320,7 +322,15 @@ function play(seed: number): Result {
     coldSnap: count(/cold snap/),
     supplies: count(/gift of supplies/),
     blight: count(/Blight/),
-    caravan: count(/^Traders from .* on their way/),
+    caravan: count(/^Traders from .* have arrived/),
+    heatWave: count(/heat wave has settled/),
+    eclipse: count(/^An eclipse/),
+    manhunters: count(/maddened boars/),
+    meteorite: count(/^A meteorite/),
+    refugee: count(/wounded and fleeing raiders/),
+    aurora: count(/^An aurora/),
+    inspiration: count(/is inspired/),
+    bumperCrop: count(/^Perfect growing weather/),
     lightning: count(/^Lightning struck/),
     burned: burnCounts.get(sim) ?? 0,
   };

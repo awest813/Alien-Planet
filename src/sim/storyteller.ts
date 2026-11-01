@@ -1,9 +1,10 @@
-import { herdArrives, wildCap, wildCount } from './animals';
+import { herdArrives, manhuntersArrive, wildCap, wildCount } from './animals';
 import { spawnRaid, weaponScore } from './combat';
 import { TICKS_PER_HOUR } from './constants';
-import { ANIMALS, FACTIONS, NONE, featureDef, itemId } from './defs';
-import { infect } from './health';
+import { ANIMALS, FACTIONS, NONE, featureDef, itemId, terrainDef } from './defs';
+import { damage, infect } from './health';
 import { caravanArrives, goodwillOf } from './trade';
+import { ignite } from './weather';
 import { Season } from './seasons';
 import type { Simulation } from './simulation';
 
@@ -20,6 +21,12 @@ export interface StoryState {
   // Tick before which each event may not fire again.
   cooldowns: Record<string, number>;
   coldSnapUntil: number;
+  // A manhunter pack is on the loose (colonists stand down once it's dealt with).
+  manhuntersActive?: boolean;
+  // Ticks when a heat wave, an eclipse and an aurora end (0 or past: none on).
+  heatWaveUntil?: number;
+  eclipseUntil?: number;
+  auroraUntil?: number;
   difficulty: Difficulty;
 }
 
@@ -27,17 +34,28 @@ export const freshStory = (difficulty: Difficulty = 'standard'): StoryState => (
   lastEventTick: 0,
   cooldowns: {},
   coldSnapUntil: 0,
+  heatWaveUntil: 0,
+  eclipseUntil: 0,
+  auroraUntil: 0,
   difficulty,
 });
 
+// Whether a timed event is on right now (an end tick of 0 means it never started).
+const until = (sim: Simulation, end: number | undefined) => !!end && sim.tick < end;
+export const coldSnapOn = (sim: Simulation): boolean => until(sim, sim.story.coldSnapUntil);
+export const heatWaveOn = (sim: Simulation): boolean => until(sim, sim.story.heatWaveUntil);
+export const eclipseOn = (sim: Simulation): boolean => until(sim, sim.story.eclipseUntil);
+export const auroraOn = (sim: Simulation): boolean => until(sim, sim.story.auroraUntil);
+
 // How strongly each difficulty leans on threats (raids, illness, cold, blight).
 const THREAT_WEIGHT: Record<Difficulty, number> = { peaceful: 0.5, standard: 1, harsh: 1.4 };
-const isThreat = (key: string) => key !== 'wanderer' && key !== 'supplies' && key !== 'herd';
 
 interface EventDef {
   key: string;
   minDay: number;
   cooldownDays: number;
+  // Threats come more often on harsh and less on peaceful.
+  threat?: boolean;
   weight: (sim: Simulation) => number;
   run: (sim: Simulation) => boolean;
 }
@@ -57,6 +75,7 @@ const EVENTS: EventDef[] = [
     key: 'raid',
     minDay: 4,
     cooldownDays: 3,
+    threat: true,
     weight: (sim) => (sim.story.difficulty === 'peaceful' ? 0 : 3),
     run: (sim) => {
       const living = sim.living().length;
@@ -76,6 +95,7 @@ const EVENTS: EventDef[] = [
     key: 'disease',
     minDay: 3,
     cooldownDays: 5,
+    threat: true,
     weight: () => 1.5,
     run: (sim) => {
       const healthy = sim.living().filter((c) => !c.health.disease);
@@ -136,7 +156,8 @@ const EVENTS: EventDef[] = [
     key: 'coldSnap',
     minDay: 3,
     cooldownDays: 6,
-    weight: () => 1,
+    threat: true,
+    weight: (sim) => (heatWaveOn(sim) ? 0 : 1),
     run: (sim) => {
       sim.story.coldSnapUntil = sim.tick + 2 * DAY;
       sim.addLog('A cold snap has rolled in. Expect freezing nights for the next two days.', 'warn', true);
@@ -157,8 +178,8 @@ const EVENTS: EventDef[] = [
     cooldownDays: 3,
     weight: () => 1.2,
     run: (sim) => {
-      const anchor = sim.living()[0];
-      if (!anchor) {
+      const home = sim.homeTile();
+      if (home === undefined) {
         return false;
       }
       const options: [string, number][] = [
@@ -168,7 +189,7 @@ const EVENTS: EventDef[] = [
         ['cloth', 20],
       ];
       const [key, count] = sim.rng.pick(options);
-      sim.world.dropItemNear(anchor.tile, itemId(key), count);
+      sim.world.dropItemNear(home, itemId(key), count);
       sim.addLog(`${friendlyFaction().name} left a gift of supplies near the colony.`, 'good', true);
       return true;
     },
@@ -177,12 +198,30 @@ const EVENTS: EventDef[] = [
     key: 'blight',
     minDay: 5,
     cooldownDays: 8,
+    threat: true,
     weight: (sim) => (sim.countFeature((f) => !!featureDef(f).crop) > 8 ? 0.6 : 0),
     run: (sim) => {
       const w = sim.world;
+      const exposed = (i: number) => w.feature[i] !== NONE && !!featureDef(w.feature[i]).crop && !sim.isRoofed(i);
+      const crops = [...w.tilesWith('features')].filter(exposed);
+      if (crops.length === 0) {
+        return false;
+      }
+      // Spreads through one field: the crops joined to where it starts.
+      const start = sim.rng.pick(crops);
+      const field = new Set([start]);
+      const queue = [start];
+      while (queue.length > 0) {
+        for (const n of w.neighbors(queue.pop()!, false)) {
+          if (!field.has(n) && exposed(n)) {
+            field.add(n);
+            queue.push(n);
+          }
+        }
+      }
       let lost = 0;
-      for (let i = 0; i < w.size; i++) {
-        if (w.feature[i] !== NONE && featureDef(w.feature[i]).crop && sim.rng.next() < 0.5) {
+      for (const i of field) {
+        if (sim.rng.next() < 0.6) {
           w.setFeature(i, NONE);
           lost++;
         }
@@ -190,23 +229,212 @@ const EVENTS: EventDef[] = [
       if (lost === 0) {
         return false;
       }
-      sim.addLog(`Blight has struck the fields. ${lost} plants withered.`, 'warn', true);
+      sim.addLog(`Blight has struck a field. ${lost} plants withered.`, 'warn', true);
+      return true;
+    },
+  },
+  {
+    // Two days of blistering heat: heatstroke for anyone working outside for long.
+    key: 'heatWave',
+    minDay: 5,
+    cooldownDays: 8,
+    threat: true,
+    weight: (sim) => (heatWaveOn(sim) || coldSnapOn(sim) ? 0 : 1),
+    run: (sim) => {
+      sim.story.heatWaveUntil = sim.tick + 2 * DAY;
+      sim.addLog('A heat wave has settled over the valley. Keep colonists cool indoors.', 'warn', true);
+      return true;
+    },
+  },
+  {
+    // The sun goes dark for a few hours: solar panels stop and the air cools.
+    key: 'eclipse',
+    minDay: 6,
+    cooldownDays: 12,
+    threat: true,
+    weight: (sim) => (sim.hour >= 8 && sim.hour < 13 ? 0.5 : 0),
+    run: (sim) => {
+      sim.story.eclipseUntil = sim.tick + TICKS_PER_HOUR * 4;
+      sim.addLog('An eclipse darkens the sky. Solar panels will be dark for a few hours.', 'warn', true);
+      return true;
+    },
+  },
+  {
+    // A pack of animals gone mad comes for the colonists, one after another.
+    key: 'manhunters',
+    minDay: 6,
+    cooldownDays: 7,
+    threat: true,
+    weight: (sim) => (sim.story.difficulty === 'peaceful' ? 0 : 0.7),
+    run: (sim) => {
+      // Two boars at first, one more every twelve days (and one more on harsh), never more than five.
+      const count = Math.min(5, 2 + Math.floor(sim.day / 12) + (sim.story.difficulty === 'harsh' ? 1 : 0));
+      const arrived = manhuntersArrive(sim, 'boar', count);
+      if (arrived === 0) {
+        return false;
+      }
+      sim.addLog(
+        `A pack of ${arrived} maddened boars is charging the colony! Draft colonists and fight them off.`,
+        'danger',
+        true,
+      );
+      sim.events.push('manhunters');
+      sim.story.manhuntersActive = true;
+      return true;
+    },
+  },
+  {
+    // A shooting star that didn't burn up: silver and stone for whoever hauls it in, and maybe a fire.
+    key: 'meteorite',
+    minDay: 3,
+    cooldownDays: 10,
+    weight: () => 0.4,
+    run: (sim) => {
+      const w = sim.world;
+      const home = sim.homeTile();
+      if (home === undefined) {
+        return false;
+      }
+      // Open dry ground 10–20 tiles out, with nothing built right next to it.
+      const clear = (i: number) =>
+        terrainDef(w.terrain[i]).buildable &&
+        w.isPassable(i) &&
+        !sim.isRoofed(i) &&
+        [i, ...w.neighbors(i)].every((n) => w.feature[n] === NONE || featureDef(w.feature[n]).natural);
+      const candidates: number[] = [];
+      for (let k = 0; k < 60 && candidates.length < 12; k++) {
+        const angle = sim.rng.next() * Math.PI * 2;
+        const r = 10 + sim.rng.next() * 10;
+        const x = Math.round(w.xOf(home) + Math.cos(angle) * r);
+        const y = Math.round(w.yOf(home) + Math.sin(angle) * r);
+        if (w.inBounds(x, y) && clear(w.idx(x, y))) {
+          candidates.push(w.idx(x, y));
+        }
+      }
+      if (candidates.length === 0) {
+        return false;
+      }
+      const impact = sim.rng.pick(candidates);
+      w.dropItemNear(impact, itemId('silver'), sim.rng.int(40, 90));
+      w.dropItemNear(impact, itemId('stone'), sim.rng.int(15, 30));
+      // The impact sets anything flammable around it alight.
+      let burning = false;
+      for (const n of [impact, ...w.neighbors(impact)]) {
+        burning = ignite(sim, n) || burning;
+      }
+      sim.addLog(
+        `A meteorite crashed near the colony${burning ? ' and started a fire' : ''}. Silver and stone lie scattered around the crater.`,
+        burning ? 'warn' : 'good',
+        true,
+      );
+      if (burning) {
+        sim.events.push('fire');
+      }
+      return true;
+    },
+  },
+  {
+    // Someone hurt, fleeing trouble elsewhere, asks for help and a place to stay.
+    key: 'refugee',
+    minDay: 4,
+    cooldownDays: 8,
+    weight: (sim) => (sim.living().length < MAX_COLONISTS ? 0.6 : 0),
+    run: (sim) => {
+      const c = sim.addWanderer();
+      if (!c) {
+        return false;
+      }
+      for (let k = 0; k < 2 + sim.rng.int(0, 1); k++) {
+        damage(sim, c, 0.08 + sim.rng.next() * 0.08, sim.rng.next() < 0.5 ? 'cut' : 'arrow');
+      }
+      sim.addLog(
+        `${c.name}, wounded and fleeing raiders, has staggered into the colony and asked to stay. They need a doctor.`,
+        'warn',
+        true,
+      );
+      for (const other of sim.living()) {
+        if (other !== c) {
+          sim.addThought(other, 'welcomedNewcomer');
+        }
+      }
+      return true;
+    },
+  },
+  {
+    // Lights in the night sky: everyone's spirits lift.
+    key: 'aurora',
+    minDay: 2,
+    cooldownDays: 9,
+    weight: (sim) => (sim.isNight() && !sim.weatherIsOvercast() ? 1 : 0),
+    run: (sim) => {
+      sim.story.auroraUntil = sim.tick + TICKS_PER_HOUR * 5;
+      for (const c of sim.living()) {
+        if (!c.sleeping) {
+          sim.addThought(c, 'sawAurora');
+        }
+      }
+      sim.addLog('An aurora lights up the night sky. Everyone awake stops to watch.', 'good', true);
+      return true;
+    },
+  },
+  {
+    // A colonist wakes up full of ideas and works 40% faster for a day.
+    key: 'inspiration',
+    minDay: 2,
+    cooldownDays: 4,
+    weight: () => 0.8,
+    run: (sim) => {
+      const ready = sim.living().filter((c) => !c.health.downed && !sim.inMentalBreak(c));
+      if (ready.length === 0) {
+        return false;
+      }
+      const c = sim.rng.pick(ready);
+      sim.addThought(c, 'inspired');
+      sim.addLog(`${c.name} is inspired and will work faster for a day.`, 'good', true);
+      return true;
+    },
+  },
+  {
+    // Perfect growing weather: every field shoots up.
+    key: 'bumperCrop',
+    minDay: 4,
+    cooldownDays: 8,
+    weight: (sim) => (sim.countFeature((f) => !!featureDef(f).crop) > 8 ? 0.6 : 0),
+    run: (sim) => {
+      const w = sim.world;
+      let grown = 0;
+      for (const i of w.tilesWith('features')) {
+        if (w.feature[i] !== NONE && featureDef(w.feature[i]).crop && w.growth[i] < 1) {
+          w.growth[i] = Math.min(1, w.growth[i] + 0.35);
+          w.markDirty(i);
+          grown++;
+        }
+      }
+      if (grown === 0) {
+        return false;
+      }
+      sim.addLog(`Perfect growing weather: ${grown} plants shot up overnight.`, 'good', true);
       return true;
     },
   },
 ];
 
-// Seasonal leanings: cold snaps in the cold months, no herds or blight in winter, more illness.
+// Seasonal leanings: cold snaps in the cold months, heat in summer, no herds or blight in winter,
+// more illness, auroras on long nights, bumper crops in the growing season.
 const SEASON_WEIGHT: Record<string, Partial<Record<Season, number>>> = {
   coldSnap: { Spring: 0.3, Summer: 0, Autumn: 1.2, Winter: 1.5 },
+  heatWave: { Spring: 0.3, Summer: 1.6, Autumn: 0.3, Winter: 0 },
   herd: { Winter: 0, Spring: 1.3 },
   blight: { Winter: 0, Spring: 0.5 },
   disease: { Autumn: 1.3, Winter: 1.3 },
+  aurora: { Spring: 0.5, Summer: 0.3, Autumn: 1.2, Winter: 1.6 },
+  bumperCrop: { Autumn: 0.5, Winter: 0 },
+  manhunters: { Winter: 1.3 },
 };
 
 function weightOf(sim: Simulation, event: EventDef): number {
   const seasonal = SEASON_WEIGHT[event.key]?.[sim.season] ?? 1;
-  return event.weight(sim) * seasonal * (isThreat(event.key) ? THREAT_WEIGHT[sim.story.difficulty ?? 'standard'] : 1);
+  return event.weight(sim) * seasonal * (event.threat ? THREAT_WEIGHT[sim.story.difficulty ?? 'standard'] : 1);
 }
 
 // Called every tick; at most rolls once per in-game hour.
@@ -256,3 +484,6 @@ export function triggerEvent(sim: Simulation, key: string): boolean {
 }
 
 export const EVENT_KEYS = EVENTS.map((e) => e.key);
+
+// Events that count as threats (more frequent on harsh, rarer on peaceful).
+export const THREAT_EVENTS = EVENTS.filter((e) => e.threat).map((e) => e.key);

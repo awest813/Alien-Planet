@@ -219,6 +219,8 @@ export interface Animal {
   restUntil: number;
   // Tick when its anger wears off.
   revengeUntil: number;
+  // Part of a pack gone mad: it goes after one colonist after another until its fury runs out.
+  manhunter?: boolean;
 }
 
 export interface Injury {

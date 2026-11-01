@@ -325,6 +325,7 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             or a raider to focus fire on them.
           </li>
           <li>Research better bows, armor, sandbags, embrasures and spike traps.</li>
+          <li>Maddened animals sometimes come for the colony too: draft and fight them like raiders.</li>
         </ul>
       </details>
       <details>
@@ -342,6 +343,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             <b>Trade</b> in the top bar.
           </li>
           <li>Floors make rooms nicer, roofs keep the rain off open shelters, tool kits make workers faster.</li>
+          <li>
+            The storyteller sends good and bad turns: heat waves, eclipses, meteorites, refugees, auroras, inspired
+            colonists and bumper crops among them.
+          </li>
         </ul>
       </details>
     </Modal>
