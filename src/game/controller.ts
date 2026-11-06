@@ -262,7 +262,7 @@ export const TOOLS: ToolDef[] = [
     'Roof',
     '',
     'structure',
-    'Drag over an open area to keep the rain off (rooms are roofed already). Roofs only show while this tool is picked',
+    'Drag over an open area to keep the rain off (rooms are roofed already). Not over crops or growing zones: they need the sun. Roofs only show while this tool is picked',
   ),
   build('woodFloor', 'Wood floor', '', 'floors', 'Faster to walk on, and a little prettier'),
   build('stoneTiles', 'Stone tiles', '', 'floors', 'Fast underfoot and handsome; made from granite blocks'),

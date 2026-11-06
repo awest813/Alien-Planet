@@ -147,7 +147,8 @@ How the storytelling layer works:
 - **Floors and roofs:** wood floors, stone tiles (from granite blocks) and carpet (from cloth, after Tailoring)
   are laid under furniture without moving it. Floors are quicker to walk on than bare ground and add to a room's
   beauty, and nothing grows on them. Enclosed rooms are roofed already; build a roof over an open area to make a
-  shelter from the rain (it keeps colonists dry, crops out of the weather and lightning off). Roofs are drawn only
+  shelter from the rain (it keeps colonists dry and lightning off). Crops need the sun, so a roof can't go over a
+  crop or a growing zone, and a growing zone can't go under a roof; a walled greenhouse with sun lamps needs no roof. Roofs are drawn only
   while the Roof, Deconstruct or Cancel tool is picked; the tile inspector says whether a tile is roofed. Deconstructing a
   tile takes down the building first, then the roof, then the floor.
 - **Tool kits:** a crafting bench turns wood and granite chunks into tool kits. Anyone who mines, builds, grows or

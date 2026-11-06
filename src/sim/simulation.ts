@@ -716,7 +716,11 @@ export class Simulation {
       case 'zone':
         this.forRect(cmd.rect, (i) => {
           const terrain = terrainDef(w.terrain[i]);
-          const ok = cmd.zone >= GROW_ZONE ? terrain.fertility > 0 : terrain.buildable;
+          // A growing zone needs fertile soil open to the sky.
+          const ok = cmd.zone >= GROW_ZONE ? terrain.fertility > 0 && w.roof[i] === NONE : terrain.buildable;
+          if (cmd.zone >= GROW_ZONE && ok && w.blueprint[i] !== NONE && featureDef(w.blueprint[i]).layer === 'roof') {
+            this.cancelBlueprint(i);
+          }
           if (cmd.zone === 0 || ok) {
             w.zone[i] = cmd.zone;
             this.zoneVersion++;
@@ -1235,13 +1239,14 @@ export class Simulation {
         frosted++;
         continue;
       }
-      // Sun lamps let crops grow at night and through winter.
-      if ((!growing && !lit[i]) || w.growth[i] >= 1 || temp < CROP_MIN_TEMP) {
+      // Sun lamps let crops grow at night and through winter; under a roof they're the only light.
+      const sunlit = growing && w.roof[i] === NONE;
+      if ((!sunlit && !lit[i]) || w.growth[i] >= 1 || temp < CROP_MIN_TEMP) {
         continue;
       }
       const before = Math.floor(w.growth[i] * 3);
       const fertility = terrainDef(w.terrain[i]).fertility;
-      // Rain helps and drought stunts crops in the open; a roof keeps the weather off.
+      // Rain helps and drought stunts crops in the open; walls keep the weather off.
       const weatherFactor = this.isRoofed(i) ? 1 : weatherDef(this).crops;
       w.growth[i] = Math.min(
         1,
@@ -1384,6 +1389,10 @@ export class Simulation {
       // Floors and roofs go under or over buildings (trees and rocks get cleared first), but
       // never push aside another building's blueprint, and not where they're already laid.
       const pending = w.blueprint[i];
+      // Crops need the sun: no roof over a crop or a growing zone.
+      if (def.layer === 'roof' && (w.zone[i] >= GROW_ZONE || (existing !== NONE && featureDef(existing).crop))) {
+        return false;
+      }
       return (
         w[def.layer][i] !== feature &&
         (pending === NONE || featureDef(pending).layer === def.layer) &&
@@ -2244,6 +2253,7 @@ export class Simulation {
       growZoneCrop(w.zone[i]) !== NONE &&
       w.feature[i] === NONE &&
       w.floor[i] === NONE &&
+      w.roof[i] === NONE &&
       w.blueprint[i] === NONE &&
       w.itemType[i] === NONE &&
       terrainDef(w.terrain[i]).fertility > 0

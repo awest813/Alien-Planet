@@ -116,12 +116,45 @@ describe('floor and roof plans', () => {
     expect(w.blueprint[tile]).toBe(featureId('stoneTiles'));
   });
 
-  it('never put a floor under a growing crop', () => {
+  it('never put a floor under a growing crop, or a roof over one', () => {
     const { sim, w, x, y } = site(13);
     const tile = w.idx(x + 3, y + 3);
     w.setFeature(tile, featureId('potatoPlant'));
     expect(sim.canPlaceBlueprint(tile, featureId('woodFloor'))).toBe(false);
-    expect(sim.canPlaceBlueprint(tile, featureId('roof'))).toBe(true);
+    expect(sim.canPlaceBlueprint(tile, featureId('roof'))).toBe(false);
+  });
+
+  it('keep roofs and growing zones apart, so crops get the sun', () => {
+    const { sim, w, x, y } = site(15);
+    const potatoes = GROW_ZONE + featureId('potatoPlant');
+    // No roof over a growing zone, even a bare one.
+    const field = w.idx(x + 3, y + 3);
+    sim.apply({ type: 'zone', rect: { x0: x + 3, y0: y + 3, x1: x + 3, y1: y + 3 }, zone: potatoes });
+    expect(w.zone[field]).toBe(potatoes);
+    sim.apply({ type: 'build', feature: featureId('roof'), tiles: [field] });
+    expect(w.blueprint[field]).toBe(NONE);
+    // No growing zone under a roof; zoning over a planned roof drops the plan.
+    const roofed = w.idx(x + 5, y + 3);
+    w.setLayer('roof', roofed, featureId('roof'));
+    const planned = w.idx(x + 6, y + 3);
+    sim.apply({ type: 'build', feature: featureId('roof'), tiles: [planned] });
+    expect(w.blueprint[planned]).toBe(featureId('roof'));
+    sim.apply({ type: 'zone', rect: { x0: x + 5, y0: y + 3, x1: x + 6, y1: y + 3 }, zone: potatoes });
+    expect(w.zone[roofed]).not.toBe(potatoes);
+    expect(w.zone[planned]).toBe(potatoes);
+    expect(w.blueprint[planned]).toBe(NONE);
+  });
+
+  it('leave a crop under a roof (from an older colony) in the dark without a sun lamp', () => {
+    const { sim, w, x, y } = site(16);
+    const open = w.idx(x + 3, y + 3);
+    const covered = w.idx(x + 5, y + 3);
+    w.setFeature(open, featureId('potatoPlant'));
+    w.setFeature(covered, featureId('potatoPlant'));
+    w.setLayer('roof', covered, featureId('roof'));
+    run(sim, HOUR * 12);
+    expect(w.growth[open]).toBeGreaterThan(0);
+    expect(w.growth[covered]).toBe(0);
   });
 
   it('give back most of an old floor when a new one is laid over it', () => {
