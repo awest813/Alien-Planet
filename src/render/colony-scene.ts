@@ -34,6 +34,58 @@ const SHALLOW = terrainId('shallowWater');
 const DEEP = terrainId('deepWater');
 const isWater = (t: number) => t === SHALLOW || t === DEEP;
 
+// Light from fires and heaters, and the dimmer glow of a stove (buildings without their own light).
+const FIRE_LIGHT = { radius: 3.6, color: '#ff9a3c', flicker: true };
+const STOVE_LIGHT = { radius: 2.4, color: '#ff9a3c', flicker: true };
+
+// The colour laid over the map at a given hour, how strongly, and how dark it is (0 day … 1 night,
+// for how brightly lights show).
+function skyAt(hour: number): { color: number; alpha: number; dark: number } {
+  const NIGHT = Phaser.Display.Color.ValueToColor(0x0a1230);
+  const DUSK = Phaser.Display.Color.ValueToColor(0x4a2a5a);
+  const GOLD = Phaser.Display.Color.ValueToColor(0xffa040);
+  const DAWN = Phaser.Display.Color.ValueToColor(0xff8a7a);
+  const mix = (a: Phaser.Display.Color, b: Phaser.Display.Color, t: number) => {
+    const c = Phaser.Display.Color.Interpolate.ColorWithColor(a, b, 100, Math.round(Math.max(0, Math.min(1, t)) * 100));
+    return Phaser.Display.Color.GetColor(c.r, c.g, c.b);
+  };
+  if (hour >= NIGHT_START || hour < NIGHT_END) {
+    return { color: 0x0a1230, alpha: 0.55, dark: 1 };
+  }
+  if (hour < NIGHT_END + 1) {
+    // Dawn: night lifting quickly, leaving a faint rosy light.
+    const t = hour - NIGHT_END;
+    return { color: mix(NIGHT, DAWN, t), alpha: 0.55 * (1 - t) * (1 - t) + 0.08 * t, dark: 1 - t };
+  }
+  if (hour < NIGHT_END + 2) {
+    const t = hour - NIGHT_END - 1;
+    return { color: 0xff8a7a, alpha: 0.08 * (1 - t), dark: 0 };
+  }
+  if (hour >= NIGHT_START - 2) {
+    // Dusk: the golden light deepening to night.
+    const t = (hour - (NIGHT_START - 2)) / 2;
+    const color = t < 0.5 ? mix(GOLD, DUSK, t * 2) : mix(DUSK, NIGHT, t * 2 - 1);
+    return { color, alpha: 0.14 + t * 0.41, dark: t };
+  }
+  if (hour >= NIGHT_START - 4) {
+    // Golden hour.
+    const t = (hour - (NIGHT_START - 4)) / 2;
+    return { color: 0xffa040, alpha: 0.14 * t, dark: 0 };
+  }
+  return { color: 0xffffff, alpha: 0, dark: 0 };
+}
+
+// The legs frame for a figure: a two-step stride while walking, standing otherwise.
+const stride = (moving: boolean, time: number) =>
+  moving ? `pawn-legs-${1 + (Math.floor(time / 140) % 2)}` : 'pawn-legs-0';
+
+// Mostly plain ground, with details here and there.
+const terrainVariant = (x: number, y: number) => {
+  const r = hash2(x, y, 17);
+  return r < 0.5 ? 0 : r < 0.75 ? 1 : r < 0.9 ? 2 : 3;
+};
+const SEASON_INDEX: Record<string, number> = { Spring: 0, Summer: 1, Autumn: 2, Winter: 3 };
+
 const Depth = { WATER: 0.5, OVERLAY: 20, NIGHT: 30, PAWNS: 40, LABELS: 41, PREVIEW: 50 };
 const PAN_SPEED = 700;
 const MIN_ZOOM = 1;
@@ -61,6 +113,8 @@ export class ColonyScene extends Phaser.Scene {
   private overlay: Phaser.GameObjects.Graphics;
   private preview: Phaser.GameObjects.Graphics;
   private night: Phaser.GameObjects.Rectangle;
+  // The season the ground is drawn for (0 spring … 3 winter); a change repaints it.
+  private terrainSeason = 1;
   private glow: Phaser.GameObjects.Graphics;
   private heatmap: Phaser.GameObjects.Graphics;
   private fireFx!: Phaser.GameObjects.Graphics;
@@ -70,7 +124,14 @@ export class ColonyScene extends Phaser.Scene {
   private heatmapAt = 0;
   private heatmapView = '';
   // Tiles holding a heat/light source, refreshed when features change.
-  private glowSources: number[] = [];
+  private glowSources: {
+    tile: number;
+    radius: number;
+    color: number;
+    flicker: boolean;
+    strength: number;
+    powered: boolean;
+  }[] = [];
   private glowVersion = -1;
   private builtFor = -1;
   private roomsVersion = -1;
@@ -111,6 +172,7 @@ export class ColonyScene extends Phaser.Scene {
     }
     const world = controller.sim.world;
     this.syncDirty(world);
+    this.syncSeason(world);
     if (world.structureVersion !== this.roomsVersion) {
       this.roomsVersion = world.structureVersion;
       this.glowVersion = -1;
@@ -291,6 +353,7 @@ export class ColonyScene extends Phaser.Scene {
 
   private buildWorld(): void {
     this.builtFor = controller.simVersion;
+    this.terrainSeason = SEASON_INDEX[controller.sim.season] ?? 1;
     // A drag or pan begun on the old map mustn't carry its tile indexes onto the new one.
     this.drag = null;
     this.pan = null;
@@ -349,12 +412,25 @@ export class ColonyScene extends Phaser.Scene {
     }
   }
 
+  // The ground changes with the seasons: green in spring and summer, golden in autumn, frosted in winter.
+  private syncSeason(world: World): void {
+    const season = SEASON_INDEX[controller.sim.season] ?? 1;
+    if (season === this.terrainSeason) {
+      return;
+    }
+    this.terrainSeason = season;
+    for (let i = 0; i < world.size; i++) {
+      const x = world.xOf(i);
+      const y = world.yOf(i);
+      this.put(this.layers.terrain, x, y, Frames.terrain(world.terrain[i], terrainVariant(x, y), season));
+    }
+  }
+
   private drawTile(world: World, i: number): void {
     const x = world.xOf(i);
     const y = world.yOf(i);
     const L = this.layers;
-    const variant = hash2(x, y, 17) < 0.5 ? 0 : 1;
-    this.put(L.terrain, x, y, Frames.terrain(world.terrain[i], variant));
+    this.put(L.terrain, x, y, Frames.terrain(world.terrain[i], terrainVariant(x, y), this.terrainSeason));
     this.put(L.floor, x, y, world.floor[i] !== NONE ? Frames.feature(world.floor[i]) : -1);
     this.put(L.roof, x, y, world.roof[i] !== NONE ? Frames.feature(world.roof[i]) : -1);
     const zone = world.zone[i];
@@ -425,9 +501,10 @@ export class ColonyScene extends Phaser.Scene {
 
   private createPawn(c: Colonist): PawnView {
     const color = Phaser.Display.Color.HexStringToColor(c.color).color;
+    const legs = this.add.image(0, 0, 'pawn-legs-0');
     const body = this.add.image(0, 0, 'pawn-body').setTint(color);
     const head = this.add.image(0, 0, 'pawn-head');
-    const figure = this.add.container(0, 0, [body, head]);
+    const figure = this.add.container(0, 0, [legs, body, head]);
     const carry = this.add.image(5, 3, TILESET_KEY, Frames.item(1)).setScale(0.55).setVisible(false);
     const label = this.add
       .text(0, -11, c.name, {
@@ -482,6 +559,7 @@ export class ColonyScene extends Phaser.Scene {
       const moving = c.path.length > 0;
       const { dead, downed } = c.health;
       pawn.root.setPosition(x, y + (moving ? -Math.abs(Math.sin(time / 90)) * 1.2 : 0));
+      (pawn.figure.getAt(0) as Phaser.GameObjects.Image).setTexture(stride(moving && !downed && !dead, time));
       pawn.root.setAlpha(dead ? 0.55 : 1);
       pawn.figure.setAngle(c.sleeping || dead || downed ? 90 : 0);
       pawn.zzz.setVisible(c.sleeping).setY(-6 - ((time / 400) % 3));
@@ -513,6 +591,7 @@ export class ColonyScene extends Phaser.Scene {
     for (const v of visitors) {
       let trader = this.traders.get(v.id);
       if (!trader) {
+        const legs = this.add.image(0, 0, 'pawn-legs-0');
         const body = this.add.image(0, 0, 'pawn-body').setTint(0x5f9a4a);
         const head = this.add.image(0, 0, 'pawn-head');
         const label = this.add
@@ -525,19 +604,21 @@ export class ColonyScene extends Phaser.Scene {
           })
           .setOrigin(0.5, 1)
           .setResolution(4);
-        trader = this.add.container(0, 0, [body, head, label]).setDepth(Depth.PAWNS);
+        trader = this.add.container(0, 0, [legs, body, head, label]).setDepth(Depth.PAWNS);
         this.traders.set(v.id, trader);
       }
       const to = v.path.length > 0 ? v.path[0] : v.tile;
       const x = world.xOf(v.tile) + (world.xOf(to) - world.xOf(v.tile)) * v.moveProgress;
       const y = world.yOf(v.tile) + (world.yOf(to) - world.yOf(v.tile)) * v.moveProgress;
       trader.setPosition((x + 0.5) * TILE, (y + 0.5) * TILE);
-      (trader.getAt(2) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames);
+      (trader.getAt(0) as Phaser.GameObjects.Image).setTexture(stride(v.path.length > 0, this.time.now));
+      (trader.getAt(3) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames);
     }
   }
 
   private createRaider(e: Enemy): Phaser.GameObjects.Container {
     const tint = e.faction === 0 ? 0x8a5a3c : 0x5a5a64;
+    const legs = this.add.image(0, 0, 'pawn-legs-0');
     const body = this.add.image(0, 0, 'pawn-body').setTint(tint);
     const head = this.add.image(0, 0, 'raider-head');
     const label = this.add
@@ -550,7 +631,7 @@ export class ColonyScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 1)
       .setResolution(4);
-    return this.add.container(0, 0, [body, head, label]).setDepth(Depth.PAWNS);
+    return this.add.container(0, 0, [legs, body, head, label]).setDepth(Depth.PAWNS);
   }
 
   private syncAnimals(): void {
@@ -572,7 +653,9 @@ export class ColonyScene extends Phaser.Scene {
       const to = a.path.length > 0 ? a.path[0] : a.tile;
       const x = world.xOf(a.tile) + (world.xOf(to) - world.xOf(a.tile)) * a.moveProgress;
       const y = world.yOf(a.tile) + (world.yOf(to) - world.yOf(a.tile)) * a.moveProgress;
-      beast.setPosition((x + 0.5) * TILE, (y + 0.5) * TILE);
+      // A little hop with each step while on the move.
+      const hop = a.path.length > 0 ? Math.abs(Math.sin(this.time.now / 80 + a.id)) * 1.5 : 0;
+      beast.setPosition((x + 0.5) * TILE, (y + 0.5) * TILE - hop);
       // Face the direction of travel.
       const body = beast.getAt(0) as Phaser.GameObjects.Image;
       if (to !== a.tile) {
@@ -621,8 +704,9 @@ export class ColonyScene extends Phaser.Scene {
       const x = world.xOf(e.tile) + (world.xOf(to) - world.xOf(e.tile)) * t;
       const y = world.yOf(e.tile) + (world.yOf(to) - world.yOf(e.tile)) * t;
       raider.setPosition((x + 0.5) * TILE, (y + 0.5) * TILE).setAlpha(e.fleeing ? 0.6 : 1);
+      (raider.getAt(0) as Phaser.GameObjects.Image).setTexture(stride(e.path.length > 0, this.time.now));
       // The name label is the container's last child.
-      (raider.getAt(2) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames);
+      (raider.getAt(3) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames);
     }
   }
 
@@ -699,24 +783,22 @@ export class ColonyScene extends Phaser.Scene {
     }
   }
 
+  // The sky through the day: clear at midday, a warm golden hour and dusk, deep blue at night and a
+  // rosy dawn. An eclipse brings dusk in the middle of the day.
   private updateNight(): void {
-    const hour = controller.sim.hour;
-    // Fade over two hours around dusk and dawn.
-    let dark: number;
-    if (hour >= NIGHT_START || hour < NIGHT_END) {
-      dark = 1;
-    } else if (hour >= NIGHT_START - 2) {
-      dark = (hour - (NIGHT_START - 2)) / 2;
-    } else if (hour < NIGHT_END + 1) {
-      dark = 1 - (hour - NIGHT_END);
-    } else {
-      dark = 0;
+    const sim = controller.sim;
+    if (!controller.settings.dayNightLighting) {
+      this.night.setFillStyle(0x0a1230, 0);
+      this.glow.clear();
+      return;
     }
-    // An eclipse brings dusk in the middle of the day.
-    if (eclipseOn(controller.sim)) {
-      dark = Math.max(dark, 0.85);
+    const { color, alpha, dark } = skyAt(sim.hour);
+    if (eclipseOn(sim)) {
+      this.night.setFillStyle(0x0a1230, Math.max(alpha, 0.47));
+      this.drawGlow(Math.max(dark, 0.85));
+      return;
     }
-    this.night.setFillStyle(0x0a1230, dark * 0.55);
+    this.night.setFillStyle(color, alpha);
     this.drawGlow(dark);
   }
 
@@ -753,6 +835,8 @@ export class ColonyScene extends Phaser.Scene {
     }
   }
 
+  // Pools of light after dark: fires and heaters flicker warm, stoves glow dimly, lamps (while the
+  // grid is powered) shine steady.
   private drawGlow(dark: number): void {
     const world = controller.sim.world;
     if (world.featureVersion !== this.glowVersion) {
@@ -760,8 +844,21 @@ export class ColonyScene extends Phaser.Scene {
       this.glowSources = [];
       for (let i = 0; i < world.size; i++) {
         const f = world.feature[i];
-        if (f !== NONE && (featureDef(f).heater > 0 || featureDef(f).workbench === 'cooking')) {
-          this.glowSources.push(i);
+        if (f === NONE) {
+          continue;
+        }
+        const def = featureDef(f);
+        const light =
+          def.light ?? (def.heater > 0 ? FIRE_LIGHT : def.workbench === 'cooking' ? STOVE_LIGHT : undefined);
+        if (light) {
+          this.glowSources.push({
+            tile: i,
+            radius: light.radius,
+            color: Phaser.Display.Color.HexStringToColor(light.color).color,
+            flicker: light.flicker,
+            strength: light === STOVE_LIGHT ? 0.4 : 1,
+            powered: !!def.power?.draw,
+          });
         }
       }
     }
@@ -771,23 +868,29 @@ export class ColonyScene extends Phaser.Scene {
       return;
     }
     const time = this.time.now;
-    // Glow reaches about four tiles, so skip fires well off screen.
     const view = this.visibleTiles();
-    for (const i of this.glowSources) {
+    const gridOn = controller.sim.power.powered;
+    for (const source of this.glowSources) {
+      const i = source.tile;
+      const reach = Math.ceil(source.radius);
       if (
-        world.xOf(i) < view.x0 - 4 ||
-        world.xOf(i) > view.x1 + 4 ||
-        world.yOf(i) < view.y0 - 4 ||
-        world.yOf(i) > view.y1 + 4
+        (source.powered && !gridOn) ||
+        world.xOf(i) < view.x0 - reach ||
+        world.xOf(i) > view.x1 + reach ||
+        world.yOf(i) < view.y0 - reach ||
+        world.yOf(i) > view.y1 + reach
       ) {
         continue;
       }
-      const strength = featureDef(world.feature[i]).heater > 0 ? 1 : 0.4;
-      const flicker = 0.85 + 0.15 * Math.sin(time / 110 + i);
+      const flicker = source.flicker ? 0.85 + 0.15 * Math.sin(time / 110 + i) : 1;
       const x = (world.xOf(i) + 0.5) * TILE;
       const y = (world.yOf(i) + 0.5) * TILE;
-      for (const radius of [3.6, 3, 2.4, 1.8, 1.2, 0.7]) {
-        g.fillStyle(0xff9a3c, 0.035 * dark * strength * flicker).fillCircle(x, y, radius * TILE);
+      for (const share of [1, 0.83, 0.67, 0.5, 0.33, 0.2]) {
+        g.fillStyle(source.color, 0.06 * dark * source.strength * flicker).fillCircle(
+          x,
+          y,
+          share * source.radius * TILE,
+        );
       }
     }
   }

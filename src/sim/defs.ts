@@ -96,6 +96,9 @@ export interface FeatureDef {
   art: boolean;
   // Flowers: full beauty in bloom, little in winter.
   flowers: boolean;
+  // Light it casts after dark: how far (tiles), its colour, and whether it flickers like a flame.
+  // Anything on the power grid only shines while the grid is powered.
+  light?: { radius: number; color: string; flicker: boolean };
   workbench?: BenchType;
   // Heat added to the room per climate update.
   heater: number;
@@ -180,6 +183,7 @@ interface RawFeature {
   beauty?: number;
   art?: boolean;
   flowers?: boolean;
+  light?: { radius: number; color: string; flicker?: boolean };
   workbench?: string;
   heater?: number;
   cover?: number;
@@ -310,6 +314,7 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   beauty: f.beauty ?? 0,
   art: !!f.art,
   flowers: !!f.flowers,
+  light: f.light && { radius: f.light.radius, color: f.light.color, flicker: !!f.light.flicker },
   workbench: f.workbench as BenchType | undefined,
   heater: f.heater ?? 0,
   cover: f.cover ?? 1,

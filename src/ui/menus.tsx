@@ -410,6 +410,11 @@ export function SettingsScreen({ state, onClose }: { state: UiState; onClose: ()
       <Toggle label="Names over colonists and raiders" value={s.showNames} onChange={(v) => set({ showNames: v })} />
       <Toggle label="Minimap" value={s.showMinimap} onChange={(v) => set({ showMinimap: v })} />
       <Toggle label="Lightning flashes" value={s.lightningFlashes} onChange={(v) => set({ lightningFlashes: v })} />
+      <Toggle
+        label="Day and night lighting"
+        value={s.dayNightLighting}
+        onChange={(v) => set({ dayNightLighting: v })}
+      />
       <h3>Controls</h3>
       <table className="summary">
         <tbody>

@@ -2,7 +2,14 @@ import Phaser from 'phaser';
 import { FEATURES, ITEMS, TERRAIN } from '../sim/defs';
 import { hash2 } from '../sim/rng';
 import { setTilesetImage } from './icons';
-import { Frames, TILE, TILESET_COLUMNS as COLUMNS, TILESET_ROWS as ROWS } from './tileset-layout';
+import {
+  Frames,
+  TERRAIN_SEASONS,
+  TERRAIN_VARIANTS,
+  TILE,
+  TILESET_COLUMNS as COLUMNS,
+  TILESET_ROWS as ROWS,
+} from './tileset-layout';
 
 export { Frames, TILE } from './tileset-layout';
 export const TILESET_KEY = 'tiles';
@@ -26,8 +33,10 @@ export function createTextures(scene: Phaser.Scene): void {
   };
 
   TERRAIN.forEach((t) => {
-    for (let v = 0; v < 2; v++) {
-      at(Frames.terrain(t.id, v), (c) => drawTerrain(c, t.key, v));
+    for (let season = 0; season < TERRAIN_SEASONS; season++) {
+      for (let v = 0; v < TERRAIN_VARIANTS; v++) {
+        at(Frames.terrain(t.id, v, season), (c) => drawTerrain(c, t.key, v, season));
+      }
     }
   });
   FEATURES.forEach((f) => {
@@ -91,30 +100,99 @@ function speckle(c: Ctx, seed: number, colors: string[], density: number): void 
   }
 }
 
-function drawTerrain(c: Ctx, key: string, variant: number): void {
-  const seed = variant * 97 + key.length * 13;
-  const palette: Record<string, [string, string[], number]> = {
-    deepWater: ['#1d4670', ['#24547f', '#2b5f8c'], 0.12],
-    shallowWater: ['#3d7bb0', ['#4a8bc0', '#5a9bd0'], 0.12],
-    sand: ['#d6c286', ['#c9b376', '#e2d199'], 0.18],
-    grass: ['#5a8a38', ['#4e7c30', '#679a42', '#72a34a'], 0.22],
-    soil: ['#5f4a2f', ['#544128', '#6c553a'], 0.25],
-    stoneFloor: ['#77746f', ['#6a6762', '#85827c'], 0.25],
-    ice: ['#cfe4ef', ['#bcd6e6', '#e6f3fa'], 0.2],
+// Ground in four looks (0 plain; 1–3 with details) through the four seasons (0 spring … 3 winter).
+function drawTerrain(c: Ctx, key: string, variant: number, season: number): void {
+  const seed = variant * 97 + season * 31 + key.length * 13;
+  const winter = season === 3;
+  const palettes: Record<string, [string, string[], number][]> = {
+    deepWater: [['#1d4670', ['#24547f', '#2b5f8c'], 0.12]],
+    shallowWater: [['#3d7bb0', ['#4a8bc0', '#5a9bd0'], 0.12]],
+    sand: [['#d6c286', ['#c9b376', '#e2d199'], 0.18]],
+    grass: [
+      ['#5f9238', ['#527f30', '#6ea442', '#7ab24c'], 0.22],
+      ['#5a8a38', ['#4e7c30', '#679a42', '#72a34a'], 0.22],
+      ['#7a8a3a', ['#8a8236', '#6c7c34', '#9a8a3e'], 0.24],
+      ['#8a9884', ['#96a290', '#a8b2a6', '#c8d2d4'], 0.16],
+    ],
+    soil: [['#5f4a2f', ['#544128', '#6c553a'], 0.25]],
+    stoneFloor: [['#77746f', ['#6a6762', '#85827c'], 0.25]],
+    ice: [['#cfe4ef', ['#bcd6e6', '#e6f3fa'], 0.2]],
   };
-  const [base, specks, density] = palette[key];
+  const options = palettes[key];
+  const [base, specks, density] = options[Math.min(season, options.length - 1)];
   c.fillStyle = base;
   c.fillRect(0, 0, TILE, TILE);
   speckle(c, seed, specks, density);
+  const dot = (x: number, y: number, color: string, w = 1, h = 1) => {
+    c.fillStyle = color;
+    c.fillRect(x, y, w, h);
+  };
+  // Small details, placed by the variant so neighbouring tiles differ.
+  const spot = (k: number) => [
+    2 + Math.floor(hash2(variant, k, seed) * 11),
+    2 + Math.floor(hash2(k, variant, seed) * 11),
+  ];
+  if (key === 'grass' && variant > 0) {
+    if (variant === 1) {
+      // Tufts.
+      for (const k of [1, 2]) {
+        const [x, y] = spot(k);
+        const blade = winter ? '#9aa69a' : season === 2 ? '#6c6a2c' : '#3f6e26';
+        dot(x, y, blade, 1, 2);
+        dot(x + 1, y - 1, blade, 1, 3);
+        dot(x + 2, y, blade, 1, 2);
+      }
+    } else if (variant === 2) {
+      // Flowers in spring and summer, fallen leaves in autumn, snow in winter.
+      const colors = [
+        ['#f2d24c', '#e85a8a', '#ffffff'],
+        ['#f2d24c', '#9b6bd6', '#ffffff'],
+        ['#c8642e', '#d89a32', '#a8442a'],
+        ['#f4f8fa', '#e6eef2', '#ffffff'],
+      ][season];
+      for (const k of [1, 2, 3]) {
+        const [x, y] = spot(k);
+        dot(x, y, colors[k - 1], winter ? 2 : 1, 1);
+      }
+    } else {
+      // A pebble.
+      const [x, y] = spot(1);
+      dot(x, y, '#8a8780', 2, 2);
+      dot(x, y, '#a5a29a');
+    }
+  }
+  if (key === 'soil' && variant > 1) {
+    for (const k of [1, 2, 3]) {
+      const [x, y] = spot(k);
+      dot(x, y, '#7a6a52');
+    }
+  }
+  if (key === 'sand' && variant > 0) {
+    // Ripples, and now and then a shell.
+    dot(3, 4 + variant * 3, 'rgba(160,130,80,0.45)', 6, 1);
+    if (variant === 3) {
+      const [x, y] = spot(4);
+      dot(x, y, '#f2ead8', 2, 1);
+    }
+  }
+  if (key === 'stoneFloor' && variant > 1) {
+    const [x, y] = spot(5);
+    dot(x, y, '#5f5c58', 3, 1);
+    dot(x + 2, y + 1, '#5f5c58', 1, 2);
+  }
+  // Frost on open ground in winter.
+  if (winter && (key === 'soil' || key === 'sand' || key === 'stoneFloor')) {
+    speckle(c, seed + 7, ['rgba(235,242,248,0.7)'], 0.12);
+  }
   if (key === 'deepWater' || key === 'shallowWater') {
     c.fillStyle = 'rgba(255,255,255,0.18)';
-    const y = variant ? 4 : 10;
+    const y = 3 + variant * 3;
     c.fillRect(3, y, 4, 1);
-    c.fillRect(9, y + 3, 4, 1);
+    c.fillRect(9, ((y + 6) % 14) + 1, 4, 1);
   }
   if (key === 'ice') {
     c.fillStyle = 'rgba(80,120,150,0.35)';
-    if (variant) {
+    if (variant % 2) {
       c.fillRect(2, 5, 5, 1);
       c.fillRect(7, 6, 4, 1);
       c.fillRect(11, 7, 1, 4);
@@ -334,6 +412,34 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillRect(12, 2, 2, 2);
       c.fillStyle = '#7fb3d9';
       c.fillRect(13, 2, 1, 1);
+      break;
+    case 'torch':
+      // A wooden post with a flame on top.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(5, 14, 6, 1);
+      c.fillStyle = '#5a3818';
+      c.fillRect(7, 6, 2, 9);
+      c.fillStyle = '#3a2414';
+      c.fillRect(6, 5, 4, 2);
+      c.fillStyle = '#ff7a2a';
+      c.fillRect(6, 2, 4, 3);
+      c.fillStyle = '#ffd166';
+      c.fillRect(7, 1, 2, 3);
+      c.fillStyle = '#fff4c0';
+      c.fillRect(7, 3, 1, 1);
+      break;
+    case 'standingLamp':
+      // A slim lamp with a warm shade.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(4, 14, 8, 1);
+      c.fillStyle = '#4a4a52';
+      c.fillRect(5, 13, 6, 2);
+      c.fillRect(7, 6, 2, 8);
+      c.fillStyle = '#e8d29a';
+      c.fillRect(4, 2, 8, 4);
+      c.fillRect(5, 1, 6, 1);
+      c.fillStyle = '#fff1c8';
+      c.fillRect(5, 5, 6, 1);
       break;
     case 'grave':
       // A mound of earth with a wooden marker.
@@ -1248,11 +1354,6 @@ function createPawnTextures(scene: Phaser.Scene): void {
   // Raiders: a hooded head over the same tintable body.
   const hood = scene.textures.createCanvas('raider-head', TILE, TILE)!;
   const r = hood.getContext();
-  r.fillStyle = 'rgba(0,0,0,0.3)';
-  r.fillRect(4, 14, 8, 2);
-  r.fillStyle = '#2a2a30';
-  r.fillRect(5, 13, 2, 2);
-  r.fillRect(9, 13, 2, 2);
   r.fillStyle = '#4a3a34';
   r.fillRect(4, 1, 8, 6);
   r.fillStyle = '#d8b48c';
@@ -1273,11 +1374,6 @@ function createPawnTextures(scene: Phaser.Scene): void {
 
   const head = scene.textures.createCanvas('pawn-head', TILE, TILE)!;
   const h = head.getContext();
-  h.fillStyle = 'rgba(0,0,0,0.3)';
-  h.fillRect(4, 14, 8, 2);
-  h.fillStyle = '#3a3a48';
-  h.fillRect(5, 13, 2, 2);
-  h.fillRect(9, 13, 2, 2);
   h.fillStyle = '#f1c9a0';
   h.fillRect(5, 2, 6, 5);
   h.fillStyle = '#4a3020';
@@ -1287,4 +1383,20 @@ function createPawnTextures(scene: Phaser.Scene): void {
   h.fillRect(7, 4, 1, 1);
   h.fillRect(9, 4, 1, 1);
   head.refresh();
+
+  // Shadow and feet, apart from the rest so they can stride: standing, then each foot forward.
+  for (const [frame, left, right] of [
+    [0, 13, 13],
+    [1, 12, 14],
+    [2, 14, 12],
+  ]) {
+    const legs = scene.textures.createCanvas(`pawn-legs-${frame}`, TILE, TILE)!;
+    const l = legs.getContext();
+    l.fillStyle = 'rgba(0,0,0,0.3)';
+    l.fillRect(4, 14, 8, 2);
+    l.fillStyle = '#3a3a48';
+    l.fillRect(5, left, 2, 15 - left);
+    l.fillRect(9, right, 2, 15 - right);
+    legs.refresh();
+  }
 }

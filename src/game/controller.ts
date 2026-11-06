@@ -350,6 +350,8 @@ export const TOOLS: ToolDef[] = [
     'Carved by an artist (Art work) in memory of the fallen. While it stands, the fallen are remembered',
   ),
   build('banner', 'Banner', '', 'decor', 'A splash of colour for a room'),
+  build('torch', 'Torch', '', 'decor', 'Lights up the dark around it'),
+  build('standingLamp', 'Standing lamp', '', 'decor', 'Steady light after dark, while the power grid is running'),
   build('stove', 'Stove', 'k', 'production', 'Cooks meals from raw food'),
   build('craftingBench', 'Crafting bench', 'j', 'production', 'Weaves cloth and crafts bows'),
   build('researchBench', 'Research bench', '', 'production', 'Where colonists research new technology'),

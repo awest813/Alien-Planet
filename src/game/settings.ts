@@ -16,6 +16,8 @@ export interface Settings {
   showMinimap: boolean;
   // The screen flash when lightning strikes.
   lightningFlashes: boolean;
+  // Dusk, night and dawn shading, with lamps and fires lighting the dark.
+  dayNightLighting: boolean;
   // How long notification cards stay up.
   noticeSeconds: number;
   // Keyboard panning speed, as a multiple of normal.
@@ -57,6 +59,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showMinimap: true,
   // Off for anyone whose system asks for less motion.
   lightningFlashes: !prefersReducedMotion(),
+  dayNightLighting: true,
   noticeSeconds: 8,
   panSpeed: 1,
   sound: false,

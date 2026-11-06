@@ -8,6 +8,10 @@ export const TILE = 16;
 export const TILESET_COLUMNS = 16;
 
 const CROPS = FEATURES.filter((f) => f.crop);
+// Each terrain has four looks (plain, and three with details) in each of the four seasons.
+export const TERRAIN_VARIANTS = 4;
+export const TERRAIN_SEASONS = 4;
+const TERRAIN_FRAMES = TERRAIN_VARIANTS * TERRAIN_SEASONS;
 // Designations are numbered from 1; frame 0 of the section is left empty.
 const DESIGNATION_FRAMES = 5;
 const OVERLAY_FRAMES = 3;
@@ -27,7 +31,7 @@ function layout(sections: Record<string, number>): { starts: Record<string, numb
 }
 
 const { starts, rows } = layout({
-  terrain: TERRAIN.length * 2,
+  terrain: TERRAIN.length * TERRAIN_FRAMES,
   features: FEATURES.length,
   blueprints: FEATURES.length,
   designations: DESIGNATION_FRAMES,
@@ -40,7 +44,9 @@ export const TILESET_ROWS = rows;
 
 // Frame indices in the generated tileset.
 export const Frames = {
-  terrain: (terrain: number, variant: number) => starts.terrain + terrain * 2 + variant,
+  // `season`: 0 spring, 1 summer, 2 autumn, 3 winter.
+  terrain: (terrain: number, variant: number, season = 1) =>
+    starts.terrain + terrain * TERRAIN_FRAMES + season * TERRAIN_VARIANTS + variant,
   feature: (feature: number) => starts.features + feature - 1,
   blueprint: (feature: number) => starts.blueprints + feature - 1,
   designation: (designation: number) => starts.designations + designation,

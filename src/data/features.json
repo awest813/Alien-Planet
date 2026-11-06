@@ -495,6 +495,10 @@
         }
       ],
       "work": 150
+    },
+    "light": {
+      "radius": 5,
+      "color": "#e8f4ff"
     }
   },
   {
@@ -960,5 +964,50 @@
       ],
       "work": 900
     }
+  },
+  {
+    "key": "torch",
+    "name": "Torch",
+    "beauty": 1,
+    "light": {
+      "radius": 3.5,
+      "color": "#ffa040",
+      "flicker": true
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 4
+        }
+      ],
+      "work": 40
+    }
+  },
+  {
+    "key": "standingLamp",
+    "name": "Standing lamp",
+    "beauty": 2,
+    "power": {
+      "draw": 30
+    },
+    "light": {
+      "radius": 4.5,
+      "color": "#fff1c8"
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 10
+        },
+        {
+          "item": "silver",
+          "count": 5
+        }
+      ],
+      "work": 120
+    },
+    "research": "electricity"
   }
 ]

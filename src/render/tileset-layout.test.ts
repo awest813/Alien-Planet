@@ -5,7 +5,9 @@ import { Frames, TILESET_COLUMNS, TILESET_ROWS } from './tileset-layout';
 describe('tileset layout', () => {
   it('gives every piece of art its own frame inside the tileset', () => {
     const frames = [
-      ...TERRAIN.flatMap((t) => [Frames.terrain(t.id, 0), Frames.terrain(t.id, 1)]),
+      ...TERRAIN.flatMap((t) =>
+        [0, 1, 2, 3].flatMap((season) => [0, 1, 2, 3].map((v) => Frames.terrain(t.id, v, season))),
+      ),
       ...FEATURES.flatMap((f) => [Frames.feature(f.id), Frames.blueprint(f.id)]),
       ...[1, 2, 3, 4].map(Frames.designation),
       ...ITEMS.map((i) => Frames.item(i.id)),
