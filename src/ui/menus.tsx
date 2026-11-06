@@ -66,6 +66,7 @@ function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: ()
       <div className="row start-row">
         <input
           placeholder="Seed (optional)"
+          aria-label="Seed"
           title="The same seed gives the same map; leave blank for a random one"
           value={seed}
           onChange={(e) => setSeed(e.target.value)}
@@ -196,8 +197,9 @@ export function PauseMenu({ state, onClose, actions }: { state: UiState; onClose
   return (
     <Modal title="Paused" onClose={onClose}>
       <p className="muted">
-        Day {state.day} · {state.colonists.filter((c) => !c.dead).length} colonists · {current?.label} · {state.mapSize}
-        ×{state.mapSize} map · seed {state.seed}
+        Day {state.day} · {state.colonists.filter((c) => !c.dead).length} colonists · {current?.label} ·{' '}
+        {MAP_SIZES.find((m) => m.size === state.mapSize)?.label ?? `${state.mapSize}×${state.mapSize}`} map · seed{' '}
+        {state.seed}
       </p>
       {view === 'main' && (
         <div className="title-buttons">

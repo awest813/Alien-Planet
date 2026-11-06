@@ -14,21 +14,30 @@ export function App() {
   const state = useUiState();
   const onTitle = !state.inPlay;
   const [screen, setScreen] = useState<Screen>(null);
-  const close = () => {
-    if (screen === 'help') {
+  // Settings and help opened from the pause menu go back to it when closed, not to the game.
+  const returnTo = useRef<Screen>(null);
+  const back = (from: Screen) => {
+    if (from === 'help') {
       markHelpSeen();
     }
-    setScreen(null);
+    setScreen(returnTo.current);
+    returnTo.current = null;
+  };
+  const close = () => back(screen);
+  const openFromMenu = (next: Screen) => () => {
+    returnTo.current = screen === 'menu' ? 'menu' : null;
+    setScreen(next);
   };
 
   const actions: MenuActions = {
     // A new player gets the welcome help as their first colony starts.
     onPlay: () => setScreen(helpSeen() ? null : 'help'),
-    onSettings: () => setScreen('settings'),
-    onHelp: () => setScreen('help'),
+    onSettings: openFromMenu('settings'),
+    onHelp: openFromMenu('help'),
     // The menu stays open (and the game paused) until the autosave is written.
     onTitle: async () => {
       if (await controller.quitToTitle()) {
+        returnTo.current = null;
         setScreen(null);
       }
     },
@@ -52,19 +61,23 @@ export function App() {
 
   // Escape peels back one layer at a time: an open screen, then the current tool, then the
   // selection, and finally opens the pause menu.
-  const latest = useRef({ screen, onTitle });
-  latest.current = { screen, onTitle };
+  const latest = useRef({ screen, onTitle, back });
+  latest.current = { screen, onTitle, back };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') {
+      // Held keys repeat, which would flicker the pause menu open and shut.
+      if (e.key !== 'Escape' || e.repeat) {
+        return;
+      }
+      // Esc in a text field (the seed, say) just leaves the field.
+      const target = e.target as HTMLElement | null;
+      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
+        target.blur();
         return;
       }
       const open = latest.current.screen;
       if (open) {
-        if (open === 'help') {
-          markHelpSeen();
-        }
-        setScreen(null);
+        latest.current.back(open);
       } else if (latest.current.onTitle || controller.getState().fallen) {
         // Nothing to back out of.
       } else if (controller.tool.kind !== 'select') {

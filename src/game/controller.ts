@@ -1319,7 +1319,10 @@ export class GameController {
     const raiders = sim.enemies.filter((e) => !e.fleeing).length;
     if (sim.caravan && tradeOpen(sim)) {
       const hours = Math.max(0, Math.ceil((sim.caravan.leaveAt - sim.tick) / TICKS_PER_HOUR));
-      alerts.push({ text: `Traders are visiting for ${hours} more hours: open Trade in the top bar.`, tone: 'warn' });
+      alerts.push({
+        text: `Traders are visiting for ${hours} more ${hours === 1 ? 'hour' : 'hours'}: open Trade in the top bar.`,
+        tone: 'warn',
+      });
     }
     if (sim.burning.size > 0) {
       const n = sim.burning.size;
@@ -1388,7 +1391,10 @@ export class GameController {
     }
     if (heatWaveOn(sim)) {
       const hours = Math.ceil(((sim.story.heatWaveUntil ?? 0) - sim.tick) / TICKS_PER_HOUR);
-      alerts.push({ text: `Heat wave for ${hours} more hours: keep colonists cool indoors`, tone: 'warn' });
+      alerts.push({
+        text: `Heat wave for ${hours} more ${hours === 1 ? 'hour' : 'hours'}: keep colonists cool indoors`,
+        tone: 'warn',
+      });
     }
     if (eclipseOn(sim) && sim.countFeature((f) => !!featureDef(f).power?.solar) > 0) {
       alerts.push({ text: 'Eclipse: solar panels are dark until the sun comes back', tone: 'warn' });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   ColonistView,
@@ -64,6 +64,8 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
               className={state.speed === index ? 'active' : ''}
               onClick={() => controller.setSpeed(index)}
               title={s.title}
+              aria-label={s.title}
+              aria-pressed={state.speed === index}
             >
               {s.label}
             </button>
@@ -143,12 +145,36 @@ function FoodDays({ days }: { days: number }) {
 // Every item the colony has, in a dropdown from the top bar.
 function AllResources({ state }: { state: UiState }) {
   const [open, setOpen] = useState(false);
+  const root = useRef<HTMLSpanElement>(null);
+  // Esc or a click anywhere else folds the list away.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onDown = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
   const items = state.resources.filter((r) => r.total > 0);
   if (items.length === 0) {
     return null;
   }
   return (
-    <span className="res-more">
+    <span className="res-more" ref={root}>
       <button className={open ? 'active' : ''} onClick={() => setOpen(!open)} aria-expanded={open}>
         All items ▾
       </button>
@@ -271,7 +297,11 @@ function ColonistCard({ c }: { c: ColonistView }) {
             {c.drafted ? 'Drafted' : 'Draft'}
           </button>
         )}
-        <button onClick={() => controller.selectColonist(c.id, true)} title="Centre the view on them">
+        <button
+          onClick={() => controller.selectColonist(c.id, true)}
+          title="Centre the view on them"
+          aria-label="Centre the view on them"
+        >
           ◎
         </button>
         <button onClick={() => controller.selectColonist(null)} title="Close" aria-label="Close">
@@ -525,7 +555,7 @@ export function HoverCard({ state }: { state: UiState }) {
 
 type SideTab = 'goals' | 'log';
 // Alerts shown before the rest fold behind "more".
-const ALERTS_SHOWN = 4;
+const ALERTS_SHOWN = 3;
 
 export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: Screen) => void }) {
   const [tab, setTab] = useState<SideTab>('goals');
@@ -547,7 +577,12 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
   const next = phases[0]?.objectives.find((o) => !o.done && !o.failed);
   if (!open) {
     return (
-      <button className="panel side-toggle" onClick={() => setOpen(true)} title="Show alerts and goals">
+      <button
+        className="panel side-toggle"
+        onClick={() => setOpen(true)}
+        title="Show alerts and goals"
+        aria-label={`Show alerts and goals (${state.alerts.length} alerts)`}
+      >
         ◀ {state.alerts.length > 0 && <span className={`badge ${danger ? 'danger' : ''}`}>{state.alerts.length}</span>}
       </button>
     );
@@ -721,6 +756,9 @@ function NextGoal({ goal, onOpen }: { goal: ObjectiveView; onOpen: (screen: Scre
 }
 
 // Build and order tools, grouped into tabs.
+// A phone or tablet: the map is moved with a finger rather than a mouse.
+const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+
 export function Architect({ state }: { state: UiState }) {
   const current = TOOLS.find((t) => t.id === state.toolId);
   const [group, setGroup] = useState<ToolGroup>('orders');
@@ -734,6 +772,8 @@ export function Architect({ state }: { state: UiState }) {
       setGroup(current.group);
     }
   }, [current]);
+  // A tab switch moves the buttons out from under the mouse, which never sends a mouseleave.
+  useEffect(() => setHovered(null), [group]);
   const tools = TOOLS.filter((t) => t.group === group);
   return (
     <section className="panel architect" aria-label="Architect">
@@ -786,7 +826,11 @@ export function Architect({ state }: { state: UiState }) {
           </>
         )}
         {(!shown || shown.id === 'select') && (
-          <span className="muted"> · Right-drag or WASD pans, the wheel zooms, right-click drops the tool.</span>
+          <span className="muted">
+            {TOUCH
+              ? ' · Drag to move the map, pinch to zoom, tap to inspect.'
+              : ' · Right-drag or WASD pans, the wheel zooms, right-click drops the tool.'}
+          </span>
         )}
       </div>
     </section>

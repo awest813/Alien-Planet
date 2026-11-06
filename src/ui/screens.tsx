@@ -241,9 +241,11 @@ export function ProductionScreen({ state, onClose }: { state: UiState; onClose: 
                 <td>
                   <button
                     className={bill.target > 0 ? 'active' : ''}
+                    aria-pressed={bill.target > 0}
+                    title={bill.target > 0 ? 'Click to stop mending' : 'Click to start mending'}
                     onClick={() => set(bill.recipe, bill.target > 0 ? 0 : 1)}
                   >
-                    {bill.target > 0 ? 'Mending' : 'Paused'}
+                    {bill.target > 0 ? 'Mending: on' : 'Mending: off'}
                   </button>
                 </td>
               ) : (
@@ -365,7 +367,7 @@ export function ResearchScreen({ state, onClose }: { state: UiState; onClose: ()
       <p className="muted">
         {state.researchBench
           ? 'Pick a project; colonists with the Research work type study it at the research bench.'
-          : 'Build a research bench (Production) first, then pick a project.'}
+          : 'Build a research bench (Architect › Production) first, then pick a project.'}
       </p>
       <ul className="research">
         {[...state.research]

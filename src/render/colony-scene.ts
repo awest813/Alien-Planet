@@ -77,6 +77,8 @@ export class ColonyScene extends Phaser.Scene {
   private readonly held = new Set<string>();
   private drag: { start: number; end: number } | null = null;
   private pan: { x: number; y: number; scrollX: number; scrollY: number; moved: boolean; button: number } | null = null;
+  // Two fingers on a touch screen: the gap between them when the pinch began, and the zoom then.
+  private pinch: { distance: number; zoom: number } | null = null;
 
   constructor() {
     super('ColonyScene');
@@ -289,6 +291,10 @@ export class ColonyScene extends Phaser.Scene {
 
   private buildWorld(): void {
     this.builtFor = controller.simVersion;
+    // A drag or pan begun on the old map mustn't carry its tile indexes onto the new one.
+    this.drag = null;
+    this.pan = null;
+    this.pinch = null;
     const world = controller.sim.world;
     this.map?.destroy();
     this.itemLabels.forEach((label) => label.destroy());
@@ -866,10 +872,25 @@ export class ColonyScene extends Phaser.Scene {
 
   private setupPointer(): void {
     this.input.mouse?.disableContextMenu();
+    // Room for a second finger, for pinch zoom.
+    this.input.addPointer(1);
     const cam = this.cameras.main;
+    const fingerGap = () => {
+      const a = this.input.pointer1;
+      const b = this.input.pointer2;
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (pointer.button !== 0) {
+      if (pointer.wasTouch && this.input.pointer1.isDown && this.input.pointer2.isDown) {
+        // A second finger turns whatever the first was doing into a pinch.
+        this.drag = null;
+        this.pan = null;
+        this.pinch = { distance: Math.max(1, fingerGap()), zoom: cam.zoom };
+        return;
+      }
+      // On a touch screen one finger drags the map in Select mode; a tap still selects.
+      if (pointer.button !== 0 || (pointer.wasTouch && controller.tool.kind === 'select')) {
         this.pan = {
           x: pointer.x,
           y: pointer.y,
@@ -897,6 +918,15 @@ export class ColonyScene extends Phaser.Scene {
     });
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (this.pinch) {
+        if (this.input.pointer1.isDown && this.input.pointer2.isDown) {
+          this.zoomAround(this.pinch.zoom * (fingerGap() / this.pinch.distance), {
+            x: (this.input.pointer1.x + this.input.pointer2.x) / 2,
+            y: (this.input.pointer1.y + this.input.pointer2.y) / 2,
+          });
+        }
+        return;
+      }
       if (this.pan) {
         const dx = pointer.x - this.pan.x;
         const dy = pointer.y - this.pan.y;
@@ -913,6 +943,26 @@ export class ColonyScene extends Phaser.Scene {
     });
 
     const release = (pointer: Phaser.Input.Pointer) => {
+      if (this.pinch) {
+        // Lifting either finger ends the pinch; nothing else happens until both are up.
+        if (!this.input.pointer1.isDown && !this.input.pointer2.isDown) {
+          this.pinch = null;
+        }
+        return;
+      }
+      if (this.pan && this.pan.button === 0 && pointer.button === 0) {
+        // A one-finger touch pan; a tap that didn't move selects, as a click would.
+        if (!this.pan.moved) {
+          const colonist = this.pickColonist(pointer);
+          if (colonist !== null) {
+            controller.selectColonist(colonist);
+          } else {
+            controller.selectTile(this.tileAt(pointer));
+          }
+        }
+        this.pan = null;
+        return;
+      }
       if (this.pan && pointer.button === this.pan.button) {
         // A right click without dragging drops the current tool.
         if (!this.pan.moved && this.pan.button === 2) {
@@ -937,17 +987,22 @@ export class ColonyScene extends Phaser.Scene {
     this.input.on('gameout', () => controller.setHover(null));
 
     this.input.on('wheel', (pointer: Phaser.Input.Pointer, _objects: unknown, _dx: number, dy: number) => {
-      const oldZoom = cam.zoom;
-      const zoom = Phaser.Math.Clamp(oldZoom * (dy > 0 ? 1 / 1.15 : 1.15), this.minZoom(), MAX_ZOOM);
-      // Keep the point under the cursor fixed while zooming.
-      const worldX = cam.scrollX + cam.width / 2 + (pointer.x - cam.width / 2) / oldZoom;
-      const worldY = cam.scrollY + cam.height / 2 + (pointer.y - cam.height / 2) / oldZoom;
-      cam.setZoom(zoom);
-      cam.setScroll(
-        worldX - cam.width / 2 - (pointer.x - cam.width / 2) / zoom,
-        worldY - cam.height / 2 - (pointer.y - cam.height / 2) / zoom,
-      );
+      this.zoomAround(cam.zoom * (dy > 0 ? 1 / 1.15 : 1.15), pointer);
     });
+  }
+
+  // Zooms the camera, keeping the world point under `at` (a screen position) where it is.
+  private zoomAround(target: number, at: { x: number; y: number }): void {
+    const cam = this.cameras.main;
+    const oldZoom = cam.zoom;
+    const zoom = Phaser.Math.Clamp(target, this.minZoom(), MAX_ZOOM);
+    const worldX = cam.scrollX + cam.width / 2 + (at.x - cam.width / 2) / oldZoom;
+    const worldY = cam.scrollY + cam.height / 2 + (at.y - cam.height / 2) / oldZoom;
+    cam.setZoom(zoom);
+    cam.setScroll(
+      worldX - cam.width / 2 - (at.x - cam.width / 2) / zoom,
+      worldY - cam.height / 2 - (at.y - cam.height / 2) / zoom,
+    );
   }
 
   private setupKeyboard(): void {

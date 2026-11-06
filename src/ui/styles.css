@@ -548,6 +548,10 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* Expanded, a long list scrolls rather than pushing the next goal out of view. */
+  max-height: 220px;
+  overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .alerts li {
@@ -672,6 +676,8 @@ kbd {
   align-items: center;
   justify-content: center;
   pointer-events: auto;
+  /* Above the floating alerts panel on narrow screens. */
+  z-index: 10;
 }
 
 .modal {
@@ -689,6 +695,7 @@ kbd {
 
 .row {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin: 8px 0;
   align-items: center;
