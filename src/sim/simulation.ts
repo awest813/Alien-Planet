@@ -24,6 +24,7 @@ import {
   weaponDef,
   terrainId,
   type JoyKind,
+  type JoySpec,
 } from './defs';
 import { animalName, animalsAtDawn, populateWildlife, updateAnimals } from './animals';
 import {
@@ -80,7 +81,7 @@ import { PassRegions, Rooms, computePassRegions, computeRooms } from './regions'
 import { Rng, hash2 } from './rng';
 import { Caravan, updateCaravan } from './trade';
 import { WET_CHILL, WeatherState, douse, freshWeather, isWet, updateFires, updateWeather, weatherDef } from './weather';
-import { relationLabel, rollTraits, socialThoughts, traitFactor, traitValue, updateSocial } from './social';
+import { converse, relationLabel, rollTraits, socialThoughts, traitFactor, traitValue, updateSocial } from './social';
 import {
   Difficulty,
   StoryState,
@@ -126,7 +127,27 @@ const REST_DECAY = 1 / (TICKS_PER_HOUR * 18);
 const REST_GAIN_BED = 1 / (TICKS_PER_HOUR * 7);
 const REST_GAIN_GROUND = 1 / (TICKS_PER_HOUR * 9);
 const JOY_DECAY = 1 / (TICKS_PER_HOUR * 24);
-const JOY_GAIN_WALK = 1 / (TICKS_PER_HOUR * 4);
+// Below this after a meal, a colonist eats again straight away.
+const STILL_HUNGRY = 0.3;
+const WALK_HOURS_TO_FULL = 4;
+const JOY_GAIN_WALK = 1 / (TICKS_PER_HOUR * WALK_HOURS_TO_FULL);
+// Recreation tolerance: past a free allowance, what a kind is worth falls as
+// (1 + TOLERANCE × FREE_JOY) / (1 + TOLERANCE × recent amount of it).
+const TOLERANCE = 1;
+const FREE_JOY = 0.5;
+const MIN_JOY_EFFICIENCY = 0.25;
+// A game for two, played alone, is worth this share.
+const COMPANY_ALONE = 0.4;
+// How much a tile of walking takes off an option's appeal (in need per hour).
+const JOY_DISTANCE_COST = 0.004;
+// Up to half as much again from a walk among trees or by the water.
+const SCENIC_BONUS = 0.5;
+// A kind of recreation counts towards variety when it's a fair share of what they've had lately; when
+// one kind is nearly all of it (and there's been a fair amount), it gets old.
+const VARIETY_MIN = 0.08;
+const VARIETY_SHARE = 0.12;
+const SAME_OLD_TOTAL = 0.6;
+const SAME_OLD_SHARE = 0.85;
 const EAT_TICKS = 60;
 
 // Mood below this for a couple of hours risks a mental break.
@@ -1652,6 +1673,17 @@ export class Simulation {
     } else if (joy > 0.8) {
       keys.push('entertained');
     }
+    // Variety is the spice of life.
+    const recent = Object.values(c.recentJoy);
+    const total = recent.reduce((a, b) => a + b, 0);
+    const kinds = recent.filter((amount) => amount >= Math.max(VARIETY_MIN, VARIETY_SHARE * total)).length;
+    // "Same old thing" only once the colony has built something for fun: a fresh landing has nothing
+    // but walks.
+    if (kinds >= 3) {
+      keys.push('variedRecreation');
+    } else if (total >= SAME_OLD_TOTAL && Math.max(...recent) >= SAME_OLD_SHARE * total && this.hasJoyBuilding()) {
+      keys.push('sameOldThing');
+    }
     // Cold and heat as felt in what they're wearing.
     const temp = this.temperatureAt(c.tile);
     const comfort = comfortRange(c);
@@ -1711,7 +1743,9 @@ export class Simulation {
       n.rest = Math.max(0, n.rest - REST_DECAY);
     }
     if (c.job?.type === 'joy' && c.job.target < 0 && c.path.length > 0) {
-      this.enjoy(c, 'outdoor', JOY_GAIN_WALK);
+      // A walk among trees or by the water does more good than one across bare ground.
+      const scenic = 1 + SCENIC_BONUS * this.scenery(c.tile);
+      this.enjoy(c, 'outdoor', JOY_GAIN_WALK * this.joyEfficiency(c, 'outdoor') * scenic);
     }
   }
 
@@ -3466,6 +3500,10 @@ export class Simulation {
       this.addThought(c, 'niceDining');
     }
     this.endJob(c);
+    // A small stack of raw food may not be enough: still hungry, they go for another bite.
+    if (c.needs.food < STILL_HUNGRY) {
+      this.tryEat(c);
+    }
   }
 
   // A badly cooked meal, raw meat or fish can make someone sick for a while. Skilled cooks rarely
@@ -3483,28 +3521,53 @@ export class Simulation {
 
   // ---- Recreation ----
 
+  // Picks the most rewarding recreation in reach: each option is worth what the colonist would get out
+  // of it (less for a kind they've had a lot of lately, much less for a game with nobody to play), less
+  // a little for the walk there. A walk is always an option.
   private tryJoy(c: Colonist): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
-    const spot = this.nearestIn(
+    let best: { spot: number; seat: number; path: number[] } | undefined;
+    let bestScore = -Infinity;
+    const options = this.nearestIn(
       'buildings',
       c.tile,
-      (i) =>
-        w.feature[i] !== NONE &&
-        !!featureDef(w.feature[i]).joy &&
-        this.regions.region[i] === region &&
-        !this.isReserved(`j${i}`, c),
-      1,
-    )[0];
-    if (spot !== undefined) {
-      const path = this.pathfinder.find(c.tile, [spot]);
+      (i) => w.feature[i] !== NONE && !!featureDef(w.feature[i]).joy && this.joyOpen(i, c, region),
+      6,
+    );
+    for (const spot of options) {
+      const joy = featureDef(w.feature[spot]).joy!;
+      const seat = this.freeSeat(spot, joy.seats, c);
+      if (seat < 0) {
+        continue;
+      }
+      // Joining someone already at a game beats starting one; starting one is worth it when someone
+      // else is free to come and play; with nobody about, it's a poor game alone.
+      const company = !joy.company
+        ? 1
+        : this.playersAt(spot, c).length > 0
+          ? 1.1
+          : this.someoneFreeToPlay(c, region)
+            ? 0.9
+            : COMPANY_ALONE;
+      const score =
+        (this.joyEfficiency(c, joy.kind) * company) / joy.hoursToFull - w.distance(c.tile, spot) * JOY_DISTANCE_COST;
+      if (score <= bestScore) {
+        continue;
+      }
+      const path = this.pathfinder.find(c.tile, joy.seats > 1 ? this.workSpots(spot, false, region) : [spot]);
       if (path) {
-        this.reserve(c, `j${spot}`);
-        this.assign(c, this.makeJob('joy', spot, { wait: TICKS_PER_HOUR * 2 }), path);
-        return true;
+        best = { spot, seat, path };
+        bestScore = score;
       }
     }
-    // No recreation furniture: go for a walk.
+    const walkScore = this.joyEfficiency(c, 'outdoor') / WALK_HOURS_TO_FULL;
+    if (best && bestScore >= walkScore) {
+      this.reserve(c, `j${best.spot}.${best.seat}`);
+      this.assign(c, this.makeJob('joy', best.spot, { wait: TICKS_PER_HOUR * 2 }), best.path);
+      return true;
+    }
+    // Go for a walk, outdoors if possible.
     const x = w.xOf(c.tile);
     const y = w.yOf(c.tile);
     for (let attempt = 0; attempt < 8; attempt++) {
@@ -3522,6 +3585,71 @@ export class Simulation {
     return false;
   }
 
+  // Whether a joy building can be used right now: reachable, a telescope only on a clear night under
+  // the open sky, and not a table a rival is already sitting at.
+  private joyOpen(spot: number, c: Colonist, region: number): boolean {
+    const joy = featureDef(this.world.feature[spot]).joy!;
+    if (!this.hasWorkSpot(spot, joy.seats === 1, region)) {
+      return false;
+    }
+    if (joy.stargazing && !this.starsOut(spot)) {
+      return false;
+    }
+    return !this.playersAt(spot, c).some((o) => relationLabel(c, o) === 'Rival');
+  }
+
+  private starsOut(spot: number): boolean {
+    return this.isNight() && !this.weatherIsOvercast() && !this.isRoofed(spot);
+  }
+
+  private freeSeat(spot: number, seats: number, c: Colonist): number {
+    for (let seat = 0; seat < seats; seat++) {
+      if (!this.isReserved(`j${spot}.${seat}`, c)) {
+        return seat;
+      }
+    }
+    return -1;
+  }
+
+  // Whether the colony has built anything for recreation (cached until buildings change).
+  private hasJoyBuilding(): boolean {
+    if (this.joyBuiltVersion !== this.world.featureVersion) {
+      this.joyBuiltVersion = this.world.featureVersion;
+      this.joyBuilt = this.countFeature((f) => !!featureDef(f).joy) > 0;
+    }
+    return this.joyBuilt;
+  }
+  private joyBuiltVersion = -1;
+  private joyBuilt = false;
+
+  // Whether anyone else in reach is off duty and could do with some recreation.
+  private someoneFreeToPlay(c: Colonist, region: number): boolean {
+    const hour = Math.floor(this.hour);
+    return this.living().some(
+      (o) =>
+        o !== c &&
+        !o.drafted &&
+        !o.sleeping &&
+        !o.health.downed &&
+        o.needs.joy < 0.9 &&
+        (o.schedule[hour] === 'J' || (o.schedule[hour] === 'A' && o.needs.joy < 0.3)) &&
+        (!o.job || o.job.type === 'joy' || o.job.type === 'wander') &&
+        this.regions.region[o.tile] === region,
+    );
+  }
+
+  // Others using a joy building (on their way there or already at it).
+  private playersAt(spot: number, c: Colonist): Colonist[] {
+    return this.living().filter((o) => o !== c && o.job?.type === 'joy' && o.job.target === spot);
+  }
+
+  // How much a colonist gets out of a kind of recreation: full value for a fair share, then less the
+  // more of it they've had lately.
+  public joyEfficiency(c: Colonist, kind: JoyKind): number {
+    const had = c.recentJoy[kind] ?? 0;
+    return Math.max(MIN_JOY_EFFICIENCY, Math.min(1, (1 + TOLERANCE * FREE_JOY) / (1 + TOLERANCE * had)));
+  }
+
   // Fills the recreation need and notes what kind of recreation it was.
   private enjoy(c: Colonist, kind: JoyKind, amount: number): void {
     const gained = Math.min(amount, 1 - c.needs.joy);
@@ -3529,18 +3657,66 @@ export class Simulation {
     c.recentJoy[kind] = (c.recentJoy[kind] ?? 0) + gained;
   }
 
+  // Trees, bushes and water within a step make a walk more refreshing: 0 (bare ground) to 1.
+  private scenery(i: number): number {
+    const w = this.world;
+    let n = 0;
+    for (const t of [i, ...w.neighbors(i)]) {
+      const f = w.feature[t];
+      if ((f !== NONE && featureDef(f).natural && featureDef(f).passable) || this.isWaterTile(w.terrain[t])) {
+        n++;
+      }
+    }
+    return Math.min(1, n / 3);
+  }
+
   private stepJoy(c: Colonist, job: Job): void {
     const w = this.world;
-    const joy = job.target >= 0 && w.feature[job.target] !== NONE ? featureDef(w.feature[job.target]).joy : undefined;
-    if (!joy || c.tile !== job.target) {
+    const spot = job.target;
+    const joy = spot >= 0 && w.feature[spot] !== NONE ? featureDef(w.feature[spot]).joy : undefined;
+    const there = joy && (joy.seats > 1 ? this.isAtWorkSpot(c, spot, false) : c.tile === spot);
+    if (!joy || !there || (joy.stargazing && !this.starsOut(spot))) {
       this.endJob(c);
       return;
     }
-    this.enjoy(c, joy.kind, 1 / (TICKS_PER_HOUR * joy.hoursToFull));
+    const partners = joy.company
+      ? this.playersAt(spot, c).filter((o) => o.path.length === 0 && this.isAtWorkSpot(o, spot, false))
+      : [];
+    const alone = joy.company && partners.length === 0;
+    this.enjoy(
+      c,
+      joy.kind,
+      (this.joyEfficiency(c, joy.kind) * (alone ? COMPANY_ALONE : 1)) / (TICKS_PER_HOUR * joy.hoursToFull),
+    );
+    // Talk over the game: about one exchange every three quarters of an hour.
+    if (partners.length > 0) {
+      job.progress++;
+      if (this.rng.chance(1 / (TICKS_PER_HOUR * 0.75))) {
+        converse(this, c, this.rng.pick(partners));
+      }
+    }
     const slot = c.schedule[Math.floor(this.hour)];
     if (c.needs.joy >= 0.99 || --job.wait <= 0 || (slot !== 'J' && c.needs.joy > 0.9)) {
-      this.endJob(c);
+      this.finishJoy(c, job, joy);
     }
+  }
+
+  // The lasting impressions of a session: a good game with company, the stars, a fine room.
+  private finishJoy(c: Colonist, job: Job, joy: JoySpec): void {
+    if (joy.company && job.progress >= TICKS_PER_HOUR / 2) {
+      this.addThought(c, 'goodGame');
+      if (featureDef(this.world.feature[job.target]).key === 'chessTable') {
+        this.stats.chessGames = (this.stats.chessGames ?? 0) + 1;
+      }
+    }
+    if (joy.stargazing) {
+      this.addThought(c, 'stargazed');
+    }
+    const room = this.roomAt(c.tile);
+    if (room && room.role === 'Recreation room' && room.impressiveness >= NICE_ROOM) {
+      this.addThought(c, 'niceRecRoom');
+    }
+    this.endJob(c);
   }
 
   // ---- Sleep ----
@@ -4639,6 +4815,17 @@ export interface ObjectiveDef {
 export const PHASE_NAMES = ['Shelter', 'Living', 'Story', 'Seasons', 'Prosperity'];
 
 const produced = (s: Simulation, key: string) => s.stats.produced[key] ?? 0;
+// Kinds of recreation the colony's buildings offer (walks don't count).
+const recreationKinds = (s: Simulation) => {
+  const kinds = new Set<string>();
+  for (const i of s.world.tilesWith('features')) {
+    const joy = featureDef(s.world.feature[i]).joy;
+    if (joy) {
+      kinds.add(joy.kind);
+    }
+  }
+  return kinds.size;
+};
 
 // Phase 1 is the vertical slice (gather, haul, build, survive the night);
 // phase 2 asks the colony to feed, entertain, and warm itself.
@@ -4833,6 +5020,19 @@ export const OBJECTIVES: ObjectiveDef[] = [
     phase: 5,
     check: (s) => s.living().length > 0 && s.living().every((c) => c.apparel?.item === itemId('parka')),
     progress: (s) => `${s.living().filter((c) => c.apparel?.item === itemId('parka')).length}/${s.living().length}`,
+  },
+  {
+    id: 'recVariety',
+    label: 'Offer three kinds of recreation',
+    phase: 5,
+    check: (s) => recreationKinds(s) >= 3,
+    progress: (s) => `${Math.min(3, recreationKinds(s))}/3`,
+  },
+  {
+    id: 'chess',
+    label: 'Have two colonists play a game of chess',
+    phase: 5,
+    check: (s) => (s.stats.chessGames ?? 0) > 0,
   },
   {
     id: 'population',

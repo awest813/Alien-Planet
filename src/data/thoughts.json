@@ -232,5 +232,28 @@
     "label": "Inspired: working faster",
     "mood": 6,
     "hours": 24
+  },
+  "variedRecreation": {
+    "label": "Varied recreation",
+    "mood": 3
+  },
+  "sameOldThing": {
+    "label": "Same old thing for fun",
+    "mood": -2
+  },
+  "niceRecRoom": {
+    "label": "Had fun in a nice room",
+    "mood": 3,
+    "hours": 8
+  },
+  "stargazed": {
+    "label": "Gazed at the stars",
+    "mood": 3,
+    "hours": 12
+  },
+  "goodGame": {
+    "label": "Had a good game",
+    "mood": 2,
+    "hours": 6
   }
 }

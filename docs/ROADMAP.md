@@ -57,27 +57,48 @@ Also from this work: an undrafted colonist caught outside with raiders near now 
 trading shots, unless a raider is already beside them. The check used to run only every 20 ticks, so
 whether they ran or stood and shot depended on timing.
 
-## 3. Phase A: Recreation depth
+## 3. Phase A: Recreation depth (done)
 
-Today a colony with one armchair has solved recreation forever. The goal is variety, and recreation that
-brings people together.
+A colony with one armchair no longer has recreation solved for good: variety pays, and games bring people
+together.
 
-- **Tolerance.** Doing the same kind of recreation over and over gives less each time and recovers over a
-  few days. A colonist with three or more kinds available gets a "Varied recreation" mood thought; with only
-  one, a "Same old thing" thought.
-- **New joy buildings** (data in `features.json`, art in `textures.ts`):
-  - Chess table (wood and stone): gaming, two players. Players chat while they play, so it builds opinions.
-    Rivals won't sit down together.
-  - Telescope (research Optics, a new cheap project): outdoor, stargazing at night under a clear sky, with
-    extra mood during an aurora.
+- **Tolerance.** Each kind of recreation is worth full value up to a fair share of what a colonist has had
+  lately (half a need's worth). Past that, it's worth (1 + 0.5) / (1 + recent amount), down to 25%. The
+  recent amount halves every dawn. Colonists choose whatever would do them the most good, allowing for the
+  walk there, so they move between kinds on their own.
+- **Variety thoughts.** "Varied recreation" (+3) when three kinds each make up a fair share of what they've
+  had lately. "Same old thing for fun" (−2) when one kind is 85% or more of it, but only once the colony has
+  built something for fun, so a fresh landing with nothing but walks isn't penalised.
+- **New buildings:**
+  - Chess table (wood and stone): games, two players.
   - Card table (wood and cloth): social, up to four players.
-  - Nature walks: walking near trees and water counts as outdoor recreation, so a scenic map is worth
-    something.
-- **Recreation room.** A good recreation room (impressive, with two or more kinds of joy) gives a mood
-  thought, the way a nice dining room does now.
-- **Goals:** "Offer three kinds of recreation" and "Play a game of chess" join the Living or Prosperity goals.
-- **Tests and checks:** tolerance rises and falls; two-player games pair up and move opinions; rivals avoid
-  each other. In the harness, the share of time joy is low drops, and so does the number of mental breaks.
+  - Telescope (Optics research, 700): stargazing on clear nights under the open sky, which leaves a
+    "Gazed at the stars" thought.
+
+  On the two tables:
+  - Played alone, a game is worth 40%. A colonist sits down to wait when someone else is free for
+    recreation too, and anyone free joins a game already going.
+  - Players talk as they play, with fewer insults than talk in passing. A game of half an hour or more
+    leaves a "Had a good game" thought.
+  - Rivals won't sit at the same table.
+
+- **Nature walks.** A walk among trees, bushes or water fills recreation up to half again as fast.
+- **Recreation room.** A session in an impressive recreation room leaves "Had fun in a nice room" (+3).
+- **Goals:** "Offer three kinds of recreation" and "Have two colonists play a game of chess" (Prosperity).
+- **Results** (Standard, 48 days, 12 seeds, with the test colony now building a chess table, a card table
+  and a telescope):
+  - Recreation time spreads across horseshoes, cards, the armchair, walks and chess, where before almost
+    all of it was horseshoes and walks.
+  - Average mood is unchanged (48.1 against 48.2) and survival is the same (71 of 73).
+  - Time with recreation under 30% went from 17% to about 20%: repetition is worth less now.
+  - There were 5 mental breaks in 12 colonies, against 3 before. Most come from one colony stuck in a
+    famine; the others had 2 between them.
+  - Harsh: 72 of 73 survive with no breaks. Peaceful: 36 of 36.
+- **Fixes found along the way:**
+  - A colonist who is still hungry after a small stack of raw food goes for another bite.
+  - The balance script now keeps building sites, fishing spots and the research bench where colonists
+    can reach them, and re-plans a bench that gets walled off. One test colony had never researched
+    anything because of this.
 
 ## 4. Phase B: Art and decor
 

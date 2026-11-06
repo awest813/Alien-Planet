@@ -85,12 +85,20 @@ function adjust(from: Colonist, to: Colonist, amount: number): void {
   to.opinions[from.id] = Math.max(-100, Math.min(100, (to.opinions[from.id] ?? 0) + scaled));
 }
 
-function interact(sim: Simulation, a: Colonist, b: Colonist): void {
+// Talk over a game: friendlier than talk in passing, with far fewer insults.
+const GAME_INSULTS = 0.3;
+
+// One exchange between two colonists sharing a game.
+export function converse(sim: Simulation, a: Colonist, b: Colonist): void {
+  interact(sim, a, b, GAME_INSULTS);
+}
+
+function interact(sim: Simulation, a: Colonist, b: Colonist, insults = 1): void {
   const before = relationLabel(a, b);
   const chemistry = compatibility(sim, a, b);
   // Bad chemistry breeds insults; good chemistry, deep talks.
   const traitInsults = traitValue(a, 'insultChance');
-  const insultChance = traitInsults === 0 ? 0 : (traitInsults ?? 0.04) + Math.max(0, -chemistry) * 0.08;
+  const insultChance = traitInsults === 0 ? 0 : ((traitInsults ?? 0.04) + Math.max(0, -chemistry) * 0.08) * insults;
   const deepTalkChance = 0.06 + Math.max(0, chemistry) * 0.14;
   const roll = sim.rng.next();
   if (roll < insultChance) {

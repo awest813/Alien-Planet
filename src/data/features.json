@@ -661,5 +661,81 @@
       "work": 140
     },
     "research": "traps"
+  },
+  {
+    "key": "chessTable",
+    "name": "Chess table",
+    "beauty": 2,
+    "joy": {
+      "activity": "Playing chess",
+      "kind": "gaming",
+      "hoursToFull": 2,
+      "seats": 2,
+      "company": true
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 20
+        },
+        {
+          "item": "stone",
+          "count": 10
+        }
+      ],
+      "work": 140
+    }
+  },
+  {
+    "key": "cardTable",
+    "name": "Card table",
+    "beauty": 2,
+    "joy": {
+      "activity": "Playing cards",
+      "kind": "social",
+      "hoursToFull": 1.75,
+      "seats": 4,
+      "company": true
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 25
+        },
+        {
+          "item": "cloth",
+          "count": 4
+        }
+      ],
+      "work": 140
+    }
+  },
+  {
+    "key": "telescope",
+    "name": "Telescope",
+    "passable": true,
+    "beauty": 1,
+    "joy": {
+      "activity": "Stargazing",
+      "kind": "outdoor",
+      "hoursToFull": 2,
+      "stargazing": true
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 15
+        },
+        {
+          "item": "silver",
+          "count": 15
+        }
+      ],
+      "work": 160
+    },
+    "research": "optics"
   }
 ]

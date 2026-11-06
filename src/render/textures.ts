@@ -278,6 +278,63 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillStyle = '#b8864f';
       c.fillRect(1, 3, 14, 2);
       break;
+    case 'chessTable': {
+      // A small table with a checkered board.
+      c.fillStyle = '#5a3818';
+      c.fillRect(3, 11, 2, 4);
+      c.fillRect(11, 11, 2, 4);
+      c.fillStyle = '#8a5c30';
+      c.fillRect(1, 2, 14, 10);
+      for (let by = 0; by < 4; by++) {
+        for (let bx = 0; bx < 4; bx++) {
+          c.fillStyle = (bx + by) % 2 ? '#2a2420' : '#e8dcc0';
+          c.fillRect(4 + bx * 2, 3 + by * 2, 2, 2);
+        }
+      }
+      // Two pieces.
+      c.fillStyle = '#f4f0e6';
+      c.fillRect(5, 4, 1, 1);
+      c.fillStyle = '#121010';
+      c.fillRect(10, 9, 1, 1);
+      break;
+    }
+    case 'cardTable':
+      // A round green-baize table with cards on it.
+      c.fillStyle = '#5a3818';
+      c.fillRect(7, 12, 2, 3);
+      c.fillStyle = '#6b4424';
+      c.fillRect(2, 3, 12, 10);
+      c.fillRect(3, 2, 10, 12);
+      c.fillStyle = '#2f6b45';
+      c.fillRect(3, 4, 10, 8);
+      c.fillRect(4, 3, 8, 10);
+      c.fillStyle = '#f2efe6';
+      c.fillRect(5, 6, 2, 3);
+      c.fillRect(9, 7, 2, 3);
+      c.fillStyle = '#c0392b';
+      c.fillRect(5, 7, 1, 1);
+      c.fillRect(10, 8, 1, 1);
+      break;
+    case 'telescope':
+      // A brass tube on a wooden tripod, pointing up at the sky.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(3, 13, 10, 2);
+      c.fillStyle = '#6b4424';
+      c.fillRect(7, 8, 2, 6);
+      c.fillRect(4, 12, 2, 2);
+      c.fillRect(10, 12, 2, 2);
+      c.fillRect(5, 11, 1, 1);
+      c.fillRect(10, 11, 1, 1);
+      c.fillStyle = '#c99a3a';
+      c.fillRect(4, 6, 2, 2);
+      c.fillRect(6, 5, 2, 2);
+      c.fillRect(8, 4, 2, 2);
+      c.fillRect(10, 3, 2, 2);
+      c.fillStyle = '#e8c565';
+      c.fillRect(12, 2, 2, 2);
+      c.fillStyle = '#7fb3d9';
+      c.fillRect(13, 2, 1, 1);
+      break;
     case 'armchair':
       c.fillStyle = '#7a2e3a';
       c.fillRect(2, 2, 12, 12);

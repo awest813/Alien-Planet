@@ -364,6 +364,8 @@ export interface Stats {
   hunted: number;
   tamed: number;
   wintersSurvived: number;
+  // Games of chess played with someone.
+  chessGames?: number;
 }
 
 export type NightResult = 'pending' | 'success' | 'failed';

@@ -57,6 +57,7 @@ const RESEARCH_ORDER = [
   'refrigeration',
   'solarPower',
   'sunLamps',
+  'optics',
 ];
 
 // Finds the nearest w×h rectangle to the colonists where every tile can take a blueprint.
@@ -64,6 +65,8 @@ function findSite(sim: Simulation, w: number, h: number, avoid: Set<number>): { 
   const world = sim.world;
   const cx = world.xOf(sim.colonists[0].tile);
   const cy = world.yOf(sim.colonists[0].tile);
+  // Only where the colonists can walk to.
+  const home = sim.regionOf(sim.colonists[0].tile);
   let best: { x: number; y: number; d: number } | null = null;
   for (let y = 1; y + h < world.height - 1; y++) {
     for (let x = 1; x + w < world.width - 1; x++) {
@@ -78,6 +81,7 @@ function findSite(sim: Simulation, w: number, h: number, avoid: Set<number>): { 
           const f = world.feature[i];
           ok =
             !avoid.has(i) &&
+            sim.regionOf(i) === home &&
             terrainDef(world.terrain[i]).buildable &&
             terrainDef(world.terrain[i]).fertility > 0 &&
             (f === NONE || !!FEATURES[f - 1].harvest) &&
@@ -230,6 +234,9 @@ function play(seed: number): Result {
   let builtDay2 = false;
   let secondFarm = false;
   let hearthPlaced = false;
+  let gamesPlaced = false;
+  let labTile = -1;
+  let telescopePlaced = false;
   let fishingPlaced = false;
   let chopRadius = 15;
   let friendDay = -1;
@@ -318,7 +325,27 @@ function play(seed: number): Result {
       const lab = findSite(sim, 1, 1, avoid);
       if (lab) {
         claim(avoid, sim, lab.x, lab.y, 1, 1);
-        sim.apply({ type: 'build', feature: featureId('researchBench'), tiles: [at(lab.x, lab.y)] });
+        labTile = at(lab.x, lab.y);
+        sim.apply({ type: 'build', feature: featureId('researchBench'), tiles: [labTile] });
+      }
+    }
+    // Mining and building can wall a planned bench off; a player would notice and plan it elsewhere.
+    const bench = featureId('researchBench');
+    if (
+      labTile >= 0 &&
+      Math.floor(sim.hour) === 6 &&
+      w.feature[labTile] !== bench &&
+      sim.regionOf(labTile) !== sim.regionOf(sim.living()[0]?.tile ?? labTile)
+    ) {
+      sim.apply({
+        type: 'cancel',
+        rect: { x0: w.xOf(labTile), y0: w.yOf(labTile), x1: w.xOf(labTile), y1: w.yOf(labTile) },
+      });
+      const lab = findSite(sim, 1, 1, avoid);
+      labTile = lab ? at(lab.x, lab.y) : -1;
+      if (lab) {
+        claim(avoid, sim, lab.x, lab.y, 1, 1);
+        sim.apply({ type: 'build', feature: bench, tiles: [labTile] });
       }
     }
     // Keep research going, in a sensible order, and use what it unlocks.
@@ -326,6 +353,24 @@ function play(seed: number): Result {
       const next = RESEARCH_ORDER.find((key) => !sim.research.done.includes(key));
       if (next) {
         sim.apply({ type: 'research', project: next });
+      }
+    }
+    // A games corner on day 3, and a telescope once Optics is in.
+    if (!gamesPlaced && sim.day >= 3) {
+      gamesPlaced = true;
+      const corner = findSite(sim, 4, 1, avoid);
+      if (corner) {
+        claim(avoid, sim, corner.x, corner.y, 4, 1);
+        sim.apply({ type: 'build', feature: featureId('chessTable'), tiles: [at(corner.x, corner.y)] });
+        sim.apply({ type: 'build', feature: featureId('cardTable'), tiles: [at(corner.x + 3, corner.y)] });
+      }
+    }
+    if (!telescopePlaced && sim.isResearched('optics')) {
+      telescopePlaced = true;
+      const spot = findSite(sim, 1, 1, avoid);
+      if (spot) {
+        claim(avoid, sim, spot.x, spot.y, 1, 1);
+        sim.apply({ type: 'build', feature: featureId('telescope'), tiles: [at(spot.x, spot.y)] });
       }
     }
     if (hut && !hearthPlaced && sim.isResearched('hearths')) {
@@ -363,7 +408,12 @@ function play(seed: number): Result {
     if (!fishingPlaced && sim.day >= 4) {
       fishingPlaced = true;
       const start = sim.colonists[0].tile;
-      const spots = sim.nearest(start, (i) => sim.canPlaceBlueprint(i, featureId('fishingSpot')), 2);
+      // Not on a tile already planned for something else (that would replace the plan).
+      const spots = sim.nearest(
+        start,
+        (i) => w.blueprint[i] === NONE && !avoid.has(i) && sim.canPlaceBlueprint(i, featureId('fishingSpot')),
+        2,
+      );
       sim.apply({ type: 'build', feature: featureId('fishingSpot'), tiles: spots });
     }
     // A second field early enough to stock up for winter, as a player would.
@@ -393,6 +443,10 @@ function play(seed: number): Result {
       colonistHours++;
       if (c.needs.joy < 0.3) {
         joyLowHours++;
+      }
+      if (c.job?.type === 'joy') {
+        const doing = c.job.target >= 0 ? (FEATURES[sim.world.feature[c.job.target] - 1]?.key ?? 'gone') : 'walk';
+        joyTime[doing] = (joyTime[doing] ?? 0) + 1;
       }
       for (const t of sim.thoughtsOf(c)) {
         moodBy[t.label] = (moodBy[t.label] ?? 0) + t.mood;
@@ -549,6 +603,8 @@ Simulation.prototype.addLog = function (this: Simulation, text, tone, story) {
 };
 
 const starvingDoing: Record<string, number> = {};
+// Colonist-hours spent on each kind of recreation (a building, or a walk).
+const joyTime: Record<string, number> = {};
 const results: Result[] = [];
 const started = performance.now();
 // "seed=47514" replays just that colony.
@@ -597,6 +653,12 @@ const moodRanked = Object.entries(moodTotals)
   .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
 console.log(
   `  mood by thought (average per colonist): ${moodRanked.map(([label, avg]) => `${label} ${avg > 0 ? '+' : ''}${avg.toFixed(1)}`).join(', ')}`,
+);
+console.log(
+  `  recreation time: ${Object.entries(joyTime)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${k} ${n}h`)
+    .join(', ')}`,
 );
 console.log(
   `  recreation under 30%: ${((100 * sum((r) => r.joyLowHours)) / Math.max(1, allHours)).toFixed(1)}% of colonist-hours`,

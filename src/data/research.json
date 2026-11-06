@@ -110,5 +110,11 @@
     "cost": 1200,
     "requires": ["fortifications"],
     "description": "Unlocks spike traps that wound the first raider to step on them."
+  },
+  {
+    "key": "optics",
+    "name": "Optics",
+    "cost": 700,
+    "description": "Unlocks the telescope: stargazing on clear nights, outdoors."
   }
 ]

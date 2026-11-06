@@ -54,11 +54,15 @@ Objectives:
 
 How the living simulation works:
 
-- **Needs:** food, rest and recreation drain over time. Colonists eat when hungry (cooked meals first), sleep
-  during scheduled hours or when exhausted, and seek recreation (horseshoe pin, armchair, or a walk). Each kind
-  of recreation is labelled (relaxing, games, outdoors, and later social, music and art), and the inspector shows
-  what a colonist has had lately. A
-  starving colonist (food at zero) works at 80% and walks at 90% until they eat.
+- **Needs:** food, rest and recreation drain over time. Colonists eat when hungry (cooked meals first) and sleep
+  during scheduled hours or when exhausted. A starving colonist (food at zero) works at 80% and walks at 90% until
+  they eat.
+- **Recreation:** colonists relax in an armchair, pitch horseshoes, play chess (two players) or cards (up to four),
+  stargaze through a telescope on clear nights (Optics research), or go for a walk, which does more good among
+  trees and water. Each has a kind (relaxing, games, social, outdoors; music and art come later). Doing the same
+  kind over and over is worth less each time, so colonists move between them, and a good mix gives "Varied
+  recreation" while one kind on its own gets old. Players chat over a game, which builds friendships; rivals won't
+  sit down together. The inspector shows what a colonist has had lately.
 - **Mood:** 50 plus the sum of current thoughts, such as "Ate a cooked meal" +4, "Ate without a table" −3,
   "Slept in the cold" −5, "Slept in a nice bedroom" +4. Low mood slows work; very low mood can cause a break.
 - **Farming and production:** growing zones are sown and harvested automatically; crops grow by day, faster on
@@ -143,7 +147,7 @@ How the storytelling layer works:
   summers, freezing winter nights). Crops don't grow in winter and hard frost kills anything left in the field,
   so plant enough in spring and summer and harvest before winter.
 - **Research:** build a research bench, pick a project in the Research screen, and colonists with the Research
-  work type study it (training the Intellectual skill). Seventeen projects unlock the recurve bow, sandbags, the
+  work type study it (training the Intellectual skill). Eighteen projects unlock the recurve bow, sandbags, the
   stone hearth, the fine bed, tailoring and all the electrical tech below, or improve insulation, crop growth and
   doctoring.
 - **Power:** the colony shares one grid. Wood-fired generators (kept fuelled by haulers) and solar panels (daytime

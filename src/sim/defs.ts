@@ -186,7 +186,14 @@ interface RawFeature {
   growLight?: number;
   bridge?: boolean;
   fishing?: boolean;
-  joy?: { activity: string; kind: string; hoursToFull: number };
+  joy?: {
+    activity: string;
+    kind: string;
+    hoursToFull: number;
+    seats?: number;
+    company?: boolean;
+    stargazing?: boolean;
+  };
   harvest?: { work: string; amount: number; item: string; count: number };
   crop?: { item: string; count: number; growDays: number; sowWork: number; harvestWork: number };
   build?: { cost: { item: string; count: number }[]; work: number };
@@ -229,6 +236,12 @@ export interface JoySpec {
   activity: string;
   kind: JoyKind;
   hoursToFull: number;
+  // How many can use it at once. With more than one seat, players stand beside it, not on it.
+  seats: number;
+  // A game for two or more: on their own, a player gets far less out of it.
+  company: boolean;
+  // Only on a clear night, out under the open sky.
+  stargazing: boolean;
 }
 function joyKind(kind: string, feature: string): JoyKind {
   if (!(JOY_KINDS as readonly string[]).includes(kind)) {
@@ -302,7 +315,14 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   growLight: f.growLight ?? 0,
   bridge: !!f.bridge,
   fishing: !!f.fishing,
-  joy: f.joy && { ...f.joy, kind: joyKind(f.joy.kind, f.key) },
+  joy: f.joy && {
+    activity: f.joy.activity,
+    kind: joyKind(f.joy.kind, f.key),
+    hoursToFull: f.joy.hoursToFull,
+    seats: f.joy.seats ?? 1,
+    company: !!f.joy.company,
+    stargazing: !!f.joy.stargazing,
+  },
   harvest: f.harvest && {
     work: f.harvest.work as WorkType,
     amount: f.harvest.amount,
