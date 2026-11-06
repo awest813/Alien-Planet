@@ -358,7 +358,9 @@ export type Command =
   // Whether the colony keeps the seasonal festivals.
   | { type: 'festivals'; on: boolean }
   // When the ship has landed: board it (the colony's story ends) or stay.
-  | { type: 'shipChoice'; board: boolean };
+  | { type: 'shipChoice'; board: boolean }
+  // Sell the sculpture on a tile to the visiting traders.
+  | { type: 'sellArt'; tile: number };
 
 export interface LogEntry {
   tick: number;
@@ -378,6 +380,8 @@ export interface Stats {
   wintersSurvived: number;
   // Games of chess played with someone.
   chessGames?: number;
+  // Sculptures sold to traders.
+  artSold?: number;
   // Concerts given, and the gatherings held.
   concerts?: number;
   parties?: number;

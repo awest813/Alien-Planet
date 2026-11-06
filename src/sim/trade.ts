@@ -1,5 +1,6 @@
 import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
-import { FACTIONS, ITEMS, NORMAL_QUALITY, itemDef, itemId } from './defs';
+import { artBeauty } from './art';
+import { FACTIONS, ITEMS, NONE, NORMAL_QUALITY, featureDef, itemDef, itemId } from './defs';
 import type { Simulation } from './simulation';
 
 // Friendly factions send caravans. Traders walk in from the map edge, set up near the colony for
@@ -303,4 +304,76 @@ export function applyTrade(sim: Simulation, buy: [number, number][], sell: [numb
 // Everything the colony could put on the table, by item.
 export function tradableItems(): number[] {
   return ITEMS.filter((i) => i.key !== 'silver').map((i) => i.id);
+}
+
+// ---- Art ----
+
+// Sculptures are sold where they stand: the traders pay in silver and carry the piece off. Memorials
+// aren't for sale.
+export interface ArtOffer {
+  tile: number;
+  name: string;
+  title: string;
+  artist: string;
+  quality: number;
+  price: number;
+}
+
+// What the visiting traders would pay for a piece: its worth by size, scaled by how well it came out,
+// less their cut (smaller the better they think of the colony).
+export function artPrice(sim: Simulation, tile: number): number {
+  const art = sim.artworkAt(tile);
+  const caravan = sim.caravan;
+  const def = featureDef(sim.world.feature[tile]);
+  if (!art || !caravan || def.value <= 0) {
+    return 0;
+  }
+  const g = Math.max(-50, Math.min(100, goodwillOf(sim, caravan.faction)));
+  return Math.round(((def.value * artBeauty(art.quality)) / artBeauty(NORMAL_QUALITY)) * (0.5 + g * 0.002));
+}
+
+// Every piece the colony could sell to the traders here now, most valuable first.
+export function artForSale(sim: Simulation): ArtOffer[] {
+  if (!tradeOpen(sim)) {
+    return [];
+  }
+  const offers: ArtOffer[] = [];
+  for (const [tile] of sim.artworks) {
+    const art = sim.artworkAt(tile);
+    const price = art ? artPrice(sim, tile) : 0;
+    if (art && price > 0) {
+      const name = featureDef(sim.world.feature[tile]).name;
+      offers.push({ tile, name, title: art.title, artist: art.artist, quality: art.quality, price });
+    }
+  }
+  return offers.sort((a, b) => b.price - a.price);
+}
+
+// Sells the sculpture on a tile. Returns null on success, or why it couldn't be done.
+export function sellArt(sim: Simulation, tile: number): string | null {
+  const caravan = sim.caravan;
+  if (!caravan || !tradeOpen(sim)) {
+    return 'No traders are here.';
+  }
+  const art = sim.artworkAt(tile);
+  const price = artPrice(sim, tile);
+  if (!art || price <= 0) {
+    return "That isn't a piece the traders will buy.";
+  }
+  if (price > caravan.silver) {
+    return "The traders can't afford that piece.";
+  }
+  const name = featureDef(sim.world.feature[tile]).name.toLowerCase();
+  sim.world.setFeature(tile, NONE);
+  sim.artworks.delete(tile);
+  caravan.silver -= price;
+  sim.world.dropItemNear(sim.homeTile() ?? tile, SILVER(), price);
+  sim.goodwill[caravan.faction] = Math.min(100, goodwillOf(sim, caravan.faction) + 3);
+  sim.stats.artSold = (sim.stats.artSold ?? 0) + 1;
+  sim.addLog(
+    `${FACTIONS[caravan.faction].name} bought ${art.artist}'s ${name}, “${art.title}”, for ${price} silver.`,
+    'good',
+    true,
+  );
+  return null;
 }

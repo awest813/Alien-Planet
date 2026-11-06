@@ -281,9 +281,19 @@ Settled since:
 
 - Cleaning and filth: blood, debris and rubble that lower beauty, and a Cleaning work type.
 - A crafted look for each sculpture by quality.
-- Caravans buying art.
 
 Done since:
+
+- **Caravans buy art.**
+  - When traders are in town, the Trade screen lists the colony's sculptures under "Sell art", with title,
+    quality and artist. They buy a piece where it stands and carry it off, so nothing needs packing up.
+  - The price comes from its size (small 120, large 300, grand 800 at normal quality), scaled by quality
+    (a masterwork is worth about twice a normal piece) and by the traders' usual cut, which shrinks as
+    goodwill grows.
+  - A normal small piece fetches about 65 silver against roughly 40 wood to make; a masterwork large one,
+    about 360.
+  - Each sale is confirmed, raises goodwill by 3, and goes in the story. Memorials aren't for sale, and the
+    traders can only pay what's in their purse.
 
 - **Visual pass.**
   - Colonists, traders and raiders stride as they walk, and animals hop.

@@ -761,7 +761,8 @@
         }
       ],
       "work": 600
-    }
+    },
+    "value": 120
   },
   {
     "key": "sculptureLarge",
@@ -782,7 +783,8 @@
         }
       ],
       "work": 1200
-    }
+    },
+    "value": 300
   },
   {
     "key": "sculptureGrand",
@@ -808,7 +810,8 @@
       ],
       "work": 2400
     },
-    "research": "fineArts"
+    "research": "fineArts",
+    "value": 800
   },
   {
     "key": "flowerPot",

@@ -100,7 +100,8 @@ How the living simulation works:
   piece is titled after a moment from the colony's story ("Ada and Bram", "The Long Winter", "In Memory of Wren").
   Flower pots (faded in winter) and banners need no artist. Colonists feel beauty within a couple of tiles
   ("Pleasant" or "Beautiful surroundings"), a bare room drags a little, sculptures are art recreation, and a room
-  that's mostly art is a gallery.
+  that's mostly art is a gallery. Visiting traders buy sculptures where they stand (memorials excepted): the finer
+  the piece and the better they think of the colony, the more silver it fetches.
 - **Rooms and temperature:** enclosed rooms get a role (bedroom, barracks, kitchen, …) and an impressiveness
   score from furniture beauty and size. Outdoor temperature follows a day/night cycle; rooms drift towards it
   and campfires heat them.

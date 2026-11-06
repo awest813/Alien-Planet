@@ -634,6 +634,55 @@ export function TradeScreen({ state, onClose }: { state: UiState; onClose: () =>
           Make the deal
         </button>
       </div>
+      {trade.art.length > 0 && <ArtForSale trade={trade} />}
     </Modal>
+  );
+}
+
+// The colony's sculptures, which the traders buy where they stand and carry off. Each sale is
+// confirmed: a piece sold is gone.
+function ArtForSale({ trade }: { trade: NonNullable<UiState['trade']> }) {
+  const [selling, setSelling] = useState<number | null>(null);
+  return (
+    <>
+      <h3>Sell art</h3>
+      <p className="muted small">
+        The traders pay well for fine work and carry it off themselves. Memorials aren't for sale.
+      </p>
+      <table className="summary">
+        <tbody>
+          {trade.art.map((a) => (
+            <tr key={a.tile}>
+              <td>
+                <b>“{a.title}”</b> <span className="muted">{a.name.toLowerCase()}</span>
+                <div className="muted small">{a.byline}</div>
+              </td>
+              <td className="num">{a.price} silver</td>
+              <td className="num">
+                {selling === a.tile ? (
+                  <button
+                    className="primary"
+                    onClick={() => {
+                      controller.command({ type: 'sellArt', tile: a.tile });
+                      setSelling(null);
+                    }}
+                  >
+                    Sell it
+                  </button>
+                ) : (
+                  <button
+                    disabled={!a.affordable}
+                    title={a.affordable ? undefined : "The traders can't afford it"}
+                    onClick={() => setSelling(a.tile)}
+                  >
+                    Sell…
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }

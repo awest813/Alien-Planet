@@ -87,7 +87,7 @@ import { Season, daysUntilWinter, seasonDay, seasonOf, yearOf } from './seasons'
 import { emptyXp, learn, rollPassions, rustSkills, skillFactor } from './skills';
 import { PassRegions, Rooms, computePassRegions, computeRooms } from './regions';
 import { Rng, hash2 } from './rng';
-import { Caravan, updateCaravan } from './trade';
+import { Caravan, sellArt, updateCaravan } from './trade';
 import { WET_CHILL, WeatherState, douse, freshWeather, isWet, updateFires, updateWeather, weatherDef } from './weather';
 import {
   converse,
@@ -929,6 +929,13 @@ export class Simulation {
       case 'festivals':
         this.story.festivals = cmd.on;
         break;
+      case 'sellArt': {
+        const why = sellArt(this, cmd.tile);
+        if (why) {
+          this.addLog(why, 'warn');
+        }
+        break;
+      }
       case 'shipChoice':
         if (this.beacon.landed && !this.departed) {
           if (cmd.board) {

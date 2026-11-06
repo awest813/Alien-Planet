@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { itemId } from './defs';
+import { featureId, itemId } from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
 import { triggerEvent } from './storyteller';
 import { HOUR, clearAround, run } from './test-helpers';
-import { STARTING_GOODWILL, applyTrade, colonyStock, goodwillOf, tradeOpen } from './trade';
+import {
+  STARTING_GOODWILL,
+  applyTrade,
+  artForSale,
+  artPrice,
+  colonyStock,
+  goodwillOf,
+  sellArt,
+  tradeOpen,
+} from './trade';
 
 const SILVER = itemId('silver');
 
@@ -79,5 +88,54 @@ describe('trade caravans', () => {
     const copy = deserialize(structuredClone(serialize(sim)));
     expect(copy.caravan?.visitors.length).toBe(3);
     expect(tradeOpen(copy)).toBe(true);
+  });
+});
+
+describe('selling art', () => {
+  // Traders in town and two sculptures standing, one finer than the other, plus a memorial.
+  function gallery(seed: number) {
+    const m = market(seed);
+    const { sim, w, x, y } = m;
+    const rough = w.idx(x + 3, y - 3);
+    const fine = w.idx(x + 5, y - 3);
+    const memorial = w.idx(x + 7, y - 3);
+    w.setFeature(rough, featureId('sculptureSmall'));
+    w.setFeature(fine, featureId('sculptureSmall'));
+    w.setFeature(memorial, featureId('memorial'));
+    sim.artworks.set(rough, { quality: 3, title: 'Rough', artist: 'Ada', day: 1 });
+    sim.artworks.set(fine, { quality: 17, title: 'Fine', artist: 'Bram', day: 2 });
+    sim.artworks.set(memorial, { quality: 10, title: 'In Memory of Kip', artist: 'Ada', day: 3, honors: [9] });
+    return { ...m, rough, fine, memorial };
+  }
+
+  it('offers the colony’s sculptures, finer pieces for more, but not memorials', () => {
+    const { sim, rough, fine, memorial } = gallery(11);
+    const offers = artForSale(sim);
+    expect(offers.map((o) => o.tile)).toEqual([fine, rough]);
+    expect(offers[0].price).toBeGreaterThan(offers[1].price * 2);
+    expect(offers.some((o) => o.tile === memorial)).toBe(false);
+  });
+
+  it('sells a piece where it stands: it goes, silver comes, and goodwill grows', () => {
+    const { sim, w, fine } = gallery(12);
+    const price = artPrice(sim, fine);
+    const silver = sim.stockOf(SILVER);
+    const goodwill = goodwillOf(sim, sim.caravan!.faction);
+    sim.apply({ type: 'sellArt', tile: fine });
+    expect(w.feature[fine]).toBe(0);
+    expect(sim.artworkAt(fine)).toBeUndefined();
+    expect(sim.stockOf(SILVER)).toBe(silver + price);
+    expect(goodwillOf(sim, sim.caravan!.faction)).toBeGreaterThan(goodwill);
+    expect(sim.stats.artSold).toBe(1);
+  });
+
+  it("won't sell what the traders can't afford, or with no traders here", () => {
+    const { sim, w, fine } = gallery(13);
+    sim.caravan!.silver = 1;
+    expect(sellArt(sim, fine)).not.toBeNull();
+    expect(w.feature[fine]).toBe(featureId('sculptureSmall'));
+    sim.caravan = null;
+    expect(artForSale(sim)).toEqual([]);
+    expect(sellArt(sim, fine)).not.toBeNull();
   });
 });

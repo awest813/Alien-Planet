@@ -32,7 +32,7 @@ import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
-import { applyTrade, goodwillOf, prices, standingLabel, tradableItems, tradeOpen } from '../sim/trade';
+import { applyTrade, goodwillOf, prices, standingLabel, tradableItems, tradeOpen, artForSale } from '../sim/trade';
 import { weatherDef } from '../sim/weather';
 import {
   Command,
@@ -553,6 +553,8 @@ export interface TradeView {
   traderSilver: number;
   theirs: TradeLine[];
   ours: TradeLine[];
+  // Sculptures the traders would buy, where they stand.
+  art: { tile: number; name: string; title: string; byline: string; price: number; affordable: boolean }[];
 }
 
 export interface ObjectiveView {
@@ -1177,6 +1179,14 @@ export class GameController {
       ours: tradableItems()
         .map((item) => ({ item, name: itemDef(item).name, count: stock.get(item) ?? 0, price: price.sell(item) }))
         .filter((line) => line.count > 0),
+      art: artForSale(sim).map((offer) => ({
+        tile: offer.tile,
+        name: offer.name,
+        title: offer.title,
+        byline: `${qualityLabel(offer.quality)} quality, by ${offer.artist}`,
+        price: offer.price,
+        affordable: offer.price <= caravan.silver,
+      })),
     };
   }
 
