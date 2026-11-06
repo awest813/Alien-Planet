@@ -180,6 +180,8 @@ const CONCERT_HOURS_TO_FULL = 1.5;
 const musicQuality = (c: Colonist) => 0.5 + c.skills.artistic / 20;
 // Below this after a meal, a colonist eats again straight away.
 const STILL_HUNGRY = 0.3;
+// How long "nowhere to carry this patient" stands before a doctor looks again.
+const NO_RESCUE_RETRY = TICKS_PER_HOUR / 2;
 // Jobs nobody leaves for a wedding or a funeral.
 const BUSY_FOR_RITES = new Set<JobType>([
   'tend',
@@ -1669,6 +1671,7 @@ export class Simulation {
 
   private onDawn(): void {
     let exposed = 0;
+    this.noRescueUntil.clear();
     for (const c of this.living()) {
       rustSkills(c, this.tick);
       fadeRecentJoy(c);
@@ -5250,9 +5253,20 @@ export class Simulation {
 
   // Whether there's anywhere to carry a patient to (before any shelter exists, there isn't, and
   // a doctor shouldn't keep dropping their work to try).
+  // A failed search covers the whole map, so "nowhere to take them" is remembered for a while (per
+  // patient and region) rather than worked out again every time a doctor checks.
   private canRescue(c: Colonist, p: Colonist): boolean {
-    return this.rescueDestination(c, p) !== undefined;
+    const key = `${p.id}:${this.regionOf(c.tile)}`;
+    if ((this.noRescueUntil.get(key) ?? 0) > this.tick) {
+      return false;
+    }
+    const found = this.rescueDestination(c, p) !== undefined;
+    if (!found) {
+      this.noRescueUntil.set(key, this.tick + NO_RESCUE_RETRY);
+    }
+    return found;
   }
+  private noRescueUntil = new Map<string, number>();
 
   // A downed colonist in this doctor's reach who is suffering from the cold or heat right now.
   private exposedPatient(c: Colonist): boolean {
