@@ -38,6 +38,8 @@ const isWater = (t: number) => t === SHALLOW || t === DEEP;
 // Light from fires and heaters, and the dimmer glow of a stove (buildings without their own light).
 const FIRE_LIGHT = { radius: 3.6, color: '#ff9a3c', flicker: true };
 const STOVE_LIGHT = { radius: 2.4, color: '#ff9a3c', flicker: true };
+// An electric heater glows steady.
+const HEATER_LIGHT = { radius: 2.8, color: '#ff8a50', flicker: false };
 
 // The colour laid over the map at a given hour, how strongly, and how dark it is (0 day … 1 night,
 // for how brightly lights show).
@@ -360,6 +362,8 @@ export class ColonyScene extends Phaser.Scene {
     this.builtFor = controller.simVersion;
     this.ship?.destroy();
     this.ship = undefined;
+    // A new or loaded map can share the old one's version numbers: work the lights out afresh.
+    this.glowVersion = -1;
     this.terrainSeason = SEASON_INDEX[controller.sim.season] ?? 1;
     // A drag or pan begun on the old map mustn't carry its tile indexes onto the new one.
     this.drag = null;
@@ -435,8 +439,10 @@ export class ColonyScene extends Phaser.Scene {
       const t = (this.time.now % 2400) / 2400;
       this.beaconFx.lineStyle(1, 0x7fe0ff, 0.6 * (1 - t)).strokeCircle(x, y - 6, 4 + t * TILE * 3);
     }
-    if (sim.beacon.landed && !sim.departed) {
-      this.ship ??= this.add.image(0, 0, 'ship').setDepth(Depth.PAWNS - 2);
+    // After boarding the ship stays, the colonists gone aboard.
+    if (sim.beacon.landed) {
+      // With the buildings: shaded at night, under the rain.
+      this.ship ??= this.add.image(0, 0, 'ship').setDepth(Depth.NIGHT - 1);
       this.ship.setPosition(x + TILE * 1.5, y - TILE * 0.5).setVisible(true);
     } else {
       this.ship?.setVisible(false);
@@ -589,7 +595,10 @@ export class ColonyScene extends Phaser.Scene {
       const { x, y } = this.pawnPosition(c);
       const moving = c.path.length > 0;
       const { dead, downed } = c.health;
-      pawn.root.setPosition(x, y + (moving ? -Math.abs(Math.sin(time / 90)) * 1.2 : 0));
+      // A bob in the step when walking (not when crawling).
+      pawn.root.setPosition(x, y + (moving && !downed ? -Math.abs(Math.sin(time / 90)) * 1.2 : 0));
+      // Once the colony has boarded the ship, nobody is left on the map.
+      pawn.root.setVisible(!controller.sim.departed);
       (pawn.figure.getAt(0) as Phaser.GameObjects.Image).setTexture(stride(moving && !downed && !dead, time));
       pawn.root.setAlpha(dead ? 0.55 : 1);
       pawn.figure.setAngle(c.sleeping || dead || downed ? 90 : 0);
@@ -649,7 +658,8 @@ export class ColonyScene extends Phaser.Scene {
 
   private createRaider(e: Enemy): Phaser.GameObjects.Container {
     const tint = e.faction === 0 ? 0x8a5a3c : 0x5a5a64;
-    const legs = this.add.image(0, 0, 'pawn-legs-0');
+    // Raiders' boots are darker than colonists'.
+    const legs = this.add.image(0, 0, 'pawn-legs-0').setTint(0x9a9aa0);
     const body = this.add.image(0, 0, 'pawn-body').setTint(tint);
     const head = this.add.image(0, 0, 'raider-head');
     const label = this.add
@@ -880,7 +890,14 @@ export class ColonyScene extends Phaser.Scene {
         }
         const def = featureDef(f);
         const light =
-          def.light ?? (def.heater > 0 ? FIRE_LIGHT : def.workbench === 'cooking' ? STOVE_LIGHT : undefined);
+          def.light ??
+          (def.heater > 0
+            ? def.power?.draw
+              ? HEATER_LIGHT
+              : FIRE_LIGHT
+            : def.workbench === 'cooking'
+              ? STOVE_LIGHT
+              : undefined);
         if (light) {
           this.glowSources.push({
             tile: i,
@@ -916,8 +933,10 @@ export class ColonyScene extends Phaser.Scene {
       const flicker = source.flicker ? 0.85 + 0.15 * Math.sin(time / 110 + i) : 1;
       const x = (world.xOf(i) + 0.5) * TILE;
       const y = (world.yOf(i) + 0.5) * TILE;
-      for (const share of [1, 0.83, 0.67, 0.5, 0.33, 0.2]) {
-        g.fillStyle(source.color, 0.06 * dark * source.strength * flicker).fillCircle(
+      // Many faint rings, so the pool fades smoothly rather than in bands.
+      for (let ring = 12; ring >= 1; ring--) {
+        const share = ring / 12;
+        g.fillStyle(source.color, 0.032 * dark * source.strength * flicker).fillCircle(
           x,
           y,
           share * source.radius * TILE,

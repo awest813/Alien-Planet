@@ -629,6 +629,8 @@ export interface UiState {
   fallen: boolean;
   // The signal beacon and its ship: 'landed' means the colony must choose; 'departed' is the end.
   ship: 'none' | 'transmitting' | 'answered' | 'landed' | 'departed';
+  // Hours the beacon has transmitted towards the next ship.
+  beaconHours: number;
   // For the closing summary.
   legacy: { label: string; value: string | number }[];
   settings: Settings;
@@ -1488,6 +1490,7 @@ export class GameController {
             : sim.beacon.hours > 0
               ? 'transmitting'
               : 'none',
+      beaconHours: sim.beacon.hours,
       legacy: this.legacySummary(),
       settings: this.settings,
       inPlay: this.inPlay,

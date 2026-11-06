@@ -334,10 +334,20 @@ kbd {
 
 /* On narrower desktops the top bar is crowded: the title goes and the weather shows as its icon
    (its name stays in the tooltip), so the screen buttons keep to one row. */
-@media (max-width: 1400px) {
+@media (max-width: 1500px) {
   .topbar .title,
-  .weather-label {
+  .weather-label,
+  .topbar .wide-only {
     display: none;
+  }
+
+  .topbar {
+    column-gap: 10px;
+  }
+
+  .screens button {
+    padding-left: 7px;
+    padding-right: 7px;
   }
 }
 

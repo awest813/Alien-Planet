@@ -56,6 +56,7 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
         {state.weather.icon && (
           <span
             className="weather"
+            role="img"
             title={`Weather: ${state.weather.label}`}
             aria-label={`Weather: ${state.weather.label}`}
           >
@@ -99,7 +100,9 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
               {net >= 0 ? '+' : ''}
               {formatPower(net)}
             </b>
-            {p.capacity > 0 && ` · ${(p.stored / 1000).toFixed(1)}/${(p.capacity / 1000).toFixed(0)} kWh`}
+            {p.capacity > 0 && (
+              <span className="wide-only">{` · ${(p.stored / 1000).toFixed(1)}/${(p.capacity / 1000).toFixed(0)} kWh`}</span>
+            )}
             {!p.powered && ' · OFF'}
           </span>
         )}
@@ -142,7 +145,7 @@ function FoodDays({ days }: { days: number }) {
   const tone = days < 1 ? 'bad' : days < 3 ? 'low' : '';
   return (
     <span className={`res food ${tone}`} title="How long the colony's food would last at the current headcount">
-      🍲 <b>{shown}</b> days of food
+      🍲 <b>{shown}</b> days<span className="wide-only"> of food</span>
     </span>
   );
 }

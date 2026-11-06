@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SAVE_SLOTS, UiState, controller, slotLabel } from '../game/controller';
 import { SaveMeta } from '../game/save-store';
 import { DEFAULT_SETTINGS, NOTICE_TIMES, PAN_SPEEDS, Settings, UI_SCALES, forgetHelp } from '../game/settings';
@@ -291,19 +291,34 @@ export function FallenScreen({ state, actions }: { state: UiState; actions: Menu
 }
 
 // The ship has landed: the colony decides whether its story ends here.
+// A two-step confirmation for something that can't be undone: the confirm button only works a
+// moment after it appears, so a double-click (or Enter twice) can't push it through.
+function useConfirm(): { armed: boolean; ready: boolean; arm: () => void; disarm: () => void } {
+  const [armed, setArmed] = useState(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!armed) {
+      setReady(false);
+      return;
+    }
+    const timer = setTimeout(() => setReady(true), 400);
+    return () => clearTimeout(timer);
+  }, [armed]);
+  return { armed, ready, arm: () => setArmed(true), disarm: () => setArmed(false) };
+}
+
 export function ShipScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
-  const [sure, setSure] = useState(false);
+  const confirm = useConfirm();
   if (state.ship !== 'landed') {
     return (
       <Modal title="The ship" onClose={onClose}>
         <p>
           {state.ship === 'answered'
             ? 'A ship has answered the signal and is on its way.'
-            : 'No ship has answered yet. Build a signal beacon and keep it transmitting for five days.'}
+            : state.ship === 'transmitting'
+              ? `The beacon is transmitting: ${state.beaconHours} of 120 hours. Keep it powered, and keep the raiders off it.`
+              : 'No ship has answered yet. Build a signal beacon and keep it transmitting for five days.'}
         </p>
-        <div className="row end">
-          <button onClick={onClose}>Close</button>
-        </div>
       </Modal>
     );
   }
@@ -312,28 +327,42 @@ export function ShipScreen({ state, onClose }: { state: UiState; onClose: () => 
     <Modal title="The ship has landed" onClose={onClose}>
       <p>
         It waits beside the beacon for a day. There's room for everyone: {aboard.join(', ')}. Board it and the colony's
-        story ends here, on your terms. Stay, and the ship leaves without you; you can always signal again.
+        story ends here, on your terms. Stay, and the ship leaves without you; you can always signal again. Close this
+        to decide later.
       </p>
-      <div className="title-buttons">
-        {!sure ? (
-          <button className="primary" autoFocus onClick={() => setSure(true)}>
+      {!confirm.armed ? (
+        <div className="title-buttons">
+          <button className="primary" autoFocus onClick={confirm.arm}>
             Board the ship…
           </button>
-        ) : (
-          <button className="primary" autoFocus onClick={() => controller.command({ type: 'shipChoice', board: true })}>
-            Yes, leave the valley for good
+          <button
+            onClick={() => {
+              controller.command({ type: 'shipChoice', board: false });
+              onClose();
+            }}
+          >
+            Stay in the valley
           </button>
-        )}
-        <button
-          onClick={() => {
-            controller.command({ type: 'shipChoice', board: false });
-            onClose();
-          }}
-        >
-          Stay in the valley
-        </button>
-        <button onClick={onClose}>Decide later</button>
-      </div>
+        </div>
+      ) : (
+        <>
+          <p>
+            <b>Leave the valley for good?</b> The colony's story ends here.
+          </p>
+          <div className="row end">
+            <button autoFocus onClick={confirm.disarm}>
+              No, go back
+            </button>
+            <button
+              className="primary"
+              disabled={!confirm.ready}
+              onClick={() => controller.command({ type: 'shipChoice', board: true })}
+            >
+              Yes, board the ship
+            </button>
+          </div>
+        </>
+      )}
     </Modal>
   );
 }
@@ -643,6 +672,8 @@ export function TradeScreen({ state, onClose }: { state: UiState; onClose: () =>
 // confirmed: a piece sold is gone.
 function ArtForSale({ trade }: { trade: NonNullable<UiState['trade']> }) {
   const [selling, setSelling] = useState<number | null>(null);
+  const confirm = useConfirm();
+  const piece = trade.art.find((a) => a.tile === selling);
   return (
     <>
       <h3>Sell art</h3>
@@ -659,30 +690,48 @@ function ArtForSale({ trade }: { trade: NonNullable<UiState['trade']> }) {
               </td>
               <td className="num">{a.price} silver</td>
               <td className="num">
-                {selling === a.tile ? (
-                  <button
-                    className="primary"
-                    onClick={() => {
-                      controller.command({ type: 'sellArt', tile: a.tile });
-                      setSelling(null);
-                    }}
-                  >
-                    Sell it
-                  </button>
-                ) : (
-                  <button
-                    disabled={!a.affordable}
-                    title={a.affordable ? undefined : "The traders can't afford it"}
-                    onClick={() => setSelling(a.tile)}
-                  >
-                    Sell…
-                  </button>
-                )}
+                <button
+                  disabled={!a.affordable || confirm.armed}
+                  title={a.affordable ? undefined : "The traders can't afford it"}
+                  onClick={() => {
+                    setSelling(a.tile);
+                    confirm.arm();
+                  }}
+                >
+                  Sell…
+                </button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      {confirm.armed && piece && (
+        <div className="row end">
+          <span>
+            Sell “{piece.title}” for {piece.price} silver? It goes with the traders for good.
+          </span>
+          <button
+            autoFocus
+            onClick={() => {
+              confirm.disarm();
+              setSelling(null);
+            }}
+          >
+            Keep it
+          </button>
+          <button
+            className="primary"
+            disabled={!confirm.ready}
+            onClick={() => {
+              controller.command({ type: 'sellArt', tile: piece.tile });
+              confirm.disarm();
+              setSelling(null);
+            }}
+          >
+            Sell it
+          </button>
+        </div>
+      )}
     </>
   );
 }

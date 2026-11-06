@@ -60,6 +60,12 @@ export function App() {
     }
   }, [landed]);
   const departed = state.ship === 'departed';
+  // Boarding ends the story: whatever screen was open closes behind the ending.
+  useEffect(() => {
+    if (departed) {
+      setScreen(null);
+    }
+  }, [departed]);
 
   // Game hotkeys stand aside while any menu or screen is open.
   const anyScreen = onTitle || screen !== null || state.fallen || departed;
