@@ -79,6 +79,12 @@ How the living simulation works:
   screen; every goal in the list is clickable the same way.
 - **Top bar:** days of food at the current headcount, icons for key materials, and every item under "All items".
   Hovering a build tool shows what it does, what it costs and any research it needs.
+- **Gatherings:** a cheerful colonist sometimes throws a party on an evening; the year has three festivals
+  (Planting Day, the harvest festival, where everyone eats from the stores, and the midwinter bonfire), which you
+  can skip from the Story screen; devoted lovers marry in the colony's finest room, and stay married; and the fallen
+  are laid to rest at a funeral once there's a grave for them, with a memorial stone, carved by an artist,
+  keeping their names. Off-duty colonists come to parties and festivals; everyone not dealing with an emergency
+  comes to weddings and funerals. Upcoming gatherings show in the side panel.
 - **Music:** build a drum, flute, lute or (after Instruments research) a harp. Colonists play for fun and train
   Artistic, and everyone in earshot enjoys it, more so from a good player. On an evening, a player with Artistic 6+
   may give a concert: off-duty colonists gather round to listen and chat. With sound on, you hear every
@@ -235,6 +241,7 @@ src/
     animals.ts      Wildlife: wandering, fleeing, predators, revenge, herds, produce and hunting yields
     plants.ts       Trees and berry bushes spreading back over open ground
     art.ts          Sculpture quality, beauty and titles drawn from the colony's story
+    gatherings.ts   Parties, festivals, weddings and funerals: what each is and when
     simulation.ts   Fixed-tick loop, needs and mood, colonist AI, job system, reservations, objectives
     serialize.ts    Save format
   game/       Glue between the simulation, renderer, and UI
@@ -285,7 +292,8 @@ focus fire, taking cover and sheltering. `src/sim/flow.balance.test.ts` covers t
 before chopping when builders wait on stone, grazers returning to a hunted-out valley, and wild plants regrowing. `src/sim/groundwork.test.ts` covers recreation kinds and the Artistic skill,
 `src/sim/recreation.test.ts` covers tolerance, games, stargazing and nature walks, `src/sim/art.test.ts` covers
 sculpting, quality, titles, beauty, galleries and surroundings, `src/sim/music.test.ts` covers instruments,
-earshot and concerts, `src/game/music.test.ts` covers the tunes, and
+earshot and concerts, `src/game/music.test.ts` covers the tunes,
+`src/sim/gatherings.test.ts` covers funerals and graves, weddings, festivals and feasts, parties and memorials, and
 `src/render/tileset-layout.test.ts` checks the art layout.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,
@@ -314,8 +322,9 @@ no colony wiped out. First friendships appear around day 6–7, with a few rival
   priorities and work schedules; rooms, furniture and temperature.
 - **Phase 3 – The storytelling game** (done): relationships and traits; injuries, medicine and disease; combat, raids
   and factions; dynamic events.
-- **Next:** recreation depth, art and decor, music, and gatherings and festivals. See
-  [docs/ROADMAP.md](docs/ROADMAP.md) for the plan, the groundwork it needs, and the decisions still open.
+- **Phase 4 – Culture** (done): recreation with variety, games and stargazing; art and decor, with sculptures
+  titled after the colony's story; music, concerts and sound; parties, seasonal festivals, weddings, funerals
+  and memorials. See [docs/ROADMAP.md](docs/ROADMAP.md) for how each works, the balance results, and what's next.
 
 ## 🛠️ Installation <a id="installation"></a>
 

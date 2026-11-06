@@ -191,26 +191,65 @@ The colony makes music, and a good player can bring everyone together on an even
   text field. It took an extra Esc to close Settings, and it could leave the game paused behind the
   menu. Only text fields count now.
 
-## 6. Phase D: Gatherings, rites and festivals
+## 6. Phase D: Gatherings, rites and festivals (done)
 
-This ties recreation, art and music into the storyteller.
+Recreation, art and music come together in the moments a colony shares. All of them run on one gathering
+system (`src/sim/gatherings.ts` for the definitions, the "Gatherings" section of the simulation for the
+behaviour):
 
-- **Parties.** A colonist in good spirits sometimes calls a gathering in the dining or recreation room:
-  drinks, music if there's an instrument, and conversation. Everyone who attends gets a mood boost and
-  better opinions of the others.
-- **Seasonal festivals** (storyteller good events):
-  - Spring planting day.
-  - Harvest festival after the autumn harvest: a feast of fine meals, or a smaller mood boost without them.
-  - Midwinter bonfire.
+- One gathering at a time, planned or under way, centred on a tile.
+- Attendees come to a free spot within three tiles of it. While there, they fill up on social recreation
+  and chat with whoever else came.
+- Staying half an hour counts as having been there.
+- A raid calls off anything planned or under way.
+- Parties and festivals are for whoever is off duty. Weddings and funerals are rites: everyone not dealing
+  with an emergency (asleep, starving, hurt, fighting, doctoring, rescuing, warming up) comes.
 
-  Each is a short scheduled event the player can let happen or skip.
+- **Parties.** On an evening (18:00–21:00), no more often than every three days, a colonist with mood 65+
+  sometimes throws one in the best dining room, recreation room or gallery (or outdoors near home). Two
+  hours; "Went to a party" (+4).
+- **Seasonal festivals**, announced at dawn for that evening:
+  - Planting Day: spring day 2 at 18:00, "Celebrated Planting Day" (+3).
+  - The harvest festival: autumn day 4 at 18:00. Everyone who stays eats a meal from the stores, fine ones
+    first: "Feasted at the harvest festival" (+6), or "Celebrated the harvest" (+3) with nothing in store.
+  - The midwinter bonfire: winter day 3 at 19:00, beside a campfire or hearth if there is one. "Sang round
+    the midwinter bonfire" (+5).
 
-- **Rites of passage.**
-  - **Weddings:** lovers marry, with a ceremony and mood for everyone.
-  - **Funerals:** the fallen get a grave, and a memorial stone or statue (a sculpture subject) gives a lasting
-    "Remembered" thought instead of only grief. This also fills today's gap where death leaves nothing
-    behind.
-- **Goals:** "Hold a feast", "Hold a wedding", "Raise a memorial".
+  The Story screen has a toggle to skip them.
+
+- **Weddings.** At dawn, lovers whose opinion of each other is 60+ may decide to marry that evening at
+  17:00, in the colony's most impressive room. If both are there to the end:
+  - They're married: "Just married" (+12, five days), then "Married" (+3) for good.
+  - Guests get "Went to a wedding" (+5).
+  - Married couples never break up. A death leaves the other widowed.
+  - If either can't come (drafted, downed), the wedding is called off and may be announced again.
+- **Funerals and graves.**
+  - A death puts the colonist on a list waiting for burial. For four days after a death, while anyone lies
+    unburied, everyone has "One of us lies unburied" (−2).
+  - With an empty grave (Art & decor: 10 wood), the colony holds a funeral there by day (08:00–19:00).
+    Mourners get "Said goodbye at a funeral" (+2), and their grief thoughts fade in half the time.
+  - The grave then reads "Here lies Wren, died of blood loss on day 21".
+- **Memorials.** The memorial stone (40 stone) is carved by an artist like a sculpture, with quality from
+  Artistic. Its inscription names the fallen ("In Memory of Wren and Kip", or "To Our Fallen" for many).
+  Finishing it eases everyone's grief, and while one stands, anyone who knew a death gets "The fallen are
+  remembered" (+2).
+- **Notices.** A planned or running gathering shows in the side panel as good news ("The wedding of Ada and
+  Bram at 17:00"), and clicking it moves the camera there. A gathering starting plays a chime with sound on.
+- **Goals (Prosperity):**
+  - hold a harvest feast;
+  - celebrate a wedding;
+  - give a fallen colonist a funeral;
+  - raise a memorial.
+
+  The last two appear only after a death.
+
+- **Results** (Standard, 48 days, 12 seeds, the test colony adding two graves on day 6):
+  - Mood rose from 48.6 to 49.5, and everyone survived (72 of 72).
+  - There were about six festivals, one or two parties and one wedding per colony, and a few harvest
+    feasts (most test colonies have no meals in store by autumn).
+  - There were 6 mental breaks, against 2, spread thinly over three colonies.
+  - Harsh, 30 days and 12 seeds: 72 of 72 survived, with 2 breaks.
+  - Funerals are covered by tests rather than the balance runs, because no test colony lost anyone.
 
 ## 7. Decisions
 

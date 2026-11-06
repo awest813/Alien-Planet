@@ -420,6 +420,15 @@ export function StoryScreen({ state, onClose }: { state: UiState; onClose: () =>
           ))}
         </tbody>
       </table>
+      <h3>Festivals</h3>
+      <label className="setting">
+        <span>Keep the seasonal festivals (Planting Day, the harvest festival, the midwinter bonfire)</span>
+        <input
+          type="checkbox"
+          checked={state.festivals}
+          onChange={(e) => controller.command({ type: 'festivals', on: e.target.checked })}
+        />
+      </label>
       <h3>Events</h3>
       <ul className="story">
         {state.story.map((entry, index) => (

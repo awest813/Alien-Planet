@@ -49,6 +49,8 @@ export interface Job {
   patient: number;
   // Recreation: listening to a concert rather than using the building at `target`.
   listening?: boolean;
+  // At a gathering (party, festival, wedding, funeral) centred on `target`.
+  gathering?: boolean;
 }
 
 export interface Skills {
@@ -174,6 +176,8 @@ export interface Colonist {
   opinions: Record<number, number>;
   // Colonist id of their partner, or -1.
   lover: number;
+  // Who they married (-1: nobody, or widowed).
+  spouse: number;
   health: Health;
   // Drafted colonists stop working and follow move orders; they shoot at enemies in range.
   drafted: boolean;
@@ -350,7 +354,9 @@ export type Command =
   | { type: 'focus'; colonist: number; enemy: number }
   | { type: 'hunt'; rect: Rect; add: boolean }
   | { type: 'tame'; rect: Rect; add: boolean }
-  | { type: 'research'; project: string | null };
+  | { type: 'research'; project: string | null }
+  // Whether the colony keeps the seasonal festivals.
+  | { type: 'festivals'; on: boolean };
 
 export interface LogEntry {
   tick: number;
@@ -370,11 +376,41 @@ export interface Stats {
   wintersSurvived: number;
   // Games of chess played with someone.
   chessGames?: number;
-  // Concerts given.
+  // Concerts given, and the gatherings held.
   concerts?: number;
+  parties?: number;
+  feasts?: number;
+  weddings?: number;
+  funerals?: number;
+  memorials?: number;
   // Sculptures finished, and the best quality reached (0–20).
   sculptures?: number;
   bestArt?: number;
+}
+
+// Kinds of gathering: some for fun, some rites everyone turns out for.
+export type GatheringKind = 'party' | 'plantingDay' | 'harvestFestival' | 'midwinter' | 'wedding' | 'funeral';
+
+// A gathering planned or under way, centred on `tile`.
+export interface Gathering {
+  kind: GatheringKind;
+  tile: number;
+  startsAt: number;
+  endsAt: number;
+  // Who threw the party (-1 for others).
+  host: number;
+  // The couple marrying, or the colonist being buried.
+  couple?: [number, number];
+  honoree?: number;
+  started?: boolean;
+}
+
+// Someone who died: kept for burial, graves and memorials.
+export interface Fallen {
+  id: number;
+  name: string;
+  day: number;
+  cause: string;
 }
 
 // A finished sculpture: how well it came out, what it shows, and who made it.
@@ -383,6 +419,8 @@ export interface Artwork {
   title: string;
   artist: string;
   day: number;
+  // A memorial: who it remembers (colonist ids).
+  honors?: number[];
 }
 
 export type NightResult = 'pending' | 'success' | 'failed';

@@ -335,6 +335,41 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillStyle = '#7fb3d9';
       c.fillRect(13, 2, 1, 1);
       break;
+    case 'grave':
+      // A mound of earth with a wooden marker.
+      c.fillStyle = '#5b4030';
+      c.fillRect(3, 6, 10, 9);
+      c.fillStyle = '#6e5038';
+      c.fillRect(4, 7, 8, 7);
+      c.fillStyle = '#7d5c40';
+      c.fillRect(5, 8, 6, 2);
+      c.fillStyle = '#8a6a44';
+      c.fillRect(7, 1, 2, 6);
+      c.fillRect(5, 2, 6, 2);
+      c.fillStyle = '#a8865a';
+      c.fillRect(7, 1, 1, 6);
+      break;
+    case 'memorial':
+      // A rounded headstone with carved lines and a flower at its foot.
+      c.fillStyle = 'rgba(0,0,0,0.25)';
+      c.fillRect(2, 13, 12, 2);
+      c.fillStyle = '#8e8d93';
+      c.fillRect(3, 4, 10, 10);
+      c.fillRect(4, 3, 8, 1);
+      c.fillRect(5, 2, 6, 1);
+      c.fillStyle = '#b4b3b8';
+      c.fillRect(4, 4, 8, 9);
+      c.fillRect(5, 3, 6, 1);
+      c.fillStyle = '#6e6d73';
+      c.fillRect(6, 5, 4, 1);
+      c.fillRect(5, 7, 6, 1);
+      c.fillRect(5, 9, 6, 1);
+      c.fillRect(6, 11, 4, 1);
+      c.fillStyle = '#e85a8a';
+      c.fillRect(12, 12, 2, 2);
+      c.fillStyle = '#3f8a3a';
+      c.fillRect(12, 14, 1, 1);
+      break;
     case 'drum':
       // A hide drum on short legs.
       c.fillStyle = 'rgba(0,0,0,0.2)';

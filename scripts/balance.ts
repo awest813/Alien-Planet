@@ -237,6 +237,7 @@ function play(seed: number): Result {
   let gamesPlaced = false;
   let artPlaced = false;
   let lutePlaced = false;
+  let gravesPlaced = false;
   let bannerPlaced = false;
   let labTile = -1;
   let telescopePlaced = false;
@@ -358,6 +359,15 @@ function play(seed: number): Result {
         sim.apply({ type: 'research', project: next });
       }
     }
+    // Two graves on day 6, so the fallen can be laid to rest.
+    if (!gravesPlaced && sim.day >= 6) {
+      gravesPlaced = true;
+      const plot = findSite(sim, 3, 1, avoid);
+      if (plot) {
+        claim(avoid, sim, plot.x, plot.y, 3, 1);
+        sim.apply({ type: 'build', feature: featureId('grave'), tiles: [at(plot.x, plot.y), at(plot.x + 2, plot.y)] });
+      }
+    }
     // A lute on day 4, for music and the odd evening concert.
     if (!lutePlaced && sim.day >= 4) {
       lutePlaced = true;
@@ -471,7 +481,13 @@ function play(seed: number): Result {
         joyLowHours++;
       }
       if (c.job?.type === 'joy') {
-        const doing = c.job.target >= 0 ? (FEATURES[sim.world.feature[c.job.target] - 1]?.key ?? 'gone') : 'walk';
+        const doing = c.job.gathering
+          ? `gathering:${sim.gathering?.kind ?? 'ending'}`
+          : c.job.listening
+            ? 'concert'
+            : c.job.target >= 0
+              ? (FEATURES[sim.world.feature[c.job.target] - 1]?.key ?? 'gone')
+              : 'walk';
         joyTime[doing] = (joyTime[doing] ?? 0) + 1;
       }
       for (const t of sim.thoughtsOf(c)) {
@@ -519,6 +535,11 @@ function play(seed: number): Result {
     bumperCrop: count(/^Perfect growing weather/),
     lightning: count(/^Lightning struck/),
     concerts: sim.stats.concerts ?? 0,
+    parties: sim.stats.parties ?? 0,
+    feasts: sim.stats.feasts ?? 0,
+    festivals: count(/^(It's Planting Day|The harvest festival is tonight|The midwinter bonfire will be lit)/),
+    weddings: sim.stats.weddings ?? 0,
+    funerals: sim.stats.funerals ?? 0,
     burned: burnCounts.get(sim) ?? 0,
   };
   return {

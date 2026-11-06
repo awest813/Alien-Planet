@@ -27,6 +27,8 @@ import {
   WornApparel,
   SKILL_KEYS,
   Artwork,
+  Fallen,
+  Gathering,
 } from './types';
 import { Caravan } from './trade';
 import { WeatherState } from './weather';
@@ -53,6 +55,7 @@ interface SavedColonist {
   traits: string[];
   opinions: Record<number, number>;
   lover: number;
+  spouse: number;
   health: Health;
   drafted: boolean;
   skillXp: Record<SkillKey, number>;
@@ -114,6 +117,10 @@ export interface SaveData {
   storyLog: StoryEntry[];
   // Finished sculptures: [tile, artwork].
   artworks?: [number, Artwork][];
+  // A gathering planned or under way, the dead awaiting burial, and the graves: [tile, who].
+  gathering?: Gathering | null;
+  unburied?: Fallen[];
+  graves?: [number, Fallen][];
   story: StoryState;
   enemies: Enemy[];
   nextEnemyId: number;
@@ -183,6 +190,7 @@ export function serialize(sim: Simulation): SaveData {
         traits: c.traits,
         opinions: c.opinions,
         lover: c.lover,
+        spouse: c.spouse,
         health: c.health,
         drafted: c.drafted,
         skillXp: c.skillXp,
@@ -212,6 +220,9 @@ export function serialize(sim: Simulation): SaveData {
     log: sim.log.map((entry) => ({ ...entry })),
     storyLog: structuredClone(sim.storyLog),
     // Only pieces still standing (one taken down leaves its record behind).
+    gathering: sim.gathering && structuredClone(sim.gathering),
+    unburied: structuredClone(sim.unburied),
+    graves: [...sim.graves].map(([i, f]) => [i, { ...f }]),
     artworks: [...sim.artworks].filter(([i]) => sim.artworkAt(i)).map(([i, art]) => [i, { ...art }]),
     story: structuredClone(sim.story),
     enemies: structuredClone(sim.enemies),
@@ -282,6 +293,9 @@ export function deserialize(data: SaveData): Simulation {
   sim.stats = structuredClone(data.stats);
   sim.log = data.log.map((entry) => ({ ...entry }));
   sim.storyLog = structuredClone(data.storyLog);
+  sim.gathering = data.gathering ? structuredClone(data.gathering) : null;
+  sim.unburied = structuredClone(data.unburied ?? []);
+  sim.graves = new Map((data.graves ?? []).map(([i, f]) => [i, { ...f }]));
   sim.artworks = new Map((data.artworks ?? []).map(([i, art]) => [i, { ...art }]));
   sim.storyCount = sim.storyLog.length;
   // Saves from before difficulty settings play on standard.

@@ -150,6 +150,17 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     screen: 'production',
   },
   parkas: { how: 'Research Tailoring; crafters then make parkas from leather (see Production).', screen: 'research' },
+  feast: {
+    how: 'The harvest festival comes in mid-autumn. Have meals in store (fine ones best) and colonists free that evening.',
+  },
+  wedding: {
+    how: 'Lovers who think the world of each other may decide to marry. A fine room makes a fine wedding.',
+  },
+  funeral: { how: 'Build a grave (Art & decor). The colony gathers there to lay the fallen to rest.', tool: 'grave' },
+  memorial: {
+    how: 'Build a memorial stone (Art & decor); an artist carves it with the names of the fallen.',
+    tool: 'memorial',
+  },
   instrument: {
     how: 'Build a drum, flute or lute (Furniture). Colonists play it for fun, and everyone nearby enjoys the music.',
     tool: 'lute',
@@ -330,6 +341,14 @@ export const TOOLS: ToolDef[] = [
   build('sculptureLarge', 'Large sculpture', '', 'decor', 'A granite piece, twice the beauty of a small one'),
   build('sculptureGrand', 'Grand sculpture', '', 'decor', 'Granite and silver: the finest piece a colony can make'),
   build('flowerPot', 'Flower pot', '', 'decor', 'Pretty while in bloom; little to look at in winter'),
+  build('grave', 'Grave', '', 'decor', 'A resting place: the colony holds a funeral here for someone who has died'),
+  build(
+    'memorial',
+    'Memorial stone',
+    '',
+    'decor',
+    'Carved by an artist (Art work) in memory of the fallen. While it stands, the fallen are remembered',
+  ),
   build('banner', 'Banner', '', 'decor', 'A splash of colour for a room'),
   build('stove', 'Stove', 'k', 'production', 'Cooks meals from raw food'),
   build('craftingBench', 'Crafting bench', 'j', 'production', 'Weaves cloth and crafts bows'),
@@ -532,7 +551,8 @@ export interface ObjectiveView {
 
 export interface Alert {
   text: string;
-  tone: 'warn' | 'danger';
+  // Calm: good news to look forward to (a festival, a wedding).
+  tone: 'warn' | 'danger' | 'calm';
   // Who or where it's about: clicking the alert takes the camera there.
   colonist?: number;
   tile?: number;
@@ -574,6 +594,8 @@ export interface UiState {
   alerts: Alert[];
   log: LogEntry[];
   story: StoryEntry[];
+  // Whether the colony keeps the seasonal festivals.
+  festivals: boolean;
   raid: RaidView | null;
   hover: TileView | null;
   hoverColonist: number | null;
@@ -798,6 +820,8 @@ export class GameController {
         sound.alert('death');
       } else if (event === 'goal' || event === 'concert') {
         sound.alert(event);
+      } else if (event === 'gathering') {
+        sound.alert('concert');
       }
       if (event === 'dawn') {
         this.autosave();
@@ -1368,6 +1392,7 @@ export class GameController {
       alerts: this.alertsFor(totals),
       log: sim.log.slice(-12).reverse(),
       story: [...sim.storyLog].reverse(),
+      festivals: sim.story.festivals !== false,
       raid:
         sim.enemies.length > 0
           ? { faction: FACTIONS[sim.enemies[0].faction].name, remaining: sim.enemies.filter((e) => !e.fleeing).length }
@@ -1435,6 +1460,10 @@ export class GameController {
     const w = sim.world;
     const alerts: Alert[] = [];
     const raiders = sim.enemies.filter((e) => !e.fleeing).length;
+    const gathering = sim.gatheringNotice();
+    if (gathering) {
+      alerts.push({ text: gathering, tone: 'calm', tile: sim.gathering?.tile });
+    }
     if (sim.caravan && tradeOpen(sim)) {
       const hours = Math.max(0, Math.ceil((sim.caravan.leaveAt - sim.tick) / TICKS_PER_HOUR));
       alerts.push({
@@ -1692,6 +1721,15 @@ export class GameController {
     const def = f !== NONE ? featureDef(f) : undefined;
     if (art && def) {
       details.push(`${qualityLabel(art.quality)} ${def.name.toLowerCase()} by ${art.artist}, day ${art.day}`);
+    }
+    if (def?.key === 'grave') {
+      const lies = sim.graves.get(i);
+      details.push(
+        lies ? `Here lies ${lies.name}, died of ${lies.cause} on day ${lies.day}` : 'Empty: ready for a burial',
+      );
+    }
+    if (art?.honors && art.honors.length > 0) {
+      details.push(`Remembers ${art.honors.map((id) => sim.colonists[id]?.name ?? '?').join(', ')}`);
     }
     if (def?.flowers && sim.season === 'Winter') {
       details.push('Out of bloom until spring');

@@ -242,9 +242,14 @@ function die(sim: Simulation, c: Colonist, cause: string): void {
   c.health.dead = true;
   c.health.downed = false;
   c.drafted = false;
+  // Waiting to be buried (a grave and a funeral), and remembered by name.
+  sim.unburied.push({ id: c.id, name: c.name, day: sim.day, cause });
   sim.addLog(`${c.name} has died of ${cause}.`, 'danger', true);
   sim.events.push('death');
   for (const other of sim.living()) {
+    if (other.spouse === c.id) {
+      other.spouse = -1;
+    }
     if (other.lover === c.id) {
       other.lover = -1;
       sim.addThought(other, 'loverDied');

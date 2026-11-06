@@ -19,6 +19,7 @@ import {
   researchDef,
   TRAITS,
   featureDef,
+  featureId,
   isFood,
   itemDef,
   itemId,
@@ -88,7 +89,16 @@ import { PassRegions, Rooms, computePassRegions, computeRooms } from './regions'
 import { Rng, hash2 } from './rng';
 import { Caravan, updateCaravan } from './trade';
 import { WET_CHILL, WeatherState, douse, freshWeather, isWet, updateFires, updateWeather, weatherDef } from './weather';
-import { converse, relationLabel, rollTraits, socialThoughts, traitFactor, traitValue, updateSocial } from './social';
+import {
+  converse,
+  mutualOpinion,
+  relationLabel,
+  rollTraits,
+  socialThoughts,
+  traitFactor,
+  traitValue,
+  updateSocial,
+} from './social';
 import {
   Difficulty,
   StoryState,
@@ -120,8 +130,26 @@ import {
   WORK_TYPES,
   WorkTypeKey,
   Artwork,
+  Fallen,
+  Gathering,
+  GatheringKind,
 } from './types';
 import { EXCELLENT, MASTERWORK, artBeauty, rollQuality, titleFor } from './art';
+import {
+  ATTENDED_TICKS,
+  FESTIVALS,
+  FUNERAL_FROM,
+  FUNERAL_UNTIL,
+  GATHERINGS,
+  GRIEF,
+  PARTY_FROM,
+  PARTY_GAP_TICKS,
+  PARTY_MOOD,
+  PARTY_UNTIL,
+  UNBURIED_DAYS,
+  WEDDING_HOUR,
+  WEDDING_OPINION,
+} from './gatherings';
 import { spreadWildPlants } from './plants';
 import { Designation, GROW_ZONE, TileKind, World, growZoneCrop } from './world';
 import { generateWorld } from './worldgen';
@@ -152,6 +180,28 @@ const CONCERT_HOURS_TO_FULL = 1.5;
 const musicQuality = (c: Colonist) => 0.5 + c.skills.artistic / 20;
 // Below this after a meal, a colonist eats again straight away.
 const STILL_HUNGRY = 0.3;
+// Jobs nobody leaves for a wedding or a funeral.
+const BUSY_FOR_RITES = new Set<JobType>([
+  'tend',
+  'rescue',
+  'feed',
+  'eat',
+  'extinguish',
+  'shelter',
+  'warmUp',
+  'rest',
+  'sleep',
+]);
+// A gathering fills recreation in this many hours.
+const GATHERING_HOURS_TO_FULL = 2;
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+// A memorial's inscription: the fallen by name, or (before anyone has died) a dedication.
+const memorialTitle = (names: string[]) =>
+  names.length === 0
+    ? 'To Absent Friends'
+    : names.length <= 3
+      ? `In Memory of ${names.join(', ').replace(/, ([^,]*)$/, ' and $1')}`
+      : 'To Our Fallen';
 // Beauty within SURROUNDINGS tiles needed to feel pleasant, and beautiful.
 const SURROUNDINGS = 2;
 const PLEASANT_AROUND = 6;
@@ -192,6 +242,7 @@ export interface SimTimers {
   nextFoodSearch: [number, number][];
   // Missing from saves made before these were kept.
   ordered?: number[];
+  nextPartyTick?: number;
   nextTactics?: [number, number][];
   nextShelterSearch?: [number, number][];
   shelterLogged?: [number, number][];
@@ -208,7 +259,8 @@ export type SimEvent =
   | 'fire'
   | 'manhunters'
   | 'goal'
-  | 'concert';
+  | 'concert'
+  | 'gathering';
 
 // A notable moment in the colony's history, for the story screen.
 export interface StoryEntry {
@@ -338,6 +390,7 @@ function createColonist(id: number, name: string, tile: number, rng: Rng): Colon
     traits: rollTraits(rng),
     opinions: {},
     lover: -1,
+    spouse: -1,
     health: healthyState(),
     drafted: false,
     draftTarget: -1,
@@ -419,6 +472,13 @@ export class Simulation {
   };
   public log: LogEntry[] = [];
   public storyLog: StoryEntry[] = [];
+  // A party, festival, wedding or funeral, planned or under way (one at a time).
+  public gathering: Gathering | null = null;
+  // The dead awaiting burial, and who lies in each grave.
+  public unburied: Fallen[] = [];
+  public graves = new Map<number, Fallen>();
+  // No party before this tick.
+  private nextPartyTick = 0;
   // An evening concert under way: who's playing, at which instrument, until when.
   public concert: { player: number; tile: number; endsAt: number } | null = null;
   // Finished sculptures by tile.
@@ -480,6 +540,7 @@ export class Simulation {
       nextWarmSearch: [...this.nextWarmSearch],
       nextFoodSearch: [...this.nextFoodSearch],
       ordered: [...this.ordered],
+      nextPartyTick: this.nextPartyTick,
       nextTactics: [...this.nextTactics],
       nextShelterSearch: [...this.nextShelterSearch],
       shelterLogged: [...this.shelterLogged],
@@ -496,6 +557,7 @@ export class Simulation {
     timers.nextFoodSearch.forEach(([id, tick]) => this.nextFoodSearch.set(id, tick));
     // A drafted colonist walking where the player sent them keeps going there after a load.
     this.ordered = new Set(timers.ordered ?? []);
+    this.nextPartyTick = timers.nextPartyTick ?? 0;
     this.nextTactics = new Map(timers.nextTactics ?? []);
     this.nextShelterSearch = new Map(timers.nextShelterSearch ?? []);
     this.shelterLogged = new Map(timers.shelterLogged ?? []);
@@ -746,6 +808,7 @@ export class Simulation {
       updateFires(this, SLOW_TICKS / TICKS_PER_HOUR);
       updateSocial(this);
       this.checkConcert();
+      this.updateGathering();
     }
     if (this.tick % TICKS_PER_HOUR === 0) {
       this.updateIce();
@@ -843,6 +906,9 @@ export class Simulation {
             w.markDirty(i);
           }
         });
+        break;
+      case 'festivals':
+        this.story.festivals = cmd.on;
         break;
       case 'build':
         for (const i of cmd.tiles) {
@@ -1110,6 +1176,9 @@ export class Simulation {
       case 'joy':
         if (job.listening) {
           return 'Listening to a concert';
+        }
+        if (job.gathering && this.gathering) {
+          return `At ${GATHERINGS[this.gathering.kind].name}`;
         }
         return job.target >= 0 && w.feature[job.target] !== NONE
           ? (featureDef(w.feature[job.target]).joy?.activity ?? 'Relaxing')
@@ -1652,6 +1721,7 @@ export class Simulation {
     this.lastSeason = season;
     animalsAtDawn(this);
     spreadWildPlants(this);
+    this.planDay();
   }
 
   private checkObjectives(): void {
@@ -1747,6 +1817,15 @@ export class Simulation {
       keys.push('variedRecreation');
     } else if (total >= SAME_OLD_TOTAL && Math.max(...recent) >= SAME_OLD_SHARE * total && this.hasJoyBuilding()) {
       keys.push('sameOldThing');
+    }
+    // The dead: a memorial keeps them with us; one left unburied for days weighs on everyone.
+    if (this.colonists.some((o) => o.health.dead)) {
+      if (this.hasMemorial()) {
+        keys.push('remembered');
+      }
+      if (this.unburied.some((f) => this.day - f.day <= UNBURIED_DAYS)) {
+        keys.push('unburied');
+      }
     }
     // What's around them: sculptures, flowers, fine floors and furniture lift the spirits; a bare
     // room with nothing pleasant in it drags a little.
@@ -2483,8 +2562,23 @@ export class Simulation {
   // A finished sculpture: its quality from the artist's skill, a subject from the colony's story.
   private finishArtwork(c: Colonist, tile: number, name: string): void {
     const quality = rollQuality(this, c);
-    const title = titleFor(this, c);
-    this.artworks.set(tile, { quality, title, artist: c.name, day: this.day });
+    const memorial = featureDef(this.world.feature[tile]).key === 'memorial';
+    const fallen = this.colonists.filter((o) => o.health.dead);
+    const title = memorial ? memorialTitle(fallen.map((o) => o.name)) : titleFor(this, c);
+    this.artworks.set(tile, {
+      quality,
+      title,
+      artist: c.name,
+      day: this.day,
+      ...(memorial ? { honors: fallen.map((o) => o.id) } : {}),
+    });
+    if (memorial) {
+      // A memorial eases grief for everyone.
+      for (const o of this.living()) {
+        this.easeGrief(o);
+      }
+      this.stats.memorials = (this.stats.memorials ?? 0) + 1;
+    }
     // Room beauty was worked out before the quality was known.
     this.contentsVersion = '';
     this.stats.sculptures = (this.stats.sculptures ?? 0) + 1;
@@ -3815,6 +3909,18 @@ export class Simulation {
     return -1;
   }
 
+  // Whether a memorial stone stands (cached until buildings change).
+  private hasMemorial(): boolean {
+    if (this.memorialVersion !== this.world.featureVersion) {
+      this.memorialVersion = this.world.featureVersion;
+      const memorial = featureId('memorial');
+      this.memorialStands = this.countFeature((f) => f === memorial) > 0;
+    }
+    return this.memorialStands;
+  }
+  private memorialVersion = -1;
+  private memorialStands = false;
+
   // Whether the colony has built anything for recreation (cached until buildings change).
   private hasJoyBuilding(): boolean {
     if (this.joyBuiltVersion !== this.world.featureVersion) {
@@ -3879,6 +3985,10 @@ export class Simulation {
       this.stepListen(c, job);
       return;
     }
+    if (job.gathering) {
+      this.stepGather(c, job);
+      return;
+    }
     const w = this.world;
     const spot = job.target;
     const joy = spot >= 0 && w.feature[spot] !== NONE ? featureDef(w.feature[spot]).joy : undefined;
@@ -3939,6 +4049,7 @@ export class Simulation {
     const hour = Math.floor(this.hour);
     if (
       !this.concert &&
+      !this.gathering?.started &&
       c.skills.artistic >= CONCERT_SKILL &&
       hour >= CONCERT_FROM &&
       hour < CONCERT_UNTIL &&
@@ -4017,33 +4128,37 @@ export class Simulation {
     if (!concert || concert.player === c.id) {
       return false;
     }
+    const path = this.pathToGather(c, concert.tile, region);
+    if (!path) {
+      return false;
+    }
+    this.reserve(c, `l${path.at(-1) ?? c.tile}`);
+    this.assign(c, this.makeJob('joy', concert.tile, { listening: true, wait: CONCERT_TICKS + TICKS_PER_HOUR }), path);
+    return true;
+  }
+
+  // A way to a free spot within a few tiles of `center` (and within earshot of it), or null.
+  private pathToGather(c: Colonist, center: number, region: number): number[] | null {
     const w = this.world;
-    const x0 = w.xOf(concert.tile);
-    const y0 = w.yOf(concert.tile);
+    const x0 = w.xOf(center);
+    const y0 = w.yOf(center);
     const spots: number[] = [];
     for (let y = y0 - CONCERT_RADIUS; y <= y0 + CONCERT_RADIUS; y++) {
       for (let x = x0 - CONCERT_RADIUS; x <= x0 + CONCERT_RADIUS; x++) {
         const i = w.inBounds(x, y) ? w.idx(x, y) : -1;
         if (
           i >= 0 &&
-          i !== concert.tile &&
+          i !== center &&
           w.isPassable(i) &&
           this.regions.region[i] === region &&
           !this.isReserved(`l${i}`, c) &&
-          this.inEarshot(concert.tile, i)
+          this.inEarshot(center, i)
         ) {
           spots.push(i);
         }
       }
     }
-    const path = spots.length > 0 ? this.pathfinder.find(c.tile, spots) : null;
-    if (!path) {
-      return false;
-    }
-    const spot = path.at(-1) ?? c.tile;
-    this.reserve(c, `l${spot}`);
-    this.assign(c, this.makeJob('joy', concert.tile, { listening: true, wait: CONCERT_TICKS + TICKS_PER_HOUR }), path);
-    return true;
+    return spots.length > 0 ? this.pathfinder.find(c.tile, spots) : null;
   }
 
   // In the audience: music at its best, and a word with whoever's listening alongside.
@@ -4087,6 +4202,401 @@ export class Simulation {
       this.addThought(c, 'niceRecRoom');
     }
     this.endJob(c);
+  }
+
+  // ---- Gatherings: parties, festivals, weddings, funerals ----
+
+  // Every couple of seconds of game time: start, end or cancel the gathering, plan a funeral or a
+  // party when the moment is right, and bring people along.
+  private updateGathering(): void {
+    const g = this.gathering;
+    if (!g) {
+      this.planFuneral();
+      this.planParty();
+      return;
+    }
+    const def = GATHERINGS[g.kind];
+    // A raid calls it off, planned or under way.
+    if (this.raid) {
+      this.endGathering(true);
+      return;
+    }
+    if (this.tick < g.startsAt) {
+      return;
+    }
+    // A raid, or the people it's for being unable to come, calls it off.
+    const away = (id: number | undefined) => {
+      const c = id === undefined ? undefined : this.colonists[id];
+      return !c || c.health.dead || c.health.downed || c.drafted;
+    };
+    if (g.kind === 'wedding' && (away(g.couple?.[0]) || away(g.couple?.[1]))) {
+      this.endGathering(true);
+      return;
+    }
+    if (!g.started) {
+      g.started = true;
+      this.events.push('gathering');
+      const opening: Record<string, string> = {
+        party: `${this.colonists[g.host]?.name ?? 'Someone'} is throwing a party. Anyone off duty, come along!`,
+        plantingDay: 'Planting Day: the colony gathers to welcome the growing season.',
+        harvestFestival: 'The harvest festival has begun. Off-duty colonists gather to feast.',
+        midwinter: 'The midwinter bonfire is lit. Off-duty colonists gather round to sing.',
+        wedding: `The wedding of ${this.coupleNames(g)} is beginning.`,
+        funeral: `The colony gathers to bury ${this.fallenName(g.honoree)}.`,
+      };
+      this.addLog(opening[g.kind], 'good');
+    }
+    if (this.tick >= g.endsAt) {
+      this.endGathering(false);
+      return;
+    }
+    const hour = Math.floor(this.hour);
+    for (const c of this.living()) {
+      if (c.job?.gathering || !this.mayAttend(c, def.rite, hour)) {
+        continue;
+      }
+      const region = this.regionOf(c.tile);
+      const path = this.pathToGather(c, g.tile, region);
+      if (!path) {
+        continue;
+      }
+      this.endJob(c);
+      this.reserve(c, `l${path.at(-1) ?? c.tile}`);
+      this.assign(
+        c,
+        this.makeJob('joy', g.tile, { gathering: true, wait: g.endsAt - this.tick + TICKS_PER_HOUR }),
+        path,
+      );
+    }
+  }
+
+  // Who comes: anyone off duty and doing nothing much for fun; for a rite, anyone not dealing
+  // with an emergency (asleep, hurt, starving, fighting, rescuing, doctoring or in a break).
+  private mayAttend(c: Colonist, rite: boolean, hour: number): boolean {
+    if (c.drafted || c.sleeping || c.health.downed || this.inMentalBreak(c) || c.needs.food < 0.15) {
+      return false;
+    }
+    const job = c.job?.type;
+    if (rite) {
+      return !job || !BUSY_FOR_RITES.has(job);
+    }
+    return c.schedule[hour] !== 'W' && (!job || job === 'wander' || (job === 'joy' && !c.job?.listening));
+  }
+
+  // At a gathering: company and good cheer, and talk with whoever else is there.
+  private stepGather(c: Colonist, job: Job): void {
+    const g = this.gathering;
+    if (!g || g.tile !== job.target || this.tick < g.startsAt || --job.wait <= 0) {
+      this.endJob(c);
+      return;
+    }
+    if (c.path.length > 0) {
+      return;
+    }
+    job.progress++;
+    this.enjoy(c, 'social', this.joyEfficiency(c, 'social') / (TICKS_PER_HOUR * GATHERING_HOURS_TO_FULL));
+    if (this.rng.chance(1 / (TICKS_PER_HOUR * 0.75))) {
+      const others = this.living().filter((o) => o !== c && o.job?.gathering && o.path.length === 0);
+      if (others.length > 0) {
+        converse(this, c, this.rng.pick(others));
+      }
+    }
+  }
+
+  // The end of a gathering (or its cancellation): what everyone who stayed takes away from it.
+  private endGathering(cancelled: boolean): void {
+    const g = this.gathering!;
+    const def = GATHERINGS[g.kind];
+    const there = this.living().filter((c) => c.job?.gathering && c.job.target === g.tile);
+    const stayed = there.filter((c) => (c.job?.progress ?? 0) >= ATTENDED_TICKS);
+    this.gathering = null;
+    for (const c of there) {
+      this.endJob(c);
+    }
+    if (cancelled) {
+      if (g.started || g.kind === 'wedding' || g.kind === 'funeral') {
+        this.addLog(`${capitalize(def.name)} has been called off.`, 'warn');
+      }
+      return;
+    }
+    if (g.kind === 'harvestFestival') {
+      this.holdFeast(stayed);
+    } else if (g.kind === 'wedding') {
+      this.marry(g, stayed);
+    } else if (g.kind === 'funeral') {
+      this.bury(g, stayed);
+    } else {
+      for (const c of stayed) {
+        this.addThought(c, def.thought);
+      }
+      if (g.kind === 'party' && stayed.length > 1) {
+        this.stats.parties = (this.stats.parties ?? 0) + 1;
+      }
+      this.addLog(`${capitalize(def.name)} is over. ${stayed.length} came along.`, 'good');
+    }
+  }
+
+  // A meal from the stores for everyone at the harvest festival, the finest first, if there's one.
+  private holdFeast(guests: Colonist[]): void {
+    const w = this.world;
+    const meals = [itemId('fineMeal'), itemId('meal')];
+    let fed = 0;
+    for (const c of guests) {
+      const tile = meals
+        .map((m) => [...w.tilesWith('items')].find((i) => w.itemType[i] === m && this.isStockpile(i)))
+        .find((i) => i !== undefined);
+      if (tile !== undefined) {
+        const def = itemDef(w.itemType[tile]);
+        w.takeItem(tile, 1);
+        c.needs.food = Math.min(1, c.needs.food + def.nutrition);
+        this.addThought(c, 'harvestFeast');
+        fed++;
+      } else {
+        this.addThought(c, 'harvestFestival');
+      }
+    }
+    if (fed > 0) {
+      this.stats.feasts = (this.stats.feasts ?? 0) + 1;
+      this.addLog(`The harvest festival is over: ${fed} feasted on meals from the stores.`, 'good', true);
+    } else {
+      this.addLog('The harvest festival is over. There were no meals in store to feast on.', 'info', true);
+    }
+  }
+
+  private marry(g: Gathering, guests: Colonist[]): void {
+    const [a, b] = (g.couple ?? []).map((id) => this.colonists[id]);
+    if (!a || !b || !guests.includes(a) || !guests.includes(b)) {
+      this.addLog('The wedding ended without the couple both there. It will have to wait.', 'warn');
+      return;
+    }
+    a.spouse = b.id;
+    b.spouse = a.id;
+    this.addThought(a, 'gotMarried');
+    this.addThought(b, 'gotMarried');
+    for (const c of guests) {
+      if (c !== a && c !== b) {
+        this.addThought(c, 'attendedWedding');
+      }
+    }
+    this.stats.weddings = (this.stats.weddings ?? 0) + 1;
+    this.addLog(`${a.name} and ${b.name} are married!`, 'good', true);
+  }
+
+  // Into the grave: it now bears their name, and the mourners' grief eases.
+  private bury(g: Gathering, mourners: Colonist[]): void {
+    const fallen = this.unburied.find((f) => f.id === g.honoree);
+    const w = this.world;
+    if (!fallen || w.feature[g.tile] !== featureId('grave') || this.graves.has(g.tile)) {
+      return;
+    }
+    this.graves.set(g.tile, fallen);
+    this.unburied = this.unburied.filter((f) => f !== fallen);
+    for (const c of mourners) {
+      this.addThought(c, 'saidGoodbye');
+      this.easeGrief(c);
+    }
+    this.stats.funerals = (this.stats.funerals ?? 0) + 1;
+    this.addLog(`${fallen.name} has been laid to rest.`, 'info', true);
+  }
+
+  // Grief from a death fades in half the time.
+  private easeGrief(c: Colonist): void {
+    for (const t of c.thoughts) {
+      if (GRIEF.includes(t.key) && t.expires > this.tick) {
+        t.expires = this.tick + Math.ceil((t.expires - this.tick) / 2);
+      }
+    }
+  }
+
+  // A funeral, by day, once there's an empty grave for someone waiting to be buried.
+  private planFuneral(): void {
+    const hour = Math.floor(this.hour);
+    const fallen = this.unburied[0];
+    if (!fallen || this.raid || hour < FUNERAL_FROM || hour >= FUNERAL_UNTIL || this.living().length === 0) {
+      return;
+    }
+    const grave = this.emptyGrave();
+    if (grave === undefined) {
+      return;
+    }
+    const start = this.tick + TICKS_PER_HOUR;
+    this.gathering = {
+      kind: 'funeral',
+      tile: grave,
+      startsAt: start,
+      endsAt: start + GATHERINGS.funeral.hours * TICKS_PER_HOUR,
+      host: -1,
+      honoree: fallen.id,
+    };
+    this.addLog(`${fallen.name} will be buried within the hour.`, 'info');
+  }
+
+  // A grave nobody lies in yet, that the living can reach.
+  public emptyGrave(): number | undefined {
+    const home = this.living()[0];
+    if (!home) {
+      return undefined;
+    }
+    const region = this.regionOf(home.tile);
+    const grave = featureId('grave');
+    return [...this.world.tilesWith('features')].find(
+      (i) => this.world.feature[i] === grave && !this.graves.has(i) && this.regions.region[i] === region,
+    );
+  }
+
+  // Now and then on an evening, someone in good spirits throws a party in the best room for it.
+  private planParty(): void {
+    const hour = Math.floor(this.hour);
+    if (
+      this.raid ||
+      this.concert ||
+      hour < PARTY_FROM ||
+      hour >= PARTY_UNTIL ||
+      this.tick < this.nextPartyTick ||
+      this.living().length < 3 ||
+      !this.rng.chance(SLOW_TICKS / (TICKS_PER_HOUR * 6))
+    ) {
+      return;
+    }
+    const host = this.living().find(
+      (c) => c.mood >= PARTY_MOOD && !c.drafted && !c.sleeping && !c.health.downed && !this.inMentalBreak(c),
+    );
+    const spot = this.bestRoomSpot(['Dining room', 'Recreation room', 'Gallery']) ?? this.homeSpot();
+    if (!host || spot === undefined) {
+      return;
+    }
+    this.nextPartyTick = this.tick + PARTY_GAP_TICKS;
+    this.gathering = {
+      kind: 'party',
+      tile: spot,
+      startsAt: this.tick,
+      endsAt: this.tick + GATHERINGS.party.hours * TICKS_PER_HOUR,
+      host: host.id,
+    };
+  }
+
+  // At dawn: today's festival, if it's a festival day, and perhaps a wedding this evening.
+  private planDay(): void {
+    if (this.gathering || this.living().length < 2) {
+      return;
+    }
+    const day = seasonDay(this.totalHours);
+    const festival = FESTIVALS.find((f) => f.season === this.season && f.day === day);
+    if (festival && this.story.festivals !== false) {
+      const spot = festival.kind === 'midwinter' ? this.bonfireSpot() : this.homeSpot();
+      if (spot !== undefined) {
+        this.scheduleToday(festival.kind, spot, festival.hour);
+        const when = `${festival.hour}:00`;
+        const what: Record<string, string> = {
+          plantingDay: `It's Planting Day: the colony will gather at ${when} to welcome the growing season.`,
+          harvestFestival: `The harvest festival is tonight at ${when}. Meals in store will make it a feast.`,
+          midwinter: `The midwinter bonfire will be lit tonight at ${when}.`,
+        };
+        this.addLog(what[festival.kind], 'good', true);
+        return;
+      }
+    }
+    // Devoted lovers may decide to marry.
+    for (const a of this.living()) {
+      const b = a.lover >= 0 ? this.colonists[a.lover] : undefined;
+      if (
+        !b ||
+        b.health.dead ||
+        a.id > b.id ||
+        a.spouse === b.id ||
+        mutualOpinion(a, b) < WEDDING_OPINION ||
+        !this.rng.chance(0.25)
+      ) {
+        continue;
+      }
+      const spot = this.bestRoomSpot() ?? this.homeSpot();
+      if (spot === undefined) {
+        return;
+      }
+      this.scheduleToday('wedding', spot, WEDDING_HOUR);
+      this.gathering!.couple = [a.id, b.id];
+      this.addLog(`${a.name} and ${b.name} are to be married this evening at ${WEDDING_HOUR}:00.`, 'good', true);
+      return;
+    }
+  }
+
+  private scheduleToday(kind: GatheringKind, tile: number, hour: number): void {
+    const start = this.tick + Math.max(0, Math.round((hour - this.hour) * TICKS_PER_HOUR));
+    this.gathering = { kind, tile, startsAt: start, endsAt: start + GATHERINGS[kind].hours * TICKS_PER_HOUR, host: -1 };
+  }
+
+  // A walkable tile near the middle of the most impressive room (of the given roles), if any.
+  private bestRoomSpot(roles?: string[]): number | undefined {
+    this.ensureRegions();
+    const contents = this.contents();
+    let best = -1;
+    let bestScore = -1;
+    for (let r = 0; r < this.rooms.sizes.length; r++) {
+      if (!this.rooms.enclosed[r] || this.rooms.sizes[r] < 6) {
+        continue;
+      }
+      const info = describeRoom(r, this.rooms, contents[r], 0);
+      if ((!roles || roles.includes(info.role)) && info.impressiveness > bestScore) {
+        best = r;
+        bestScore = info.impressiveness;
+      }
+    }
+    if (best < 0) {
+      return undefined;
+    }
+    const w = this.world;
+    const tiles: number[] = [];
+    for (let i = 0; i < w.size; i++) {
+      if (this.rooms.room[i] === best) {
+        tiles.push(i);
+      }
+    }
+    const cx = tiles.reduce((s, i) => s + w.xOf(i), 0) / tiles.length;
+    const cy = tiles.reduce((s, i) => s + w.yOf(i), 0) / tiles.length;
+    return tiles
+      .filter((i) => w.isPassable(i))
+      .sort((a, b) => Math.hypot(w.xOf(a) - cx, w.yOf(a) - cy) - Math.hypot(w.xOf(b) - cx, w.yOf(b) - cy))[0];
+  }
+
+  // Open ground near the heart of the colony.
+  private homeSpot(): number | undefined {
+    const home = this.homeTile() ?? this.living()[0]?.tile;
+    return home === undefined
+      ? undefined
+      : this.nearest(home, (i) => this.world.isPassable(i) && !this.isIndoors(i), 1)[0];
+  }
+
+  // Beside a campfire or hearth if there is one; otherwise anywhere near home.
+  private bonfireSpot(): number | undefined {
+    const w = this.world;
+    const home = this.homeTile() ?? this.living()[0]?.tile;
+    if (home === undefined) {
+      return undefined;
+    }
+    const fire = this.nearest(home, (i) => w.feature[i] !== NONE && featureDef(w.feature[i]).heater > 0, 1)[0];
+    return fire ?? this.homeSpot();
+  }
+
+  private coupleNames(g: Gathering): string {
+    return (g.couple ?? []).map((id) => this.colonists[id]?.name ?? '?').join(' and ');
+  }
+
+  private fallenName(id: number | undefined): string {
+    return this.colonists.find((c) => c.id === id)?.name ?? 'the fallen';
+  }
+
+  // What the colony has to look forward to (or is doing now), for the side panel.
+  public gatheringNotice(): string | null {
+    const g = this.gathering;
+    if (!g) {
+      return null;
+    }
+    const name = g.kind === 'wedding' ? `The wedding of ${this.coupleNames(g)}` : capitalize(GATHERINGS[g.kind].name);
+    if (this.tick < g.startsAt) {
+      const hour = Math.floor(((this.totalHours + (g.startsAt - this.tick) / TICKS_PER_HOUR) % 24) + 1e-6);
+      return `${name} at ${String(hour).padStart(2, '0')}:00`;
+    }
+    return `${name} is under way`;
   }
 
   // ---- Sleep ----
@@ -5415,6 +5925,32 @@ export const OBJECTIVES: ObjectiveDef[] = [
     label: 'Hold a concert (a player with Artistic 6+, in the evening)',
     phase: 5,
     check: (s) => (s.stats.concerts ?? 0) > 0,
+  },
+  {
+    id: 'feast',
+    label: 'Hold a harvest feast (meals in store at the autumn festival)',
+    phase: 5,
+    check: (s) => (s.stats.feasts ?? 0) > 0,
+  },
+  {
+    id: 'wedding',
+    label: 'Celebrate a wedding',
+    phase: 5,
+    check: (s) => (s.stats.weddings ?? 0) > 0,
+  },
+  {
+    id: 'funeral',
+    label: 'Give a fallen colonist a funeral (build a grave)',
+    phase: 5,
+    hidden: (s) => !s.colonists.some((c) => c.health.dead),
+    check: (s) => (s.stats.funerals ?? 0) > 0,
+  },
+  {
+    id: 'memorial',
+    label: 'Raise a memorial stone to the fallen',
+    phase: 5,
+    hidden: (s) => !s.colonists.some((c) => c.health.dead),
+    check: (s) => (s.stats.memorials ?? 0) > 0,
   },
   {
     id: 'sculpture',

@@ -70,6 +70,9 @@ export function socialThoughts(sim: Simulation, c: Colonist): string[] {
   if (c.lover >= 0 && !sim.colonists[c.lover].health.dead) {
     keys.push('hasLover');
   }
+  if (c.spouse >= 0 && !sim.colonists[c.spouse].health.dead) {
+    keys.push('married');
+  }
   if (others.some((o) => o.id !== c.lover && mutualOpinion(c, o) >= FRIEND_OPINION)) {
     keys.push('hasFriend');
   }
@@ -122,7 +125,8 @@ function interact(sim: Simulation, a: Colonist, b: Colonist, insults = 1): void 
     adjust(b, a, 1.5 + 2 * chemistry);
   }
 
-  if (a.lover === b.id && mutualOpinion(a, b) < BREAKUP_OPINION) {
+  // Married couples see their rough patches through.
+  if (a.lover === b.id && a.spouse !== b.id && mutualOpinion(a, b) < BREAKUP_OPINION) {
     a.lover = -1;
     b.lover = -1;
     sim.addLog(`${a.name} and ${b.name} have broken up.`, 'warn', true);

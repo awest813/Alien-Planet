@@ -297,5 +297,57 @@
     "label": "Went to a concert",
     "mood": 4,
     "hours": 12
+  },
+  "attendedParty": {
+    "label": "Went to a party",
+    "mood": 4,
+    "hours": 12
+  },
+  "plantingDay": {
+    "label": "Celebrated Planting Day",
+    "mood": 3,
+    "hours": 24
+  },
+  "harvestFeast": {
+    "label": "Feasted at the harvest festival",
+    "mood": 6,
+    "hours": 24
+  },
+  "harvestFestival": {
+    "label": "Celebrated the harvest",
+    "mood": 3,
+    "hours": 24
+  },
+  "midwinterBonfire": {
+    "label": "Sang round the midwinter bonfire",
+    "mood": 5,
+    "hours": 24
+  },
+  "attendedWedding": {
+    "label": "Went to a wedding",
+    "mood": 5,
+    "hours": 24
+  },
+  "gotMarried": {
+    "label": "Just married",
+    "mood": 12,
+    "hours": 120
+  },
+  "married": {
+    "label": "Married",
+    "mood": 3
+  },
+  "saidGoodbye": {
+    "label": "Said goodbye at a funeral",
+    "mood": 2,
+    "hours": 12
+  },
+  "remembered": {
+    "label": "The fallen are remembered",
+    "mood": 2
+  },
+  "unburied": {
+    "label": "One of us lies unburied",
+    "mood": -2
   }
 }

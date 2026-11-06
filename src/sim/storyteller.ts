@@ -29,6 +29,8 @@ export interface StoryState {
   auroraUntil?: number;
   // No new threat before this tick: a breather after the last one.
   nextThreatTick?: number;
+  // The colony keeps the seasonal festivals (on unless the player turns them off).
+  festivals?: boolean;
   difficulty: Difficulty;
 }
 

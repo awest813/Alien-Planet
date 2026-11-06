@@ -931,5 +931,34 @@
       "work": 220
     },
     "research": "instruments"
+  },
+  {
+    "key": "grave",
+    "name": "Grave",
+    "passable": true,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 10
+        }
+      ],
+      "work": 80
+    }
+  },
+  {
+    "key": "memorial",
+    "name": "Memorial stone",
+    "beauty": 6,
+    "art": true,
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 40
+        }
+      ],
+      "work": 900
+    }
   }
 ]

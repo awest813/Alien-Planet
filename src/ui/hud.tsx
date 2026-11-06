@@ -591,7 +591,9 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
       </button>
     );
   }
-  const alerts = [...state.alerts].sort((a, b) => (a.tone === b.tone ? 0 : a.tone === 'danger' ? -1 : 1));
+  // Dangers first, then warnings, then good news.
+  const rank = { danger: 0, warn: 1, calm: 2 };
+  const alerts = [...state.alerts].sort((a, b) => rank[a.tone] - rank[b.tone]);
   const shown = allAlerts ? alerts : alerts.slice(0, ALERTS_SHOWN);
   return (
     <aside className="panel side">
