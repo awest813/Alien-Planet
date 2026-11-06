@@ -59,6 +59,8 @@ import {
 import {
   bleedingOf,
   healthFactor,
+  STARVING_MOVE,
+  starving,
   healthyState,
   needsBedRest,
   needsTending,
@@ -1918,7 +1920,8 @@ export class Simulation {
       return 0;
     }
     const diagonal = w.xOf(next) !== w.xOf(c.tile) && w.yOf(next) !== w.yOf(c.tile);
-    return (MOVE_SPEED * armorOf(c).speed) / (w.moveCost(next) * (diagonal ? Math.SQRT2 : 1));
+    const hunger = starving(c) ? STARVING_MOVE : 1;
+    return (MOVE_SPEED * armorOf(c).speed * hunger) / (w.moveCost(next) * (diagonal ? Math.SQRT2 : 1));
   }
 
   private move(c: Colonist): void {

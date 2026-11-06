@@ -78,6 +78,28 @@ describe('storyteller pacing', () => {
     expect(closest).toBeGreaterThanOrEqual(24 * HOUR);
   });
 
+  it('keeps maddened wolf packs to four, even for a big colony late on', () => {
+    let wolfPacks = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const { sim } = colony(seed);
+      while (sim.colonists.length < 12) {
+        sim.addWanderer();
+      }
+      sim.tick = 60 * 24 * HOUR + 22 * HOUR;
+      sim.syncClock();
+      sim.story.difficulty = 'harsh';
+      if (triggerEvent(sim, 'manhunters')) {
+        const pack = sim.animals.filter((a) => a.manhunter);
+        expect(pack.length).toBeGreaterThanOrEqual(2);
+        if (pack[0].kind === 'wolf') {
+          wolfPacks++;
+          expect(pack.length).toBeLessThanOrEqual(4);
+        }
+      }
+    }
+    expect(wolfPacks).toBeGreaterThan(0);
+  });
+
   it('sends food as a gift when the stores are low', () => {
     let meals = 0;
     for (let seed = 1; seed <= 30; seed++) {

@@ -2,8 +2,7 @@
 
 A working plan for what comes after the current build. The direction so far: **art and decor, musical
 instruments, recreation, and more**. Each phase lists what it adds, how it fits the systems the game already
-has, what it needs first, and how we'll know it works. Section 7 lists the decisions to settle before
-building.
+has, what it needs first, and how we'll know it works. Section 7 records the decisions made so far.
 
 ## 1. Where the game stands
 
@@ -139,23 +138,25 @@ This ties recreation, art and music into the storyteller.
     behind.
 - **Goals:** "Hold a feast", "Hold a wedding", "Raise a memorial".
 
-## 7. Decisions to make
+## 7. Decisions
 
-1. **One Artistic skill for both art and music, or two skills?** Recommended: one.
-2. **Real sound, or none?** Recommended: a small procedural synthesizer with volume sliders, off by default.
-3. **Instruments: buildings played in place, or items carried and played anywhere?** Recommended: buildings,
-   which are simpler and work naturally with rooms and audiences.
-4. **Should hunger hurt?** At the moment starving only lowers mood: in one test colony every colonist went
-   five days with no food and nobody died. Options:
-   - Leave it as it is.
-   - Starving slows work and walking.
-   - Malnutrition builds up over days and can cause a collapse and, eventually, death.
+Settled:
 
-   Recommended: the slowdown first, then decide on lethality after a harness run.
+1. **Skills:** one Artistic skill covers both art and music.
+2. **Sound:** a small synthesizer in code, no sound files. Off by default, with volume sliders in Settings.
+3. **Instruments:** buildings, played in place.
+4. **Hunger:** starving colonists (food at zero) now work at 80% and walk at 90% until they eat; it doesn't
+   kill. In balance runs a harder version (70% and 80%) cost Harsh colonies 13 colonists over 18 seeds,
+   because starving colonists are often the ones carrying the wounded in and tending them; the milder one
+   costs about 7 on Harsh, which fits its "expect losses" billing, and none extra on Standard or Peaceful.
+   Malnutrition that can kill stays off the table for now.
+5. **Wolf packs:** a maddened wolf pack now stops at four, however big the colony. Boar packs still grow to
+   five. (Earlier, a pack of six wolves downed all eight colonists in one run and five bled out.)
 
-5. **Late-game wolf packs.** A pack of six maddened wolves downed all eight colonists in one run, and five
-   bled out. Now that no new threat comes while half the colony is down, the next attack can't finish a
-   beaten colony off. Should the packs themselves also be smaller, or easier to escape indoors?
+Still open:
+
+- Whether downed colonists should be able to crawl to food or a bed when nobody is left to help. Most
+  starving hours in the harness are colonists lying wounded after a fight that downed everyone.
 
 ## 8. Later and maybe
 

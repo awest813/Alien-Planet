@@ -407,6 +407,7 @@ function HealthTab({ c }: { c: ColonistView }) {
   return (
     <>
       {healthy && <div className="muted">Healthy.</div>}
+      {c.needs.food <= 0 && !c.dead && <div className="bad">Starving: works and walks slower until they eat.</div>}
       {c.injuries.map((injury, index) => (
         <div key={index} className="row-line">
           <span>

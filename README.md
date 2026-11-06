@@ -55,7 +55,8 @@ Objectives:
 How the living simulation works:
 
 - **Needs:** food, rest and recreation drain over time. Colonists eat when hungry (cooked meals first), sleep
-  during scheduled hours or when exhausted, and seek recreation (horseshoe pin, armchair, or a walk).
+  during scheduled hours or when exhausted, and seek recreation (horseshoe pin, armchair, or a walk). A
+  starving colonist (food at zero) works at 80% and walks at 90% until they eat.
 - **Mood:** 50 plus the sum of current thoughts, such as "Ate a cooked meal" +4, "Ate without a table" −3,
   "Slept in the cold" −5, "Slept in a nice bedroom" +4. Low mood slows work; very low mood can cause a break.
 - **Farming and production:** growing zones are sown and harvested automatically; crops grow by day, faster on
@@ -180,7 +181,7 @@ How the storytelling layer works:
 - **Sun lamps:** crops beneath them grow day and night, all year, so a heated greenhouse can farm in winter.
 - **Storyteller:** roughly once or twice a day it may send something. Threats (more often on Harsh, rarer on
   Peaceful): raids, marsh fever, cold snaps, summer heat waves, crop blight, eclipses that darken the sky and
-  solar panels for a few hours, and packs of maddened boars or wolves (more likely at night) that hunt colonists down one after another. Good
+  solar panels for a few hours, and packs of maddened boars or wolves (more likely at night, and never more than four wolves) that hunt colonists down one after another. Good
   fortune: wanderers and wounded refugees asking to join, herds, trade caravans and gifts from the friendly Meadow
   Kin, meteorites that scatter silver and stone (and may start a fire), auroras that lift everyone's mood, a
   colonist struck by inspiration (40% faster work for a day), and bumper crops. Each event pops up as a short

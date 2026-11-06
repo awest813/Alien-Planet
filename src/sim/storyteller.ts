@@ -51,6 +51,8 @@ export const auroraOn = (sim: Simulation): boolean => until(sim, sim.story.auror
 
 // How strongly each difficulty leans on threats (raids, illness, cold, blight).
 const THREAT_WEIGHT: Record<Difficulty, number> = { peaceful: 0.5, standard: 1, harsh: 1.4 };
+// The largest pack of maddened wolves.
+const MAX_WOLF_PACK = 4;
 // The breather after any threat before the next one, in days.
 const THREAT_GAP_DAYS: Record<Difficulty, number> = { peaceful: 1.5, standard: 1, harsh: 0.5 };
 
@@ -309,11 +311,16 @@ const EVENTS: EventDef[] = [
     threat: true,
     weight: (sim) => (sim.story.difficulty === 'peaceful' ? 0 : 0.7),
     run: (sim) => {
-      // Two boars at first, one more every twelve days (and one more on harsh), never more than five.
-      const base = Math.min(5, 2 + Math.floor(sim.day / 12) + (sim.story.difficulty === 'harsh' ? 1 : 0));
-      const count = Math.max(2, Math.round(base * threatScale(sim)));
       // Boars by day; wolves are more likely after dark.
       const kind = sim.rng.next() < (sim.isNight() ? 0.7 : 0.35) ? 'wolf' : 'boar';
+      // Two at first, one more every twelve days (and one more on harsh), never more than five boars.
+      // Wolves bite deep and come in fast, so a pack of them stops at four, whatever the colony's size.
+      const cap = kind === 'wolf' ? MAX_WOLF_PACK : 5;
+      const base = Math.min(cap, 2 + Math.floor(sim.day / 12) + (sim.story.difficulty === 'harsh' ? 1 : 0));
+      const count = Math.min(
+        kind === 'wolf' ? MAX_WOLF_PACK : Infinity,
+        Math.max(2, Math.round(base * threatScale(sim))),
+      );
       const arrived = manhuntersArrive(sim, kind, count);
       if (arrived === 0) {
         return false;

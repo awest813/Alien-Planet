@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { comfortRange } from './apparel';
 import { featureId, itemDef, itemId } from './defs';
-import { damage, healthFactor, updateExposure } from './health';
+import { STARVING_MOVE, STARVING_WORK, damage, healthFactor, updateExposure } from './health';
 import { deserialize, serialize } from './serialize';
 import { Simulation, START_HOUR } from './simulation';
 import { HOUR, clearAround, outline, run } from './test-helpers';
@@ -18,6 +18,24 @@ function setHour(sim: Simulation, test: (t: number) => boolean): void {
   }
   throw new Error('No such hour');
 }
+
+describe('hunger', () => {
+  it('slows a starving colonist down at work and on foot, until they eat', () => {
+    const sim = Simulation.newColony(5);
+    const c = sim.colonists[0];
+    const w = sim.world;
+    c.path = [w.neighbors(c.tile).find((n) => w.isPassable(n))!];
+    c.needs.food = 0.5;
+    const [work, walk] = [healthFactor(c), sim.moveRate(c)];
+    c.needs.food = 0;
+    expect(healthFactor(c)).toBeCloseTo(work * STARVING_WORK);
+    expect(sim.moveRate(c)).toBeCloseTo(walk * STARVING_MOVE);
+    expect(STARVING_WORK).toBeLessThan(1);
+    expect(STARVING_MOVE).toBeLessThan(1);
+    c.needs.food = 0.05;
+    expect(healthFactor(c)).toBeCloseTo(work);
+  });
+});
 
 describe('clothing and exposure', () => {
   it('lets the cold build into hypothermia, less so in a parka', () => {

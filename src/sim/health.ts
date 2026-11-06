@@ -68,8 +68,13 @@ export function needsBedRest(c: Colonist): boolean {
 
 // Work speed multiplier from pain and illness.
 export function healthFactor(c: Colonist): number {
-  return Math.max(0.3, 1 - painOf(c) * 0.5) * (c.health.poisoned > 0 ? 0.65 : 1);
+  return Math.max(0.3, 1 - painOf(c) * 0.5) * (c.health.poisoned > 0 ? 0.65 : 1) * (starving(c) ? STARVING_WORK : 1);
 }
+
+// A colonist with nothing left in the tank works and walks slower until they eat. It doesn't kill.
+export const STARVING_WORK = 0.8;
+export const STARVING_MOVE = 0.9;
+export const starving = (c: Colonist): boolean => c.needs.food <= 0;
 
 // Cold or heat beyond what a colonist's clothes can handle slowly builds into hypothermia or
 // heatstroke; it eases again somewhere comfortable.
