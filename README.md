@@ -287,6 +287,8 @@ no colony wiped out. First friendships appear around day 6–7, with a few rival
   priorities and work schedules; rooms, furniture and temperature.
 - **Phase 3 – The storytelling game** (done): relationships and traits; injuries, medicine and disease; combat, raids
   and factions; dynamic events.
+- **Next:** recreation depth, art and decor, music, and gatherings and festivals. See
+  [docs/ROADMAP.md](docs/ROADMAP.md) for the plan, the groundwork it needs, and the decisions still open.
 
 ## 🛠️ Installation <a id="installation"></a>
 
