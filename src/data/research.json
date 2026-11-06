@@ -128,5 +128,12 @@
     "name": "Instruments",
     "cost": 1000,
     "description": "Unlocks the harp, the finest instrument a colony can make."
+  },
+  {
+    "key": "signalBeacon",
+    "name": "Signal beacon",
+    "cost": 3000,
+    "requires": ["electricity"],
+    "description": "Unlocks the signal beacon: transmit for five days and a ship may answer."
   }
 ]

@@ -290,6 +290,88 @@ export function FallenScreen({ state, actions }: { state: UiState; actions: Menu
   );
 }
 
+// The ship has landed: the colony decides whether its story ends here.
+export function ShipScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+  const [sure, setSure] = useState(false);
+  if (state.ship !== 'landed') {
+    return (
+      <Modal title="The ship" onClose={onClose}>
+        <p>
+          {state.ship === 'answered'
+            ? 'A ship has answered the signal and is on its way.'
+            : 'No ship has answered yet. Build a signal beacon and keep it transmitting for five days.'}
+        </p>
+        <div className="row end">
+          <button onClick={onClose}>Close</button>
+        </div>
+      </Modal>
+    );
+  }
+  const aboard = state.colonists.filter((c) => !c.dead).map((c) => c.name);
+  return (
+    <Modal title="The ship has landed" onClose={onClose}>
+      <p>
+        It waits beside the beacon for a day. There's room for everyone: {aboard.join(', ')}. Board it and the colony's
+        story ends here, on your terms. Stay, and the ship leaves without you; you can always signal again.
+      </p>
+      <div className="title-buttons">
+        {!sure ? (
+          <button className="primary" autoFocus onClick={() => setSure(true)}>
+            Board the ship…
+          </button>
+        ) : (
+          <button className="primary" autoFocus onClick={() => controller.command({ type: 'shipChoice', board: true })}>
+            Yes, leave the valley for good
+          </button>
+        )}
+        <button
+          onClick={() => {
+            controller.command({ type: 'shipChoice', board: false });
+            onClose();
+          }}
+        >
+          Stay in the valley
+        </button>
+        <button onClick={onClose}>Decide later</button>
+      </div>
+    </Modal>
+  );
+}
+
+// The end of a colony's story, by its own choice.
+export function DepartedScreen({ state, actions }: { state: UiState; actions: MenuActions }) {
+  const [view, setView] = useState<'main' | 'new'>('main');
+  return (
+    <Modal title="The colony's story ends" onClose={() => undefined} closable={false}>
+      <p>The colonists boarded the ship and left the valley behind. Here is what they made of their time there.</p>
+      <table className="summary">
+        <tbody>
+          {state.legacy.map(({ label, value }) => (
+            <tr key={label}>
+              <td>{label}</td>
+              <td className="num">{value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {view === 'main' && (
+        <div className="title-buttons">
+          <button className="primary" autoFocus onClick={() => setView('new')}>
+            New colony
+          </button>
+          <button onClick={actions.onTitle}>Title screen</button>
+        </div>
+      )}
+      {view === 'new' && <NewColonyForm confirm={false} onStarted={actions.onPlay} />}
+      {view !== 'main' && (
+        <div className="row end">
+          <button onClick={() => setView('main')}>Back</button>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 function Choice<T extends number>({
   label,
   value,

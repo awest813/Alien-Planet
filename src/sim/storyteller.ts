@@ -1,3 +1,4 @@
+import { SIGNAL_RAID_WEIGHT, transmitting } from './beacon';
 import { herdArrives, manhuntersArrive, wildCap, wildCount } from './animals';
 import { spawnRaid, weaponScore } from './combat';
 import { TICKS_PER_HOUR, populationFor } from './constants';
@@ -116,7 +117,8 @@ const EVENTS: EventDef[] = [
     minDay: 4,
     cooldownDays: 3,
     threat: true,
-    weight: (sim) => (sim.story.difficulty === 'peaceful' ? 0 : 3),
+    // Raiders home in on a transmitting beacon.
+    weight: (sim) => (sim.story.difficulty === 'peaceful' ? 0 : 3 * (transmitting(sim) ? SIGNAL_RAID_WEIGHT : 1)),
     run: (sim) => {
       // Two raiders on day 4 and one more every three days, plus extra for a well-armed colony. The cap
       // is seven at first (nine on harsh), rising by one every eight days after day 19; then all of it

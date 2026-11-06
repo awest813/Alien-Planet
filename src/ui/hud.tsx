@@ -27,6 +27,7 @@ export type Screen =
   | 'research'
   | 'story'
   | 'help'
+  | 'ship'
   | null;
 
 const SPEEDS = [

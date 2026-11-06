@@ -413,6 +413,22 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillStyle = '#7fb3d9';
       c.fillRect(13, 2, 1, 1);
       break;
+    case 'signalBeacon':
+      // A lattice mast with a dish and a light at the top.
+      c.fillStyle = 'rgba(0,0,0,0.25)';
+      c.fillRect(2, 14, 12, 2);
+      c.fillStyle = '#5a5a64';
+      c.fillRect(3, 12, 10, 3);
+      c.fillStyle = '#9a9aa6';
+      c.fillRect(7, 3, 2, 10);
+      c.fillRect(5, 8, 6, 1);
+      c.fillRect(6, 5, 4, 1);
+      c.fillStyle = '#c8ccd6';
+      c.fillRect(3, 4, 4, 3);
+      c.fillRect(2, 5, 1, 1);
+      c.fillStyle = '#7fe0ff';
+      c.fillRect(7, 1, 2, 2);
+      break;
     case 'torch':
       // A wooden post with a flame on top.
       c.fillStyle = 'rgba(0,0,0,0.2)';
@@ -1383,6 +1399,32 @@ function createPawnTextures(scene: Phaser.Scene): void {
   h.fillRect(7, 4, 1, 1);
   h.fillRect(9, 4, 1, 1);
   head.refresh();
+
+  // The ship that answers the beacon: a stubby lander on its legs, 32 pixels across.
+  const ship = scene.textures.createCanvas('ship', TILE * 2, TILE * 2)!;
+  const s = ship.getContext();
+  s.fillStyle = 'rgba(0,0,0,0.3)';
+  s.fillRect(4, 27, 24, 4);
+  s.fillStyle = '#4a4e5a';
+  s.fillRect(5, 22, 2, 7);
+  s.fillRect(25, 22, 2, 7);
+  s.fillRect(3, 28, 6, 1);
+  s.fillRect(23, 28, 6, 1);
+  s.fillStyle = '#c8ccd6';
+  s.fillRect(8, 8, 16, 16);
+  s.fillRect(10, 5, 12, 3);
+  s.fillRect(13, 2, 6, 3);
+  s.fillStyle = '#e8ecf2';
+  s.fillRect(9, 9, 6, 13);
+  s.fillStyle = '#7fe0ff';
+  s.fillRect(13, 10, 6, 4);
+  s.fillStyle = '#d94b4b';
+  s.fillRect(8, 18, 16, 2);
+  s.fillStyle = '#5a5e6a';
+  s.fillRect(14, 20, 4, 4);
+  s.fillStyle = '#ffb060';
+  s.fillRect(12, 24, 8, 2);
+  ship.refresh();
 
   // Shadow and feet, apart from the rest so they can stride: standing, then each foot forward.
   for (const [frame, left, right] of [

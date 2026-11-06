@@ -150,6 +150,7 @@ import {
   WEDDING_HOUR,
   WEDDING_OPINION,
 } from './gatherings';
+import { BeaconState, TRANSMIT_HOURS, chooseToStay, depart, freshBeacon, updateBeacon } from './beacon';
 import { spreadWildPlants, wildPlantCover } from './plants';
 import { Designation, GROW_ZONE, TileKind, World, growZoneCrop } from './world';
 import { generateWorld } from './worldgen';
@@ -267,7 +268,9 @@ export type SimEvent =
   | 'manhunters'
   | 'goal'
   | 'concert'
-  | 'gathering';
+  | 'gathering'
+  | 'shipAnswered'
+  | 'shipLanded';
 
 // A notable moment in the colony's history, for the story screen.
 export interface StoryEntry {
@@ -479,6 +482,9 @@ export class Simulation {
   };
   public log: LogEntry[] = [];
   public storyLog: StoryEntry[] = [];
+  // The signal beacon's progress towards a ship, and whether the colony has boarded it (the end).
+  public beacon: BeaconState = freshBeacon();
+  public departed = false;
   // How many trees and berry bushes the map started with: regrowth stops there.
   public wildCover = 0;
   // A party, festival, wedding or funeral, planned or under way (one at a time).
@@ -825,6 +831,7 @@ export class Simulation {
     if (this.tick % TICKS_PER_HOUR === 0) {
       this.updateIce();
       updateWeather(this);
+      updateBeacon(this);
     }
 
     for (const c of this.colonists) {
@@ -921,6 +928,15 @@ export class Simulation {
         break;
       case 'festivals':
         this.story.festivals = cmd.on;
+        break;
+      case 'shipChoice':
+        if (this.beacon.landed && !this.departed) {
+          if (cmd.board) {
+            depart(this);
+          } else {
+            chooseToStay(this);
+          }
+        }
         break;
       case 'build':
         for (const i of cmd.tiles) {
@@ -5830,14 +5846,14 @@ const NUMBER_WORDS: Record<number, string> = { 3: 'Three', 4: 'Four', 5: 'Five',
 export interface ObjectiveDef {
   id: string;
   label: string;
-  phase: 1 | 2 | 3 | 4 | 5;
+  phase: 1 | 2 | 3 | 4 | 5 | 6;
   check: (sim: Simulation) => boolean;
   progress?: (sim: Simulation) => string;
   // Left out entirely in some games (no raids on peaceful).
   hidden?: (sim: Simulation) => boolean;
 }
 
-export const PHASE_NAMES = ['Shelter', 'Living', 'Story', 'Seasons', 'Prosperity'];
+export const PHASE_NAMES = ['Shelter', 'Living', 'Story', 'Seasons', 'Prosperity', 'Legacy'];
 
 const produced = (s: Simulation, key: string) => s.stats.produced[key] ?? 0;
 // Kinds of recreation the colony's buildings offer (walks don't count).
@@ -6128,5 +6144,30 @@ export const OBJECTIVES: ObjectiveDef[] = [
     label: 'Survive a second winter',
     phase: 5,
     check: (s) => s.stats.wintersSurvived >= 2,
+  },
+  {
+    id: 'beaconResearch',
+    label: 'Research the signal beacon',
+    phase: 6,
+    check: (s) => s.isResearched('signalBeacon'),
+  },
+  {
+    id: 'beaconBuilt',
+    label: 'Build a signal beacon and power it',
+    phase: 6,
+    check: (s) => s.beacon.hours > 0 || s.beacon.answeredAt !== undefined || s.beacon.choice !== undefined,
+  },
+  {
+    id: 'beaconSignal',
+    label: 'Keep the beacon transmitting for five days',
+    phase: 6,
+    check: (s) => s.beacon.answeredAt !== undefined || s.beacon.choice !== undefined,
+    progress: (s) => `${Math.min(TRANSMIT_HOURS, s.beacon.hours)}/${TRANSMIT_HOURS} hours`,
+  },
+  {
+    id: 'shipChoice',
+    label: 'Meet the ship: board it, or stay',
+    phase: 6,
+    check: (s) => s.beacon.choice !== undefined,
   },
 ];

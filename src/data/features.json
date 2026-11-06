@@ -1009,5 +1009,35 @@
       "work": 120
     },
     "research": "electricity"
+  },
+  {
+    "key": "signalBeacon",
+    "name": "Signal beacon",
+    "beauty": 2,
+    "power": {
+      "draw": 400
+    },
+    "light": {
+      "radius": 2.5,
+      "color": "#7fe0ff"
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 60
+        },
+        {
+          "item": "silver",
+          "count": 60
+        },
+        {
+          "item": "wood",
+          "count": 40
+        }
+      ],
+      "work": 1500
+    },
+    "research": "signalBeacon"
   }
 ]

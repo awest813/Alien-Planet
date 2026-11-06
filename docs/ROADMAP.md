@@ -280,12 +280,30 @@ Settled since:
 ## 8. Later and maybe
 
 - Cleaning and filth: blood, debris and rubble that lower beauty, and a Cleaning work type.
-- A visual pass:
-  - walking animation;
-  - day and night lighting;
-  - a more varied look for each terrain;
-  - a crafted look for each sculpture by quality.
-- A long-game goal, for example a monument or a signal beacon that ends a run on the player's terms.
+- A crafted look for each sculpture by quality.
+- Caravans buying art.
+
+Done since:
+
+- **Visual pass.**
+  - Colonists, traders and raiders stride as they walk, and animals hop.
+  - The sky follows the clock: a golden hour, dusk through violet to night blue, and a quick rosy dawn.
+  - Fires and heaters flicker warm, stoves glow dimly, and sun lamps shine steady while the grid runs. So
+    do the new standing lamp (Electricity) and the new torch. Settings › Display turns the lighting off.
+  - Each ground type has four looks (tufts, flowers, pebbles, ripples, shells, cracks) in each of four
+    seasons, and the ground repaints when the season turns.
+- **The long game: the signal beacon** (`src/sim/beacon.ts`, goal phase 6, Legacy).
+  - Research it (3000, after Electricity), then build it: 60 stone, 60 silver and 40 wood, drawing 400 W.
+  - Every powered hour counts. After 120 hours (five days) a ship answers, and it lands beside the beacon
+    two days later.
+  - While the beacon transmits, raids are half again as likely.
+  - When the ship lands the game pauses and asks:
+    - Board it, and the colony's story ends with a summary of its days, losses, winters, raids, research,
+      sculptures, concerts and weddings.
+    - Stay, and the ship leaves and the beacon can call again.
+    - Do nothing for a day and it leaves on its own.
+  - Balance, 60 days on 12 seeds: the test colony researches the beacon in its second year and gets a ship
+    about every week after that, always choosing to stay. Everyone survived (72 of 72).
 
 ## 9. Every phase is done when
 

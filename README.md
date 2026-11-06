@@ -18,7 +18,7 @@ every dawn and whenever you leave the page, so a closed tab doesn't lose the col
 died, a summary shows how the colony fared.
 
 **Settings** (remembered in the browser): autosave, pausing on raids and on deaths or collapses, sound (off by
-default, with volume sliders for music and for ambience and alerts), interface
+default, with volume sliders for music and for ambience and alerts), day and night lighting, interface
 size, how long notifications stay, camera speed, name labels, the minimap, a list of controls, and a way to
 see the welcome help again.
 
@@ -52,6 +52,12 @@ Objectives:
   alive.
 - **Phase 4 – Seasons:** build a research bench and pick a project, complete three research projects, research
   hearths and build a stone hearth, and survive your first winter.
+- **Phase 5 – Prosperity:** power, cold storage, taming, fine meals, parkas, a full colony, a second winter, and the
+  culture goals (recreation, art, music, gatherings).
+- **Phase 6 – Legacy:** the long game. Research the signal beacon, build it and keep it powered for five days
+  while raiders, drawn by the signal, come for it. A ship answers and lands beside the beacon. Board it and the
+  colony's story ends on your terms, with a summary of what it made of its time; or stay, and signal again
+  whenever you like.
 
 How the living simulation works:
 
@@ -166,7 +172,7 @@ How the storytelling layer works:
   summers, freezing winter nights). Crops don't grow in winter and hard frost kills anything left in the field,
   so plant enough in spring and summer and harvest before winter.
 - **Research:** build a research bench, pick a project in the Research screen, and colonists with the Research
-  work type study it (training the Intellectual skill). Twenty projects unlock the recurve bow, sandbags, the
+  work type study it (training the Intellectual skill). Twenty-one projects unlock the recurve bow, sandbags, the
   stone hearth, the fine bed, tailoring and all the electrical tech below, or improve insulation, crop growth and
   doctoring.
 - **Power:** the colony shares one grid. Wood-fired generators (kept fuelled by haulers) and solar panels (daytime
@@ -324,6 +330,9 @@ no colony wiped out. First friendships appear around day 6–7, with a few rival
   priorities and work schedules; rooms, furniture and temperature.
 - **Phase 3 – The storytelling game** (done): relationships and traits; injuries, medicine and disease; combat, raids
   and factions; dynamic events.
+- **Phase 5 – Looks and the long game** (done): walking animation, day and night lighting with fires and lamps
+  lighting the dark, seasonal terrain with more variety, and the signal beacon that lets a run end on the
+  player's terms.
 - **Phase 4 – Culture** (done): recreation with variety, games and stargazing; art and decor, with sculptures
   titled after the colony's story; music, concerts and sound; parties, seasonal festivals, weddings, funerals
   and memorials. See [docs/ROADMAP.md](docs/ROADMAP.md) for how each works, the balance results, and what's next.

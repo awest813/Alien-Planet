@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { TOOLS, Tool, controller } from '../game/controller';
 import { NONE, featureDef, terrainId } from '../sim/defs';
 import { hash2 } from '../sim/rng';
+import { beaconTile, transmitting } from '../sim/beacon';
 import { NIGHT_END, NIGHT_START } from '../sim/simulation';
 import { Animal, Colonist, Enemy } from '../sim/types';
 import { Designation, GROW_ZONE, World } from '../sim/world';
@@ -113,6 +114,8 @@ export class ColonyScene extends Phaser.Scene {
   private overlay: Phaser.GameObjects.Graphics;
   private preview: Phaser.GameObjects.Graphics;
   private night: Phaser.GameObjects.Rectangle;
+  private beaconFx!: Phaser.GameObjects.Graphics;
+  private ship: Phaser.GameObjects.Image | undefined;
   // The season the ground is drawn for (0 spring … 3 winter); a change repaints it.
   private terrainSeason = 1;
   private glow: Phaser.GameObjects.Graphics;
@@ -156,6 +159,7 @@ export class ColonyScene extends Phaser.Scene {
       .setBlendMode(Phaser.BlendModes.ADD);
     // Flames show through the night shading; weather sits over everything on the map.
     this.fireFx = this.add.graphics().setDepth(Depth.NIGHT + 1);
+    this.beaconFx = this.add.graphics().setDepth(Depth.NIGHT + 1);
     this.weatherFx = this.add.graphics().setDepth(Depth.NIGHT + 3);
     // Above the tiles and night shading, below colonists.
     this.heatmap = this.add.graphics().setDepth(Depth.NIGHT + 2);
@@ -185,6 +189,7 @@ export class ColonyScene extends Phaser.Scene {
     this.drawOverlay();
     this.updateCamera(delta);
     this.updateNight();
+    this.syncBeacon();
     this.drawHeatmap();
     this.drawWater();
     this.drawFires();
@@ -353,6 +358,8 @@ export class ColonyScene extends Phaser.Scene {
 
   private buildWorld(): void {
     this.builtFor = controller.simVersion;
+    this.ship?.destroy();
+    this.ship = undefined;
     this.terrainSeason = SEASON_INDEX[controller.sim.season] ?? 1;
     // A drag or pan begun on the old map mustn't carry its tile indexes onto the new one.
     this.drag = null;
@@ -409,6 +416,30 @@ export class ColonyScene extends Phaser.Scene {
       layer.removeTileAt(x, y, false, false);
     } else {
       layer.putTileAt(frame, x, y, false);
+    }
+  }
+
+  // The signal beacon: a pulse spreading from it while it transmits, and the ship beside it once landed.
+  private syncBeacon(): void {
+    const sim = controller.sim;
+    const tile = beaconTile(sim);
+    this.beaconFx.clear();
+    if (tile === undefined) {
+      this.ship?.setVisible(false);
+      return;
+    }
+    const world = sim.world;
+    const x = (world.xOf(tile) + 0.5) * TILE;
+    const y = (world.yOf(tile) + 0.5) * TILE;
+    if (transmitting(sim)) {
+      const t = (this.time.now % 2400) / 2400;
+      this.beaconFx.lineStyle(1, 0x7fe0ff, 0.6 * (1 - t)).strokeCircle(x, y - 6, 4 + t * TILE * 3);
+    }
+    if (sim.beacon.landed && !sim.departed) {
+      this.ship ??= this.add.image(0, 0, 'ship').setDepth(Depth.PAWNS - 2);
+      this.ship.setPosition(x + TILE * 1.5, y - TILE * 0.5).setVisible(true);
+    } else {
+      this.ship?.setVisible(false);
     }
   }
 

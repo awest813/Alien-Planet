@@ -1,3 +1,4 @@
+import { TRANSMIT_HOURS, beaconTile } from '../sim/beacon';
 import { Musician, SoundScene, sound } from './audio';
 import { isInstrument } from './music';
 import { impressivenessLabel } from '../sim/climate';
@@ -161,6 +162,15 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     how: 'Build a memorial stone (Art & decor); an artist carves it with the names of the fallen.',
     tool: 'memorial',
   },
+  beaconResearch: { how: 'Research Electricity, then the Signal beacon (Research).', screen: 'research' },
+  beaconBuilt: {
+    how: 'Build the signal beacon (Power tab) and keep the grid running: it draws a lot of power.',
+    tool: 'signalBeacon',
+  },
+  beaconSignal: {
+    how: 'Five days of power without a break in the signal… and raiders will come for it. Keep the generators fed.',
+  },
+  shipChoice: { how: 'When the ship lands, decide: board it and end the story here, or stay.', screen: 'ship' },
   instrument: {
     how: 'Build a drum, flute or lute (Furniture). Colonists play it for fun, and everyone nearby enjoys the music.',
     tool: 'lute',
@@ -368,6 +378,13 @@ export const TOOLS: ToolDef[] = [
   build('woodGenerator', 'Wood generator', '', 'power', '1000 W while fuelled; haulers refuel it with wood'),
   build('solarPanel', 'Solar panel', '', 'power', 'Up to 1200 W in daylight, less in winter'),
   build('battery', 'Battery', '', 'power', 'Stores 8 kWh of spare power for the night'),
+  build(
+    'signalBeacon',
+    'Signal beacon',
+    '',
+    'power',
+    'Draws 400 W. Transmit for five days and a ship may answer; raiders will hear it too',
+  ),
   build('campfire', 'Campfire', 'f', 'climate', 'Heats the room it is in'),
   build('hearth', 'Stone hearth', '', 'climate', 'A strong heater for cold winters'),
   build('electricHeater', 'Electric heater', '', 'climate', 'Strong heater, keeps rooms at 21°C (175 W)'),
@@ -548,7 +565,7 @@ export interface ObjectiveView {
   // A line on how to get it done, and the tool or screen that does it.
   how: string;
   tool?: string;
-  screen?: 'work' | 'production' | 'research' | 'schedule';
+  screen?: 'work' | 'production' | 'research' | 'schedule' | 'ship';
 }
 
 export interface Alert {
@@ -608,6 +625,10 @@ export interface UiState {
   toast: string | null;
   // Everyone has died.
   fallen: boolean;
+  // The signal beacon and its ship: 'landed' means the colony must choose; 'departed' is the end.
+  ship: 'none' | 'transmitting' | 'answered' | 'landed' | 'departed';
+  // For the closing summary.
+  legacy: { label: string; value: string | number }[];
   settings: Settings;
   // Whether the player is playing this colony (false for the backdrop behind the title screen).
   inPlay: boolean;
@@ -703,6 +724,30 @@ export class GameController {
     storeSettings(this.settings);
     this.applySound();
     this.publish();
+  }
+
+  // What the colony leaves behind, for the closing summary.
+  private legacySummary(): { label: string; value: string | number }[] {
+    const sim = this.sim;
+    if (!sim.departed) {
+      return [];
+    }
+    const st = sim.stats;
+    const fallen = sim.colonists.filter((c) => c.health.dead).length;
+    const married = sim.living().filter((c) => c.spouse >= 0).length / 2;
+    return [
+      { label: 'Days in the valley', value: sim.day },
+      { label: 'Boarded the ship', value: sim.living().length },
+      { label: 'Lost along the way', value: fallen },
+      { label: 'Winters survived', value: st.wintersSurvived },
+      { label: 'Raids repelled', value: st.raidsRepelled },
+      { label: 'Research completed', value: sim.research.done.length },
+      { label: 'Sculptures carved', value: st.sculptures ?? 0 },
+      { label: 'Concerts given', value: st.concerts ?? 0 },
+      { label: 'Weddings', value: st.weddings ?? 0 },
+      { label: 'Couples leaving together', value: Math.floor(married) },
+      { label: 'Buildings built', value: st.built },
+    ];
   }
 
   private applySound(): void {
@@ -823,6 +868,12 @@ export class GameController {
         sound.alert('death');
       } else if (event === 'goal' || event === 'concert') {
         sound.alert(event);
+      } else if (event === 'shipAnswered') {
+        sound.alert('goal');
+        this.notify('A ship has answered the signal. It lands in two days.');
+      } else if (event === 'shipLanded') {
+        sound.alert('goal');
+        this.setSpeed(0);
       } else if (event === 'gathering') {
         // A funeral gets a sombre note, not a cheerful chime.
         sound.alert(this.sim.gathering?.kind === 'funeral' ? 'death' : 'concert');
@@ -1418,6 +1469,16 @@ export class GameController {
       saves: this.saves,
       toast: this.toast,
       fallen: this.fallen,
+      ship: sim.departed
+        ? 'departed'
+        : sim.beacon.landed
+          ? 'landed'
+          : sim.beacon.answeredAt !== undefined
+            ? 'answered'
+            : sim.beacon.hours > 0
+              ? 'transmitting'
+              : 'none',
+      legacy: this.legacySummary(),
       settings: this.settings,
       inPlay: this.inPlay,
       latestSave: this.latestSave(),
@@ -1466,6 +1527,32 @@ export class GameController {
     const w = sim.world;
     const alerts: Alert[] = [];
     const raiders = sim.enemies.filter((e) => !e.fleeing).length;
+    // The signal beacon and its ship.
+    const beacon = beaconTile(sim);
+    if (sim.departed) {
+      // The story is over: nothing more to say about the beacon.
+    } else if (sim.beacon.landed) {
+      alerts.push({
+        text: 'The ship is waiting beside the beacon: board it, or stay (Legacy goal)',
+        tone: 'calm',
+        tile: beacon,
+      });
+    } else if (sim.beacon.answeredAt !== undefined && sim.beacon.landsAt !== undefined) {
+      const hours = Math.max(0, Math.ceil((sim.beacon.landsAt - sim.tick) / TICKS_PER_HOUR));
+      alerts.push({
+        text: `A ship is coming: it lands in ${hours} ${hours === 1 ? 'hour' : 'hours'}`,
+        tone: 'calm',
+        tile: beacon,
+      });
+    } else if (beacon !== undefined && !sim.power.powered) {
+      alerts.push({ text: 'The signal beacon has no power: it isn’t transmitting', tone: 'warn', tile: beacon });
+    } else if (beacon !== undefined && sim.beacon.hours > 0) {
+      alerts.push({
+        text: `Signal beacon transmitting: ${sim.beacon.hours}/${TRANSMIT_HOURS} hours. Raiders are drawn to it.`,
+        tone: 'calm',
+        tile: beacon,
+      });
+    }
     const gathering = sim.gatheringNotice();
     if (gathering) {
       // Good news, except a funeral.

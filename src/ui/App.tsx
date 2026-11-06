@@ -3,7 +3,16 @@ import { controller } from '../game/controller';
 import { helpSeen, markHelpSeen } from '../game/settings';
 import { useUiState } from './common';
 import { Architect, ColonistBar, HoverCard, Inspector, Notices, Screen, SidePanel, TopBar } from './hud';
-import { FallenScreen, MenuActions, PauseMenu, SettingsScreen, TitleScreen, TradeScreen } from './menus';
+import {
+  DepartedScreen,
+  FallenScreen,
+  MenuActions,
+  PauseMenu,
+  SettingsScreen,
+  ShipScreen,
+  TitleScreen,
+  TradeScreen,
+} from './menus';
 import { Minimap } from './minimap';
 import { HelpScreen, ProductionScreen, ResearchScreen, ScheduleScreen, StoryScreen, WorkScreen } from './screens';
 
@@ -43,14 +52,30 @@ export function App() {
     },
   };
 
+  // When the ship lands, the choice comes up by itself (once).
+  const landed = state.ship === 'landed';
+  useEffect(() => {
+    if (landed) {
+      setScreen('ship');
+    }
+  }, [landed]);
+  const departed = state.ship === 'departed';
+
   // Game hotkeys stand aside while any menu or screen is open.
-  const anyScreen = onTitle || screen !== null || state.fallen;
+  const anyScreen = onTitle || screen !== null || state.fallen || departed;
   useEffect(() => {
     controller.modalOpen = anyScreen;
   }, [anyScreen]);
 
   // The title screen, help, settings and the pause menu stop the clock while they're open.
-  const pausing = onTitle || screen === 'help' || screen === 'menu' || screen === 'settings' || screen === 'trade';
+  const pausing =
+    onTitle ||
+    departed ||
+    screen === 'help' ||
+    screen === 'menu' ||
+    screen === 'settings' ||
+    screen === 'trade' ||
+    screen === 'ship';
   useEffect(() => {
     if (pausing) {
       controller.holdPause();
@@ -84,7 +109,7 @@ export function App() {
       const open = latest.current.screen;
       if (open) {
         latest.current.back(open);
-      } else if (latest.current.onTitle || controller.getState().fallen) {
+      } else if (latest.current.onTitle || controller.getState().fallen || controller.getState().ship === 'departed') {
         // Nothing to back out of.
       } else if (controller.tool.kind !== 'select') {
         controller.setTool({ kind: 'select' });
@@ -138,6 +163,8 @@ export function App() {
           </div>
           <Notices state={state} paused={state.speed === 0 && !screen && !state.fallen} />
           {state.fallen && !screen && <FallenScreen state={state} actions={actions} />}
+          {departed && !state.fallen && <DepartedScreen state={state} actions={actions} />}
+          {screen === 'ship' && !departed && <ShipScreen state={state} onClose={close} />}
           {screen === 'menu' && <PauseMenu state={state} onClose={close} actions={actions} />}
           {screen === 'work' && <WorkScreen state={state} onClose={close} />}
           {screen === 'schedule' && <ScheduleScreen state={state} onClose={close} />}

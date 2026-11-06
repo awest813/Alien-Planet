@@ -58,6 +58,7 @@ const RESEARCH_ORDER = [
   'solarPower',
   'sunLamps',
   'optics',
+  'signalBeacon',
 ];
 
 // Finds the nearest w×h rectangle to the colonists where every tile can take a blueprint.
@@ -241,6 +242,8 @@ function play(seed: number): Result {
   let artPlaced = false;
   let lutePlaced = false;
   let gravesPlaced = false;
+  let beaconPlaced = false;
+  let shipsLanded = 0;
   let bannerPlaced = false;
   let labTile = -1;
   let telescopePlaced = false;
@@ -361,6 +364,25 @@ function play(seed: number): Result {
       if (next) {
         sim.apply({ type: 'research', project: next });
       }
+    }
+    // The long game: once the signal beacon is researched, build it beside two wood generators.
+    if (!beaconPlaced && sim.isResearched('signalBeacon')) {
+      beaconPlaced = true;
+      const site = findSite(sim, 5, 1, avoid);
+      if (site) {
+        claim(avoid, sim, site.x, site.y, 5, 1);
+        sim.apply({
+          type: 'build',
+          feature: featureId('woodGenerator'),
+          tiles: [at(site.x, site.y), at(site.x + 4, site.y)],
+        });
+        sim.apply({ type: 'build', feature: featureId('signalBeacon'), tiles: [at(site.x + 2, site.y)] });
+      }
+    }
+    // When a ship lands, stay (so the run carries on to the end of the measured days).
+    if (sim.beacon.landed) {
+      shipsLanded++;
+      sim.apply({ type: 'shipChoice', board: false });
     }
     // Two graves on day 6, so the fallen can be laid to rest.
     if (!gravesPlaced && sim.day >= 6) {
@@ -543,6 +565,8 @@ function play(seed: number): Result {
     festivals: count(/^(It's Planting Day|The harvest festival is tonight|The midwinter bonfire will be lit)/),
     weddings: sim.stats.weddings ?? 0,
     funerals: sim.stats.funerals ?? 0,
+    beaconHours: sim.beacon.hours,
+    shipsLanded,
     burned: burnCounts.get(sim) ?? 0,
   };
   return {

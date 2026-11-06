@@ -356,7 +356,9 @@ export type Command =
   | { type: 'tame'; rect: Rect; add: boolean }
   | { type: 'research'; project: string | null }
   // Whether the colony keeps the seasonal festivals.
-  | { type: 'festivals'; on: boolean };
+  | { type: 'festivals'; on: boolean }
+  // When the ship has landed: board it (the colony's story ends) or stay.
+  | { type: 'shipChoice'; board: boolean };
 
 export interface LogEntry {
   tick: number;

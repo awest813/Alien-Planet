@@ -1,3 +1,4 @@
+import type { BeaconState } from './beacon';
 import type { JoyKind } from './defs';
 import { RaidState } from './combat';
 import { PowerState } from './power';
@@ -122,6 +123,9 @@ export interface SaveData {
   gathering?: Gathering | null;
   // Trees and bushes the map started with (regrowth stops there).
   wildCover?: number;
+  // The signal beacon's progress, and whether the colony has left.
+  beacon?: BeaconState;
+  departed?: boolean;
   unburied?: Fallen[];
   graves?: [number, Fallen][];
   story: StoryState;
@@ -226,6 +230,8 @@ export function serialize(sim: Simulation): SaveData {
     gathering: sim.gathering && structuredClone(sim.gathering),
     unburied: structuredClone(sim.unburied),
     wildCover: sim.wildCover,
+    beacon: structuredClone(sim.beacon),
+    departed: sim.departed,
     // Only graves still standing (one taken down leaves its record behind).
     graves: [...sim.graves].filter(([i]) => sim.graveAt(i)).map(([i, f]) => [i, { ...f }]),
     artworks: [...sim.artworks].filter(([i]) => sim.artworkAt(i)).map(([i, art]) => [i, { ...art }]),
@@ -301,6 +307,8 @@ export function deserialize(data: SaveData): Simulation {
   sim.gathering = data.gathering ? structuredClone(data.gathering) : null;
   sim.unburied = structuredClone(data.unburied ?? []);
   sim.wildCover = data.wildCover ?? 0;
+  sim.beacon = data.beacon ? structuredClone(data.beacon) : { hours: 0 };
+  sim.departed = !!data.departed;
   sim.graves = new Map((data.graves ?? []).map(([i, f]) => [i, { ...f }]));
   sim.artworks = new Map((data.artworks ?? []).map(([i, art]) => [i, { ...art }]));
   sim.storyCount = sim.storyLog.length;
