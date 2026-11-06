@@ -109,6 +109,7 @@ import {
   WORK_TYPES,
   WorkTypeKey,
 } from './types';
+import { spreadWildPlants } from './plants';
 import { Designation, GROW_ZONE, TileKind, World, growZoneCrop } from './world';
 import { generateWorld } from './worldgen';
 
@@ -203,6 +204,12 @@ const defaultSchedule = (): ScheduleSlot[] =>
   Array.from({ length: 24 }, (_, h) => (h >= NIGHT_START || h < NIGHT_END ? 'S' : 'A'));
 
 // Every colonist starts willing to do everything at normal priority.
+// The work order with mining moved ahead of plant cutting (see workOrder).
+const STONE_FIRST_ORDER: readonly WorkTypeKey[] = (() => {
+  const order: WorkTypeKey[] = WORK_TYPES.filter((w) => w !== 'mining');
+  order.splice(order.indexOf('plantCutting'), 0, 'mining');
+  return order;
+})();
 const defaultPriorities = (): Priorities => Object.fromEntries(WORK_TYPES.map((work) => [work, 3])) as Priorities;
 
 function createColonist(id: number, name: string, tile: number, rng: Rng): Colonist {
@@ -1541,6 +1548,7 @@ export class Simulation {
     }
     this.lastSeason = season;
     animalsAtDawn(this);
+    spreadWildPlants(this);
   }
 
   private checkObjectives(): void {
@@ -1999,8 +2007,9 @@ export class Simulation {
     if (c.priorities.hauling > 0 && this.generatorRunningLow() && this.tryRefuel(c, true)) {
       return true;
     }
+    const order = this.workOrder();
     for (let p = 1; p <= 4; p++) {
-      for (const work of WORK_TYPES) {
+      for (const work of order) {
         if (c.priorities[work] === p && this.tryWorkType(c, work)) {
           return true;
         }
@@ -2008,6 +2017,32 @@ export class Simulation {
     }
     return false;
   }
+
+  // Work types in the order colonists consider them at equal priority. Normally the fixed order the
+  // Work screen shows; but when builders are waiting on stone and not on wood, mining comes before
+  // plant cutting, so a big chop order doesn't hold up the stove for days.
+  private workOrder(): readonly WorkTypeKey[] {
+    if (this.tick >= this.workOrderAt) {
+      this.workOrderAt = this.tick + SLOW_TICKS;
+      const short = (key: string) => {
+        const item = itemId(key);
+        let needed = 0;
+        for (const i of this.world.tilesWith('blueprints')) {
+          for (const need of this.world.blueprintNeeds(i)) {
+            if (need.item === item) {
+              needed += need.count;
+            }
+          }
+        }
+        return needed > this.stockOf(item);
+      };
+      const stoneFirst = short('stone') && !short('wood');
+      this.cachedWorkOrder = stoneFirst ? STONE_FIRST_ORDER : WORK_TYPES;
+    }
+    return this.cachedWorkOrder;
+  }
+  private workOrderAt = 0;
+  private cachedWorkOrder: readonly WorkTypeKey[] = WORK_TYPES;
 
   private tryWorkType(c: Colonist, work: WorkTypeKey): boolean {
     switch (work) {

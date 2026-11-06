@@ -1,7 +1,7 @@
 // Headless balance harness: an "autoplayer" runs a sensible colony on many seeds and prints
 // survival, combat, health, mood and social statistics.
 //
-//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K] [nohunt]
+//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K] [nohunt] [flow]
 //
 // "passive" never drafts during raids, to measure the worst case; "peaceful" and "harsh" pick the
 // storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies;
@@ -9,7 +9,18 @@
 // first K seeds; "nohunt" leaves the wildlife alone. With DEBUG=1 in the environment, a trace also
 // shows research, production, bills, rooms and heaters.
 import { colonistTarget, lineOfSight } from '../src/sim/combat';
-import { FEATURES, NONE, RECIPES, featureId, itemDef, itemId, terrainDef, weaponDef } from '../src/sim/defs';
+import {
+  ANIMALS,
+  FEATURES,
+  NONE,
+  RECIPES,
+  featureDef,
+  featureId,
+  itemDef,
+  itemId,
+  terrainDef,
+  weaponDef,
+} from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
 import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { mutualOpinion } from '../src/sim/social';
@@ -21,6 +32,10 @@ const seeds = Number(process.argv[3] ?? 8);
 const passive = process.argv.includes('passive');
 const trace = process.argv.includes('trace');
 const noHunt = process.argv.includes('nohunt');
+// "flow" prints a day-by-day table of food, materials and wildlife, averaged over the seeds.
+const flow = process.argv.includes('flow');
+// Nutrition a colonist eats in a day (as the top bar's "days of food" counts it).
+const DAILY_NUTRITION = 1.4;
 const mapSize = Number(process.argv.find((a) => a.startsWith('size='))?.slice(5) ?? 64);
 const difficulty: Difficulty = process.argv.includes('harsh')
   ? 'harsh'
@@ -110,6 +125,36 @@ interface Result {
   tailoringDay: number;
   frost: number;
   events: Record<string, number>;
+  // One row per day at dawn, for the "flow" report.
+  daily: Record<string, number>[];
+}
+
+// What the "flow" report tracks each dawn.
+const FLOW_STOCKS = ['wood', 'stone', 'stoneBlocks', 'cloth', 'leather', 'herbalMedicine', 'silver'];
+const FLOW_MADE = ['potatoes', 'berries', 'rawMeat', 'rawFish', 'meal', 'fineMeal', 'milk', 'egg', 'wood', 'stone'];
+function snapshot(sim: Simulation): Record<string, number> {
+  const totals = sim.resourceTotals();
+  const nutrition = totals.reduce((sum, t) => sum + itemDef(t.item).nutrition * t.total, 0);
+  const living = Math.max(1, sim.living().length);
+  const row: Record<string, number> = {
+    living: sim.living().length,
+    foodDays: nutrition / (living * DAILY_NUTRITION),
+    meals: sim.stockOf(itemId('meal')) + sim.stockOf(itemId('fineMeal')),
+    crops: sim.countFeature((f) => !!featureDef(f).crop),
+    wild: sim.animals.filter((a) => !a.tame).length,
+    prey: sim.animals.filter((a) => !a.tame && !ANIMALS[a.kind].preys).length,
+    predators: sim.animals.filter((a) => !a.tame && !!ANIMALS[a.kind].preys).length,
+    tame: sim.animals.filter((a) => a.tame).length,
+    trees: sim.countFeature((f) => featureDef(f).key === 'tree'),
+    hunger: sim.living().filter((c) => c.needs.food < 0.25).length,
+  };
+  for (const key of FLOW_STOCKS) {
+    row[key] = sim.stockOf(itemId(key));
+  }
+  for (const key of FLOW_MADE) {
+    row[`+${key}`] = sim.stats.produced[key] ?? 0;
+  }
+  return row;
 }
 
 function play(seed: number): Result {
@@ -175,6 +220,7 @@ function play(seed: number): Result {
   let moodSamples = 0;
   let minMood = 100;
   const hours = days * 24;
+  const daily: Record<string, number>[] = [];
 
   for (let hour = 0; hour < hours; hour++) {
     for (let t = 0; t < TICKS_PER_HOUR; t += 20) {
@@ -318,11 +364,17 @@ function play(seed: number): Result {
       bedsBuilt++;
     }
 
+    if (flow && Math.floor(sim.hour) === 6) {
+      daily.push(snapshot(sim));
+    }
     for (const c of sim.living()) {
       moodSum += c.mood;
       moodSamples++;
       minMood = Math.min(minMood, c.mood);
       if (c.needs.food <= 0) {
+        // What starving colonists are busy with instead of eating.
+        const doing = `${c.job?.type ?? 'idle'}${c.health.downed ? ' (downed)' : ''}${sim.inMentalBreak(c) ? ' (break)' : ''}`;
+        starvingDoing[doing] = (starvingDoing[doing] ?? 0) + 1;
         starvingHours++;
         starvingByDay[sim.day] = (starvingByDay[sim.day] ?? 0) + 1;
       }
@@ -350,7 +402,7 @@ function play(seed: number): Result {
     caravan: count(/^Traders from .* have arrived/),
     heatWave: count(/heat wave has settled/),
     eclipse: count(/^An eclipse/),
-    manhunters: count(/maddened boars/),
+    manhunters: count(/maddened .* is charging/),
     meteorite: count(/^A meteorite/),
     refugee: count(/wounded and fleeing raiders/),
     aurora: count(/^An aurora/),
@@ -383,6 +435,7 @@ function play(seed: number): Result {
     tailoringDay: tailoringDays.get(sim) ?? -1,
     frost: story.filter((s) => s.startsWith('Frost killed')).length,
     events,
+    daily,
   };
 }
 
@@ -462,6 +515,7 @@ Simulation.prototype.addLog = function (this: Simulation, text, tone, story) {
   originalAddLog.call(this, text, tone, story);
 };
 
+const starvingDoing: Record<string, number> = {};
 const results: Result[] = [];
 const started = performance.now();
 // "seed=47514" replays just that colony.
@@ -495,3 +549,29 @@ console.log(
     `  rivals ${sum((r) => r.rivals)}, couples ${sum((r) => r.lovers)}, starving colonist-hours ${sum((r) => r.starvingHours)}\n` +
     `  events ${JSON.stringify(Object.fromEntries(Object.keys(results[0].events).map((k) => [k, sum((r) => r.events[k])])))}`,
 );
+
+if (Object.keys(starvingDoing).length > 0) {
+  const sorted = Object.entries(starvingDoing).sort((a, b) => b[1] - a[1]);
+  console.log(`  starving colonists were busy with: ${sorted.map(([k, n]) => `${k} ${n}`).join(', ')}`);
+}
+
+// Day-by-day averages over the seeds: stocks at dawn, and what was gathered or made since the
+// previous dawn (columns starting "+").
+if (flow) {
+  const length = Math.max(...results.map((r) => r.daily.length));
+  const keys = Object.keys(results.find((r) => r.daily.length > 0)?.daily[0] ?? {});
+  const width = (k: string) => Math.max(6, k.length + 1);
+  console.log('\nday ' + keys.map((k) => k.padStart(width(k))).join(''));
+  for (let d = 0; d < length; d++) {
+    const rows = results.filter((r) => r.daily[d]);
+    const cells = keys.map((k) => {
+      const avg =
+        rows.reduce((n, r) => n + (k.startsWith('+') ? r.daily[d][k] - (r.daily[d - 1]?.[k] ?? 0) : r.daily[d][k]), 0) /
+        rows.length;
+      return (Math.abs(avg) < 10 && !Number.isInteger(avg) ? avg.toFixed(1) : Math.round(avg).toString()).padStart(
+        width(k),
+      );
+    });
+    console.log(String(d + 1).padStart(3) + ' ' + cells.join(''));
+  }
+}

@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { featureId, itemId } from './defs';
+import { featureId, itemDef, itemId } from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation, START_HOUR } from './simulation';
-import { EVENT_KEYS, THREAT_EVENTS, auroraOn, eclipseOn, heatWaveOn, triggerEvent } from './storyteller';
+import {
+  EVENT_KEYS,
+  THREAT_EVENTS,
+  auroraOn,
+  eclipseOn,
+  heatWaveOn,
+  readyForThreat,
+  triggerEvent,
+  updateStoryteller,
+} from './storyteller';
 import { HOUR, clearAround, run } from './test-helpers';
 
 const forever = Number.MAX_SAFE_INTEGER;
@@ -23,6 +32,72 @@ describe('storyteller', () => {
       expect(EVENT_KEYS).toContain(key);
       expect(THREAT_EVENTS).not.toContain(key);
     }
+  });
+});
+
+describe('storyteller pacing', () => {
+  it('holds threats back while half the colony is down or a pack is loose', () => {
+    const { sim } = colony(2);
+    sim.tick = 6 * 24 * HOUR;
+    expect(readyForThreat(sim)).toBe(true);
+    const living = sim.living();
+    for (const c of living.slice(0, Math.ceil(living.length / 2))) {
+      c.health.downed = true;
+    }
+    expect(readyForThreat(sim)).toBe(false);
+    for (const c of living) {
+      c.health.downed = false;
+    }
+    sim.story.manhuntersActive = true;
+    expect(readyForThreat(sim)).toBe(false);
+  });
+
+  it('leaves a breather after a threat before the next one', () => {
+    const { sim } = colony(3);
+    sim.tick = 6 * 24 * HOUR;
+    sim.syncClock();
+    let threats = 0;
+    let lastThreat = -Infinity;
+    let closest = Infinity;
+    for (let t = 0; t < 40 * 24 * HOUR; t += HOUR) {
+      sim.tick += HOUR;
+      const before = sim.story.nextThreatTick ?? 0;
+      updateStoryteller(sim);
+      if ((sim.story.nextThreatTick ?? 0) !== before) {
+        threats++;
+        closest = Math.min(closest, sim.tick - lastThreat);
+        lastThreat = sim.tick;
+      }
+      // Keep the colony fit and the raid over, so only the pacing holds threats back.
+      sim.raid = null;
+      sim.enemies = [];
+      sim.story.manhuntersActive = false;
+      sim.animals = sim.animals.filter((a) => !a.manhunter);
+    }
+    expect(threats).toBeGreaterThan(3);
+    expect(closest).toBeGreaterThanOrEqual(24 * HOUR);
+  });
+
+  it('sends food as a gift when the stores are low', () => {
+    let meals = 0;
+    for (let seed = 1; seed <= 30; seed++) {
+      const { sim } = colony(seed);
+      // Nothing to eat anywhere.
+      const w = sim.world;
+      for (const i of [...w.tilesWith('items')]) {
+        if (itemDef(w.itemType[i]).nutrition > 0) {
+          w.takeItem(i, w.itemCount[i]);
+        }
+      }
+      // A home for the gift to arrive at, and plenty of wood, so only food is short.
+      sim.world.setFeature(sim.colonists[0].tile + 2, featureId('woodWall'));
+      sim.world.dropItemNear(sim.colonists[0].tile, itemId('wood'), 100);
+      const before = sim.stockOf(itemId('meal'));
+      expect(triggerEvent(sim, 'supplies')).toBe(true);
+      meals += sim.stockOf(itemId('meal')) > before ? 1 : 0;
+    }
+    // Four times as likely as each of the others: over half the gifts, against a quarter at random.
+    expect(meals).toBeGreaterThanOrEqual(12);
   });
 });
 

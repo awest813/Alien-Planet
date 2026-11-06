@@ -1,7 +1,7 @@
 import { herdArrives, manhuntersArrive, wildCap, wildCount } from './animals';
 import { spawnRaid, weaponScore } from './combat';
 import { TICKS_PER_HOUR, populationFor } from './constants';
-import { ANIMALS, FACTIONS, NONE, featureDef, itemId, terrainDef } from './defs';
+import { ANIMALS, FACTIONS, NONE, featureDef, itemDef, itemId, terrainDef } from './defs';
 import { damage, infect } from './health';
 import { caravanArrives, goodwillOf } from './trade';
 import { ignite } from './weather';
@@ -27,6 +27,8 @@ export interface StoryState {
   heatWaveUntil?: number;
   eclipseUntil?: number;
   auroraUntil?: number;
+  // No new threat before this tick: a breather after the last one.
+  nextThreatTick?: number;
   difficulty: Difficulty;
 }
 
@@ -49,6 +51,23 @@ export const auroraOn = (sim: Simulation): boolean => until(sim, sim.story.auror
 
 // How strongly each difficulty leans on threats (raids, illness, cold, blight).
 const THREAT_WEIGHT: Record<Difficulty, number> = { peaceful: 0.5, standard: 1, harsh: 1.4 };
+// The breather after any threat before the next one, in days.
+const THREAT_GAP_DAYS: Record<Difficulty, number> = { peaceful: 1.5, standard: 1, harsh: 0.5 };
+
+// Whether the colony is in a state to face a new threat: not while a maddened pack is still loose,
+// and not while half or more of the colonists are down. A beaten colony gets the chance to recover.
+export function readyForThreat(sim: Simulation): boolean {
+  const living = sim.living();
+  const down = living.filter((c) => c.health.downed).length;
+  return !sim.story.manhuntersActive && down * 2 < living.length && sim.tick >= (sim.story.nextThreatTick ?? 0);
+}
+
+// Days of food in the colony at the current headcount (as the top bar counts it).
+const DAILY_NUTRITION = 1.4;
+function foodDays(sim: Simulation): number {
+  const nutrition = sim.resourceTotals().reduce((sum, t) => sum + itemDef(t.item).nutrition * t.total, 0);
+  return nutrition / (Math.max(1, sim.living().length) * DAILY_NUTRITION);
+}
 
 interface EventDef {
   key: string;
@@ -164,7 +183,9 @@ const EVENTS: EventDef[] = [
           true,
         );
       } else {
-        sim.addLog(`A group of ${count} ${animalLabel(kind)} has wandered onto the map.`, 'good', true);
+        const arrivals =
+          count === 1 ? `A ${ANIMALS[kind].name.toLowerCase()} has` : `A group of ${count} ${animalLabel(kind)} has`;
+        sim.addLog(`${arrivals} wandered onto the map.`, 'good', true);
       }
       return true;
     },
@@ -199,13 +220,17 @@ const EVENTS: EventDef[] = [
       if (home === undefined) {
         return false;
       }
-      const options: [string, number][] = [
-        ['meal', 10],
-        ['herbalMedicine', 6],
-        ['wood', 60],
-        ['cloth', 20],
+      // The Meadow Kin send what the colony looks short of: food when the stores run low, medicine
+      // when someone is hurt or sick, wood when the pile is nearly gone; otherwise any of them.
+      const hurt = sim.living().some((c) => c.health.injuries.length > 0 || c.health.disease);
+      const options: [string, number, number][] = [
+        ['meal', 10, foodDays(sim) < 3 ? 4 : 1],
+        ['herbalMedicine', 6, hurt && sim.stockOf(itemId('herbalMedicine')) < 4 ? 3 : 1],
+        ['wood', 60, sim.stockOf(itemId('wood')) < 40 ? 3 : 1],
+        ['cloth', 20, 1],
       ];
-      const [key, count] = sim.rng.pick(options);
+      let roll = sim.rng.next() * options.reduce((sum, [, , weight]) => sum + weight, 0);
+      const [key, count] = options.find(([, , weight]) => (roll -= weight) <= 0) ?? options[0];
       sim.world.dropItemNear(home, itemId(key), count);
       sim.addLog(`${friendlyFaction().name} left a gift of supplies near the colony.`, 'good', true);
       return true;
@@ -467,8 +492,13 @@ export function updateStoryteller(sim: Simulation): void {
   if (sim.living().length === 0 || sim.raid || sim.rng.next() >= chance) {
     return;
   }
+  const threatsWelcome = readyForThreat(sim);
   const eligible = EVENTS.filter(
-    (e) => sim.day >= e.minDay && (story.cooldowns[e.key] ?? 0) <= sim.tick && weightOf(sim, e) > 0,
+    (e) =>
+      sim.day >= e.minDay &&
+      (story.cooldowns[e.key] ?? 0) <= sim.tick &&
+      (!e.threat || threatsWelcome) &&
+      weightOf(sim, e) > 0,
   );
   let roll = sim.rng.next() * eligible.reduce((sum, e) => sum + weightOf(sim, e), 0);
   for (const event of eligible) {
@@ -481,10 +511,8 @@ export function updateStoryteller(sim: Simulation): void {
         const maxSpread = story.difficulty === 'harsh' ? DAY / 2 : 2 * DAY;
         const spread = event.key === 'raid' ? Math.floor(sim.rng.next() * maxSpread) : 0;
         story.cooldowns[event.key] = sim.tick + event.cooldownDays * DAY + spread;
-        // Give the colony half a day between a raid and an illness, either way round.
-        const other = event.key === 'raid' ? 'disease' : event.key === 'disease' ? 'raid' : null;
-        if (other) {
-          story.cooldowns[other] = Math.max(story.cooldowns[other] ?? 0, sim.tick + DAY / 2);
+        if (event.threat) {
+          story.nextThreatTick = sim.tick + THREAT_GAP_DAYS[story.difficulty ?? 'standard'] * DAY;
         }
       }
       return;

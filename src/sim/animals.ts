@@ -2,6 +2,7 @@ import { MAP_SIZE, MOVE_SPEED, TICKS_PER_HOUR } from './constants';
 import { ANIMALS, itemDef, itemId } from './defs';
 import { armorTakes, woundEnemy } from './combat';
 import { damage } from './health';
+import type { Season } from './seasons';
 import type { Simulation } from './simulation';
 import { Animal, Colonist } from './types';
 
@@ -68,8 +69,8 @@ export function populateWildlife(sim: Simulation, count: number, avoid: number):
   }
 }
 
-// A small herd wanders in from the map edge. Returns how many arrived.
-export function herdArrives(sim: Simulation): number {
+// A small herd wanders in from the map edge (only grazers, if asked). Returns how many arrived.
+export function herdArrives(sim: Simulation, grazersOnly = false): number {
   const region = sim.outsideRegion();
   if (region === undefined || wildCount(sim) >= wildCap(sim)) {
     return 0;
@@ -85,7 +86,7 @@ export function herdArrives(sim: Simulation): number {
   }
   // One pack of predators at a time is plenty.
   const predatorsAbout = sim.animals.some((a) => !a.tame && a.hp > 0 && ANIMALS[a.kind].preys);
-  const kind = pickKind(sim, (key) => !predatorsAbout || !ANIMALS[key].preys);
+  const kind = pickKind(sim, (key) => !ANIMALS[key].preys || (!grazersOnly && !predatorsAbout));
   const [least, most] = ANIMALS[kind].group;
   const count = Math.min(wildCap(sim) - wildCount(sim), sim.rng.int(least, most));
   for (let n = 0; n < count; n++) {
@@ -293,6 +294,7 @@ export function animalsAtDawn(sim: Simulation): void {
     sim.addLog(`New ${born.length > 1 ? 'young' : 'young one'} in the herd: ${born.join(', ')}.`, 'good');
   }
   moveOn(sim);
+  migrate(sim);
   // Wounds mend, a quarter of an animal's health a day.
   for (const a of sim.animals) {
     if (a.hp > 0) {
@@ -306,6 +308,24 @@ export function animalsAtDawn(sim: Simulation): void {
       const key = itemDef(produce.item).key;
       sim.stats.produced[key] = (sim.stats.produced[key] ?? 0) + produce.count;
     }
+  }
+}
+
+// A hunted-out valley fills back up slowly: while the wild population is under half the room there
+// is, a few grazers sometimes wander in on their own, most often in spring and rarely in winter. The
+// storyteller's herds are the bigger, announced arrivals.
+const MIGRATION_CHANCE: Record<Season, number> = { Spring: 0.4, Summer: 0.3, Autumn: 0.25, Winter: 0.1 };
+function migrate(sim: Simulation): void {
+  if (wildCount(sim) >= wildCap(sim) / 2 || !sim.rng.chance(MIGRATION_CHANCE[sim.season])) {
+    return;
+  }
+  const count = herdArrives(sim, true);
+  if (count > 0) {
+    const kind = sim.animals[sim.animals.length - 1].kind;
+    sim.addLog(
+      `${count === 1 ? `A ${ANIMALS[kind].name.toLowerCase()} has` : `${count} ${ANIMALS[kind].plural} have`} wandered into the valley.`,
+      'info',
+    );
   }
 }
 

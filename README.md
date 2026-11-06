@@ -62,7 +62,9 @@ How the living simulation works:
   rich soil, and not below 5°C. Stoves turn raw food into meals and crafting benches turn cotton into cloth until
   the production target is met.
 - **Work:** each colonist has a 1–4 priority per work type; within a priority, work types run left to right. The
-  Work screen shows each colonist's skill and passions in every cell (right-click lowers a priority).
+  Work screen shows each colonist's skill and passions in every cell (right-click lowers a priority). One
+  exception: while blueprints wait on granite and not on wood, mining comes before plant cutting, so a big chop
+  order doesn't hold up the stove.
 - **Alerts and goals:** the side panel keeps alerts in view (low food, missing beds, no shelter before nightfall,
   hurt, starving or breaking colonists, fires, raids); clicking one takes the camera to whoever or wherever it's
   about. Below them, the next goal says how to reach it and its button picks the right tool or opens the right
@@ -121,7 +123,11 @@ How the storytelling layer works:
   people alone: a hungry predator runs down a deer, hare or grouse, the pack shares the kill, and it
   leaves raw meat behind. Wildlife comes and goes: when the map gets crowded the herd that has been around
   longest moves on, predators with nothing left to hunt leave, and a maddened pack whose fury is spent goes
-  back where it came from. Wounded animals mend slowly.
+  back where it came from. A hunted-out valley slowly refills: while wildlife is under half the room there is, a
+  few grazers sometimes wander in at dawn (most often in spring, rarely in winter). Wounded animals mend slowly.
+- **Wild plants:** outside winter, trees and berry bushes slowly spread onto open grass and soil beside their own
+  kind (not in zones, under roofs or floors, on items or plans, or near the colony), until they cover about as
+  much of the map as at the start. A forest cut down comes back over seasons, not days.
 - **Weapons, armor and defenses:** one set of weapons for everyone, each with its own reach, rate, accuracy,
   drop-off and armor piercing: fists, knife, club, spear, short bow, recurve bow, longbow (Longbows research) and
   crossbow (Crossbows research). Leather and scale armor (Armor and Scale armor research) turn aside a share of
@@ -178,7 +184,10 @@ How the storytelling layer works:
   fortune: wanderers and wounded refugees asking to join, herds, trade caravans and gifts from the friendly Meadow
   Kin, meteorites that scatter silver and stone (and may start a fire), auroras that lift everyone's mood, a
   colonist struck by inspiration (40% faster work for a day), and bumper crops. Each event pops up as a short
-  notification card and goes into the Story screen. Pick the difficulty when founding a colony: Peaceful (no
+  notification card and goes into the Story screen. After any threat there's a breather before the next (a day
+  on Standard, a day and a half on Peaceful, half a day on Harsh), and no new threat comes while half the
+  colony is down or a maddened pack is still loose. Gifts lean towards what the colony is short of: food when
+  the stores are low, medicine when someone is hurt or sick, wood when the pile is nearly gone. Pick the difficulty when founding a colony: Peaceful (no
   raids or manhunters), Standard, or Harsh (bigger, harder-hitting raids).
 
 ## Architecture
@@ -205,6 +214,7 @@ src/
     research.ts     Research state, availability and unlocks
     power.ts        The colony power grid: generators, solar, batteries
     animals.ts      Wildlife: wandering, fleeing, predators, revenge, herds, produce and hunting yields
+    plants.ts       Trees and berry bushes spreading back over open ground
     simulation.ts   Fixed-tick loop, needs and mood, colonist AI, job system, reservations, objectives
     serialize.ts    Save format
   game/       Glue between the simulation, renderer, and UI
@@ -249,10 +259,11 @@ guard animals, `src/sim/wildlife.test.ts` covers the species, herd sizes, predat
 wolves, `src/sim/weather.test.ts` covers weather, soaking, lightning, fire and firefighting, and
 `src/sim/trade.test.ts` covers caravans, buying and selling, goodwill and saving a visit, and
 `src/sim/combat.test.ts` covers weapons, armor, raider loadouts and tactics, suppression, embrasures, traps,
-focus fire, taking cover and sheltering.
+focus fire, taking cover and sheltering. `src/sim/flow.balance.test.ts` covers the game-flow fixes: mining
+before chopping when builders wait on stone, grazers returning to a hunted-out valley, and wild plants regrowing.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,
-puts its best researcher on research, drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation:
+puts its best researcher on research, drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation (including what starving colonists were doing instead of eating):
 
 ```
 npx tsx scripts/balance.ts 26 8                # 26 days (through winter) on 8 seeds, standard difficulty
@@ -261,6 +272,7 @@ npx tsx scripts/balance.ts 20 8 harsh          # or peaceful
 npx tsx scripts/balance.ts 20 4 trace          # print the colony state whenever someone dies
 npx tsx scripts/balance.ts 30 6 size=128       # on a Large map (size=96 for Medium)
 npx tsx scripts/balance.ts 30 1 trace seed=7919 # replay one colony (DEBUG=1 adds rooms, bills, research)
+npx tsx scripts/balance.ts 48 6 flow           # day-by-day food, materials, crops and wildlife, averaged
 ```
 
 With the current tuning (8 seeds × 26 days, through the first winter), a Standard colony that farms enough
