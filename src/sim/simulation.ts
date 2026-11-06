@@ -150,7 +150,7 @@ import {
   WEDDING_HOUR,
   WEDDING_OPINION,
 } from './gatherings';
-import { spreadWildPlants } from './plants';
+import { spreadWildPlants, wildPlantCover } from './plants';
 import { Designation, GROW_ZONE, TileKind, World, growZoneCrop } from './world';
 import { generateWorld } from './worldgen';
 
@@ -474,6 +474,8 @@ export class Simulation {
   };
   public log: LogEntry[] = [];
   public storyLog: StoryEntry[] = [];
+  // How many trees and berry bushes the map started with: regrowth stops there.
+  public wildCover = 0;
   // A party, festival, wedding or funeral, planned or under way (one at a time).
   public gathering: Gathering | null = null;
   // The dead awaiting burial, and who lies in each grave.
@@ -643,6 +645,7 @@ export class Simulation {
     sim.story = freshStory(difficulty);
     // Eight animals on the standard map, more on bigger ones.
     populateWildlife(sim, Math.round((8 * world.size) / (MAP_SIZE * MAP_SIZE)), spawn);
+    sim.wildCover = wildPlantCover(sim);
     sim.addLog(
       `${NUMBER_WORDS[landing] ?? landing} colonists have landed with a few days of rations. Designate work and they will get to it.`,
       'info',
@@ -1996,7 +1999,10 @@ export class Simulation {
     const cornered = sent && adjacent;
     // Undrafted and caught outside: running for shelter comes before trading shots, unless a raider
     // is already on top of them. (Failed searches are throttled inside tryShelter.)
-    const running = !c.drafted && !adjacent && this.raidersNear(c) && this.tryShelter(c);
+    // Already on the way to shelter counts too: otherwise self-defence would cancel the run each
+    // tick and they'd stand frozen between the two.
+    const running =
+      !c.drafted && !adjacent && (c.job?.type === 'shelter' || (this.raidersNear(c) && this.tryShelter(c)));
     if (!running && (!sent || cornered) && colonistCombat(this, c)) {
       this.fighting.add(c.id);
       if (c.drafted) {

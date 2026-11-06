@@ -364,6 +364,25 @@ describe('colonist tactics', () => {
     expect(sim.isIndoors(c.tile)).toBe(true);
   });
 
+  it('keep running for shelter with a raider already in bow range', () => {
+    const { sim, w, x, y } = field(11);
+    const hut = { x0: x - 8, y0: y - 3, x1: x - 4, y1: y + 1 };
+    for (const i of outline(w, hut.x0, hut.y0, hut.x1, hut.y1)) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    w.setFeature(w.idx(hut.x1, y - 1), featureId('door'));
+    const c = sim.colonists[0];
+    c.tile = w.idx(x, y);
+    raider(sim, w.idx(x + 5, y), 'club', { hp: 50, repathAt: forever });
+    for (let t = 0; t < HOUR && !sim.isIndoors(c.tile); t++) {
+      for (const e of sim.enemies) {
+        e.path = [];
+      }
+      sim.step();
+    }
+    expect(sim.isIndoors(c.tile)).toBe(true);
+  });
+
   it('keep their kit, stance and focus through a save', () => {
     const { sim, w, x, y } = field(12);
     const c = sim.colonists[0];

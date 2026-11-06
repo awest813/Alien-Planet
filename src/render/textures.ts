@@ -387,20 +387,24 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillRect(10, 13, 1, 2);
       break;
     case 'flute':
-      // A flute resting across a little stand.
+      // A pale wooden flute held upright on the diagonal in a little stand, finger holes showing.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(3, 14, 10, 1);
       c.fillStyle = '#5a3818';
-      c.fillRect(4, 9, 1, 6);
-      c.fillRect(11, 9, 1, 6);
-      c.fillRect(3, 14, 3, 1);
-      c.fillRect(10, 14, 3, 1);
-      c.fillStyle = '#c9a36a';
-      c.fillRect(2, 7, 12, 2);
-      c.fillStyle = '#4a3020';
-      c.fillRect(5, 7, 1, 1);
-      c.fillRect(7, 7, 1, 1);
-      c.fillRect(9, 7, 1, 1);
-      c.fillStyle = '#e0c48c';
-      c.fillRect(2, 7, 12, 1);
+      c.fillRect(3, 12, 6, 2);
+      c.fillRect(5, 11, 2, 1);
+      for (let k = 0; k < 10; k++) {
+        c.fillStyle = '#7a5a34';
+        c.fillRect(4 + k, 11 - k, 2, 2);
+        c.fillStyle = '#ead7a6';
+        c.fillRect(4 + k, 11 - k, 1, 1);
+      }
+      c.fillStyle = '#3a2414';
+      for (const k of [3, 5, 7]) {
+        c.fillRect(5 + k, 11 - k, 1, 1);
+      }
+      c.fillStyle = '#c99a3a';
+      c.fillRect(13, 1, 2, 2);
       break;
     case 'lute':
       // A round-backed lute propped on its stand.

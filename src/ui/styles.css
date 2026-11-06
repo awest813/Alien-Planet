@@ -1014,6 +1014,20 @@ button.link:focus-visible {
   .minimap-toggle {
     display: none;
   }
+
+  /* One row each for the Architect tabs and tools, scrolling sideways, so the panel doesn't take a
+     third of the screen. */
+  .arch-tabs,
+  .arch-tools {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .arch-tabs button,
+  .arch-tools button {
+    flex: none;
+  }
 }
 
 /* ---------- Title screen and menus ---------- */
@@ -1226,7 +1240,8 @@ button.primary:hover:not(:disabled) {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  z-index: 5;
+  /* Above the floating side-panel toggle on narrow screens. */
+  z-index: 7;
   min-width: 240px;
   max-height: 60vh;
   overflow-y: auto;
@@ -1484,4 +1499,9 @@ button.big {
 .setting .slider .num {
   min-width: 3.5ch;
   text-align: right;
+}
+
+/* A setting that can't be changed right now (the volume sliders with sound off). */
+.setting:has(input:disabled) {
+  opacity: 0.5;
 }

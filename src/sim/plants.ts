@@ -5,8 +5,14 @@ import type { Simulation } from './simulation';
 const TRIES_PER_4096_TILES = 24;
 // Wild plants keep clear of the colony.
 const HOME_CLEARANCE = 10;
-// Spreading stops once wild plants cover this share of the map (a fresh map has about 8%).
-const MAX_COVER = 0.09;
+// Without a record of the starting cover (an old save), spreading stops at this share of the map.
+const DEFAULT_COVER = 0.08;
+
+// Trees and berry bushes on the map.
+export function wildPlantCover(sim: Simulation): number {
+  const spreading = [featureId('tree'), featureId('berryBush')];
+  return sim.countFeature((f) => spreading.includes(f));
+}
 
 // Each morning outside winter, trees and berry bushes spread a little: a seedling takes root on open
 // grass or soil beside a plant of its kind. It's slow, so a forest cut down comes back over seasons,
@@ -17,7 +23,8 @@ export function spreadWildPlants(sim: Simulation): void {
   }
   const w = sim.world;
   const spreading = [featureId('tree'), featureId('berryBush')];
-  if (sim.countFeature((f) => spreading.includes(f)) >= w.size * MAX_COVER) {
+  // Back to (about) what the map started with, and no further.
+  if (wildPlantCover(sim) >= (sim.wildCover || w.size * DEFAULT_COVER)) {
     return;
   }
   const home = sim.homeTile() ?? sim.living()[0]?.tile;
@@ -32,6 +39,7 @@ export function spreadWildPlants(sim: Simulation): void {
       w.itemType[i] !== NONE ||
       w.zone[i] !== 0 ||
       w.designation[i] !== 0 ||
+      sim.isIndoors(i) ||
       terrainDef(w.terrain[i]).fertility <= 0 ||
       (home !== undefined && w.distance(i, home) <= HOME_CLEARANCE)
     ) {

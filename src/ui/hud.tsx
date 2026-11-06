@@ -406,7 +406,8 @@ function OverviewTab({ c }: { c: ColonistView }) {
 }
 
 function HealthTab({ c }: { c: ColonistView }) {
-  const healthy = c.injuries.length === 0 && !c.disease && c.bloodLoss < 0.05 && c.conditions.length === 0;
+  const healthy =
+    c.injuries.length === 0 && !c.disease && c.bloodLoss < 0.05 && c.conditions.length === 0 && c.needs.food > 0;
   return (
     <>
       {healthy && <div className="muted">Healthy.</div>}

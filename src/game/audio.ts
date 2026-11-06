@@ -23,6 +23,9 @@ export interface SoundScene {
 
 export type Alert = 'raid' | 'death' | 'goal' | 'concert';
 
+// Whether sound is on: callers can skip gathering what it needs when it isn't.
+export const soundEnabled = (): boolean => sound.isEnabled();
+
 export interface Volumes {
   enabled: boolean;
   master: number;
@@ -61,20 +64,21 @@ class Sound {
     this.volumes = volumes;
     if (volumes.enabled) {
       this.start();
-      void this.ctx?.resume().catch(() => {});
+      this.wake();
       // Browsers only let audio start after the player interacts with the page (sound left on from a
-      // last visit): try again on the first click or key press.
-      if (this.ctx && this.ctx.state !== 'running') {
-        const wake = () => {
-          void this.ctx?.resume().catch(() => {});
-          window.removeEventListener('pointerdown', wake);
-          window.removeEventListener('keydown', wake);
+      // last visit): try again on the first tap, click or key press.
+      if (this.ctx && this.ctx.state !== 'running' && !this.wakeArmed) {
+        this.wakeArmed = true;
+        const events = ['pointerdown', 'touchend', 'click', 'keydown'];
+        const onGesture = () => {
+          this.wake();
+          if (this.ctx?.state === 'running' || !this.volumes.enabled) {
+            this.wakeArmed = false;
+            events.forEach((e) => window.removeEventListener(e, onGesture));
+          }
         };
-        window.addEventListener('pointerdown', wake);
-        window.addEventListener('keydown', wake);
+        events.forEach((e) => window.addEventListener(e, onGesture));
       }
-    } else {
-      void this.ctx?.suspend().catch(() => {});
     }
     if (this.ctx && this.master && this.musicBus && this.effectsBus) {
       const t = this.ctx.currentTime;
@@ -82,7 +86,48 @@ class Sound {
       this.musicBus.gain.setTargetAtTime(volumes.music, t, 0.05);
       this.effectsBus.gain.setTargetAtTime(volumes.effects, t, 0.05);
     }
+    if (!volumes.enabled) {
+      // Let the fade-out be heard, then stop the audio altogether.
+      this.sleepSoon();
+    }
   }
+
+  public isEnabled(): boolean {
+    return this.volumes.enabled;
+  }
+
+  // The page went out of view (another tab, the app minimised): no sound until it's back.
+  public setHidden(hidden: boolean): void {
+    this.hidden = hidden;
+    if (hidden) {
+      void this.ctx?.suspend().catch(() => {});
+    } else {
+      this.wake();
+    }
+  }
+
+  private wake(): void {
+    if (this.volumes.enabled && !this.hidden && this.ctx && this.ctx.state !== 'running') {
+      clearTimeout(this.sleepTimer);
+      void this.ctx.resume().catch(() => {});
+    }
+  }
+
+  private sleepSoon(): void {
+    clearTimeout(this.sleepTimer);
+    this.sleepTimer = setTimeout(() => {
+      if (!this.volumes.enabled) {
+        void this.ctx?.suspend().catch(() => {});
+      }
+    }, 250);
+  }
+
+  private wakeArmed = false;
+  private hidden = false;
+  private sleepTimer: ReturnType<typeof setTimeout> | undefined;
+  // Last levels asked of the wind and rain, so they're only changed when the weather does.
+  private windLevel = -1;
+  private rainLevel = -1;
 
   private start(): void {
     if (this.ctx) {
@@ -97,6 +142,7 @@ class Sound {
       const ctx = new Context();
       this.ctx = ctx;
       this.master = ctx.createGain();
+      // Starts silent and fades up to the chosen volume.
       this.master.gain.value = 0;
       this.master.connect(ctx.destination);
       this.musicBus = ctx.createGain();
@@ -140,8 +186,14 @@ class Sound {
       return;
     }
     const now = ctx.currentTime;
-    this.wind!.gain.setTargetAtTime(scene.storm ? 0.22 : scene.rain ? 0.1 : 0.05, now, 1.5);
-    this.rainGain!.gain.setTargetAtTime(scene.storm ? 0.12 : scene.rain ? 0.07 : 0, now, 1.5);
+    const wind = scene.storm ? 0.22 : scene.rain ? 0.1 : 0.05;
+    const rain = scene.storm ? 0.12 : scene.rain ? 0.07 : 0;
+    if (wind !== this.windLevel || rain !== this.rainLevel) {
+      this.windLevel = wind;
+      this.rainLevel = rain;
+      this.wind!.gain.setTargetAtTime(wind, now, 1.5);
+      this.rainGain!.gain.setTargetAtTime(rain, now, 1.5);
+    }
     if (!scene.paused && now >= this.nextCall) {
       this.nextCall = now + 2 + Math.random() * 6;
       if (!scene.rain) {

@@ -58,6 +58,15 @@ const MAX_WOLF_PACK = 4;
 // The breather after any threat before the next one, in days.
 const THREAT_GAP_DAYS: Record<Difficulty, number> = { peaceful: 1.5, standard: 1, harsh: 0.5 };
 
+// The gap before the next threat, counted from the end of whatever is still going on (a cold snap,
+// heat wave or eclipse runs on after it starts; a raid until it's over).
+function breather(sim: Simulation): void {
+  const story = sim.story;
+  const ends = Math.max(sim.tick, story.coldSnapUntil ?? 0, story.heatWaveUntil ?? 0, story.eclipseUntil ?? 0);
+  const gap = THREAT_GAP_DAYS[story.difficulty ?? 'standard'] * DAY;
+  story.nextThreatTick = Math.max(story.nextThreatTick ?? 0, ends + gap);
+}
+
 // Whether the colony is in a state to face a new threat: not while a maddened pack is still loose,
 // and not while half or more of the colonists are down. A beaten colony gets the chance to recover.
 export function readyForThreat(sim: Simulation): boolean {
@@ -498,6 +507,10 @@ export function updateStoryteller(sim: Simulation): void {
     return;
   }
   const chance = HOURLY_CHANCE * (story.difficulty === 'harsh' ? 1.3 : 1);
+  // A raid still going keeps pushing the breather back, so it counts from the raid's end.
+  if (sim.raid) {
+    breather(sim);
+  }
   if (sim.living().length === 0 || sim.raid || sim.rng.next() >= chance) {
     return;
   }
@@ -521,7 +534,7 @@ export function updateStoryteller(sim: Simulation): void {
         const spread = event.key === 'raid' ? Math.floor(sim.rng.next() * maxSpread) : 0;
         story.cooldowns[event.key] = sim.tick + event.cooldownDays * DAY + spread;
         if (event.threat) {
-          story.nextThreatTick = sim.tick + THREAT_GAP_DAYS[story.difficulty ?? 'standard'] * DAY;
+          breather(sim);
         }
       }
       return;
@@ -537,6 +550,9 @@ export function triggerEvent(sim: Simulation, key: string): boolean {
   }
   sim.story.lastEventTick = sim.tick;
   sim.story.cooldowns[event.key] = sim.tick + event.cooldownDays * DAY;
+  if (event.threat) {
+    breather(sim);
+  }
   return true;
 }
 

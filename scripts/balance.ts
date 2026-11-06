@@ -63,10 +63,12 @@ const RESEARCH_ORDER = [
 // Finds the nearest w×h rectangle to the colonists where every tile can take a blueprint.
 function findSite(sim: Simulation, w: number, h: number, avoid: Set<number>): { x: number; y: number } | null {
   const world = sim.world;
-  const cx = world.xOf(sim.colonists[0].tile);
-  const cy = world.yOf(sim.colonists[0].tile);
+  // Around (and reachable from) someone still alive.
+  const anchor = (sim.living()[0] ?? sim.colonists[0]).tile;
+  const cx = world.xOf(anchor);
+  const cy = world.yOf(anchor);
   // Only where the colonists can walk to.
-  const home = sim.regionOf(sim.colonists[0].tile);
+  const home = sim.regionOf(anchor);
   let best: { x: number; y: number; d: number } | null = null;
   for (let y = 1; y + h < world.height - 1; y++) {
     for (let x = 1; x + w < world.width - 1; x++) {
@@ -160,6 +162,7 @@ function snapshot(sim: Simulation): Record<string, number> {
   const nutrition = totals.reduce((sum, t) => sum + itemDef(t.item).nutrition * t.total, 0);
   const living = Math.max(1, sim.living().length);
   const row: Record<string, number> = {
+    day: sim.day,
     living: sim.living().length,
     foodDays: nutrition / (living * DAILY_NUTRITION),
     meals: sim.stockOf(itemId('meal')) + sim.stockOf(itemId('fineMeal')),
@@ -734,7 +737,7 @@ if (Object.keys(starvingDoing).length > 0) {
 // previous dawn (columns starting "+").
 if (flow) {
   const length = Math.max(...results.map((r) => r.daily.length));
-  const keys = Object.keys(results.find((r) => r.daily.length > 0)?.daily[0] ?? {});
+  const keys = Object.keys(results.find((r) => r.daily.length > 0)?.daily[0] ?? {}).filter((k) => k !== 'day');
   const width = (k: string) => Math.max(6, k.length + 1);
   console.log('\nday ' + keys.map((k) => k.padStart(width(k))).join(''));
   for (let d = 0; d < length; d++) {
@@ -747,6 +750,7 @@ if (flow) {
         width(k),
       );
     });
-    console.log(String(d + 1).padStart(3) + ' ' + cells.join(''));
+    // Taken at dawn: the day just begun ("+" columns cover the day before it).
+    console.log(String(rows[0]?.daily[d].day ?? d + 1).padStart(3) + ' ' + cells.join(''));
   }
 }

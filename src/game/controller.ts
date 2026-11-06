@@ -683,6 +683,7 @@ export class GameController {
     // Leaving the page (closing the tab, switching away on a phone) saves the colony.
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
+        sound.setHidden(document.hidden);
         if (document.hidden) {
           this.autosave();
         }
@@ -821,7 +822,8 @@ export class GameController {
       } else if (event === 'goal' || event === 'concert') {
         sound.alert(event);
       } else if (event === 'gathering') {
-        sound.alert('concert');
+        // A funeral gets a sombre note, not a cheerful chime.
+        sound.alert(this.sim.gathering?.kind === 'funeral' ? 'death' : 'concert');
       }
       if (event === 'dawn') {
         this.autosave();
@@ -856,7 +858,9 @@ export class GameController {
       this.toast = null;
     }
     this.collectNotifications(now);
-    sound.update(this.soundScene());
+    if (this.settings.sound) {
+      sound.update(this.soundScene());
+    }
     this.sinceUiUpdate += deltaMs;
     this.sinceHoverUpdate += deltaMs;
     if (this.sinceUiUpdate >= 200 || (this.hoverChanged && this.sinceHoverUpdate >= 80)) {
@@ -1462,7 +1466,9 @@ export class GameController {
     const raiders = sim.enemies.filter((e) => !e.fleeing).length;
     const gathering = sim.gatheringNotice();
     if (gathering) {
-      alerts.push({ text: gathering, tone: 'calm', tile: sim.gathering?.tile });
+      // Good news, except a funeral.
+      const tone = sim.gathering?.kind === 'funeral' ? 'warn' : 'calm';
+      alerts.push({ text: gathering, tone, tile: sim.gathering?.tile });
     }
     if (sim.caravan && tradeOpen(sim)) {
       const hours = Math.max(0, Math.ceil((sim.caravan.leaveAt - sim.tick) / TICKS_PER_HOUR));

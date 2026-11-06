@@ -15,6 +15,8 @@ new Phaser.Game({
   parent: 'game',
   backgroundColor: '#10141c',
   pixelArt: true,
+  // The game makes its own sound (game/audio.ts), and only once the player turns it on.
+  audio: { noAudio: true },
   roundPixels: true,
   scale: {
     mode: Phaser.Scale.RESIZE,

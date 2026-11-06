@@ -50,6 +50,32 @@ describe('game flow', () => {
     expect(sim.animals.every((a) => !ANIMALS[a.kind].preys)).toBe(true);
   });
 
+  it("doesn't sprout trees inside a walled room", () => {
+    const sim = Simulation.newColony(12);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 14);
+    const gx = x + 20 < w.width - 6 ? x + 20 : x - 24;
+    // A walled room with no roof, a grove inside it.
+    for (let dy = 0; dy <= 5; dy++) {
+      for (let dx = 0; dx <= 5; dx++) {
+        const edge = dx === 0 || dy === 0 || dx === 5 || dy === 5;
+        w.setFeature(w.idx(gx + dx, y + dy), edge ? featureId('stoneWall') : NONE);
+      }
+    }
+    w.setFeature(w.idx(gx + 1, y + 1), featureId('tree'));
+    sim.wildCover = w.size;
+    for (let day = 0; day < 300; day++) {
+      spreadWildPlants(sim);
+    }
+    let inside = 0;
+    for (let dy = 1; dy <= 4; dy++) {
+      for (let dx = 1; dx <= 4; dx++) {
+        inside += w.feature[w.idx(gx + dx, y + dy)] === featureId('tree') ? 1 : 0;
+      }
+    }
+    expect(inside).toBe(1);
+  });
+
   it('regrows trees beside the forest but not in zones or near home', () => {
     const sim = Simulation.newColony(11);
     const w = sim.world;
