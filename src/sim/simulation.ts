@@ -1161,7 +1161,7 @@ export class Simulation {
     }
     if (c.health.downed) {
       return c.path.length > 0
-        ? c.needs.food < CRAWL_HUNGRY && isFood(this.world.itemType[c.path[c.path.length - 1]])
+        ? c.needs.food < CRAWL_HUNGRY && this.isFoodTile(c.path[c.path.length - 1])
           ? 'Crawling to some food'
           : 'Crawling to shelter'
         : 'Downed, waiting for a doctor';
@@ -5473,7 +5473,15 @@ export class Simulation {
       if (this.tick % SLOW_TICKS !== 0 || this.rescuerAvailable(c)) {
         return;
       }
-      if (this.needsRescue(c)) {
+      const hungry = c.needs.food < CRAWL_HUNGRY;
+      // Food within reach comes first: having crawled to it, they eat before anything else.
+      if (hungry && this.eatWhereLying(c)) {
+        return;
+      }
+      // Out of the cold (or heat). Hungry, they only go back for shelter if the weather is actually
+      // getting to them, or they'd crawl to food and back again without ever eating.
+      const exposed = c.health.hypothermia > 0.15 || c.health.heatstroke > 0.15;
+      if (this.needsRescue(c) && (!hungry || exposed)) {
         const dest = this.rescueDestination(c, c);
         c.path = dest !== undefined && dest !== c.tile ? (this.pathfinder.find(c.tile, [dest]) ?? []) : [];
         // Nowhere better to be: food, then, if they need it.
@@ -5481,7 +5489,7 @@ export class Simulation {
           return;
         }
       }
-      if (c.needs.food < CRAWL_HUNGRY && !this.eatWhereLying(c)) {
+      if (hungry) {
         const region = this.regionOf(c.tile);
         const food = this.nearestIn(
           'items',
@@ -5511,6 +5519,11 @@ export class Simulation {
       c.path.shift();
       c.moveProgress = 0;
     }
+  }
+
+  private isFoodTile(i: number | undefined): boolean {
+    const item = i === undefined ? NONE : this.world.itemType[i];
+    return item !== NONE && isFood(item);
   }
 
   // A downed colonist eats whatever food is on their tile or right beside it. Returns false if

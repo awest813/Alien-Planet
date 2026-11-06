@@ -391,3 +391,37 @@ describe('doctors', () => {
     expect(first).toBe('feed');
   });
 });
+
+describe('downed and alone: edge cases', () => {
+  it('eat food they crawled to outdoors instead of crawling back inside first', () => {
+    const sim = Simulation.newColony(34);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 12);
+    sim.weather = { kind: 'clear', until: Number.MAX_SAFE_INTEGER };
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    sim.tick = (12 - START_HOUR) * HOUR;
+    sim.syncClock();
+    for (const item of [...w.tilesWith('items')]) {
+      w.takeItem(item, w.itemCount[item]);
+    }
+    // A room to the east, the only meal a few tiles west of its door.
+    for (const i of outline(w, x + 4, y - 2, x + 8, y + 2)) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    w.setFeature(w.idx(x + 4, y), featureId('door'));
+    w.addItem(w.idx(x + 1, y), itemId('meal'), 1);
+    for (const c of sim.colonists) {
+      c.tile = w.idx(x + 6, y);
+      c.health.bloodLoss = 0.8;
+      c.health.downed = true;
+    }
+    const c = sim.colonists[0];
+    c.needs.food = 0.05;
+    for (let t = 0; t < HOUR * 8 && c.needs.food < 0.5; t++) {
+      sim.step();
+      // Whatever they're doing, describing it never fails.
+      expect(typeof sim.describe(c)).toBe('string');
+    }
+    expect(c.needs.food).toBeGreaterThan(0.5);
+  });
+});

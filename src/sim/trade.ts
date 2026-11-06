@@ -365,6 +365,9 @@ export function sellArt(sim: Simulation, tile: number): string | null {
   }
   const name = featureDef(sim.world.feature[tile]).name.toLowerCase();
   sim.world.setFeature(tile, NONE);
+  // Any order on the piece (to take it down) goes with it, or builders would start on the floor.
+  sim.world.designation[tile] = 0;
+  sim.world.markDirty(tile);
   sim.artworks.delete(tile);
   caravan.silver -= price;
   sim.world.dropItemNear(sim.homeTile() ?? tile, SILVER(), price);

@@ -139,3 +139,19 @@ describe('selling art', () => {
     expect(sellArt(sim, fine)).not.toBeNull();
   });
 });
+
+describe('selling art: orders', () => {
+  it('drops a deconstruct order on a piece that is sold, leaving the floor be', () => {
+    const { sim, w, x, y } = market(14);
+    const tile = w.idx(x + 3, y - 3);
+    w.setLayer('floor', tile, featureId('woodFloor'));
+    w.setFeature(tile, featureId('sculptureSmall'));
+    sim.artworks.set(tile, { quality: 10, title: 'Piece', artist: 'Ada', day: 1 });
+    sim.apply({ type: 'designate', kind: 'deconstruct', rect: { x0: x + 3, y0: y - 3, x1: x + 3, y1: y - 3 } });
+    expect(w.designation[tile]).not.toBe(0);
+    sim.apply({ type: 'sellArt', tile });
+    expect(w.designation[tile]).toBe(0);
+    run(sim, HOUR * 6);
+    expect(w.floor[tile]).toBe(featureId('woodFloor'));
+  });
+});

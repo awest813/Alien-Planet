@@ -50,6 +50,9 @@ export function transmitting(sim: Simulation): boolean {
 // Called every in-game hour.
 export function updateBeacon(sim: Simulation): void {
   const b = sim.beacon;
+  if (sim.departed) {
+    return;
+  }
   if (b.answeredAt === undefined) {
     if (beaconTile(sim) === undefined || !sim.power.powered || sim.living().length === 0) {
       return;
@@ -68,6 +71,14 @@ export function updateBeacon(sim: Simulation): void {
       b.landsAt = sim.tick + LANDING_TICKS;
       sim.addLog('A ship has answered the signal! It will land beside the beacon in two days.', 'good', true);
       sim.events.push('shipAnswered');
+    }
+    return;
+  }
+  // Nobody left to meet it, or no beacon to land by: it turns back, and the beacon can call again.
+  if (!b.landed && b.landsAt !== undefined && (sim.living().length === 0 || beaconTile(sim) === undefined)) {
+    if (sim.tick >= b.landsAt) {
+      chooseToStay(sim, 'The ship found no beacon to land by and turned back.');
+      sim.beacon.choice = undefined;
     }
     return;
   }
@@ -94,7 +105,7 @@ export function chooseToStay(
 
 // The colony boards the ship: the story ends here.
 export function depart(sim: Simulation): boolean {
-  if (!sim.beacon.landed) {
+  if (!sim.beacon.landed || sim.living().length === 0) {
     return false;
   }
   sim.beacon.choice = 'depart';

@@ -92,3 +92,21 @@ describe('the signal beacon', () => {
     expect(sim.objectivesDone.beaconBuilt).toBe(true);
   });
 });
+
+describe('the signal beacon: edge cases', () => {
+  it('turns the ship back if the beacon is gone when it arrives, and ignores a departed colony', () => {
+    const { sim, w, beacon, hours } = signal(7);
+    hours(TRANSMIT_HOURS);
+    w.setFeature(beacon, 0);
+    hours(LANDING_TICKS / HOUR + 1);
+    expect(sim.beacon.landed ?? false).toBe(false);
+    expect(sim.beacon.hours).toBe(0);
+    expect(sim.beacon.choice).toBeUndefined();
+    // After boarding, nothing more happens.
+    const other = signal(8);
+    other.hours(TRANSMIT_HOURS + LANDING_TICKS / HOUR);
+    other.sim.apply({ type: 'shipChoice', board: true });
+    other.hours(WAIT_TICKS / HOUR + 2);
+    expect(other.sim.beacon.choice).toBe('depart');
+  });
+});
