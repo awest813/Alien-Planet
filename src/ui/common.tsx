@@ -14,6 +14,7 @@ export const WORK_LABELS: Record<WorkTypeKey, string> = {
   hunting: 'Hunt',
   handling: 'Handle',
   crafting: 'Craft',
+  art: 'Art',
   research: 'Research',
   hauling: 'Haul',
 };

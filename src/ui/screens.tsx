@@ -60,6 +60,7 @@ const WORK_SKILL: Partial<Record<WorkTypeKey, SkillKey>> = {
   hunting: 'combat',
   handling: 'animals',
   crafting: 'crafting',
+  art: 'artistic',
   research: 'research',
 };
 

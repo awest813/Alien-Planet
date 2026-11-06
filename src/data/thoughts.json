@@ -255,5 +255,27 @@
     "label": "Had a good game",
     "mood": 2,
     "hours": 6
+  },
+  "madeArt": {
+    "label": "Made a work of art",
+    "mood": 3,
+    "hours": 24
+  },
+  "madeMasterwork": {
+    "label": "Made a masterwork",
+    "mood": 10,
+    "hours": 72
+  },
+  "pleasantSurroundings": {
+    "label": "Pleasant surroundings",
+    "mood": 2
+  },
+  "beautifulSurroundings": {
+    "label": "Beautiful surroundings",
+    "mood": 4
+  },
+  "drabSurroundings": {
+    "label": "Drab surroundings",
+    "mood": -1
   }
 }

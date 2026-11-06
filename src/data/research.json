@@ -116,5 +116,11 @@
     "name": "Optics",
     "cost": 700,
     "description": "Unlocks the telescope: stargazing on clear nights, outdoors."
+  },
+  {
+    "key": "fineArts",
+    "name": "Fine arts",
+    "cost": 1200,
+    "description": "Unlocks the grand sculpture: granite and silver, the finest piece a colony can make."
   }
 ]

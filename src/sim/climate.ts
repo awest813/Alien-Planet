@@ -35,9 +35,16 @@ interface RoomContents {
   stoves: number;
   benches: number;
   joy: number;
+  art: number;
 }
 
-export function measureRooms(world: World, rooms: Rooms): RoomContents[] {
+// `beautyAt` gives a building's beauty on a tile (sculptures by quality, flowers by season); by
+// default, its base beauty.
+export function measureRooms(
+  world: World,
+  rooms: Rooms,
+  beautyAt: (i: number) => number = (i) => featureDef(world.feature[i]).beauty,
+): RoomContents[] {
   const contents: RoomContents[] = rooms.sizes.map(() => ({
     beauty: 0,
     beds: 0,
@@ -48,6 +55,7 @@ export function measureRooms(world: World, rooms: Rooms): RoomContents[] {
     stoves: 0,
     benches: 0,
     joy: 0,
+    art: 0,
   }));
   for (let i = 0; i < world.size; i++) {
     const room = rooms.room[i];
@@ -60,7 +68,7 @@ export function measureRooms(world: World, rooms: Rooms): RoomContents[] {
     }
     const def = featureDef(f);
     const c = contents[room];
-    c.beauty += def.beauty;
+    c.beauty += beautyAt(i);
     c.beds += def.bed ? 1 : 0;
     c.tables += def.table ? 1 : 0;
     if (def.power?.draw) {
@@ -74,6 +82,7 @@ export function measureRooms(world: World, rooms: Rooms): RoomContents[] {
     c.stoves += def.workbench === 'cooking' ? 1 : 0;
     c.benches += def.workbench === 'crafting' ? 1 : 0;
     c.joy += def.joy ? 1 : 0;
+    c.art += def.art ? 1 : 0;
   }
   return contents;
 }
@@ -96,6 +105,9 @@ export function describeRoom(id: number, rooms: Rooms, contents: RoomContents, t
       role = 'Workshop';
     } else if (contents.tables > 0) {
       role = 'Dining room';
+    } else if (contents.art > 0 && contents.art * 2 >= contents.joy) {
+      // Mostly art: somewhere to stand and look.
+      role = 'Gallery';
     } else if (contents.joy > 0) {
       role = 'Recreation room';
     } else {
@@ -145,7 +157,13 @@ export function updateRoomTemperatures(
   }
 }
 
+// A room this impressive is the colony's showpiece.
+export const MAGNIFICENT_ROOM = 60;
+
 export function impressivenessLabel(value: number): string {
+  if (value >= MAGNIFICENT_ROOM) {
+    return 'magnificent';
+  }
   if (value >= 35) {
     return 'impressive';
   }

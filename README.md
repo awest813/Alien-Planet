@@ -78,6 +78,12 @@ How the living simulation works:
   screen; every goal in the list is clickable the same way.
 - **Top bar:** days of food at the current headcount, icons for key materials, and every item under "All items".
   Hovering a build tool shows what it does, what it costs and any research it needs.
+- **Art and decor:** plan a small, large or grand sculpture (Art & decor tab) and a colonist with Art work carves
+  it in place. Their Artistic skill sets the quality, from poor to masterwork, and so how beautiful it is. Every
+  piece is titled after a moment from the colony's story ("Ada and Bram", "The Long Winter", "In Memory of Wren").
+  Flower pots (faded in winter) and banners need no artist. Colonists feel beauty within a couple of tiles
+  ("Pleasant" or "Beautiful surroundings"), a bare room drags a little, sculptures are art recreation, and a room
+  that's mostly art is a gallery.
 - **Rooms and temperature:** enclosed rooms get a role (bedroom, barracks, kitchen, …) and an impressiveness
   score from furniture beauty and size. Outdoor temperature follows a day/night cycle; rooms drift towards it
   and campfires heat them.
@@ -121,8 +127,8 @@ How the storytelling layer works:
   Tailoring is researched, a crafting bench can mend worn clothes with cloth (Production lets you pause mending).
   Recurve bows get a quality tier too: better bows hit harder, and colonists swap for a clearly better one.
 - **Skills:** every skill (mining, construction, plants, cooking, crafting, medicine, combat, intellectual,
-  animals, artistic) improves with practice, up to 20. Artistic is new and has no use yet: it's for sculpting and
-  music, coming in later phases. Each colonist has a couple of passions (★ interested, ★★ burning) that speed learning and
+  animals, artistic) improves with practice, up to 20. Artistic is used for carving sculptures (and, later,
+  music). Each colonist has a couple of passions (★ interested, ★★ burning) that speed learning and
   lift their mood while doing that work. Expert skills slowly rust without practice.
 - **Wildlife and hunting:** deer, hares, boars, muskoxen, grouse, foxes and wolves roam the map, and herds
   wander in, each species in its own numbers. Mark animals with the Hunt tool and colonists with the Hunt work
@@ -147,7 +153,7 @@ How the storytelling layer works:
   summers, freezing winter nights). Crops don't grow in winter and hard frost kills anything left in the field,
   so plant enough in spring and summer and harvest before winter.
 - **Research:** build a research bench, pick a project in the Research screen, and colonists with the Research
-  work type study it (training the Intellectual skill). Eighteen projects unlock the recurve bow, sandbags, the
+  work type study it (training the Intellectual skill). Nineteen projects unlock the recurve bow, sandbags, the
   stone hearth, the fine bed, tailoring and all the electrical tech below, or improve insulation, crop growth and
   doctoring.
 - **Power:** the colony shares one grid. Wood-fired generators (kept fuelled by haulers) and solar panels (daytime
@@ -223,6 +229,7 @@ src/
     power.ts        The colony power grid: generators, solar, batteries
     animals.ts      Wildlife: wandering, fleeing, predators, revenge, herds, produce and hunting yields
     plants.ts       Trees and berry bushes spreading back over open ground
+    art.ts          Sculpture quality, beauty and titles drawn from the colony's story
     simulation.ts   Fixed-tick loop, needs and mood, colonist AI, job system, reservations, objectives
     serialize.ts    Save format
   game/       Glue between the simulation, renderer, and UI
@@ -268,7 +275,9 @@ wolves, `src/sim/weather.test.ts` covers weather, soaking, lightning, fire and f
 `src/sim/trade.test.ts` covers caravans, buying and selling, goodwill and saving a visit, and
 `src/sim/combat.test.ts` covers weapons, armor, raider loadouts and tactics, suppression, embrasures, traps,
 focus fire, taking cover and sheltering. `src/sim/flow.balance.test.ts` covers the game-flow fixes: mining
-before chopping when builders wait on stone, grazers returning to a hunted-out valley, and wild plants regrowing. `src/sim/groundwork.test.ts` covers recreation kinds and the Artistic skill, and
+before chopping when builders wait on stone, grazers returning to a hunted-out valley, and wild plants regrowing. `src/sim/groundwork.test.ts` covers recreation kinds and the Artistic skill,
+`src/sim/recreation.test.ts` covers tolerance, games, stargazing and nature walks, `src/sim/art.test.ts` covers
+sculpting, quality, titles, beauty, galleries and surroundings, and
 `src/render/tileset-layout.test.ts` checks the art layout.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,

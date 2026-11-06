@@ -100,32 +100,53 @@ together.
     can reach them, and re-plans a bench that gets walled off. One test colony had never researched
     anything because of this.
 
-## 4. Phase B: Art and decor
+## 4. Phase B: Art and decor (done)
 
-Beauty becomes something colonists notice and make, and art becomes a way to tell the colony's story.
+Beauty is something colonists now notice and make, and every sculpture remembers a moment from the colony's
+story.
 
-- **Sculpting.** A sculptor's table (a workbench) makes sculptures:
-  - Small (wood) and large (granite blocks), plus a grand version (blocks and silver) after research.
-  - Quality comes from Artistic skill, from awful to masterwork, and sets the beauty value.
-  - A masterwork is announced in the log and the story, and gives the artist a mood thought.
-- **Art that remembers.** Each sculpture gets a title and a subject taken from the colony's own story log
-  ("Kip Holding the Door Against the Rust Wardens", "The Long Winter of Year One"). The tile inspector shows
-  it, and caravans pay well for it.
-- **Decor that needs no artist:**
-  - Flower pots and planters: the grower tends flowers, which add beauty while in bloom and wilt in winter.
-  - Rugs (cloth).
-  - Banners and wall hangings (cloth and wood).
-  - Torches and standing lamps: beauty, and a little light at night.
-  - Memorials: see Phase D.
-- **Beauty where colonists are.** Colonists get mood from what's around them (the beauty within a few tiles),
-  not only from their bedroom and the dining room. "Pleasant surroundings" and "Drab surroundings" thoughts
-  make a bare stone hall feel bad.
-- **Galleries.** A room whose beauty comes mostly from art becomes a gallery. Looking at art is a recreation
-  kind.
-- **Goals:** "Make a sculpture", "Make a masterwork", "Have an impressive room" (Prosperity).
-- **Tests and checks:** quality follows skill; beauty feeds impressiveness and the new thoughts; titles come
-  from real story entries. In the harness, average room impressiveness and mood go up, and selling art makes
-  a modest amount of silver without breaking the economy.
+- **Sculptures, carved in place.** Small (40 wood), large (40 granite blocks) and grand (70 blocks and 40
+  silver, after the Fine Arts research at 1200). A sculpture is planned like any building. A colonist with
+  the new **Art** work type fetches the materials and carves it, training Artistic; builders leave it alone.
+  (This replaces the sculptor's table in the original plan: carving in place uses the existing building
+  system and avoids moving finished pieces about.)
+- **Quality.** Artistic skill, give or take three, plus three if the artist is inspired, on the same 0–20
+  scale and labels as crafted goods (Poor to Masterwork). A sculpture's beauty is its base times 0.4 to 3
+  by quality, so a skilled artist's piece is worth several times a novice's. A finished piece gives the
+  artist "Made a work of art" (+3). A masterwork (17+) gives "Made a masterwork" (+10, three days) and goes
+  in the story.
+- **Art that remembers.** Each piece is titled after a moment from the colony's recent story:
+  - "In Memory of Wren" (a death);
+  - "Ada and Bram" (a friendship);
+  - "The Raid of Day 14";
+  - "The Long Winter";
+  - "Lights over the Valley" (an aurora);
+  - and others.
+
+  With nothing to draw on, it's "Ada's Spring Study". The tile inspector shows the title, quality, artist
+  and day.
+
+- **Decor without an artist:**
+  - flower pots: beauty 3, a fifth of that in winter;
+  - banners: beauty 2, cloth and wood.
+- **Surroundings.** Beauty within two tiles (only the same room, indoors) gives "Pleasant surroundings"
+  (+2, at 6+) or "Beautiful surroundings" (+4, at 15+). Standing in a bare room with nothing pleasant in it
+  gives "Drab surroundings" (−1). Asleep, none of it counts.
+- **Galleries and admiring art.** Sculptures are art recreation: colonists stand around them to admire
+  them. A room whose recreation is mostly art is a Gallery, and an impressive one leaves "Had fun in a nice
+  room". Rooms that reach 60 are now "magnificent".
+- **Goals (Prosperity):**
+  - carve a sculpture;
+  - carve an excellent sculpture or a masterwork;
+  - make a room magnificent.
+- **Results** (Standard, 48 days, 12 seeds, the test colony adding a small sculpture and two flower pots
+  to its hut on day 4):
+  - Barracks impressiveness rose from about 40 to 68.
+  - Survival, mood and breaks are unchanged (72 of 73, 48.0, 5 breaks).
+  - The surroundings thoughts barely show here because that colony's hut is mostly slept in. Decorating
+    where colonists eat and work is what pays.
+- **Not done:** caravans buying art. Sculptures are buildings, not items, so trading them needs a way to
+  pack one up. That's left for later.
 
 ## 5. Phase C: Music
 

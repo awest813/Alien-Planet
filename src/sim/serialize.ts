@@ -26,6 +26,7 @@ import {
   TimedThought,
   WornApparel,
   SKILL_KEYS,
+  Artwork,
 } from './types';
 import { Caravan } from './trade';
 import { WeatherState } from './weather';
@@ -111,6 +112,8 @@ export interface SaveData {
   stats: Stats;
   log: LogEntry[];
   storyLog: StoryEntry[];
+  // Finished sculptures: [tile, artwork].
+  artworks?: [number, Artwork][];
   story: StoryState;
   enemies: Enemy[];
   nextEnemyId: number;
@@ -208,6 +211,8 @@ export function serialize(sim: Simulation): SaveData {
     stats: structuredClone(sim.stats),
     log: sim.log.map((entry) => ({ ...entry })),
     storyLog: structuredClone(sim.storyLog),
+    // Only pieces still standing (one taken down leaves its record behind).
+    artworks: [...sim.artworks].filter(([i]) => sim.artworkAt(i)).map(([i, art]) => [i, { ...art }]),
     story: structuredClone(sim.story),
     enemies: structuredClone(sim.enemies),
     nextEnemyId: sim.nextEnemyId,
@@ -277,6 +282,7 @@ export function deserialize(data: SaveData): Simulation {
   sim.stats = structuredClone(data.stats);
   sim.log = data.log.map((entry) => ({ ...entry }));
   sim.storyLog = structuredClone(data.storyLog);
+  sim.artworks = new Map((data.artworks ?? []).map(([i, art]) => [i, { ...art }]));
   sim.storyCount = sim.storyLog.length;
   // Saves from before difficulty settings play on standard.
   sim.story = { ...structuredClone(data.story), difficulty: data.story.difficulty ?? 'standard' };

@@ -92,6 +92,10 @@ export interface FeatureDef {
   bed: boolean;
   table: boolean;
   beauty: number;
+  // A work of art: carved by an artist (Art work), its beauty set by the quality they achieve.
+  art: boolean;
+  // Flowers: full beauty in bloom, little in winter.
+  flowers: boolean;
   workbench?: BenchType;
   // Heat added to the room per climate update.
   heater: number;
@@ -174,6 +178,8 @@ interface RawFeature {
   bed?: boolean;
   table?: boolean;
   beauty?: number;
+  art?: boolean;
+  flowers?: boolean;
   workbench?: string;
   heater?: number;
   cover?: number;
@@ -297,6 +303,8 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   bed: !!f.bed,
   table: !!f.table,
   beauty: f.beauty ?? 0,
+  art: !!f.art,
+  flowers: !!f.flowers,
   workbench: f.workbench as BenchType | undefined,
   heater: f.heater ?? 0,
   cover: f.cover ?? 1,

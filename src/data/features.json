@@ -737,5 +737,106 @@
       "work": 160
     },
     "research": "optics"
+  },
+  {
+    "key": "sculptureSmall",
+    "name": "Small sculpture",
+    "beauty": 4,
+    "art": true,
+    "joy": {
+      "activity": "Admiring a sculpture",
+      "kind": "art",
+      "hoursToFull": 3,
+      "seats": 2
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 40
+        }
+      ],
+      "work": 600
+    }
+  },
+  {
+    "key": "sculptureLarge",
+    "name": "Large sculpture",
+    "beauty": 8,
+    "art": true,
+    "joy": {
+      "activity": "Admiring a sculpture",
+      "kind": "art",
+      "hoursToFull": 2.5,
+      "seats": 3
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "stoneBlocks",
+          "count": 40
+        }
+      ],
+      "work": 1200
+    }
+  },
+  {
+    "key": "sculptureGrand",
+    "name": "Grand sculpture",
+    "beauty": 16,
+    "art": true,
+    "joy": {
+      "activity": "Admiring a sculpture",
+      "kind": "art",
+      "hoursToFull": 2,
+      "seats": 4
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "stoneBlocks",
+          "count": 70
+        },
+        {
+          "item": "silver",
+          "count": 40
+        }
+      ],
+      "work": 2400
+    },
+    "research": "fineArts"
+  },
+  {
+    "key": "flowerPot",
+    "name": "Flower pot",
+    "beauty": 3,
+    "flowers": true,
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 8
+        }
+      ],
+      "work": 80
+    }
+  },
+  {
+    "key": "banner",
+    "name": "Banner",
+    "beauty": 2,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 5
+        },
+        {
+          "item": "cloth",
+          "count": 8
+        }
+      ],
+      "work": 90
+    }
   }
 ]

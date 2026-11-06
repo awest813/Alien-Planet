@@ -1,4 +1,11 @@
-import { CROP_MIN_TEMP, describeRoom, measureRooms, outdoorTemperature, updateRoomTemperatures } from './climate';
+import {
+  CROP_MIN_TEMP,
+  MAGNIFICENT_ROOM,
+  describeRoom,
+  measureRooms,
+  outdoorTemperature,
+  updateRoomTemperatures,
+} from './climate';
 import {
   ANIMALS,
   COLONIST_COLORS,
@@ -112,7 +119,9 @@ import {
   Stats,
   WORK_TYPES,
   WorkTypeKey,
+  Artwork,
 } from './types';
+import { EXCELLENT, MASTERWORK, artBeauty, rollQuality, titleFor } from './art';
 import { spreadWildPlants } from './plants';
 import { Designation, GROW_ZONE, TileKind, World, growZoneCrop } from './world';
 import { generateWorld } from './worldgen';
@@ -129,6 +138,12 @@ const REST_GAIN_GROUND = 1 / (TICKS_PER_HOUR * 9);
 const JOY_DECAY = 1 / (TICKS_PER_HOUR * 24);
 // Below this after a meal, a colonist eats again straight away.
 const STILL_HUNGRY = 0.3;
+// Beauty within SURROUNDINGS tiles needed to feel pleasant, and beautiful.
+const SURROUNDINGS = 2;
+const PLEASANT_AROUND = 6;
+const BEAUTIFUL_AROUND = 15;
+// Flowers in winter keep this share of their beauty.
+const WINTER_FLOWERS = 0.2;
 const WALK_HOURS_TO_FULL = 4;
 const JOY_GAIN_WALK = 1 / (TICKS_PER_HOUR * WALK_HOURS_TO_FULL);
 // Recreation tolerance: past a free allowance, what a kind is worth falls as
@@ -186,7 +201,16 @@ const JOB_FOR_DESIGNATION: Record<number, JobType> = {
   [Designation.DECONSTRUCT]: 'deconstruct',
 };
 
-const WORK_JOBS = new Set<JobType>(['mine', 'chop', 'forage', 'construct', 'deconstruct', 'sow', 'harvestCrop']);
+const WORK_JOBS = new Set<JobType>([
+  'mine',
+  'chop',
+  'forage',
+  'construct',
+  'sculpt',
+  'deconstruct',
+  'sow',
+  'harvestCrop',
+]);
 const TEND_TICKS = 80;
 const MEDICINE = itemId('herbalMedicine');
 // A stored weapon must be this much better (by weaponScore) before someone swaps theirs for it.
@@ -316,6 +340,8 @@ function skillFor(type: JobType): SkillKey {
     case 'construct':
     case 'deconstruct':
       return 'construction';
+    case 'sculpt':
+      return 'artistic';
     default:
       return 'plants';
   }
@@ -339,6 +365,7 @@ const FIRE_INTERRUPTS = new Set<JobType>([
   'chop',
   'forage',
   'construct',
+  'sculpt',
   'deconstruct',
   'sow',
   'harvestCrop',
@@ -368,6 +395,8 @@ export class Simulation {
   };
   public log: LogEntry[] = [];
   public storyLog: StoryEntry[] = [];
+  // Finished sculptures by tile.
+  public artworks = new Map<number, Artwork>();
   public story: StoryState = freshStory();
   public enemies: Enemy[] = [];
   public nextEnemyId = 0;
@@ -481,7 +510,7 @@ export class Simulation {
   private readonly fighting = new Set<number>();
   // Tick after which a starving colonist may search for food again.
   private readonly nextFoodSearch = new Map<number, number>();
-  private contentsVersion = -1;
+  private contentsVersion = '';
   private wasNight = false;
 
   constructor(
@@ -1033,6 +1062,8 @@ export class Simulation {
         return 'Foraging berries';
       case 'construct':
         return `Building ${blueprintName(job.target)}`;
+      case 'sculpt':
+        return `Carving ${blueprintName(job.target)}`;
       case 'deconstruct':
         return `Deconstructing ${featureName(job.target)}`;
       case 'sow': {
@@ -1168,7 +1199,7 @@ export class Simulation {
     const oldTemps = this.roomTemps;
     this.regions = computePassRegions(this.world);
     this.rooms = computeRooms(this.world);
-    this.contentsVersion = -1;
+    this.contentsVersion = '';
     // New rooms start at the average temperature of the tiles they cover.
     const outdoor = this.outdoorTemperature();
     const sums = this.rooms.sizes.map(() => 0);
@@ -1185,9 +1216,11 @@ export class Simulation {
 
   private contents(): ReturnType<typeof measureRooms> {
     this.ensureRegions();
-    if (this.contentsVersion !== this.world.featureVersion) {
-      this.contentsVersion = this.world.featureVersion;
-      this.roomContents = measureRooms(this.world, this.rooms);
+    // Flowers fade in winter, so the season is part of what the room's beauty depends on.
+    const key = `${this.world.featureVersion}:${this.season === 'Winter'}`;
+    if (this.contentsVersion !== key) {
+      this.contentsVersion = key;
+      this.roomContents = measureRooms(this.world, this.rooms, (i) => this.beautyAt(i));
     }
     return this.roomContents;
   }
@@ -1684,6 +1717,18 @@ export class Simulation {
     } else if (total >= SAME_OLD_TOTAL && Math.max(...recent) >= SAME_OLD_SHARE * total && this.hasJoyBuilding()) {
       keys.push('sameOldThing');
     }
+    // What's around them: sculptures, flowers, fine floors and furniture lift the spirits; a bare
+    // room with nothing pleasant in it drags a little.
+    if (!c.sleeping) {
+      const around = this.beautyAround(c.tile);
+      if (around >= BEAUTIFUL_AROUND) {
+        keys.push('beautifulSurroundings');
+      } else if (around >= PLEASANT_AROUND) {
+        keys.push('pleasantSurroundings');
+      } else if (around <= 0 && this.isIndoors(c.tile)) {
+        keys.push('drabSurroundings');
+      }
+    }
     // Cold and heat as felt in what they're wearing.
     const temp = this.temperatureAt(c.tile);
     const comfort = comfortRange(c);
@@ -2125,6 +2170,8 @@ export class Simulation {
         return this.tryBill(c, 'cooking');
       case 'crafting':
         return this.tryBill(c, 'crafting') || this.tryBill(c, 'stonecutting');
+      case 'art':
+        return this.trySculpt(c) || this.tryDeliver(c, true);
       case 'hauling':
         return this.tryRefuel(c) || this.tryHaul(c) || this.tryChill(c, this.regionOf(c.tile));
     }
@@ -2137,6 +2184,7 @@ export class Simulation {
       case 'chop':
       case 'forage':
       case 'construct':
+      case 'sculpt':
       case 'deconstruct':
       case 'sow':
       case 'harvestCrop':
@@ -2377,9 +2425,111 @@ export class Simulation {
     const targets = this.nearestIn(
       'blueprints',
       c.tile,
-      (i) => this.constructable(i) && !this.isReserved(`w${i}`, c) && this.hasWorkSpot(i, false, region),
+      (i) =>
+        !featureDef(this.world.blueprint[i]).art &&
+        this.constructable(i) &&
+        !this.isReserved(`w${i}`, c) &&
+        this.hasWorkSpot(i, false, region),
     );
     return this.startWorkJob(c, 'construct', targets, region);
+  }
+
+  // Artists carve sculptures in place once the materials are there.
+  private trySculpt(c: Colonist): boolean {
+    const region = this.regionOf(c.tile);
+    const targets = this.nearestIn(
+      'blueprints',
+      c.tile,
+      (i) =>
+        featureDef(this.world.blueprint[i]).art &&
+        this.constructable(i) &&
+        !this.isReserved(`w${i}`, c) &&
+        this.hasWorkSpot(i, false, region),
+    );
+    return this.startWorkJob(c, 'sculpt', targets, region);
+  }
+
+  // A finished sculpture: its quality from the artist's skill, a subject from the colony's story.
+  private finishArtwork(c: Colonist, tile: number, name: string): void {
+    const quality = rollQuality(this, c);
+    const title = titleFor(this, c);
+    this.artworks.set(tile, { quality, title, artist: c.name, day: this.day });
+    // Room beauty was worked out before the quality was known.
+    this.contentsVersion = '';
+    this.stats.sculptures = (this.stats.sculptures ?? 0) + 1;
+    this.stats.bestArt = Math.max(this.stats.bestArt ?? 0, quality);
+    const label = qualityLabel(quality).toLowerCase();
+    const what = `${/^[aeiou]/.test(label) ? 'an' : 'a'} ${label} ${name.toLowerCase()}`;
+    if (quality >= MASTERWORK) {
+      this.addThought(c, 'madeMasterwork');
+      this.addLog(`${c.name} has carved a masterwork: ${name.toLowerCase()}, “${title}”.`, 'good', true);
+    } else {
+      this.addThought(c, 'madeArt');
+      this.addLog(
+        `${c.name} finished ${what}, “${title}”.`,
+        quality >= EXCELLENT ? 'good' : 'info',
+        quality >= EXCELLENT,
+      );
+    }
+  }
+
+  // The most impressive enclosed room in the colony.
+  public bestImpressiveness(): number {
+    this.ensureRegions();
+    const contents = this.contents();
+    let best = 0;
+    for (let r = 0; r < this.rooms.sizes.length; r++) {
+      if (this.rooms.enclosed[r]) {
+        best = Math.max(best, describeRoom(r, this.rooms, contents[r], 0).impressiveness);
+      }
+    }
+    return best;
+  }
+
+  // Beauty within two tiles: buildings and floors, and indoors only what's in the same room.
+  public beautyAround(tile: number): number {
+    this.ensureRegions();
+    const w = this.world;
+    const room = this.rooms.room[tile];
+    const indoors = room >= 0 && this.rooms.enclosed[room];
+    const x0 = w.xOf(tile);
+    const y0 = w.yOf(tile);
+    let total = 0;
+    for (let y = y0 - SURROUNDINGS; y <= y0 + SURROUNDINGS; y++) {
+      for (let x = x0 - SURROUNDINGS; x <= x0 + SURROUNDINGS; x++) {
+        if (!w.inBounds(x, y)) {
+          continue;
+        }
+        const i = w.idx(x, y);
+        if (indoors && this.rooms.room[i] !== room && !w.blocksRoom(i)) {
+          continue;
+        }
+        total += this.beautyAt(i) + (w.floor[i] !== NONE ? featureDef(w.floor[i]).beauty : 0);
+      }
+    }
+    return total;
+  }
+
+  // The finished sculpture on a tile, if there is one.
+  public artworkAt(i: number): Artwork | undefined {
+    const f = this.world.feature[i];
+    return f !== NONE && featureDef(f).art ? this.artworks.get(i) : undefined;
+  }
+
+  // What a building on a tile adds to beauty: a sculpture by its quality, flowers by the season.
+  public beautyAt(i: number): number {
+    const f = this.world.feature[i];
+    if (f === NONE) {
+      return 0;
+    }
+    const def = featureDef(f);
+    if (def.art) {
+      return def.beauty * artBeauty(this.artworks.get(i)?.quality ?? 6);
+    }
+    if (def.flowers && this.season === 'Winter') {
+      return def.beauty * WINTER_FLOWERS;
+    }
+    return def.beauty;
   }
 
   private tryHarvestCrop(c: Colonist): boolean {
@@ -2462,6 +2612,7 @@ export class Simulation {
   private workTargetValid(job: Job): boolean {
     switch (job.type) {
       case 'construct':
+      case 'sculpt':
         return this.constructable(job.target);
       case 'sow':
         return this.sowable(job.target);
@@ -2476,6 +2627,7 @@ export class Simulation {
     const w = this.world;
     switch (job.type) {
       case 'construct':
+      case 'sculpt':
         return featureDef(w.blueprint[job.target]).build!.work;
       case 'sow':
         return featureDef(growZoneCrop(w.zone[job.target])).crop!.sowWork;
@@ -2490,9 +2642,17 @@ export class Simulation {
 
   private workSpeed(c: Colonist, type: JobType | 'cooking' | 'crafting' | 'doctor'): number {
     const s = c.skills;
-    const plants = !['mine', 'cooking', 'crafting', 'doctor', 'construct', 'deconstruct', 'research', 'fish'].includes(
-      type,
-    );
+    const plants = ![
+      'mine',
+      'cooking',
+      'crafting',
+      'doctor',
+      'construct',
+      'sculpt',
+      'deconstruct',
+      'research',
+      'fish',
+    ].includes(type);
     const skill =
       type === 'research'
         ? s.research
@@ -2504,11 +2664,13 @@ export class Simulation {
               ? s.crafting
               : type === 'doctor'
                 ? s.medicine
-                : type === 'construct' || type === 'deconstruct'
-                  ? s.construction
-                  : type === 'fish'
-                    ? s.animals
-                    : s.plants;
+                : type === 'sculpt'
+                  ? s.artistic
+                  : type === 'construct' || type === 'deconstruct'
+                    ? s.construction
+                    : type === 'fish'
+                      ? s.animals
+                      : s.plants;
     const moodFactor = c.mood < 25 ? 0.85 : c.mood > 70 ? 1.1 : 1;
     const traits = traitFactor(c, 'workSpeed') * (plants ? traitFactor(c, 'plantSpeed') : 1);
     const tools = c.tool && TOOL_WORK.has(type as JobType) ? 1 + TOOL_BONUS * qualityFactor(c.tool.quality) : 1;
@@ -2639,7 +2801,8 @@ export class Simulation {
         }
         break;
       }
-      case 'construct': {
+      case 'construct':
+      case 'sculpt': {
         const f = w.blueprint[t];
         w.blueprint[t] = NONE;
         w.clearDelivered(t);
@@ -2666,6 +2829,10 @@ export class Simulation {
         this.pushColonistsOff(t);
         this.stats.built++;
         const def = featureDef(f);
+        if (def.art) {
+          this.finishArtwork(c, t, def.name);
+          break;
+        }
         if (!def.blocksRoom || def.door) {
           const name = def.name.toLowerCase();
           this.addLog(`${c.name} built ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name}.`);
@@ -2731,7 +2898,8 @@ export class Simulation {
 
   // ---- Construction deliveries ----
 
-  private tryDeliver(c: Colonist): boolean {
+  // Brings materials to a blueprint (only to sculptures, for an artist fetching their own).
+  private tryDeliver(c: Colonist, artOnly = false): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
     // Only consider blueprints whose missing materials actually exist, so a cluster of blueprints
@@ -2742,6 +2910,7 @@ export class Simulation {
       c.tile,
       (i) =>
         w.blueprint[i] !== NONE &&
+        (!artOnly || featureDef(w.blueprint[i]).art) &&
         w.blueprintNeeds(i).some((need) => available.has(need.item)) &&
         !this.isReserved(`d${i}`, c) &&
         this.hasWorkSpot(i, false, region),
@@ -3713,7 +3882,7 @@ export class Simulation {
       this.addThought(c, 'stargazed');
     }
     const room = this.roomAt(c.tile);
-    if (room && room.role === 'Recreation room' && room.impressiveness >= NICE_ROOM) {
+    if (room && (room.role === 'Recreation room' || room.role === 'Gallery') && room.impressiveness >= NICE_ROOM) {
       this.addThought(c, 'niceRecRoom');
     }
     this.endJob(c);
@@ -5033,6 +5202,25 @@ export const OBJECTIVES: ObjectiveDef[] = [
     label: 'Have two colonists play a game of chess',
     phase: 5,
     check: (s) => (s.stats.chessGames ?? 0) > 0,
+  },
+  {
+    id: 'sculpture',
+    label: 'Carve a sculpture (Art work)',
+    phase: 5,
+    check: (s) => (s.stats.sculptures ?? 0) > 0,
+  },
+  {
+    id: 'fineArt',
+    label: 'Carve an excellent sculpture or a masterwork',
+    phase: 5,
+    check: (s) => (s.stats.bestArt ?? 0) >= EXCELLENT,
+  },
+  {
+    id: 'impressiveRoom',
+    label: 'Make a room magnificent (sculptures help most)',
+    phase: 5,
+    check: (s) => s.bestImpressiveness() >= MAGNIFICENT_ROOM,
+    progress: (s) => `${Math.min(MAGNIFICENT_ROOM, s.bestImpressiveness())}/${MAGNIFICENT_ROOM}`,
   },
   {
     id: 'population',

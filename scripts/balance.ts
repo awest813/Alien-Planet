@@ -235,6 +235,8 @@ function play(seed: number): Result {
   let secondFarm = false;
   let hearthPlaced = false;
   let gamesPlaced = false;
+  let artPlaced = false;
+  let bannerPlaced = false;
   let labTile = -1;
   let telescopePlaced = false;
   let fishingPlaced = false;
@@ -354,6 +356,20 @@ function play(seed: number): Result {
       if (next) {
         sim.apply({ type: 'research', project: next });
       }
+    }
+    // Some art and flowers in the hut on day 4, and a banner once there's cloth to spare.
+    if (hut && !artPlaced && sim.day >= 4) {
+      artPlaced = true;
+      sim.apply({ type: 'build', feature: featureId('sculptureSmall'), tiles: [at(hut.x + 4, hut.y + 4)] });
+      sim.apply({
+        type: 'build',
+        feature: featureId('flowerPot'),
+        tiles: [at(hut.x + 2, hut.y + 4), at(hut.x + 6, hut.y + 4)],
+      });
+    }
+    if (hut && !bannerPlaced && sim.stockOf(itemId('cloth')) >= 20) {
+      bannerPlaced = true;
+      sim.apply({ type: 'build', feature: featureId('banner'), tiles: [at(hut.x + 6, hut.y + 5)] });
     }
     // A games corner on day 3, and a telescope once Optics is in.
     if (!gamesPlaced && sim.day >= 3) {

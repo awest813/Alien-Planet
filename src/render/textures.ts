@@ -335,6 +335,91 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillStyle = '#7fb3d9';
       c.fillRect(13, 2, 1, 1);
       break;
+    case 'sculptureSmall':
+      // A carved wooden figure on a low plinth.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(3, 13, 10, 2);
+      c.fillStyle = '#6b4a2e';
+      c.fillRect(4, 11, 8, 3);
+      c.fillStyle = '#a8794a';
+      c.fillRect(7, 3, 2, 2);
+      c.fillRect(6, 5, 4, 4);
+      c.fillRect(6, 9, 1, 2);
+      c.fillRect(9, 9, 1, 2);
+      c.fillRect(5, 6, 1, 2);
+      c.fillRect(10, 5, 1, 2);
+      c.fillStyle = '#c8955e';
+      c.fillRect(7, 3, 1, 1);
+      c.fillRect(6, 5, 1, 3);
+      break;
+    case 'sculptureLarge':
+      // A granite figure, arms raised, on a square plinth.
+      c.fillStyle = 'rgba(0,0,0,0.25)';
+      c.fillRect(2, 13, 12, 2);
+      c.fillStyle = '#7d7c82';
+      c.fillRect(3, 11, 10, 3);
+      c.fillStyle = '#b4b3b8';
+      c.fillRect(7, 1, 2, 2);
+      c.fillRect(6, 3, 4, 5);
+      c.fillRect(4, 2, 2, 1);
+      c.fillRect(10, 2, 2, 1);
+      c.fillRect(5, 3, 1, 2);
+      c.fillRect(10, 3, 1, 2);
+      c.fillRect(6, 8, 1, 3);
+      c.fillRect(9, 8, 1, 3);
+      c.fillStyle = '#d6d5da';
+      c.fillRect(7, 1, 1, 1);
+      c.fillRect(6, 3, 1, 4);
+      break;
+    case 'sculptureGrand':
+      // Granite with silver inlay on a stepped base.
+      c.fillStyle = 'rgba(0,0,0,0.25)';
+      c.fillRect(1, 13, 14, 2);
+      c.fillStyle = '#6e6d73';
+      c.fillRect(2, 12, 12, 2);
+      c.fillStyle = '#8f8e94';
+      c.fillRect(3, 10, 10, 2);
+      c.fillStyle = '#c4c3c8';
+      c.fillRect(6, 2, 4, 8);
+      c.fillRect(5, 4, 6, 4);
+      c.fillRect(7, 0, 2, 2);
+      c.fillStyle = '#e8edf2';
+      c.fillRect(7, 4, 2, 4);
+      c.fillRect(6, 2, 1, 1);
+      c.fillRect(9, 2, 1, 1);
+      c.fillStyle = '#ffffff';
+      c.fillRect(7, 5, 1, 1);
+      break;
+    case 'flowerPot':
+      // A clay pot of flowers.
+      c.fillStyle = '#9a4f2e';
+      c.fillRect(5, 10, 6, 5);
+      c.fillStyle = '#b8643c';
+      c.fillRect(4, 9, 8, 2);
+      c.fillStyle = '#3f8a3a';
+      c.fillRect(7, 5, 1, 4);
+      c.fillRect(5, 6, 1, 3);
+      c.fillRect(10, 6, 1, 3);
+      c.fillStyle = '#e85a8a';
+      c.fillRect(6, 3, 3, 2);
+      c.fillStyle = '#f2c94c';
+      c.fillRect(4, 5, 2, 2);
+      c.fillStyle = '#9b6bd6';
+      c.fillRect(10, 4, 2, 2);
+      break;
+    case 'banner':
+      // A pole with a hanging cloth banner.
+      c.fillStyle = '#5a3818';
+      c.fillRect(7, 1, 2, 14);
+      c.fillRect(4, 1, 8, 1);
+      c.fillStyle = '#2f5fa8';
+      c.fillRect(4, 2, 8, 9);
+      c.fillRect(5, 11, 2, 2);
+      c.fillRect(9, 11, 2, 2);
+      c.fillStyle = '#f2c94c';
+      c.fillRect(7, 4, 2, 2);
+      c.fillRect(6, 6, 4, 1);
+      break;
     case 'armchair':
       c.fillStyle = '#7a2e3a';
       c.fillRect(2, 2, 12, 12);

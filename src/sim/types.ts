@@ -4,6 +4,7 @@ export type JobType =
   | 'chop'
   | 'forage'
   | 'construct'
+  | 'sculpt'
   | 'deconstruct'
   | 'sow'
   | 'harvestCrop'
@@ -91,6 +92,7 @@ export const WORK_TYPES = [
   'hunting',
   'handling',
   'crafting',
+  'art',
   'research',
   'hauling',
 ] as const;
@@ -366,6 +368,17 @@ export interface Stats {
   wintersSurvived: number;
   // Games of chess played with someone.
   chessGames?: number;
+  // Sculptures finished, and the best quality reached (0–20).
+  sculptures?: number;
+  bestArt?: number;
+}
+
+// A finished sculpture: how well it came out, what it shows, and who made it.
+export interface Artwork {
+  quality: number;
+  title: string;
+  artist: string;
+  day: number;
 }
 
 export type NightResult = 'pending' | 'success' | 'failed';

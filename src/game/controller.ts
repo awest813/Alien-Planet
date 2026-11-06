@@ -71,6 +71,7 @@ export type ToolGroup =
   | 'structure'
   | 'floors'
   | 'furniture'
+  | 'decor'
   | 'production'
   | 'power'
   | 'climate'
@@ -83,6 +84,7 @@ export const TOOL_GROUPS: { key: ToolGroup; label: string }[] = [
   { key: 'structure', label: 'Structure' },
   { key: 'floors', label: 'Floors' },
   { key: 'furniture', label: 'Furniture' },
+  { key: 'decor', label: 'Art & decor' },
   { key: 'production', label: 'Production' },
   { key: 'power', label: 'Power' },
   { key: 'climate', label: 'Climate' },
@@ -146,6 +148,18 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     screen: 'production',
   },
   parkas: { how: 'Research Tailoring; crafters then make parkas from leather (see Production).', screen: 'research' },
+  sculpture: {
+    how: 'Build a sculpture (Art & decor). Colonists with Art work carve it; Artistic skill sets how well it turns out.',
+    tool: 'sculptureSmall',
+  },
+  fineArt: {
+    how: 'Skilled artists (Artistic 10+) make the best pieces; an inspired artist does better still. Give your best artist Art work at priority 1.',
+    screen: 'work',
+  },
+  impressiveRoom: {
+    how: 'Fill a room with beauty: sculptures, flower pots, banners, fine floors and furniture. Smaller rooms show it off more.',
+    tool: 'sculptureLarge',
+  },
   population: {
     how: 'Wanderers ask to join now and then until the valley is full (6 on a small map, 9 medium, 12 large); keep the colony comfortable and fed.',
   },
@@ -292,6 +306,17 @@ export const TOOLS: ToolDef[] = [
   ),
   build('cardTable', 'Card table', '', 'furniture', 'Social recreation for up to four. Alone, it is much less fun'),
   build('telescope', 'Telescope', '', 'furniture', 'Stargazing on clear nights; it must stand under the open sky'),
+  build(
+    'sculptureSmall',
+    'Small sculpture',
+    '',
+    'decor',
+    'Carved by an artist (Art work): the more skilled, the more beautiful. Colonists admire it for fun',
+  ),
+  build('sculptureLarge', 'Large sculpture', '', 'decor', 'A granite piece, twice the beauty of a small one'),
+  build('sculptureGrand', 'Grand sculpture', '', 'decor', 'Granite and silver: the finest piece a colony can make'),
+  build('flowerPot', 'Flower pot', '', 'decor', 'Pretty while in bloom; little to look at in winter'),
+  build('banner', 'Banner', '', 'decor', 'A splash of colour for a room'),
   build('stove', 'Stove', 'k', 'production', 'Cooks meals from raw food'),
   build('craftingBench', 'Crafting bench', 'j', 'production', 'Weaves cloth and crafts bows'),
   build('researchBench', 'Research bench', '', 'production', 'Where colonists research new technology'),
@@ -1594,9 +1619,16 @@ export class GameController {
       orders.push('Stockpile');
     }
     const f = w.feature[i];
-    const feature = f !== NONE ? featureDef(f).name : null;
+    const art = sim.artworkAt(i);
+    const feature = f !== NONE ? (art ? `“${art.title}”` : featureDef(f).name) : null;
     const details: string[] = [];
     const def = f !== NONE ? featureDef(f) : undefined;
+    if (art && def) {
+      details.push(`${qualityLabel(art.quality)} ${def.name.toLowerCase()} by ${art.artist}, day ${art.day}`);
+    }
+    if (def?.flowers && sim.season === 'Winter') {
+      details.push('Out of bloom until spring');
+    }
     if (def?.power) {
       const running = sim.power.powered;
       if (def.power.fuel) {
