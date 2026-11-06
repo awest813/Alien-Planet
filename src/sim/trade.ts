@@ -223,12 +223,23 @@ function takeFromStockpiles(sim: Simulation, item: number, count: number): void 
   }
 }
 
+function mergeLines(lines: [number, number][]): [number, number][] {
+  const total = new Map<number, number>();
+  for (const [item, count] of lines) {
+    total.set(item, (total.get(item) ?? 0) + count);
+  }
+  return [...total];
+}
+
 // One deal: buy and sell lists of [item, count]. Returns null on success, or why it failed.
 export function applyTrade(sim: Simulation, buy: [number, number][], sell: [number, number][]): string | null {
   const caravan = sim.caravan;
   if (!caravan || !tradeOpen(sim)) {
     return 'No traders are here.';
   }
+  // Fold repeated lines for the same item together, so each item is checked against its full count.
+  buy = mergeLines(buy);
+  sell = mergeLines(sell);
   const price = prices(sim, caravan.faction);
   const silver = SILVER();
   for (const [item, count] of buy) {

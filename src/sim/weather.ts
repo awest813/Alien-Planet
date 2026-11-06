@@ -154,7 +154,9 @@ const FIREPROOF = new Set(['stone', 'stoneBlocks', 'silver']);
 export function updateFires(sim: Simulation, hours: number): void {
   const w = sim.world;
   const drought = sim.weather.kind === 'drought';
-  for (const tile of [...sim.burning]) {
+  // Tile order, not ignition order, so a game loaded from a save (which rebuilds the set by
+  // scanning tiles) draws from the RNG in the same order and spreads the same way.
+  for (const tile of [...sim.burning].sort((a, b) => a - b)) {
     // Whatever was burning has been chopped or torn down: nothing left to feed the flames.
     if (burnTime(sim, tile) <= 0) {
       putOut(sim, tile);

@@ -125,7 +125,7 @@ function stalk(sim: Simulation, a: Animal): boolean {
   if ((a.fedUntil ?? 0) > sim.tick || (a.huntAgainAt ?? 0) > sim.tick || !def.preys || !def.bite) {
     return false;
   }
-  let prey = a.chasing !== undefined ? sim.animals.find((p) => p.id === a.chasing && p.hp > 0) : undefined;
+  let prey = a.chasing !== undefined ? sim.animals.find((p) => p.id === a.chasing && p.hp > 0 && !p.tame) : undefined;
   if (!prey) {
     a.chasing = undefined;
     // Looking around is occasional, not every tick.

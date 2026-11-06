@@ -1858,7 +1858,10 @@ export class Simulation {
         job !== 'tend' &&
         job !== 'warmUp' &&
         job !== 'rescue' &&
-        job !== 'shelter'
+        job !== 'shelter' &&
+        // Woken to fight a fire or to feed someone bedridden: that comes first.
+        job !== 'extinguish' &&
+        job !== 'feed'
       ) {
         this.endJob(c);
         this.startSleep(c);
@@ -4378,8 +4381,9 @@ export class Simulation {
     job.progress += this.workSpeed(c, 'doctor');
     learn(this, c, 'medicine');
     if (job.progress >= TEND_TICKS) {
+      // One dose per tend, even when the doctor happens to be carrying a whole stack.
       const medicine = c.carrying?.item === MEDICINE;
-      if (medicine) {
+      if (medicine && --c.carrying!.count <= 0) {
         c.carrying = null;
       }
       tend(this, c, patient, medicine);
