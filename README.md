@@ -17,7 +17,8 @@ load, start a new colony, settings, help, or quit to the title (which autosaves)
 every dawn and whenever you leave the page, so a closed tab doesn't lose the colony. When everyone has
 died, a summary shows how the colony fared.
 
-**Settings** (remembered in the browser): autosave, pausing on raids and on deaths or collapses, interface
+**Settings** (remembered in the browser): autosave, pausing on raids and on deaths or collapses, sound (off by
+default, with volume sliders for music and for ambience and alerts), interface
 size, how long notifications stay, camera speed, name labels, the minimap, a list of controls, and a way to
 see the welcome help again.
 
@@ -78,6 +79,10 @@ How the living simulation works:
   screen; every goal in the list is clickable the same way.
 - **Top bar:** days of food at the current headcount, icons for key materials, and every item under "All items".
   Hovering a build tool shows what it does, what it costs and any research it needs.
+- **Music:** build a drum, flute, lute or (after Instruments research) a harp. Colonists play for fun and train
+  Artistic, and everyone in earshot enjoys it, more so from a good player. On an evening, a player with Artistic 6+
+  may give a concert: off-duty colonists gather round to listen and chat. With sound on, you hear every
+  instrument, each with a tune of its own; a beginner's playing is a little off.
 - **Art and decor:** plan a small, large or grand sculpture (Art & decor tab) and a colonist with Art work carves
   it in place. Their Artistic skill sets the quality, from poor to masterwork, and so how beautiful it is. Every
   piece is titled after a moment from the colony's story ("Ada and Bram", "The Long Winter", "In Memory of Wren").
@@ -153,7 +158,7 @@ How the storytelling layer works:
   summers, freezing winter nights). Crops don't grow in winter and hard frost kills anything left in the field,
   so plant enough in spring and summer and harvest before winter.
 - **Research:** build a research bench, pick a project in the Research screen, and colonists with the Research
-  work type study it (training the Intellectual skill). Nineteen projects unlock the recurve bow, sandbags, the
+  work type study it (training the Intellectual skill). Twenty projects unlock the recurve bow, sandbags, the
   stone hearth, the fine bed, tailoring and all the electrical tech below, or improve insulation, crop growth and
   doctoring.
 - **Power:** the colony shares one grid. Wood-fired generators (kept fuelled by haulers) and solar panels (daytime
@@ -234,6 +239,8 @@ src/
     serialize.ts    Save format
   game/       Glue between the simulation, renderer, and UI
     controller.ts   Owns the sim, time controls, tools, UI snapshots
+    music.ts        Tunes for the instruments: scales, phrases, a beginner's wrong notes
+    audio.ts        Web Audio sound: instrument voices, ambience and alerts
     save-store.ts   IndexedDB save slots
   render/     Phaser 4 scene: tilemap layers, colonist sprites, camera, input
   ui/         React management UI
@@ -277,7 +284,8 @@ wolves, `src/sim/weather.test.ts` covers weather, soaking, lightning, fire and f
 focus fire, taking cover and sheltering. `src/sim/flow.balance.test.ts` covers the game-flow fixes: mining
 before chopping when builders wait on stone, grazers returning to a hunted-out valley, and wild plants regrowing. `src/sim/groundwork.test.ts` covers recreation kinds and the Artistic skill,
 `src/sim/recreation.test.ts` covers tolerance, games, stargazing and nature walks, `src/sim/art.test.ts` covers
-sculpting, quality, titles, beauty, galleries and surroundings, and
+sculpting, quality, titles, beauty, galleries and surroundings, `src/sim/music.test.ts` covers instruments,
+earshot and concerts, `src/game/music.test.ts` covers the tunes, and
 `src/render/tileset-layout.test.ts` checks the art layout.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,

@@ -1468,3 +1468,20 @@ button.big {
   font-size: 12px;
   color: var(--muted);
 }
+
+/* A volume slider with its value beside it. */
+.setting .slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting .slider input[type='range'] {
+  width: 140px;
+  accent-color: var(--accent);
+}
+
+.setting .slider .num {
+  min-width: 3.5ch;
+  text-align: right;
+}

@@ -47,6 +47,8 @@ export interface Job {
   wait: number;
   // Colonist id being tended, or -1.
   patient: number;
+  // Recreation: listening to a concert rather than using the building at `target`.
+  listening?: boolean;
 }
 
 export interface Skills {
@@ -368,6 +370,8 @@ export interface Stats {
   wintersSurvived: number;
   // Games of chess played with someone.
   chessGames?: number;
+  // Concerts given.
+  concerts?: number;
   // Sculptures finished, and the best quality reached (0–20).
   sculptures?: number;
   bestArt?: number;

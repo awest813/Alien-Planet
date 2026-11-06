@@ -335,6 +335,71 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillStyle = '#7fb3d9';
       c.fillRect(13, 2, 1, 1);
       break;
+    case 'drum':
+      // A hide drum on short legs.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(3, 13, 10, 2);
+      c.fillStyle = '#7a4a2a';
+      c.fillRect(4, 6, 8, 7);
+      c.fillStyle = '#9a6238';
+      c.fillRect(4, 6, 8, 1);
+      c.fillRect(4, 9, 8, 1);
+      c.fillStyle = '#e6d6b0';
+      c.fillRect(4, 4, 8, 2);
+      c.fillRect(5, 3, 6, 1);
+      c.fillStyle = '#5a3818';
+      c.fillRect(5, 13, 1, 2);
+      c.fillRect(10, 13, 1, 2);
+      break;
+    case 'flute':
+      // A flute resting across a little stand.
+      c.fillStyle = '#5a3818';
+      c.fillRect(4, 9, 1, 6);
+      c.fillRect(11, 9, 1, 6);
+      c.fillRect(3, 14, 3, 1);
+      c.fillRect(10, 14, 3, 1);
+      c.fillStyle = '#c9a36a';
+      c.fillRect(2, 7, 12, 2);
+      c.fillStyle = '#4a3020';
+      c.fillRect(5, 7, 1, 1);
+      c.fillRect(7, 7, 1, 1);
+      c.fillRect(9, 7, 1, 1);
+      c.fillStyle = '#e0c48c';
+      c.fillRect(2, 7, 12, 1);
+      break;
+    case 'lute':
+      // A round-backed lute propped on its stand.
+      c.fillStyle = '#5a3818';
+      c.fillRect(7, 12, 2, 3);
+      c.fillRect(5, 14, 6, 1);
+      c.fillStyle = '#a8672e';
+      c.fillRect(4, 7, 8, 6);
+      c.fillRect(5, 6, 6, 8);
+      c.fillStyle = '#3a2414';
+      c.fillRect(7, 9, 2, 2);
+      c.fillStyle = '#7a4a22';
+      c.fillRect(7, 1, 2, 6);
+      c.fillRect(6, 1, 4, 1);
+      c.fillStyle = '#e8dcc0';
+      c.fillRect(7, 6, 1, 6);
+      c.fillRect(8, 6, 1, 6);
+      break;
+    case 'harp':
+      // A tall frame harp, gilded.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(3, 14, 10, 1);
+      c.fillStyle = '#c99a3a';
+      c.fillRect(3, 2, 2, 12);
+      c.fillRect(3, 2, 9, 2);
+      c.fillRect(11, 3, 2, 3);
+      c.fillRect(4, 13, 9, 2);
+      c.fillStyle = '#e8c565';
+      c.fillRect(3, 2, 1, 12);
+      c.fillStyle = '#f2efe6';
+      for (const [k, sx] of [6, 8, 9, 11].entries()) {
+        c.fillRect(sx, 4 + k, 1, 9 - k);
+      }
+      break;
     case 'sculptureSmall':
       // A carved wooden figure on a low plinth.
       c.fillStyle = 'rgba(0,0,0,0.2)';

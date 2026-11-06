@@ -136,6 +136,20 @@ const REST_DECAY = 1 / (TICKS_PER_HOUR * 18);
 const REST_GAIN_BED = 1 / (TICKS_PER_HOUR * 7);
 const REST_GAIN_GROUND = 1 / (TICKS_PER_HOUR * 9);
 const JOY_DECAY = 1 / (TICKS_PER_HOUR * 24);
+// Music: how far it carries, and how much a listener gets from it (per tick, at average skill).
+const HEARING = 6;
+const LISTEN_GAIN = 1 / (TICKS_PER_HOUR * 10);
+// Players this good make listeners feel it more.
+const FINE_MUSIC_SKILL = 10;
+// Concerts: who can give one, when, for how long, and how close the audience gathers.
+const CONCERT_SKILL = 6;
+const CONCERT_FROM = 17;
+const CONCERT_UNTIL = 22;
+const CONCERT_TICKS = TICKS_PER_HOUR * 2;
+const CONCERT_RADIUS = 3;
+const CONCERT_HOURS_TO_FULL = 1.5;
+// How good a player sounds: 0.5 for a beginner to 1.5 for a master.
+const musicQuality = (c: Colonist) => 0.5 + c.skills.artistic / 20;
 // Below this after a meal, a colonist eats again straight away.
 const STILL_HUNGRY = 0.3;
 // Beauty within SURROUNDINGS tiles needed to feel pleasant, and beautiful.
@@ -184,7 +198,17 @@ export interface SimTimers {
 }
 
 // Moments the UI reacts to: raids, deaths and collapses pause the game.
-export type SimEvent = 'dusk' | 'dawn' | 'raid' | 'raidNear' | 'death' | 'collapse' | 'fire' | 'manhunters';
+export type SimEvent =
+  | 'dusk'
+  | 'dawn'
+  | 'raid'
+  | 'raidNear'
+  | 'death'
+  | 'collapse'
+  | 'fire'
+  | 'manhunters'
+  | 'goal'
+  | 'concert';
 
 // A notable moment in the colony's history, for the story screen.
 export interface StoryEntry {
@@ -395,6 +419,8 @@ export class Simulation {
   };
   public log: LogEntry[] = [];
   public storyLog: StoryEntry[] = [];
+  // An evening concert under way: who's playing, at which instrument, until when.
+  public concert: { player: number; tile: number; endsAt: number } | null = null;
   // Finished sculptures by tile.
   public artworks = new Map<number, Artwork>();
   public story: StoryState = freshStory();
@@ -719,6 +745,7 @@ export class Simulation {
       this.updateSpoilage(SLOW_TICKS / TICKS_PER_HOUR);
       updateFires(this, SLOW_TICKS / TICKS_PER_HOUR);
       updateSocial(this);
+      this.checkConcert();
     }
     if (this.tick % TICKS_PER_HOUR === 0) {
       this.updateIce();
@@ -1081,6 +1108,9 @@ export class Simulation {
       case 'eat':
         return job.stage === 2 ? 'Eating' : 'Getting something to eat';
       case 'joy':
+        if (job.listening) {
+          return 'Listening to a concert';
+        }
         return job.target >= 0 && w.feature[job.target] !== NONE
           ? (featureDef(w.feature[job.target]).joy?.activity ?? 'Relaxing')
           : 'Going for a walk';
@@ -1630,6 +1660,7 @@ export class Simulation {
       if (!this.objectivesDone[objective.id] && objective.check(this)) {
         this.objectivesDone[objective.id] = true;
         this.addLog(`Goal complete: ${objective.label}`, 'good', true);
+        this.events.push('goal');
       }
     }
     // A phase is over once every goal in it is done (or, like the first night, can't be any more).
@@ -3696,6 +3727,10 @@ export class Simulation {
   private tryJoy(c: Colonist): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
+    // A concert under way is the best night out there is.
+    if (this.tryAttendConcert(c, region)) {
+      return true;
+    }
     let best: { spot: number; seat: number; path: number[] } | undefined;
     let bestScore = -Infinity;
     const options = this.nearestIn(
@@ -3724,7 +3759,7 @@ export class Simulation {
       if (score <= bestScore) {
         continue;
       }
-      const path = this.pathfinder.find(c.tile, joy.seats > 1 ? this.workSpots(spot, false, region) : [spot]);
+      const path = this.pathfinder.find(c.tile, joy.beside ? this.workSpots(spot, false, region) : [spot]);
       if (path) {
         best = { spot, seat, path };
         bestScore = score;
@@ -3758,7 +3793,7 @@ export class Simulation {
   // the open sky, and not a table a rival is already sitting at.
   private joyOpen(spot: number, c: Colonist, region: number): boolean {
     const joy = featureDef(this.world.feature[spot]).joy!;
-    if (!this.hasWorkSpot(spot, joy.seats === 1, region)) {
+    if (!this.hasWorkSpot(spot, !joy.beside, region)) {
       return false;
     }
     if (joy.stargazing && !this.starsOut(spot)) {
@@ -3840,10 +3875,14 @@ export class Simulation {
   }
 
   private stepJoy(c: Colonist, job: Job): void {
+    if (job.listening) {
+      this.stepListen(c, job);
+      return;
+    }
     const w = this.world;
     const spot = job.target;
     const joy = spot >= 0 && w.feature[spot] !== NONE ? featureDef(w.feature[spot]).joy : undefined;
-    const there = joy && (joy.seats > 1 ? this.isAtWorkSpot(c, spot, false) : c.tile === spot);
+    const there = joy && (joy.beside ? this.isAtWorkSpot(c, spot, false) : c.tile === spot);
     if (!joy || !there || (joy.stargazing && !this.starsOut(spot))) {
       this.endJob(c);
       return;
@@ -3864,9 +3903,171 @@ export class Simulation {
         converse(this, c, this.rng.pick(partners));
       }
     }
+    if (joy.instrument) {
+      this.playMusic(c, job, spot);
+      // A concert goes on until it's over, however the player is feeling.
+      if (this.concert?.player === c.id) {
+        if (this.tick >= this.concert.endsAt) {
+          this.finishConcert(c);
+          this.finishJoy(c, job, joy);
+        }
+        return;
+      }
+    }
     const slot = c.schedule[Math.floor(this.hour)];
     if (c.needs.joy >= 0.99 || --job.wait <= 0 || (slot !== 'J' && c.needs.joy > 0.9)) {
       this.finishJoy(c, job, joy);
+    }
+  }
+
+  // ---- Music ----
+
+  // A colonist at an instrument: practice, music for anyone in earshot, and in the evening, with
+  // others free to listen, a skilled player may strike up a concert.
+  private playMusic(c: Colonist, job: Job, spot: number): void {
+    learn(this, c, 'artistic');
+    if (this.tick % SLOW_TICKS === 0) {
+      const fine = c.skills.artistic >= FINE_MUSIC_SKILL;
+      for (const o of this.living()) {
+        if (o === c || o.sleeping || o.health.downed || !this.inEarshot(spot, o.tile)) {
+          continue;
+        }
+        this.enjoy(o, 'music', LISTEN_GAIN * SLOW_TICKS * musicQuality(c) * this.joyEfficiency(o, 'music'));
+        this.addThought(o, fine ? 'heardFineMusic' : 'heardMusic');
+      }
+    }
+    const hour = Math.floor(this.hour);
+    if (
+      !this.concert &&
+      c.skills.artistic >= CONCERT_SKILL &&
+      hour >= CONCERT_FROM &&
+      hour < CONCERT_UNTIL &&
+      this.someoneFreeToPlay(c, this.regionOf(c.tile)) &&
+      this.rng.chance(1 / TICKS_PER_HOUR)
+    ) {
+      this.concert = { player: c.id, tile: spot, endsAt: this.tick + CONCERT_TICKS };
+      job.wait = CONCERT_TICKS + TICKS_PER_HOUR;
+      const name = featureDef(this.world.feature[spot])
+        .name.toLowerCase()
+        .replace(/ stand$/, '');
+      this.addLog(`${c.name} is giving a concert on the ${name}. Anyone free is welcome to listen.`, 'good');
+      this.events.push('concert');
+      // Whoever is off duty and doing something for fun (or nothing much) comes along.
+      const region = this.regionOf(c.tile);
+      for (const o of this.living()) {
+        const job = o.job?.type;
+        if (
+          o !== c &&
+          !o.drafted &&
+          !o.sleeping &&
+          !o.health.downed &&
+          (job === 'joy' || job === 'wander' || !job) &&
+          !o.job?.listening &&
+          o.schedule[hour] !== 'W'
+        ) {
+          const was = o.job;
+          this.endJob(o);
+          if (!this.tryAttendConcert(o, region) && was) {
+            // Couldn't get there: they carry on with whatever they were doing next.
+            this.findJob(o);
+          }
+        }
+      }
+    }
+  }
+
+  // Sound carries six tiles; indoors, only within the same room.
+  private inEarshot(from: number, to: number): boolean {
+    const w = this.world;
+    if (Math.max(Math.abs(w.xOf(from) - w.xOf(to)), Math.abs(w.yOf(from) - w.yOf(to))) > HEARING) {
+      return false;
+    }
+    const here = this.roomAt(from);
+    const there = this.roomAt(to);
+    const enclosed = (r: RoomInfo | null) => !!r && r.enclosed;
+    if (enclosed(here) || enclosed(there)) {
+      return here?.id === there?.id;
+    }
+    return true;
+  }
+
+  private finishConcert(c: Colonist): void {
+    this.concert = null;
+    this.stats.concerts = (this.stats.concerts ?? 0) + 1;
+    this.addThought(c, 'gaveConcert');
+    this.addLog(`${c.name}'s concert is over.`, 'info');
+  }
+
+  // A concert stops if the player stops playing (drafted, collapsed, called away).
+  private checkConcert(): void {
+    const concert = this.concert;
+    if (!concert) {
+      return;
+    }
+    const p = this.colonists[concert.player];
+    if (!p || p.health.dead || p.job?.type !== 'joy' || p.job.target !== concert.tile || p.job.listening) {
+      this.concert = null;
+    }
+  }
+
+  // Off-duty colonists gather round a concert, within a few tiles of the player.
+  private tryAttendConcert(c: Colonist, region: number): boolean {
+    const concert = this.concert;
+    // (The instrument's own tile isn't walkable; each listening spot is checked for reach below.)
+    if (!concert || concert.player === c.id) {
+      return false;
+    }
+    const w = this.world;
+    const x0 = w.xOf(concert.tile);
+    const y0 = w.yOf(concert.tile);
+    const spots: number[] = [];
+    for (let y = y0 - CONCERT_RADIUS; y <= y0 + CONCERT_RADIUS; y++) {
+      for (let x = x0 - CONCERT_RADIUS; x <= x0 + CONCERT_RADIUS; x++) {
+        const i = w.inBounds(x, y) ? w.idx(x, y) : -1;
+        if (
+          i >= 0 &&
+          i !== concert.tile &&
+          w.isPassable(i) &&
+          this.regions.region[i] === region &&
+          !this.isReserved(`l${i}`, c) &&
+          this.inEarshot(concert.tile, i)
+        ) {
+          spots.push(i);
+        }
+      }
+    }
+    const path = spots.length > 0 ? this.pathfinder.find(c.tile, spots) : null;
+    if (!path) {
+      return false;
+    }
+    const spot = path.at(-1) ?? c.tile;
+    this.reserve(c, `l${spot}`);
+    this.assign(c, this.makeJob('joy', concert.tile, { listening: true, wait: CONCERT_TICKS + TICKS_PER_HOUR }), path);
+    return true;
+  }
+
+  // In the audience: music at its best, and a word with whoever's listening alongside.
+  private stepListen(c: Colonist, job: Job): void {
+    const concert = this.concert;
+    const player = concert ? this.colonists[concert.player] : undefined;
+    if (!concert || !player || concert.tile !== job.target || --job.wait <= 0) {
+      if (job.progress >= TICKS_PER_HOUR / 2) {
+        this.addThought(c, 'attendedConcert');
+      }
+      this.endJob(c);
+      return;
+    }
+    job.progress++;
+    this.enjoy(
+      c,
+      'music',
+      (musicQuality(player) * this.joyEfficiency(c, 'music')) / (TICKS_PER_HOUR * CONCERT_HOURS_TO_FULL),
+    );
+    if (this.rng.chance(1 / TICKS_PER_HOUR)) {
+      const others = this.living().filter((o) => o !== c && o.job?.listening && o.job.target === concert.tile);
+      if (others.length > 0) {
+        converse(this, c, this.rng.pick(others));
+      }
     }
   }
 
@@ -5202,6 +5403,18 @@ export const OBJECTIVES: ObjectiveDef[] = [
     label: 'Have two colonists play a game of chess',
     phase: 5,
     check: (s) => (s.stats.chessGames ?? 0) > 0,
+  },
+  {
+    id: 'instrument',
+    label: 'Build a musical instrument',
+    phase: 5,
+    check: (s) => s.countFeature((f) => !!featureDef(f).joy?.instrument) > 0,
+  },
+  {
+    id: 'concert',
+    label: 'Hold a concert (a player with Artistic 6+, in the evening)',
+    phase: 5,
+    check: (s) => (s.stats.concerts ?? 0) > 0,
   },
   {
     id: 'sculpture',

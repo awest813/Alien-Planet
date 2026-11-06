@@ -122,5 +122,11 @@
     "name": "Fine arts",
     "cost": 1200,
     "description": "Unlocks the grand sculpture: granite and silver, the finest piece a colony can make."
+  },
+  {
+    "key": "instruments",
+    "name": "Instruments",
+    "cost": 1000,
+    "description": "Unlocks the harp, the finest instrument a colony can make."
   }
 ]

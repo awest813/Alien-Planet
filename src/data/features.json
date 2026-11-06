@@ -838,5 +838,98 @@
       ],
       "work": 90
     }
+  },
+  {
+    "key": "drum",
+    "name": "Drum",
+    "beauty": 1,
+    "joy": {
+      "activity": "Playing the drum",
+      "kind": "music",
+      "hoursToFull": 2,
+      "instrument": true
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 15
+        },
+        {
+          "item": "leather",
+          "count": 6
+        }
+      ],
+      "work": 120
+    }
+  },
+  {
+    "key": "flute",
+    "name": "Flute stand",
+    "beauty": 1,
+    "joy": {
+      "activity": "Playing the flute",
+      "kind": "music",
+      "hoursToFull": 2,
+      "instrument": true
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 12
+        }
+      ],
+      "work": 100
+    }
+  },
+  {
+    "key": "lute",
+    "name": "Lute stand",
+    "beauty": 2,
+    "joy": {
+      "activity": "Playing the lute",
+      "kind": "music",
+      "hoursToFull": 2,
+      "instrument": true
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 20
+        },
+        {
+          "item": "cloth",
+          "count": 4
+        }
+      ],
+      "work": 140
+    }
+  },
+  {
+    "key": "harp",
+    "name": "Harp",
+    "beauty": 4,
+    "joy": {
+      "activity": "Playing the harp",
+      "kind": "music",
+      "hoursToFull": 2,
+      "instrument": true
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 30
+        },
+        {
+          "item": "silver",
+          "count": 20
+        }
+      ],
+      "work": 220
+    },
+    "research": "instruments"
   }
 ]

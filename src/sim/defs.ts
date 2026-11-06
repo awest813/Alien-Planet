@@ -199,6 +199,7 @@ interface RawFeature {
     seats?: number;
     company?: boolean;
     stargazing?: boolean;
+    instrument?: boolean;
   };
   harvest?: { work: string; amount: number; item: string; count: number };
   crop?: { item: string; count: number; growDays: number; sowWork: number; harvestWork: number };
@@ -248,6 +249,10 @@ export interface JoySpec {
   company: boolean;
   // Only on a clear night, out under the open sky.
   stargazing: boolean;
+  // Played from beside it, not by standing on it (tables with seats, instruments).
+  beside: boolean;
+  // Played, not just used: trains Artistic, and anyone nearby hears it.
+  instrument: boolean;
 }
 function joyKind(kind: string, feature: string): JoyKind {
   if (!(JOY_KINDS as readonly string[]).includes(kind)) {
@@ -330,6 +335,8 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
     seats: f.joy.seats ?? 1,
     company: !!f.joy.company,
     stargazing: !!f.joy.stargazing,
+    beside: (f.joy.seats ?? 1) > 1 || !!f.joy.instrument,
+    instrument: !!f.joy.instrument,
   },
   harvest: f.harvest && {
     work: f.harvest.work as WorkType,

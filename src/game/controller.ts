@@ -1,3 +1,5 @@
+import { Musician, SoundScene, sound } from './audio';
+import { isInstrument } from './music';
 import { impressivenessLabel } from '../sim/climate';
 import {
   BenchType,
@@ -148,6 +150,14 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     screen: 'production',
   },
   parkas: { how: 'Research Tailoring; crafters then make parkas from leather (see Production).', screen: 'research' },
+  instrument: {
+    how: 'Build a drum, flute or lute (Furniture). Colonists play it for fun, and everyone nearby enjoys the music.',
+    tool: 'lute',
+  },
+  concert: {
+    how: 'A player with Artistic 6 or more may give a concert in the evening (17:00–22:00) when others are off duty. Give colonists some Recreation hours in the Schedule.',
+    screen: 'schedule',
+  },
   sculpture: {
     how: 'Build a sculpture (Art & decor). Colonists with Art work carve it; Artistic skill sets how well it turns out.',
     tool: 'sculptureSmall',
@@ -306,6 +316,10 @@ export const TOOLS: ToolDef[] = [
   ),
   build('cardTable', 'Card table', '', 'furniture', 'Social recreation for up to four. Alone, it is much less fun'),
   build('telescope', 'Telescope', '', 'furniture', 'Stargazing on clear nights; it must stand under the open sky'),
+  build('drum', 'Drum', '', 'furniture', 'Music: players train Artistic and anyone within earshot enjoys it'),
+  build('flute', 'Flute stand', '', 'furniture', 'Music: players train Artistic and anyone within earshot enjoys it'),
+  build('lute', 'Lute stand', '', 'furniture', 'Music: a skilled player may give an evening concert'),
+  build('harp', 'Harp', '', 'furniture', 'The finest instrument: a skilled harpist can hold the whole colony'),
   build(
     'sculptureSmall',
     'Small sculpture',
@@ -643,6 +657,7 @@ export class GameController {
     this.storySeen = this.sim.storyLog.length;
     this.state = this.buildState();
     this.refreshSaves();
+    this.applySound();
     // Leaving the page (closing the tab, switching away on a phone) saves the colony.
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
@@ -661,7 +676,51 @@ export class GameController {
   public setSettings(patch: Partial<Settings>): void {
     this.settings = { ...this.settings, ...patch };
     storeSettings(this.settings);
+    this.applySound();
     this.publish();
+  }
+
+  private applySound(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const s = this.settings;
+    sound.configure({ enabled: s.sound, master: s.masterVolume, music: s.musicVolume, effects: s.effectsVolume });
+  }
+
+  // What the sound needs from the colony each frame: who's playing what, and the weather.
+  private soundScene(): SoundScene {
+    const sim = this.sim;
+    const w = sim.world;
+    const view = this.cameraView;
+    const musicians: Musician[] = [];
+    for (const c of sim.living()) {
+      const job = c.job;
+      if (job?.type !== 'joy' || job.listening || job.target < 0 || c.path.length > 0) {
+        continue;
+      }
+      const f = w.feature[job.target];
+      const key = f !== NONE ? featureDef(f).key : '';
+      if (!featureDef(f)?.joy?.instrument || !isInstrument(key)) {
+        continue;
+      }
+      const x = w.xOf(c.tile);
+      const y = w.yOf(c.tile);
+      musicians.push({
+        id: c.id,
+        instrument: key,
+        skill: c.skills.artistic,
+        inView: x >= view.x0 && x <= view.x1 && y >= view.y0 && y <= view.y1,
+      });
+    }
+    const weather = sim.weather.kind;
+    return {
+      musicians,
+      paused: this.speedIndex === 0 || !this.inPlay,
+      night: sim.isNight(),
+      rain: weather === 'rain' || weather === 'storm',
+      storm: weather === 'storm',
+    };
   }
 
   private autosave(): void {
@@ -733,6 +792,13 @@ export class GameController {
       this.accumulator--;
     }
     for (const event of this.sim.events.splice(0)) {
+      if (event === 'raid' || event === 'manhunters') {
+        sound.alert('raid');
+      } else if (event === 'death') {
+        sound.alert('death');
+      } else if (event === 'goal' || event === 'concert') {
+        sound.alert(event);
+      }
       if (event === 'dawn') {
         this.autosave();
       } else if (event === 'fire' && this.settings.pauseOnEmergency) {
@@ -766,6 +832,7 @@ export class GameController {
       this.toast = null;
     }
     this.collectNotifications(now);
+    sound.update(this.soundScene());
     this.sinceUiUpdate += deltaMs;
     this.sinceHoverUpdate += deltaMs;
     if (this.sinceUiUpdate >= 200 || (this.hoverChanged && this.sinceHoverUpdate >= 80)) {

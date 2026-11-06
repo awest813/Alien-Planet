@@ -69,9 +69,15 @@ export function App() {
       if (e.key !== 'Escape' || e.repeat) {
         return;
       }
-      // Esc in a text field (the seed, say) just leaves the field.
+      // Esc while typing (the seed, say) just leaves the field. Checkboxes, sliders and buttons
+      // don't count: Esc closes the screen as usual.
       const target = e.target as HTMLElement | null;
-      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
+      const typing =
+        !!target &&
+        (target.tagName === 'TEXTAREA' ||
+          (target instanceof HTMLInputElement &&
+            !['checkbox', 'radio', 'range', 'button', 'submit', 'color'].includes(target.type)));
+      if (typing) {
         target.blur();
         return;
       }

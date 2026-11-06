@@ -2,6 +2,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 import Phaser from 'phaser';
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
+import { sound } from './game/audio';
 import { controller } from './game/controller';
 import { ColonyScene } from './render/colony-scene';
 import { triggerEvent } from './sim/storyteller';
@@ -28,7 +29,7 @@ createRoot(document.getElementById('ui')!).render(createElement(App));
 // Handy for poking at the simulation from the browser console during development,
 // e.g. `colonyEvent(colony.sim, 'raid')`.
 if (import.meta.env.DEV) {
-  Object.assign(window, { colony: controller, colonyEvent: triggerEvent });
+  Object.assign(window, { colony: controller, colonyEvent: triggerEvent, colonySound: sound });
 }
 
 // Minimise instead of quitting when the Android back button is pressed.

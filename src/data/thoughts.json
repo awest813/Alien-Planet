@@ -277,5 +277,25 @@
   "drabSurroundings": {
     "label": "Drab surroundings",
     "mood": -1
+  },
+  "heardMusic": {
+    "label": "Heard some music",
+    "mood": 2,
+    "hours": 6
+  },
+  "heardFineMusic": {
+    "label": "Heard beautiful music",
+    "mood": 4,
+    "hours": 8
+  },
+  "gaveConcert": {
+    "label": "Gave a concert",
+    "mood": 5,
+    "hours": 24
+  },
+  "attendedConcert": {
+    "label": "Went to a concert",
+    "mood": 4,
+    "hours": 12
   }
 }

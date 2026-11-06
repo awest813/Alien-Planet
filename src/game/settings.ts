@@ -20,6 +20,11 @@ export interface Settings {
   noticeSeconds: number;
   // Keyboard panning speed, as a multiple of normal.
   panSpeed: number;
+  // Sound, off until the player turns it on, and its volumes (0..1).
+  sound: boolean;
+  masterVolume: number;
+  musicVolume: number;
+  effectsVolume: number;
   // The last new colony's difficulty and map size, offered again next time.
   newDifficulty: string;
   newMapSize: number;
@@ -54,6 +59,10 @@ export const DEFAULT_SETTINGS: Settings = {
   lightningFlashes: !prefersReducedMotion(),
   noticeSeconds: 8,
   panSpeed: 1,
+  sound: false,
+  masterVolume: 0.7,
+  musicVolume: 0.8,
+  effectsVolume: 0.8,
   newDifficulty: 'standard',
   newMapSize: 64,
 };

@@ -236,6 +236,7 @@ function play(seed: number): Result {
   let hearthPlaced = false;
   let gamesPlaced = false;
   let artPlaced = false;
+  let lutePlaced = false;
   let bannerPlaced = false;
   let labTile = -1;
   let telescopePlaced = false;
@@ -355,6 +356,15 @@ function play(seed: number): Result {
       const next = RESEARCH_ORDER.find((key) => !sim.research.done.includes(key));
       if (next) {
         sim.apply({ type: 'research', project: next });
+      }
+    }
+    // A lute on day 4, for music and the odd evening concert.
+    if (!lutePlaced && sim.day >= 4) {
+      lutePlaced = true;
+      const spot = findSite(sim, 1, 1, avoid);
+      if (spot) {
+        claim(avoid, sim, spot.x, spot.y, 1, 1);
+        sim.apply({ type: 'build', feature: featureId('lute'), tiles: [at(spot.x, spot.y)] });
       }
     }
     // Some art and flowers in the hut on day 4, and a banner once there's cloth to spare.
@@ -508,6 +518,7 @@ function play(seed: number): Result {
     inspiration: count(/is inspired/),
     bumperCrop: count(/^Perfect growing weather/),
     lightning: count(/^Lightning struck/),
+    concerts: sim.stats.concerts ?? 0,
     burned: burnCounts.get(sim) ?? 0,
   };
   return {

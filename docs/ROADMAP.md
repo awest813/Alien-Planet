@@ -148,30 +148,48 @@ story.
 - **Not done:** caravans buying art. Sculptures are buildings, not items, so trading them needs a way to
   pack one up. That's left for later.
 
-## 5. Phase C: Music
+## 5. Phase C: Music (done)
 
-Instruments are buildings that colonists play during recreation, and anyone in earshot benefits.
+The colony makes music, and a good player can bring everyone together on an evening.
 
-- **Instruments** (one set, crafted at the crafting bench or built in place):
-  - Drum (wood, leather)
-  - Flute (wood)
-  - Lute (wood, cloth strings)
-  - Harp (research Instruments; wood, silver)
+- **Instruments**, built in place and played from beside them as music recreation:
+  - drum: wood and leather;
+  - flute stand: wood;
+  - lute stand: wood and cloth;
+  - harp: wood and silver, after the new Instruments research at 1000.
 
-  Playing is music recreation for the player and trains Artistic. Colonists in the same room or nearby
-  outdoors get "Listening to music" joy and a mood thought that rises with the player's skill.
+  Playing trains Artistic.
 
-- **Concerts.** A good player sometimes starts an evening concert on their own. Off-duty colonists gather,
-  and listening together builds opinions.
-- **Real sound** (Decision 2): a small Web Audio synthesizer instead of sound files.
-  - Each instrument has its own voice, and tunes come from the colonist's skill and the seed.
-  - Quiet ambience for day and night, rain and wind, plus a few interface sounds (a raid warning, a
-    completed goal).
-  - Master, music and effects volume sliders in Settings, all off by default for anyone who prefers
-    silence.
-- **Tests and checks:** instruments give joy to the player and to listeners within range; skill sets the
-  listeners' mood; concerts gather off-duty colonists only. Audio runs in the renderer layer, outside the
-  simulation, so the simulation stays deterministic and the tests stay silent.
+- **Listeners.** Everyone awake within six tiles hears it (indoors, only those in the same room). It fills
+  their recreation a little, with more from a better player, and gives "Heard some music" (+2), or "Heard
+  beautiful music" (+4) from a player with Artistic 10+.
+- **Concerts.** A player with Artistic 6+ playing between 17:00 and 22:00, with someone else off duty, may
+  strike up a two-hour concert, which goes in the log.
+  - Off-duty colonists who are doing something for fun, or nothing much, come along. They gather within
+    three tiles, enjoy the best music recreation there is, and chat with one another.
+  - The player gets "Gave a concert" (+5) and listeners "Went to a concert" (+4).
+  - A concert stops if the player is drafted or called away, and then it doesn't count.
+- **Goals (Prosperity):** build a musical instrument; hold a concert.
+- **Sound** (Settings › Sound, off by default): made in code with Web Audio, with no sound files.
+  - Each instrument has its own voice: the drum a falling-pitch thump, the flute a sine wave with vibrato,
+    the lute a bright pluck, and the harp a soft, ringing triangle wave.
+  - Tunes are seeded per colonist in a pentatonic scale. Tempo rises with skill, and a beginner hits the
+    odd wrong note and drifts off the beat.
+  - Music out of view plays quietly, and it stops while the game is paused.
+  - Ambience: wind, plus rain in wet weather and storms, birds by day and crickets by night.
+  - Alerts: a horn for raids and maddened animals, a falling pair of notes for a death, and a chime for a
+    finished goal or a concert starting.
+  - Sliders for overall volume, music, and ambience and alerts.
+  - If sound was left on from a last visit, it starts at the first click or key press, as browsers
+    require.
+- **Results** (Standard, 48 days, 12 fresh seeds, the test colony adding a lute on day 4):
+  - The lute became the second most-used recreation, and there was about one concert per colony.
+  - Survival was 72 of 73, against 71 of 73 without this phase.
+  - There were 2 mental breaks, against 4.
+  - Average mood was 48.6, against 48.2.
+- **Fix found along the way:** Esc pressed while a checkbox or slider had focus was treated as leaving a
+  text field. It took an extra Esc to close Settings, and it could leave the game paused behind the
+  menu. Only text fields count now.
 
 ## 6. Phase D: Gatherings, rites and festivals
 

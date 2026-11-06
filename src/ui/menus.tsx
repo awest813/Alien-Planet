@@ -330,6 +330,38 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
   );
 }
 
+// A 0–100% volume slider.
+function Slider({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="setting">
+      <span>{label}</span>
+      <span className="slider">
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={Math.round(value * 100)}
+          disabled={disabled}
+          aria-label={label}
+          onChange={(e) => onChange(Number(e.target.value) / 100)}
+        />
+        <span className="num">{Math.round(value * 100)}%</span>
+      </span>
+    </label>
+  );
+}
+
 const CONTROLS: [string, string][] = [
   ['Space', 'Pause or resume'],
   ['1 · 2 · 3', 'Game speed'],
@@ -355,6 +387,16 @@ export function SettingsScreen({ state, onClose }: { state: UiState; onClose: ()
         label="Pause when a colonist dies or collapses"
         value={s.pauseOnEmergency}
         onChange={(v) => set({ pauseOnEmergency: v })}
+      />
+      <h3>Sound</h3>
+      <Toggle label="Sound (instruments, weather and alerts)" value={s.sound} onChange={(v) => set({ sound: v })} />
+      <Slider label="Volume" value={s.masterVolume} disabled={!s.sound} onChange={(v) => set({ masterVolume: v })} />
+      <Slider label="Music" value={s.musicVolume} disabled={!s.sound} onChange={(v) => set({ musicVolume: v })} />
+      <Slider
+        label="Ambience and alerts"
+        value={s.effectsVolume}
+        disabled={!s.sound}
+        onChange={(v) => set({ effectsVolume: v })}
       />
       <h3>Display</h3>
       <Choice label="Interface size" value={s.uiScale} options={UI_SCALES} onChange={(v) => set({ uiScale: v })} />
