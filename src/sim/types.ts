@@ -1,3 +1,4 @@
+import type { JoyKind } from './defs';
 export type JobType =
   | 'mine'
   | 'chop'
@@ -57,6 +58,8 @@ export interface Skills {
   crafting: number;
   research: number;
   animals: number;
+  // Sculpting and playing music.
+  artistic: number;
 }
 
 export type SkillKey = keyof Skills;
@@ -71,6 +74,7 @@ export const SKILL_KEYS: SkillKey[] = [
   'combat',
   'research',
   'animals',
+  'artistic',
 ];
 
 // 0: no passion, 1: interested, 2: burning. Passions speed up learning.
@@ -189,6 +193,8 @@ export interface Colonist {
   apparel: WornApparel | null;
   // Tick each skill was last practised, for rust.
   practicedAt: Partial<Record<SkillKey, number>>;
+  // Recreation had lately, by kind (in needs filled; it fades day by day).
+  recentJoy: Partial<Record<JoyKind, number>>;
 }
 
 export type Stance = 'cover' | 'hold' | 'charge';

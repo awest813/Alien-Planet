@@ -15,6 +15,8 @@ import {
   researchDef,
   terrainDef,
   weaponDef,
+  JOY_KIND_LABELS,
+  type JoyKind,
 } from '../sim/defs';
 import { availableProjects, isAvailable } from '../sim/research';
 import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, yearOf } from '../sim/seasons';
@@ -378,6 +380,8 @@ export interface ColonistView {
   comfort: string;
   // Exposure and food poisoning, each 0..1.
   conditions: { label: string; value: number }[];
+  // Kinds of recreation had lately, most first, e.g. "Relaxing, Outdoors".
+  recentRecreation: string;
 }
 
 // A story event shown briefly as a card, so major moments aren't missed.
@@ -1142,6 +1146,11 @@ export class GameController {
         carrying: c.carrying && `${c.carrying.count} ${itemDef(c.carrying.item).name.toLowerCase()}`,
         skills: { ...c.skills },
         needs: { ...c.needs },
+        recentRecreation: (Object.entries(c.recentJoy) as [JoyKind, number][])
+          .filter(([, amount]) => amount >= 0.05)
+          .sort((a, b) => b[1] - a[1])
+          .map(([kind]) => JOY_KIND_LABELS[kind])
+          .join(', '),
         mood: Math.round(c.mood),
         inBreak: sim.inMentalBreak(c),
         thoughts: sim.thoughtsOf(c),

@@ -23,6 +23,7 @@ import {
   STARTING_WEAPON,
   weaponDef,
   terrainId,
+  type JoyKind,
 } from './defs';
 import { animalName, animalsAtDawn, populateWildlife, updateAnimals } from './animals';
 import {
@@ -207,6 +208,19 @@ const defaultSchedule = (): ScheduleSlot[] =>
 
 // Every colonist starts willing to do everything at normal priority.
 // The work order with mining moved ahead of plant cutting (see workOrder).
+// Each dawn, recreation had lately counts for half as much; a trace that small is forgotten.
+const JOY_MEMORY_PER_DAY = 0.5;
+function fadeRecentJoy(c: Colonist): void {
+  for (const key of Object.keys(c.recentJoy) as JoyKind[]) {
+    const left = c.recentJoy[key]! * JOY_MEMORY_PER_DAY;
+    if (left < 0.01) {
+      delete c.recentJoy[key];
+    } else {
+      c.recentJoy[key] = left;
+    }
+  }
+}
+
 const STONE_FIRST_ORDER: readonly WorkTypeKey[] = (() => {
   const order: WorkTypeKey[] = WORK_TYPES.filter((w) => w !== 'mining');
   order.splice(order.indexOf('plantCutting'), 0, 'mining');
@@ -225,6 +239,7 @@ function createColonist(id: number, name: string, tile: number, rng: Rng): Colon
     medicine: rng.int(1, 9),
     combat: rng.int(1, 9),
     animals: rng.int(1, 9),
+    artistic: rng.int(1, 9),
   };
   return {
     id,
@@ -268,6 +283,7 @@ function createColonist(id: number, name: string, tile: number, rng: Rng): Colon
     tool: null,
     apparel: starterApparel(),
     practicedAt: {},
+    recentJoy: {},
   };
 }
 
@@ -1014,7 +1030,7 @@ export class Simulation {
         return job.stage === 2 ? 'Eating' : 'Getting something to eat';
       case 'joy':
         return job.target >= 0 && w.feature[job.target] !== NONE
-          ? (featureDef(w.feature[job.target]).joy?.kind ?? 'Relaxing')
+          ? (featureDef(w.feature[job.target]).joy?.activity ?? 'Relaxing')
           : 'Going for a walk';
       case 'sleep':
         if (!c.sleeping) {
@@ -1502,6 +1518,7 @@ export class Simulation {
     let exposed = 0;
     for (const c of this.living()) {
       rustSkills(c, this.tick);
+      fadeRecentJoy(c);
     }
     for (const c of this.colonists) {
       // Only colonists who were around for a good part of the night count (not late arrivals).
@@ -1694,7 +1711,7 @@ export class Simulation {
       n.rest = Math.max(0, n.rest - REST_DECAY);
     }
     if (c.job?.type === 'joy' && c.job.target < 0 && c.path.length > 0) {
-      n.joy = Math.min(1, n.joy + JOY_GAIN_WALK);
+      this.enjoy(c, 'outdoor', JOY_GAIN_WALK);
     }
   }
 
@@ -1781,8 +1798,12 @@ export class Simulation {
       this.ordered.delete(c.id);
     }
     // On the way somewhere, they still hit back at anyone right next to them.
-    const cornered = sent && this.enemies.some((e) => e.hp > 0 && this.world.distance(e.tile, c.tile) < 1.5);
-    if ((!sent || cornered) && colonistCombat(this, c)) {
+    const adjacent = this.enemies.some((e) => e.hp > 0 && this.world.distance(e.tile, c.tile) < 1.5);
+    const cornered = sent && adjacent;
+    // Undrafted and caught outside: running for shelter comes before trading shots, unless a raider
+    // is already on top of them. (Failed searches are throttled inside tryShelter.)
+    const running = !c.drafted && !adjacent && this.raidersNear(c) && this.tryShelter(c);
+    if (!running && (!sent || cornered) && colonistCombat(this, c)) {
       this.fighting.add(c.id);
       if (c.drafted) {
         this.draftedTactics(c);
@@ -3501,6 +3522,13 @@ export class Simulation {
     return false;
   }
 
+  // Fills the recreation need and notes what kind of recreation it was.
+  private enjoy(c: Colonist, kind: JoyKind, amount: number): void {
+    const gained = Math.min(amount, 1 - c.needs.joy);
+    c.needs.joy += gained;
+    c.recentJoy[kind] = (c.recentJoy[kind] ?? 0) + gained;
+  }
+
   private stepJoy(c: Colonist, job: Job): void {
     const w = this.world;
     const joy = job.target >= 0 && w.feature[job.target] !== NONE ? featureDef(w.feature[job.target]).joy : undefined;
@@ -3508,7 +3536,7 @@ export class Simulation {
       this.endJob(c);
       return;
     }
-    c.needs.joy = Math.min(1, c.needs.joy + 1 / (TICKS_PER_HOUR * joy.hoursToFull));
+    this.enjoy(c, joy.kind, 1 / (TICKS_PER_HOUR * joy.hoursToFull));
     const slot = c.schedule[Math.floor(this.hour)];
     if (c.needs.joy >= 0.99 || --job.wait <= 0 || (slot !== 'J' && c.needs.joy > 0.9)) {
       this.endJob(c);

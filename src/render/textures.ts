@@ -2,35 +2,10 @@ import Phaser from 'phaser';
 import { FEATURES, ITEMS, TERRAIN } from '../sim/defs';
 import { hash2 } from '../sim/rng';
 import { setTilesetImage } from './icons';
+import { Frames, TILE, TILESET_COLUMNS as COLUMNS, TILESET_ROWS as ROWS } from './tileset-layout';
 
-export const TILE = 16;
+export { Frames, TILE } from './tileset-layout';
 export const TILESET_KEY = 'tiles';
-const COLUMNS = 16;
-// Room for 48 buildings, 48 blueprints and 32 items before the layout needs to grow again.
-const ROWS = 13;
-const MAX_FEATURES = 48;
-const MAX_ITEMS = 32;
-
-const CROPS = FEATURES.filter((f) => f.crop);
-
-if (FEATURES.length > MAX_FEATURES || ITEMS.length > MAX_ITEMS) {
-  throw new Error('Too many features or items for the tileset layout');
-}
-
-// Frame indices in the generated tileset.
-export const Frames = {
-  terrain: (terrain: number, variant: number) => terrain * 2 + variant,
-  feature: (feature: number) => 16 + feature - 1,
-  blueprint: (feature: number) => 64 + feature - 1,
-  designation: (designation: number) => 112 + designation,
-  item: (item: number) => 128 + item - 1,
-  ZONE: 160,
-  INDOOR: 161,
-  GROW_ZONE: 162,
-  // Three growth stages per crop.
-  crop: (feature: number, growth: number) =>
-    176 + CROPS.findIndex((f) => f.id === feature) * 3 + Math.min(2, Math.floor(growth * 3)),
-};
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -83,7 +58,7 @@ export function createTextures(scene: Phaser.Scene): void {
     c.fillRect(0, 0, TILE, 1);
     c.fillRect(0, 0, 1, TILE);
   });
-  CROPS.forEach((f) => {
+  FEATURES.filter((f) => f.crop).forEach((f) => {
     for (let stage = 0; stage < 3; stage++) {
       at(Frames.crop(f.id, stage / 3), (c) => drawCrop(c, f.key, stage));
     }

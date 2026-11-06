@@ -127,6 +127,25 @@ interface Result {
   events: Record<string, number>;
   // One row per day at dawn, for the "flow" report.
   daily: Record<string, number>[];
+  // Summed mood from each thought over every colonist-hour, and how many colonist-hours were counted.
+  moodBy: Record<string, number>;
+  colonistHours: number;
+  // Colonist-hours with the recreation need under 30%.
+  joyLowHours: number;
+  // Impressiveness of each enclosed room at the end, by role.
+  rooms: { role: string; impressiveness: number }[];
+}
+
+// Every enclosed room on the map, once each.
+function roomsAtEnd(sim: Simulation): { role: string; impressiveness: number }[] {
+  const seen = new Map<number, { role: string; impressiveness: number }>();
+  for (let i = 0; i < sim.world.size; i++) {
+    const r = sim.roomAt(i);
+    if (r && r.enclosed && !seen.has(r.id)) {
+      seen.set(r.id, { role: r.role, impressiveness: r.impressiveness });
+    }
+  }
+  return [...seen.values()];
 }
 
 // What the "flow" report tracks each dawn.
@@ -221,6 +240,9 @@ function play(seed: number): Result {
   let minMood = 100;
   const hours = days * 24;
   const daily: Record<string, number>[] = [];
+  const moodBy: Record<string, number> = {};
+  let colonistHours = 0;
+  let joyLowHours = 0;
 
   for (let hour = 0; hour < hours; hour++) {
     for (let t = 0; t < TICKS_PER_HOUR; t += 20) {
@@ -368,6 +390,13 @@ function play(seed: number): Result {
       daily.push(snapshot(sim));
     }
     for (const c of sim.living()) {
+      colonistHours++;
+      if (c.needs.joy < 0.3) {
+        joyLowHours++;
+      }
+      for (const t of sim.thoughtsOf(c)) {
+        moodBy[t.label] = (moodBy[t.label] ?? 0) + t.mood;
+      }
       moodSum += c.mood;
       moodSamples++;
       minMood = Math.min(minMood, c.mood);
@@ -436,6 +465,10 @@ function play(seed: number): Result {
     frost: story.filter((s) => s.startsWith('Frost killed')).length,
     events,
     daily,
+    moodBy,
+    colonistHours,
+    joyLowHours,
+    rooms: roomsAtEnd(sim),
   };
 }
 
@@ -550,6 +583,38 @@ console.log(
     `  events ${JSON.stringify(Object.fromEntries(Object.keys(results[0].events).map((k) => [k, sum((r) => r.events[k])])))}`,
 );
 
+// Where mood comes from: the average contribution of each thought per colonist, biggest first.
+const allHours = sum((r) => r.colonistHours);
+const moodTotals: Record<string, number> = {};
+for (const r of results) {
+  for (const [label, total] of Object.entries(r.moodBy)) {
+    moodTotals[label] = (moodTotals[label] ?? 0) + total;
+  }
+}
+const moodRanked = Object.entries(moodTotals)
+  .map(([label, total]) => [label, total / Math.max(1, allHours)] as const)
+  .filter(([, avg]) => Math.abs(avg) >= 0.2)
+  .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+console.log(
+  `  mood by thought (average per colonist): ${moodRanked.map(([label, avg]) => `${label} ${avg > 0 ? '+' : ''}${avg.toFixed(1)}`).join(', ')}`,
+);
+console.log(
+  `  recreation under 30%: ${((100 * sum((r) => r.joyLowHours)) / Math.max(1, allHours)).toFixed(1)}% of colonist-hours`,
+);
+const byRole = new Map<string, number[]>();
+for (const r of results) {
+  for (const room of r.rooms) {
+    byRole.set(room.role, [...(byRole.get(room.role) ?? []), room.impressiveness]);
+  }
+}
+console.log(
+  `  rooms at the end (average impressiveness): ${[...byRole]
+    .map(
+      ([role, values]) =>
+        `${role} ${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(0)} (${values.length})`,
+    )
+    .join(', ')}`,
+);
 if (Object.keys(starvingDoing).length > 0) {
   const sorted = Object.entries(starvingDoing).sort((a, b) => b[1] - a[1]);
   console.log(`  starving colonists were busy with: ${sorted.map(([k, n]) => `${k} ${n}`).join(', ')}`);

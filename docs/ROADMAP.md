@@ -28,20 +28,34 @@ seeds): 72 of 74 colonists survive and no colony is wiped out. Food runs at 10�
 on, and cooking starts around day 5. Wildlife holds at 6–10 animals through the first year. Harsh (30 days,
 6 seeds) loses nobody.
 
-## 2. Groundwork (do first)
+## 2. Groundwork (done)
 
-These are small, but every later phase leans on them.
+1. **A bigger tileset.** Done. The layout lives in `src/render/tileset-layout.ts` and sizes each section
+   (terrain, buildings, plans, items, overlays, crops) from the definitions, so new content can't run out of
+   room. The UI's item icons use the same layout instead of a copy of it. A test checks that no two pieces
+   of art share a frame.
+2. **Recreation kinds.** Done. Each joy building has an `activity` (what the colonist is shown doing) and a
+   `kind`: relaxing, gaming, social, outdoor, music or art. The armchair is relaxing, horseshoes are gaming,
+   and walks are outdoors. Each colonist keeps a tally of recent recreation by kind (`recentJoy`), which
+   halves every dawn and is saved; the inspector shows it as "Recent recreation". Phase A's tolerance and
+   variety rules read this tally.
+3. **An Artistic skill.** Done. A tenth skill, trained by sculpting and playing music once those exist. The
+   Art work type comes with the sculptor's table in Phase B, so the Work screen doesn't show a column
+   with nothing to do.
+4. **Harness metrics.** Done. The balance script now reports:
+   - mood by thought (the average contribution of each);
+   - the share of colonist-hours with recreation under 30%;
+   - the average impressiveness of each room role at the end.
 
-1. **A bigger tileset.** Art is drawn in code (`src/render/textures.ts`) into a fixed grid with room for 48
-   buildings and 32 items. 39 buildings and 29 items are already used. Work out the rows from the
-   definition counts so new content never hits the limit.
-2. **Recreation kinds.** Each joy source gets a kind: relaxing, gaming, social, outdoor, music, art. The
-   recreation, music and art phases all hang off this.
-3. **An Artistic skill.** A tenth skill used for sculpting and for playing music, plus an Art work type
-   (a column on the Work screen). One skill rather than two keeps the Work screen readable. (Decision 1.)
-4. **Harness metrics.** The balance script reports mood broken down by thought, how much of the time the joy
-   need is low, and the average impressiveness of each room role, so each phase can be measured before and
-   after.
+   **Baseline** (Standard, 30 days, 6 seeds):
+   - Recreation is under 30% for about 20% of colonist-hours.
+   - The biggest mood factors are cooked meals (+1.7), having a friend (+1.6) and shared bedrooms (−1.0).
+   - Boredom costs −0.5 and "Entertained" gives +0.3.
+   - The test colony builds only barracks and plain rooms.
+
+Also from this work: an undrafted colonist caught outside with raiders near now runs for shelter before
+trading shots, unless a raider is already beside them. The check used to run only every 20 ticks, so
+whether they ran or stood and shot depended on timing.
 
 ## 3. Phase A: Recreation depth
 

@@ -1,3 +1,4 @@
+import type { JoyKind } from './defs';
 import { RaidState } from './combat';
 import { PowerState } from './power';
 import { ResearchState } from './research';
@@ -72,6 +73,7 @@ interface SavedColonist {
   draftTarget: number;
   path: number[];
   practicedAt?: Partial<Record<SkillKey, number>>;
+  recentJoy: Partial<Record<JoyKind, number>>;
 }
 
 // Plain structured-cloneable data, stored as-is in IndexedDB. Jobs and reservations
@@ -199,6 +201,7 @@ export function serialize(sim: Simulation): SaveData {
         // Only a drafted colonist's walk is an order; anyone else re-plans after loading.
         path: c.drafted ? c.path : [],
         practicedAt: c.practicedAt,
+        recentJoy: { ...c.recentJoy },
       }),
     ),
     bills: structuredClone(sim.bills),

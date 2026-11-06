@@ -113,7 +113,7 @@ export interface FeatureDef {
   bridge: boolean;
   // A colonist standing here can fish the open water next to it.
   fishing: boolean;
-  joy?: { kind: string; hoursToFull: number };
+  joy?: JoySpec;
   harvest?: { work: WorkType; amount: number; item: number; count: number };
   crop?: { item: number; count: number; growDays: number; sowWork: number; harvestWork: number };
   build?: { cost: Cost[]; work: number };
@@ -186,7 +186,7 @@ interface RawFeature {
   growLight?: number;
   bridge?: boolean;
   fishing?: boolean;
-  joy?: { kind: string; hoursToFull: number };
+  joy?: { activity: string; kind: string; hoursToFull: number };
   harvest?: { work: string; amount: number; item: string; count: number };
   crop?: { item: string; count: number; growDays: number; sowWork: number; harvestWork: number };
   build?: { cost: { item: string; count: number }[]; work: number };
@@ -210,6 +210,31 @@ interface RawItem {
   tool?: boolean;
   weapon?: string;
   armor?: { protection: number; speed: number };
+}
+
+// Kinds of recreation. Doing one kind over and over gives less each time (a later phase), so a
+// colony with variety keeps its people happier.
+export const JOY_KINDS = ['relaxing', 'gaming', 'social', 'outdoor', 'music', 'art'] as const;
+export type JoyKind = (typeof JOY_KINDS)[number];
+export const JOY_KIND_LABELS: Record<JoyKind, string> = {
+  relaxing: 'Relaxing',
+  gaming: 'Games',
+  social: 'Social',
+  outdoor: 'Outdoors',
+  music: 'Music',
+  art: 'Art',
+};
+// A joy building: what the colonist is shown doing, its kind, and how long it takes to fill the need.
+export interface JoySpec {
+  activity: string;
+  kind: JoyKind;
+  hoursToFull: number;
+}
+function joyKind(kind: string, feature: string): JoyKind {
+  if (!(JOY_KINDS as readonly string[]).includes(kind)) {
+    throw new Error(`Unknown recreation kind "${kind}" on ${feature}`);
+  }
+  return kind as JoyKind;
 }
 
 // Quality of food and goods made by an average hand (and of anything found or gifted).
@@ -277,7 +302,7 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   growLight: f.growLight ?? 0,
   bridge: !!f.bridge,
   fishing: !!f.fishing,
-  joy: f.joy,
+  joy: f.joy && { ...f.joy, kind: joyKind(f.joy.kind, f.key) },
   harvest: f.harvest && {
     work: f.harvest.work as WorkType,
     amount: f.harvest.amount,

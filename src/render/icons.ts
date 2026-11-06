@@ -1,10 +1,9 @@
 // Item icons for the React UI, cut from the generated tileset. The tileset is drawn when the
 // game scene starts; until then (and outside the game) icons are simply blank.
 
-const TILE = 16;
-const COLUMNS = 16;
-// Must match Frames.item in textures.ts.
-const itemFrame = (item: number) => 128 + item - 1;
+import { Frames, TILE, TILESET_COLUMNS as COLUMNS } from './tileset-layout';
+
+const itemFrame = Frames.item;
 
 let tilesetUrl = '';
 

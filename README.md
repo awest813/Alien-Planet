@@ -55,7 +55,9 @@ Objectives:
 How the living simulation works:
 
 - **Needs:** food, rest and recreation drain over time. Colonists eat when hungry (cooked meals first), sleep
-  during scheduled hours or when exhausted, and seek recreation (horseshoe pin, armchair, or a walk). A
+  during scheduled hours or when exhausted, and seek recreation (horseshoe pin, armchair, or a walk). Each kind
+  of recreation is labelled (relaxing, games, outdoors, and later social, music and art), and the inspector shows
+  what a colonist has had lately. A
   starving colonist (food at zero) works at 80% and walks at 90% until they eat.
 - **Mood:** 50 plus the sum of current thoughts, such as "Ate a cooked meal" +4, "Ate without a table" −3,
   "Slept in the cold" −5, "Slept in a nice bedroom" +4. Low mood slows work; very low mood can cause a break.
@@ -114,8 +116,9 @@ How the storytelling layer works:
   stonecutter's table cuts granite chunks into blocks for sturdy, slightly prettier block walls, and once
   Tailoring is researched, a crafting bench can mend worn clothes with cloth (Production lets you pause mending).
   Recurve bows get a quality tier too: better bows hit harder, and colonists swap for a clearly better one.
-- **Skills:** every skill (mining, construction, plants, cooking, crafting, medicine, combat) improves with
-  practice, up to 20. Each colonist has a couple of passions (★ interested, ★★ burning) that speed learning and
+- **Skills:** every skill (mining, construction, plants, cooking, crafting, medicine, combat, intellectual,
+  animals, artistic) improves with practice, up to 20. Artistic is new and has no use yet: it's for sculpting and
+  music, coming in later phases. Each colonist has a couple of passions (★ interested, ★★ burning) that speed learning and
   lift their mood while doing that work. Expert skills slowly rust without practice.
 - **Wildlife and hunting:** deer, hares, boars, muskoxen, grouse, foxes and wolves roam the map, and herds
   wander in, each species in its own numbers. Mark animals with the Hunt tool and colonists with the Hunt work
@@ -261,10 +264,12 @@ wolves, `src/sim/weather.test.ts` covers weather, soaking, lightning, fire and f
 `src/sim/trade.test.ts` covers caravans, buying and selling, goodwill and saving a visit, and
 `src/sim/combat.test.ts` covers weapons, armor, raider loadouts and tactics, suppression, embrasures, traps,
 focus fire, taking cover and sheltering. `src/sim/flow.balance.test.ts` covers the game-flow fixes: mining
-before chopping when builders wait on stone, grazers returning to a hunted-out valley, and wild plants regrowing.
+before chopping when builders wait on stone, grazers returning to a hunted-out valley, and wild plants regrowing. `src/sim/groundwork.test.ts` covers recreation kinds and the Artistic skill, and
+`src/render/tileset-layout.test.ts` checks the art layout.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,
-puts its best researcher on research, drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation (including what starving colonists were doing instead of eating):
+puts its best researcher on research, drafts colonists during raids, and reports survival, raids, illness, mood, relationships and starvation (including what starving colonists were doing instead of eating), mood broken down by thought, how often
+recreation runs low, and the average impressiveness of each kind of room:
 
 ```
 npx tsx scripts/balance.ts 26 8                # 26 days (through winter) on 8 seeds, standard difficulty

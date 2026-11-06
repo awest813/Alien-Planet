@@ -390,6 +390,9 @@ function OverviewTab({ c }: { c: ColonistView }) {
           <span className="num">{Math.round(n.value * 100)}%</span>
         </div>
       ))}
+      <div className="muted" title="Kinds of recreation they've had in the last few days">
+        Recent recreation: {c.recentRecreation || 'none'}
+      </div>
       <h4>Mood {c.mood}</h4>
       {c.thoughts.length === 0 && <div className="muted">No strong feelings.</div>}
       {c.thoughts.map((t) => (

@@ -175,7 +175,8 @@
     "moveCost": 1.5,
     "beauty": 3,
     "joy": {
-      "kind": "Relaxing in an armchair",
+      "activity": "Relaxing in an armchair",
+      "kind": "relaxing",
       "hoursToFull": 2.5
     },
     "build": {
@@ -198,7 +199,8 @@
     "passable": true,
     "beauty": 1,
     "joy": {
-      "kind": "Pitching horseshoes",
+      "activity": "Pitching horseshoes",
+      "kind": "gaming",
       "hoursToFull": 1.5
     },
     "build": {
