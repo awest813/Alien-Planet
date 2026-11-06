@@ -242,6 +242,9 @@ kbd {
   padding: 1px 5px;
   border-radius: 4px;
   font-weight: 500;
+  /* A tag wraps to the next line whole rather than breaking mid-phrase. */
+  white-space: nowrap;
+  display: inline-block;
 }
 
 .tag.warn {
@@ -1311,6 +1314,12 @@ button.primary:hover:not(:disabled) {
   border: 0;
   padding: 1px 0;
   font-size: inherit;
+}
+
+/* The circle in its own column, so a goal that wraps lines up under its text. */
+.objectives .goal:has(> .goal-text) {
+  display: grid;
+  grid-template-columns: 18px 1fr;
 }
 
 .objectives .goal:disabled {

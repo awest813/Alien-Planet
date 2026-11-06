@@ -684,8 +684,10 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
                                 }
                               >
                                 <span className="check">{o.failed ? '✖' : '○'}</span>
-                                {o.label}
-                                {o.progress && <span className="muted"> {o.progress}</span>}
+                                <span className="goal-text">
+                                  {o.label}
+                                  {o.progress && <span className="muted"> {o.progress}</span>}
+                                </span>
                               </button>
                               {explained === o.id && o.how && o !== next && <div className="goal-how">{o.how}</div>}
                             </li>

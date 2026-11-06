@@ -136,6 +136,11 @@ export interface SimTimers {
   nextDressCheck: [number, number][];
   nextWarmSearch: [number, number][];
   nextFoodSearch: [number, number][];
+  // Missing from saves made before these were kept.
+  ordered?: number[];
+  nextTactics?: [number, number][];
+  nextShelterSearch?: [number, number][];
+  shelterLogged?: [number, number][];
 }
 
 // Moments the UI reacts to: raids, deaths and collapses pause the game.
@@ -373,6 +378,10 @@ export class Simulation {
       nextDressCheck: [...this.nextDressCheck],
       nextWarmSearch: [...this.nextWarmSearch],
       nextFoodSearch: [...this.nextFoodSearch],
+      ordered: [...this.ordered],
+      nextTactics: [...this.nextTactics],
+      nextShelterSearch: [...this.nextShelterSearch],
+      shelterLogged: [...this.shelterLogged],
     };
   }
 
@@ -384,6 +393,11 @@ export class Simulation {
     this.nextDressCheck = new Map(timers.nextDressCheck);
     this.nextWarmSearch = new Map(timers.nextWarmSearch);
     timers.nextFoodSearch.forEach(([id, tick]) => this.nextFoodSearch.set(id, tick));
+    // A drafted colonist walking where the player sent them keeps going there after a load.
+    this.ordered = new Set(timers.ordered ?? []);
+    this.nextTactics = new Map(timers.nextTactics ?? []);
+    this.nextShelterSearch = new Map(timers.nextShelterSearch ?? []);
+    this.shelterLogged = new Map(timers.shelterLogged ?? []);
     for (const c of this.living()) {
       if (c.sleeping) {
         this.reserve(c, `b${c.tile}`);

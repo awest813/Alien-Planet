@@ -261,6 +261,16 @@ describe('combat review fixes', () => {
     expect(c.path.length).toBeGreaterThan(0);
   });
 
+  it("keeps a player's move order through a save and load", () => {
+    const { sim, w, x, y } = field(24);
+    const c = sim.colonists[0];
+    sim.apply({ type: 'draft', colonist: c.id, drafted: true });
+    sim.apply({ type: 'move', colonist: c.id, tile: w.idx(x + 8, y) });
+    const copy = deserialize(structuredClone(serialize(sim)));
+    copy.apply({ type: 'stance', colonist: c.id, stance: 'hold' });
+    expect(copy.colonists[0].path.length).toBeGreaterThan(0);
+  });
+
   it('leaves hunting to those with something that shoots', () => {
     const { sim } = field(25);
     for (const c of sim.colonists) {
