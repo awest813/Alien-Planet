@@ -481,6 +481,8 @@ export class Simulation {
   public graves = new Map<number, Fallen>();
   // No party before this tick.
   private nextPartyTick = 0;
+  // Colonists who couldn't reach the gathering, and when they may try again.
+  private noGatherUntil = new Map<number, number>();
   // An evening concert under way: who's playing, at which instrument, until when.
   public concert: { player: number; tile: number; endsAt: number } | null = null;
   // Finished sculptures by tile.
@@ -4052,7 +4054,8 @@ export class Simulation {
     const hour = Math.floor(this.hour);
     if (
       !this.concert &&
-      !this.gathering?.started &&
+      // Not if a gathering is on, or due before the concert would end.
+      !(this.gathering && this.gathering.startsAt < this.tick + CONCERT_TICKS) &&
       c.skills.artistic >= CONCERT_SKILL &&
       hour >= CONCERT_FROM &&
       hour < CONCERT_UNTIL &&
@@ -4077,7 +4080,10 @@ export class Simulation {
           !o.health.downed &&
           (job === 'joy' || job === 'wander' || !job) &&
           !o.job?.listening &&
-          o.schedule[hour] !== 'W'
+          !o.job?.gathering &&
+          !this.inMentalBreak(o) &&
+          o.schedule[hour] !== 'W' &&
+          o.schedule[hour] !== 'S'
         ) {
           const was = o.job;
           this.endJob(o);
@@ -4212,6 +4218,13 @@ export class Simulation {
   // Every couple of seconds of game time: start, end or cancel the gathering, plan a funeral or a
   // party when the moment is right, and bring people along.
   private updateGathering(): void {
+    // A grave taken down loses its record, so one rebuilt there later starts empty.
+    if (this.gravesCheckedVersion !== this.world.featureVersion) {
+      this.gravesCheckedVersion = this.world.featureVersion;
+      for (const i of [...this.graves.keys()]) {
+        this.graveAt(i);
+      }
+    }
     const g = this.gathering;
     if (!g) {
       this.planFuneral();
@@ -4232,7 +4245,9 @@ export class Simulation {
       const c = id === undefined ? undefined : this.colonists[id];
       return !c || c.health.dead || c.health.downed || c.drafted;
     };
-    if (g.kind === 'wedding' && (away(g.couple?.[0]) || away(g.couple?.[1]))) {
+    // A wedding needs both of them, and still in love.
+    const [one, two] = (g.couple ?? []).map((id) => this.colonists[id]);
+    if (g.kind === 'wedding' && (away(one?.id) || away(two?.id) || one.lover !== two.id)) {
       this.endGathering(true);
       return;
     }
@@ -4261,6 +4276,8 @@ export class Simulation {
       const region = this.regionOf(c.tile);
       const path = this.pathToGather(c, g.tile, region);
       if (!path) {
+        // Can't get there (cut off, or no room left): don't keep trying every couple of seconds.
+        this.noGatherUntil.set(c.id, this.tick + TICKS_PER_HOUR / 2);
         continue;
       }
       this.endJob(c);
@@ -4276,7 +4293,18 @@ export class Simulation {
   // Who comes: anyone off duty and doing nothing much for fun; for a rite, anyone not dealing
   // with an emergency (asleep, hurt, starving, fighting, rescuing, doctoring or in a break).
   private mayAttend(c: Colonist, rite: boolean, hour: number): boolean {
-    if (c.drafted || c.sleeping || c.health.downed || this.inMentalBreak(c) || c.needs.food < 0.15) {
+    const h = c.health;
+    if (
+      c.drafted ||
+      c.sleeping ||
+      h.downed ||
+      this.inMentalBreak(c) ||
+      c.needs.food < 0.15 ||
+      h.hypothermia > 0.5 ||
+      h.heatstroke > 0.5 ||
+      needsBedRest(c) ||
+      (this.noGatherUntil.get(c.id) ?? 0) > this.tick
+    ) {
       return false;
     }
     const job = c.job?.type;
@@ -4368,7 +4396,7 @@ export class Simulation {
 
   private marry(g: Gathering, guests: Colonist[]): void {
     const [a, b] = (g.couple ?? []).map((id) => this.colonists[id]);
-    if (!a || !b || !guests.includes(a) || !guests.includes(b)) {
+    if (!a || !b || a.lover !== b.id || !guests.includes(a) || !guests.includes(b)) {
       this.addLog('The wedding ended without the couple both there. It will have to wait.', 'warn');
       return;
     }
@@ -4389,7 +4417,7 @@ export class Simulation {
   private bury(g: Gathering, mourners: Colonist[]): void {
     const fallen = this.unburied.find((f) => f.id === g.honoree);
     const w = this.world;
-    if (!fallen || w.feature[g.tile] !== featureId('grave') || this.graves.has(g.tile)) {
+    if (!fallen || w.feature[g.tile] !== featureId('grave') || this.graveAt(g.tile)) {
       return;
     }
     this.graves.set(g.tile, fallen);
@@ -4422,7 +4450,8 @@ export class Simulation {
     if (grave === undefined) {
       return;
     }
-    const start = this.tick + TICKS_PER_HOUR;
+    // On the next hour but one, so mourners have time to come.
+    const start = this.tick + Math.round((Math.floor(this.hour) + 2 - this.hour) * TICKS_PER_HOUR);
     this.gathering = {
       kind: 'funeral',
       tile: grave,
@@ -4431,26 +4460,47 @@ export class Simulation {
       host: -1,
       honoree: fallen.id,
     };
-    this.addLog(`${fallen.name} will be buried within the hour.`, 'info');
+    this.addLog(
+      `${fallen.name} will be buried at ${String((Math.floor(this.hour) + 2) % 24).padStart(2, '0')}:00.`,
+      'info',
+    );
   }
 
-  // A grave nobody lies in yet, that the living can reach.
+  // Who lies in the grave on a tile (nobody if it's empty, or the grave is gone). A record left by a
+  // grave that was taken down is dropped, so a new grave there starts empty.
+  public graveAt(i: number): Fallen | undefined {
+    const lies = this.graves.get(i);
+    if (lies && this.world.feature[i] !== featureId('grave')) {
+      this.graves.delete(i);
+      return undefined;
+    }
+    return lies;
+  }
+
+  // A grave nobody lies in yet, that the living can reach. Worked out again only when buildings
+  // change, since a funeral may wait days for a grave.
   public emptyGrave(): number | undefined {
     const home = this.living()[0];
     if (!home) {
       return undefined;
     }
     const region = this.regionOf(home.tile);
-    const grave = featureId('grave');
-    return [...this.world.tilesWith('features')].find(
-      (i) => this.world.feature[i] === grave && !this.graves.has(i) && this.regions.region[i] === region,
-    );
+    if (this.emptyGraveVersion !== this.world.featureVersion) {
+      this.emptyGraveVersion = this.world.featureVersion;
+      const grave = featureId('grave');
+      this.graveTiles = [...this.world.tilesWith('features')].filter((i) => this.world.feature[i] === grave);
+    }
+    return this.graveTiles.find((i) => !this.graveAt(i) && this.regions.region[i] === region);
   }
+  private emptyGraveVersion = -1;
+  private gravesCheckedVersion = -1;
+  private graveTiles: number[] = [];
 
   // Now and then on an evening, someone in good spirits throws a party in the best room for it.
   private planParty(): void {
     const hour = Math.floor(this.hour);
     if (
+      this.gathering ||
       this.raid ||
       this.concert ||
       hour < PARTY_FROM ||

@@ -34,7 +34,8 @@ import { Caravan } from './trade';
 import { WeatherState } from './weather';
 import { World } from './world';
 
-export const SAVE_VERSION = 15;
+// 16: recreation, art, music and gatherings added colonist fields older saves don't have.
+export const SAVE_VERSION = 16;
 
 interface SavedColonist {
   id: number;
@@ -222,7 +223,8 @@ export function serialize(sim: Simulation): SaveData {
     // Only pieces still standing (one taken down leaves its record behind).
     gathering: sim.gathering && structuredClone(sim.gathering),
     unburied: structuredClone(sim.unburied),
-    graves: [...sim.graves].map(([i, f]) => [i, { ...f }]),
+    // Only graves still standing (one taken down leaves its record behind).
+    graves: [...sim.graves].filter(([i]) => sim.graveAt(i)).map(([i, f]) => [i, { ...f }]),
     artworks: [...sim.artworks].filter(([i]) => sim.artworkAt(i)).map(([i, art]) => [i, { ...art }]),
     story: structuredClone(sim.story),
     enemies: structuredClone(sim.enemies),

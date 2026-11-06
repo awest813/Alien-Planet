@@ -1723,7 +1723,7 @@ export class GameController {
       details.push(`${qualityLabel(art.quality)} ${def.name.toLowerCase()} by ${art.artist}, day ${art.day}`);
     }
     if (def?.key === 'grave') {
-      const lies = sim.graves.get(i);
+      const lies = sim.graveAt(i);
       details.push(
         lies ? `Here lies ${lies.name}, died of ${lies.cause} on day ${lies.day}` : 'Empty: ready for a burial',
       );

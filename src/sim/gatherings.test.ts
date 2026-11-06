@@ -202,3 +202,71 @@ describe('memorials', () => {
     expect(sim.objectivesDone.memorial).toBe(true);
   });
 });
+
+describe('gathering edge cases', () => {
+  it("don't let a party take the place of a funeral planned that evening", () => {
+    const { sim, w, x, y } = village(9);
+    for (const c of sim.colonists) {
+      c.mood = 90;
+    }
+    at(sim, 2, 18);
+    kill(sim, 2);
+    w.setFeature(w.idx(x - 4, y), featureId('grave'));
+    for (let t = 0; t < HOUR && sim.gathering?.kind !== 'funeral'; t++) {
+      sim.step();
+    }
+    expect(sim.gathering?.kind).toBe('funeral');
+    for (let t = 0; t < HOUR / 2; t++) {
+      sim.step();
+      expect(sim.gathering?.kind).toBe('funeral');
+    }
+  });
+
+  it('start funerals on the hour, as the notice says', () => {
+    const { sim, w, x, y } = village(10);
+    at(sim, 2, 9);
+    sim.tick += Math.round(HOUR * 0.7);
+    sim.syncClock();
+    kill(sim, 2);
+    w.setFeature(w.idx(x - 4, y), featureId('grave'));
+    run(sim, 40);
+    const g = sim.gathering!;
+    expect(g.kind).toBe('funeral');
+    expect(sim.gatheringNotice()).toContain('11:00');
+    expect((g.startsAt - (2 - 1) * DAY - (11 - START_HOUR) * HOUR) % HOUR).toBe(0);
+  });
+
+  it('call off a wedding if the couple break up before it', () => {
+    const { sim, x, y, w } = village(11);
+    const [a, b] = sim.colonists;
+    a.lover = b.id;
+    b.lover = a.id;
+    at(sim, 2, 16);
+    sim.gathering = {
+      kind: 'wedding',
+      tile: w.idx(x, y + 2),
+      startsAt: sim.tick + HOUR,
+      endsAt: sim.tick + HOUR * 3,
+      host: -1,
+      couple: [a.id, b.id],
+    };
+    a.lover = -1;
+    b.lover = -1;
+    run(sim, HOUR * 4);
+    expect(a.spouse).toBe(-1);
+    expect(sim.stats.weddings ?? 0).toBe(0);
+  });
+
+  it('treat a grave rebuilt where an old one stood as empty', () => {
+    const { sim, w, x, y } = village(12);
+    const tile = w.idx(x - 4, y);
+    w.setFeature(tile, featureId('grave'));
+    sim.graves.set(tile, { id: 7, name: 'Old', day: 1, cause: 'age' });
+    expect(sim.emptyGrave()).toBeUndefined();
+    w.setFeature(tile, 0);
+    run(sim, 40);
+    w.setFeature(tile, featureId('grave'));
+    expect(sim.emptyGrave()).toBe(tile);
+    expect(sim.graveAt(tile)).toBeUndefined();
+  });
+});
