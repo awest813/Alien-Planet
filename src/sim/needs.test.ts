@@ -309,3 +309,85 @@ describe('richer production', () => {
     expect(food()).toBe(before);
   });
 });
+
+describe('downed and alone', () => {
+  // Everyone down, one of them starving, a meal a few tiles away.
+  function stranded(seed: number) {
+    const sim = Simulation.newColony(seed);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    sim.weather = { kind: 'clear', until: Number.MAX_SAFE_INTEGER };
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    sim.tick = (12 - START_HOUR) * HOUR;
+    sim.syncClock();
+    for (const item of [...w.tilesWith('items')]) {
+      w.takeItem(item, w.itemCount[item]);
+    }
+    for (const c of sim.colonists) {
+      c.tile = w.idx(x, y);
+      // Weak from blood loss: down for hours, in no danger.
+      c.health.bloodLoss = 0.8;
+      c.health.downed = true;
+    }
+    const c = sim.colonists[0];
+    c.needs.food = 0.05;
+    const food = w.idx(x + 4, y);
+    w.addItem(food, itemId('meal'), 1);
+    return { sim, w, c, food };
+  }
+
+  it('crawl to food when nobody is on their feet to bring it', () => {
+    const { sim, c } = stranded(31);
+    for (let t = 0; t < HOUR * 6 && c.needs.food < 0.5; t++) {
+      sim.step();
+    }
+    expect(c.needs.food).toBeGreaterThan(0.5);
+    expect(c.health.downed).toBe(true);
+  });
+
+  it('wait for a doctor instead when someone can help', () => {
+    const { sim, c, food, w } = stranded(32);
+    const doctor = sim.colonists[1];
+    doctor.health.bloodLoss = 0;
+    doctor.health.downed = false;
+    doctor.priorities.doctor = 1;
+    run(sim, 40);
+    expect(sim.describe(c)).not.toBe('Crawling to some food');
+    expect(w.itemType[food] !== 0 || c.needs.food > 0.5).toBe(true);
+  });
+});
+
+describe('doctors', () => {
+  it("feed a starving patient before tending a wound that isn't bleeding", () => {
+    const sim = Simulation.newColony(33);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    sim.weather = { kind: 'clear', until: Number.MAX_SAFE_INTEGER };
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    sim.tick = (12 - START_HOUR) * HOUR;
+    sim.syncClock();
+    const [doctor, wounded, starving] = sim.colonists;
+    for (const c of sim.colonists) {
+      c.tile = w.idx(x, y);
+      c.needs.food = 1;
+      c.needs.rest = 1;
+    }
+    doctor.priorities.doctor = 1;
+    wounded.health.injuries = [{ label: 'Bruise', severity: 0.4, bleeding: 0, tended: 0 }];
+    wounded.health.bloodLoss = 0.8;
+    wounded.health.downed = true;
+    starving.health.bloodLoss = 0.8;
+    starving.health.downed = true;
+    starving.needs.food = 0.02;
+    w.addItem(w.idx(x + 3, y), itemId('meal'), 3);
+    let first: string | undefined;
+    for (let t = 0; t < HOUR && !first; t++) {
+      sim.step();
+      const job = doctor.job?.type;
+      if (job === 'feed' || job === 'tend') {
+        first = job;
+      }
+    }
+    expect(first).toBe('feed');
+  });
+});

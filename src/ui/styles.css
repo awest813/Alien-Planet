@@ -332,6 +332,15 @@ kbd {
   border: 1px solid var(--border);
 }
 
+/* On narrower desktops the top bar is crowded: the title goes and the weather shows as its icon
+   (its name stays in the tooltip), so the screen buttons keep to one row. */
+@media (max-width: 1400px) {
+  .topbar .title,
+  .weather-label {
+    display: none;
+  }
+}
+
 .speeds {
   display: flex;
   gap: 2px;

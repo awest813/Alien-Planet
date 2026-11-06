@@ -403,6 +403,8 @@ export interface Gathering {
   couple?: [number, number];
   honoree?: number;
   started?: boolean;
+  // Ticks each colonist has spent there (kept here rather than on their job, so a save keeps it).
+  attended?: Record<number, number>;
 }
 
 // Someone who died: kept for burial, graves and memorials.

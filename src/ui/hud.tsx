@@ -53,8 +53,12 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
           {state.outdoorTemp}°C
         </span>
         {state.weather.icon && (
-          <span className="weather" title="Weather">
-            {state.weather.icon} {state.weather.label}
+          <span
+            className="weather"
+            title={`Weather: ${state.weather.label}`}
+            aria-label={`Weather: ${state.weather.label}`}
+          >
+            {state.weather.icon} <span className="weather-label">{state.weather.label}</span>
           </span>
         )}
         <div className="speeds" role="group" aria-label="Game speed">

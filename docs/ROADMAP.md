@@ -266,15 +266,20 @@ Settled:
 5. **Wolf packs:** a maddened wolf pack now stops at four, however big the colony. Boar packs still grow to
    five. (Earlier, a pack of six wolves downed all eight colonists in one run and five bled out.)
 
-Still open:
+Settled since:
 
-- Whether downed colonists should be able to crawl to food or a bed when nobody is left to help. Most
-  starving hours in the harness are colonists lying wounded after a fight that downed everyone.
+- **Downed and alone.** With nobody on their feet who can doctor, a downed colonist crawls out of the cold
+  or heat (as before) and, below 15% food, to the nearest food within 25 tiles, which they eat where it
+  lies. Doctors now feed a starving patient before tending wounds that aren't bleeding.
+  - Starving hours while downed didn't drop measurably in the harness. Most come either from colonists
+    with no food in reach, or from doctors busy for long stretches tending many wounded.
+  - Starving doesn't kill, so this is left there.
+- **Gatherings across a save.** Attendance is kept on the gathering itself, so loading a save partway
+  through a wedding or festival no longer forgets who was there.
 
 ## 8. Later and maybe
 
 - Cleaning and filth: blood, debris and rubble that lower beauty, and a Cleaning work type.
-- Downed colonists who can crawl to food or a bed when nobody is left to help them.
 - A visual pass:
   - walking animation;
   - day and night lighting;

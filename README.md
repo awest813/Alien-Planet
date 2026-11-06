@@ -107,7 +107,9 @@ How the storytelling layer works:
 - **Health:** wounds bleed until a doctor tends them (better with herbal medicine from healroot). Too much pain
   or blood loss and a colonist collapses; too much and they die, and everyone grieves. Marsh fever is a race
   between severity and immunity that bed rest and tending tilt in the patient's favour. Doctors get out of bed
-  for emergencies, and bring food to colonists too hurt to get up.
+  for emergencies, and bring food to colonists too hurt to get up (a starving patient before a wound that isn't
+  bleeding). With nobody on their feet to help, a downed colonist crawls out of the cold and, if they're going
+  hungry, to the nearest food.
 - **Combat and raids:** raiders from hostile factions arrive at the map edge. The Rust Wardens favour bows, the
   Ashen Howlers clubs and spears; later raids bring better bows, crossbows and armor. The game pauses. Archers on
   both sides look for firing positions behind cover, keep to their range and are rattled (suppressed: worse aim)

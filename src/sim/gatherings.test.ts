@@ -270,3 +270,28 @@ describe('gathering edge cases', () => {
     expect(sim.graveAt(tile)).toBeUndefined();
   });
 });
+
+describe('gatherings and saves', () => {
+  it('remember who has been there through a save and load', () => {
+    const { sim, w, x, y } = village(13);
+    const [a, b] = sim.colonists;
+    a.lover = b.id;
+    b.lover = a.id;
+    a.opinions[b.id] = 90;
+    b.opinions[a.id] = 90;
+    at(sim, 2, 16);
+    sim.gathering = {
+      kind: 'wedding',
+      tile: w.idx(x, y + 2),
+      startsAt: sim.tick + HOUR,
+      endsAt: sim.tick + HOUR * 3,
+      host: -1,
+      couple: [a.id, b.id],
+    };
+    // Most of the way through, then saved and loaded.
+    run(sim, HOUR * 2 + HOUR / 2);
+    const copy = deserialize(structuredClone(serialize(sim)));
+    run(copy, HOUR);
+    expect(copy.colonists[0].spouse).toBe(b.id);
+  });
+});

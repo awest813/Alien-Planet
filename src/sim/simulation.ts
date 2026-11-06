@@ -180,6 +180,11 @@ const CONCERT_HOURS_TO_FULL = 1.5;
 const musicQuality = (c: Colonist) => 0.5 + c.skills.artistic / 20;
 // Below this after a meal, a colonist eats again straight away.
 const STILL_HUNGRY = 0.3;
+// Downed with nobody to help: below this much food they crawl to something to eat, this far at most.
+const CRAWL_HUNGRY = 0.15;
+// A downed patient this hungry is fed before wounds that aren't bleeding are tended.
+const STARVING_PATIENT = 0.1;
+const CRAWL_RANGE = 25;
 // How long "nowhere to carry this patient" stands before a doctor looks again.
 const NO_RESCUE_RETRY = TICKS_PER_HOUR / 2;
 // Jobs nobody leaves for a wedding or a funeral.
@@ -1132,7 +1137,11 @@ export class Simulation {
       return 'Dead';
     }
     if (c.health.downed) {
-      return c.path.length > 0 ? 'Crawling to shelter' : 'Downed, waiting for a doctor';
+      return c.path.length > 0
+        ? c.needs.food < CRAWL_HUNGRY && isFood(this.world.itemType[c.path[c.path.length - 1]])
+          ? 'Crawling to some food'
+          : 'Crawling to shelter'
+        : 'Downed, waiting for a doctor';
     }
     if (c.drafted) {
       if (this.fighting.has(c.id)) {
@@ -2272,7 +2281,16 @@ export class Simulation {
     switch (work) {
       case 'doctor':
         // Someone freezing (or overheating) gets carried to shelter before anyone is tended.
-        return (this.exposedPatient(c) && this.tryRescue(c)) || this.tryTend(c) || this.tryRescue(c) || this.tryFeed(c);
+        // Bleeding first, then a starving patient's meal, then the rest of the tending, rescues, and
+        // bringing food to anyone downed and hungry.
+        return (
+          (this.exposedPatient(c) && this.tryRescue(c)) ||
+          this.tryTend(c, true) ||
+          this.tryFeed(c, STARVING_PATIENT) ||
+          this.tryTend(c) ||
+          this.tryRescue(c) ||
+          this.tryFeed(c)
+        );
       case 'construction':
         return this.tryConstruct(c) || this.tryDeliver(c) || this.tryDesignations(c, [Designation.DECONSTRUCT]);
       case 'growing':
@@ -4331,6 +4349,8 @@ export class Simulation {
       return;
     }
     job.progress++;
+    g.attended ??= {};
+    g.attended[c.id] = (g.attended[c.id] ?? 0) + 1;
     this.enjoy(c, 'social', this.joyEfficiency(c, 'social') / (TICKS_PER_HOUR * GATHERING_HOURS_TO_FULL));
     if (this.rng.chance(1 / (TICKS_PER_HOUR * 0.75))) {
       const others = this.living().filter((o) => o !== c && o.job?.gathering && o.path.length === 0);
@@ -4345,7 +4365,8 @@ export class Simulation {
     const g = this.gathering!;
     const def = GATHERINGS[g.kind];
     const there = this.living().filter((c) => c.job?.gathering && c.job.target === g.tile);
-    const stayed = there.filter((c) => (c.job?.progress ?? 0) >= ATTENDED_TICKS);
+    // Whoever is there at the end and spent long enough at it (across a save and load, too).
+    const stayed = there.filter((c) => (g.attended?.[c.id] ?? 0) >= ATTENDED_TICKS);
     this.gathering = null;
     for (const c of there) {
       this.endJob(c);
@@ -5421,16 +5442,39 @@ export class Simulation {
     );
   }
 
-  // A collapsed colonist left out in the cold with nobody on their feet to carry them drags
-  // themselves, slowly, towards shelter.
+  // A collapsed colonist with nobody on their feet to help drags themselves, slowly: out of the cold
+  // (or heat) first, and when they're going hungry, to the nearest food, which they eat where it lies.
   private crawlToShelter(c: Colonist): void {
     const w = this.world;
     if (c.path.length === 0) {
-      if (this.tick % SLOW_TICKS !== 0 || !this.needsRescue(c) || this.rescuerAvailable(c)) {
+      if (this.tick % SLOW_TICKS !== 0 || this.rescuerAvailable(c)) {
         return;
       }
-      const dest = this.rescueDestination(c, c);
-      c.path = dest !== undefined && dest !== c.tile ? (this.pathfinder.find(c.tile, [dest]) ?? []) : [];
+      if (this.needsRescue(c)) {
+        const dest = this.rescueDestination(c, c);
+        c.path = dest !== undefined && dest !== c.tile ? (this.pathfinder.find(c.tile, [dest]) ?? []) : [];
+        // Nowhere better to be: food, then, if they need it.
+        if (c.path.length > 0) {
+          return;
+        }
+      }
+      if (c.needs.food < CRAWL_HUNGRY && !this.eatWhereLying(c)) {
+        const region = this.regionOf(c.tile);
+        const food = this.nearestIn(
+          'items',
+          c.tile,
+          (i) =>
+            w.itemType[i] !== NONE &&
+            isFood(w.itemType[i]) &&
+            this.regions.region[i] === region &&
+            !this.isReserved(`i${i}`, c) &&
+            w.distance(i, c.tile) <= CRAWL_RANGE,
+          1,
+        )[0];
+        if (food !== undefined) {
+          c.path = this.pathfinder.find(c.tile, [food]) ?? [];
+        }
+      }
       return;
     }
     const next = c.path[0];
@@ -5444,6 +5488,29 @@ export class Simulation {
       c.path.shift();
       c.moveProgress = 0;
     }
+  }
+
+  // A downed colonist eats whatever food is on their tile or right beside it. Returns false if
+  // there's none.
+  private eatWhereLying(c: Colonist): boolean {
+    const w = this.world;
+    const tile = [c.tile, ...w.neighbors(c.tile)].find(
+      (i) => w.itemType[i] !== NONE && isFood(w.itemType[i]) && !this.isReserved(`i${i}`, c),
+    );
+    if (tile === undefined) {
+      return false;
+    }
+    const def = itemDef(w.itemType[tile]);
+    const wanted = def.category === 'meal' ? 1 : Math.max(1, Math.ceil((1 - c.needs.food) / def.nutrition));
+    const meal = w.pickUp(tile, wanted);
+    c.needs.food = Math.min(1, c.needs.food + def.nutrition * meal.count);
+    this.maybePoison(c, meal.item, meal.quality ?? NORMAL_QUALITY);
+    if (def.rawPenalty && !traitValue(c, 'ignoresRawFood')) {
+      this.addThought(c, 'ateRaw');
+    }
+    this.addThought(c, 'ateWithoutTable');
+    this.addLog(`${c.name}, unable to stand, dragged themselves to some food.`);
+    return true;
   }
 
   private tryRescue(c: Colonist): boolean {
@@ -5512,7 +5579,8 @@ export class Simulation {
     c.path = path;
   }
 
-  private tryTend(c: Colonist): boolean {
+  // Tends the most urgent patient (only those bleeding, if asked).
+  private tryTend(c: Colonist, bleedingOnly = false): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
     // Others first (self-treatment is a last resort), then the most urgent: downed, then bleeding.
@@ -5522,7 +5590,13 @@ export class Simulation {
       (bleedingOf(p) > 0 ? 50 + p.health.bloodLoss * 200 : 0) +
       w.distance(c.tile, p.tile);
     const patient = this.living()
-      .filter((p) => needsTending(this, p) && !this.isReserved(`t${p.id}`, c) && this.regions.region[p.tile] === region)
+      .filter(
+        (p) =>
+          needsTending(this, p) &&
+          (!bleedingOnly || bleedingOf(p) > 0) &&
+          !this.isReserved(`t${p.id}`, c) &&
+          this.regions.region[p.tile] === region,
+      )
       .sort((a, b) => urgency(a) - urgency(b))[0];
     if (!patient) {
       return false;
@@ -5608,14 +5682,15 @@ export class Simulation {
   }
 
   // Someone who can't get up to eat gets food brought to them.
-  private tryFeed(c: Colonist): boolean {
+  // Brings food to someone downed and hungry (below `below`).
+  private tryFeed(c: Colonist, below = 0.35): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
     const patient = this.living().find(
       (p) =>
         p !== c &&
         p.health.downed &&
-        p.needs.food < 0.35 &&
+        p.needs.food < below &&
         !this.isReserved(`fd${p.id}`, c) &&
         this.regions.region[p.tile] === region,
     );
