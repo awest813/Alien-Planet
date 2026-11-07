@@ -407,5 +407,18 @@
     "label": "A legend was made here",
     "mood": 4,
     "hours": 72
+  },
+  "infectedWound": {
+    "label": "Infected wound",
+    "mood": -5
+  },
+  "lastingInjury": {
+    "label": "Will never be the same",
+    "mood": -6,
+    "hours": 120
+  },
+  "inHospital": {
+    "label": "Cared for in a hospital bed",
+    "mood": 3
   }
 }

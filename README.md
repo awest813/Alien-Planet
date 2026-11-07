@@ -111,6 +111,9 @@ How the living simulation works:
   colonists with Warden work bring them in, feed them and talk them round until they join the colony, bringing
   their fighting skill. Left lying they die within a day; a starved prisoner dies too, and one can be released
   from the Prisoners screen.
+- **Bodies:** wounds land on body parts. Left untended or tended in filth, an open wound can turn infected and
+  worsen until a doctor treats it (herbal medicine helps most). A bad wound may leave a limp, a stiff hand, a lost
+  eye or an aching scar. Hospital beds heal faster and keep infection down; a room of them is an infirmary.
 - **Minds:** a colonist pushed too far breaks in their own way: a daze, a sulk in bed, a food binge, or a rage
   that smashes some furniture (gluttons binge, the abrasive rage, the kind never do). Inspirations vary too: faster
   work, a creative spark for one great sculpture, a knack for taming, a mood for teaching the children. Now and
@@ -279,6 +282,7 @@ src/
     prisoners.ts    Wounded raiders, capture, prisoners' upkeep and recruiting
     lifespans.ts    Ages, backstories, births, growing up, learning by watching, old age
     minds.ts        Kinds of mental break, inspirations, obsessions and legendary works
+    body.ts         Body parts, infection, lasting injuries, hospital beds
     simulation.ts   Fixed-tick loop, needs and mood, colonist AI, job system, reservations, objectives
     serialize.ts    Save format
   game/       Glue between the simulation, renderer, and UI
@@ -332,6 +336,7 @@ sculpting, quality, titles, beauty, galleries and surroundings, `src/sim/music.t
 earshot and concerts, `src/game/music.test.ts` covers the tunes,
 `src/sim/gatherings.test.ts` covers funerals and graves, weddings, festivals and feasts, parties and memorials,
 `src/sim/cleaning.test.ts` covers mess, where it comes from, its cost to beauty and cleaning it,
+`src/sim/body.test.ts` covers body parts, infection, lasting injuries and hospital beds,
 `src/sim/minds.test.ts` covers kinds of mental break, inspirations and obsessions,
 `src/sim/lifespans.test.ts` covers ages, backstories, births, growing up, learning by watching and old age,
 `src/sim/production.test.ts` covers grain and bread, drying racks, clay and iron, kilns and smelters,

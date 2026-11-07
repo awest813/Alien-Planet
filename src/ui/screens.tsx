@@ -369,6 +369,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             Grow <b>healroot</b> for medicine, hunt and fish for meat and leather, forage berries for quick food.
           </li>
           <li>
+            Tend wounds promptly and somewhere clean: an untended cut can turn infected (herbal medicine treats it
+            best), and a bad wound may leave a limp, a stiff hand or a lost eye. Hospital beds heal faster.
+          </li>
+          <li>
             Unhappy colonists break in their own ways: a daze, a sulk, a binge, or a rage that smashes furniture.
             Sometimes a skilled artist is seized by a vision: deliver what they ask in time for a legendary sculpture.
           </li>

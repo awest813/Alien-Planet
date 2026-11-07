@@ -145,6 +145,8 @@ interface Result {
   mess: number;
   births: number;
   smashed: number;
+  infections: number;
+  scars: number;
   obsessions: number;
   legends: number;
   grown: number;
@@ -269,6 +271,7 @@ function play(seed: number): Result {
   let lutePlaced = false;
   let gravesPlaced = false;
   let rackPlaced = false;
+  let hospitalPlaced = false;
   let cutterPlanned = false;
   let millPlaced = false;
   let prisonPlaced = false;
@@ -524,6 +527,19 @@ function play(seed: number): Result {
         sim.apply({ type: 'bill', recipe: RECIPES.find((r) => r.key === 'bakeBread')!.id, target: 30 });
       }
     }
+    // Two hospital beds once Field medicine is known.
+    if (!hospitalPlaced && sim.isResearched('fieldMedicine')) {
+      hospitalPlaced = true;
+      const spot = findSite(sim, 2, 1, avoid);
+      if (spot) {
+        claim(avoid, sim, spot.x, spot.y, 2, 1);
+        sim.apply({
+          type: 'build',
+          feature: featureId('hospitalBed'),
+          tiles: [at(spot.x, spot.y), at(spot.x + 1, spot.y)],
+        });
+      }
+    }
     if (hut && !hearthPlaced && sim.isResearched('hearths')) {
       hearthPlaced = true;
       sim.apply({ type: 'build', feature: featureId('hearth'), tiles: [at(hut.x + 7, hut.y + 4)] });
@@ -716,6 +732,8 @@ function play(seed: number): Result {
     rooms: roomsAtEnd(sim),
     births: sim.stats.births ?? 0,
     smashed: sim.stats.smashed ?? 0,
+    infections: sim.stats.infections ?? 0,
+    scars: sim.stats.scars ?? 0,
     obsessions: sim.stats.obsessions ?? 0,
     legends: sim.stats.legends ?? 0,
     grown: sim.living().filter((c) => c.backstory === 'colonyBorn' && c.age >= 18).length,
@@ -885,6 +903,7 @@ console.log(
     )
     .join(', ')}`,
 );
+console.log(`  bodies: ${sum((r) => r.infections)} wounds infected, ${sum((r) => r.scars)} lasting injuries`);
 console.log(
   `  minds: ${sum((r) => r.smashed)} things smashed in rages, ${sum((r) => r.obsessions)} obsessions, ` +
     `${sum((r) => r.legends)} legendary works made`,

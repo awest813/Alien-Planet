@@ -428,7 +428,12 @@ function OverviewTab({ c }: { c: ColonistView }) {
 
 function HealthTab({ c }: { c: ColonistView }) {
   const healthy =
-    c.injuries.length === 0 && !c.disease && c.bloodLoss < 0.05 && c.conditions.length === 0 && c.needs.food > 0;
+    c.injuries.length === 0 &&
+    !c.disease &&
+    c.bloodLoss < 0.05 &&
+    c.conditions.length === 0 &&
+    c.needs.food > 0 &&
+    c.scars.length === 0;
   return (
     <>
       {healthy && <div className="muted">Healthy.</div>}
@@ -437,9 +442,20 @@ function HealthTab({ c }: { c: ColonistView }) {
         <div key={index} className="row-line">
           <span>
             {injury.label}{' '}
-            {injury.tended ? <span className="muted">(tended)</span> : <span className="bad">(untended)</span>}
+            {injury.infected ? (
+              <span className="bad">(infected)</span>
+            ) : injury.tended ? (
+              <span className="muted">(tended)</span>
+            ) : (
+              <span className="bad">(untended)</span>
+            )}
           </span>
           <span className="muted">{Math.round(injury.severity * 100)}%</span>
+        </div>
+      ))}
+      {c.scars.map((s, index) => (
+        <div key={`scar${index}`} className="muted">
+          {s}
         </div>
       ))}
       {c.conditions.map((condition) => (

@@ -1270,5 +1270,29 @@
       "work": 1600
     },
     "value": 1500
+  },
+  {
+    "key": "hospitalBed",
+    "name": "Hospital bed",
+    "passable": true,
+    "moveCost": 1.5,
+    "bed": true,
+    "hospital": true,
+    "beauty": 1,
+    "restGain": 1.1,
+    "research": "fieldMedicine",
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 30
+        },
+        {
+          "item": "cloth",
+          "count": 10
+        }
+      ],
+      "work": 220
+    }
   }
 ]

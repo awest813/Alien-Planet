@@ -597,6 +597,24 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
 - Simple surgery and aids: a crutch, a wooden limb, later metal ones (Phase F's metal).
 - First slice: body parts with lasting injuries, infection, hospital beds. Success: Harsh survival holds
   steady while wounded veterans show visibly in the colony.
+- **Done** (`src/sim/body.ts`):
+  - Wounds land on a body part (torso, arm, leg, hand, head, eye) and remember how bad they were.
+  - Infection: an open wound (a cut or an arrow wound) left untended, or tended somewhere filthy, may turn
+    infected. An infected wound worsens instead of healing until a doctor treats it: surely with herbal
+    medicine, otherwise as well as their skill allows. It can kill ("infection"). Alerts and the inspector
+    show it, and it weighs on the patient's mood.
+  - Lasting injuries: a bad wound (more often if poorly tended or infected) may leave a mark when it
+    heals: a leg a limp (walks 15% slower), an arm or hand a stiff hand (works 10% slower), an eye a lost
+    eye (aims worse), the torso or head a scar that aches. The health tab lists them.
+  - Hospital beds (Field medicine; 30 wood, 10 cloth): patients prefer one indoors, heal half again as fast,
+    are tended better and catch half the infections; a room that's mostly hospital beds is an Infirmary.
+  - Balance, 48 days on 12 seeds, the test colony adding two hospital beds after Field medicine: Standard
+    kept everyone (79 of 79; mood 50.6), with about three infections and one lasting injury in three
+    colonies. Harsh lost 6 of 82 in raids, within its usual range.
+  - Tuning from the runs: infections were far too common at first (13 a colony; bruises festered too), and
+    patients would walk out to a hospital bed in the open; open wounds only, half the risk, and hospital
+    beds only count indoors.
+  - Not done: crutches and artificial limbs, and surgery.
 
 **Phase J: The village and its people.** _(Large.)_
 

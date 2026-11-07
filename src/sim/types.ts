@@ -264,6 +264,16 @@ export interface Animal {
 
 export interface Injury {
   label: string;
+  // Where it landed (see body.ts); missing on wounds from older saves.
+  part?: 'torso' | 'arm' | 'leg' | 'hand' | 'head' | 'eye';
+  // How bad it was when it happened.
+  peak?: number;
+  // Infection, 0..1 (0: none); treated once a doctor has seen to it.
+  infection?: number;
+  treated?: boolean;
+  wasInfected?: boolean;
+  // Tended somewhere filthy, which raises the risk of infection.
+  dirty?: boolean;
   // 0..1 contribution to pain; injuries heal by shrinking this to 0.
   severity: number;
   // Blood loss per hour while untended.
@@ -295,6 +305,11 @@ export interface Health {
   heatstroke: number;
   // Hours of food poisoning left.
   poisoned: number;
+  // Lasting marks of old wounds (see body.ts).
+  scars?: {
+    part: 'torso' | 'arm' | 'leg' | 'hand' | 'head' | 'eye';
+    kind: 'limp' | 'stiffHand' | 'lostEye' | 'scar';
+  }[];
 }
 
 export interface Enemy {
@@ -444,6 +459,9 @@ export interface Stats {
   births?: number;
   // Furniture smashed in tantrums, and legendary works made.
   smashed?: number;
+  // Wounds that turned infected, and lasting injuries left by old wounds.
+  infections?: number;
+  scars?: number;
   obsessions?: number;
   legends?: number;
   // Raiders taken prisoner, and prisoners won over.

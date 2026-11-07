@@ -27,6 +27,7 @@ export function outdoorTemperature(totalHours: number, seed: number): number {
 interface RoomContents {
   beauty: number;
   beds: number;
+  hospitalBeds: number;
   tables: number;
   heat: number;
   // Heat from electric heaters, only while the grid is powered.
@@ -48,6 +49,7 @@ export function measureRooms(
   const contents: RoomContents[] = rooms.sizes.map(() => ({
     beauty: 0,
     beds: 0,
+    hospitalBeds: 0,
     tables: 0,
     heat: 0,
     electricHeat: 0,
@@ -73,6 +75,7 @@ export function measureRooms(
     const c = contents[room];
     c.beauty += beautyAt(i);
     c.beds += def.bed ? 1 : 0;
+    c.hospitalBeds += def.hospital ? 1 : 0;
     c.tables += def.table ? 1 : 0;
     if (def.power?.draw) {
       c.electricHeat += def.heater;
@@ -98,7 +101,10 @@ export function describeRoom(id: number, rooms: Rooms, contents: RoomContents, t
     : 0;
   let role = 'Outdoors';
   if (enclosed) {
-    if (contents.beds > 1) {
+    if (contents.hospitalBeds > 0 && contents.hospitalBeds * 2 >= contents.beds) {
+      // Mostly hospital beds: a place to heal.
+      role = 'Infirmary';
+    } else if (contents.beds > 1) {
       role = 'Barracks';
     } else if (contents.beds === 1) {
       role = 'Bedroom';

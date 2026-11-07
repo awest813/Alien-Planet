@@ -122,6 +122,8 @@ export interface FeatureDef {
   shelf: number;
   // A drying rack: storage for meat, fish and berries, which dry on it into food that keeps.
   dries: boolean;
+  // A hospital bed: patients heal faster, are tended better and catch fewer infections.
+  hospital: boolean;
   // Radius of a sun lamp's light (crops grow beneath it day and night).
   growLight: number;
   // Built over water and makes it walkable.
@@ -205,6 +207,7 @@ interface RawFeature {
   icebox?: boolean;
   shelf?: number;
   dries?: boolean;
+  hospital?: boolean;
   growLight?: number;
   bridge?: boolean;
   fishing?: boolean;
@@ -346,6 +349,7 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   icebox: !!f.icebox,
   shelf: f.shelf ?? 0,
   dries: !!f.dries,
+  hospital: !!f.hospital,
   growLight: f.growLight ?? 0,
   bridge: !!f.bridge,
   fishing: !!f.fishing,

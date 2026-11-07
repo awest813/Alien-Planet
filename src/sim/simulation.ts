@@ -159,6 +159,7 @@ import {
 import { BeaconState, TRANSMIT_HOURS, chooseToStay, depart, freshBeacon, updateBeacon } from './beacon';
 import { FEED_BELOW, PRISONER_BED, TALK_TICKS, release, talk, updateCaptives, visitDue } from './prisoners';
 import { CARER_HUNGER, DRAFT_AGE, agePace, canWork, rollPast, updateLifespans } from './lifespans';
+import { inHospitalBed, isInfected, scarMove, scarWork } from './body';
 import {
   BREAK_LABELS,
   BreakKind,
@@ -1769,6 +1770,11 @@ export class Simulation {
     return f !== NONE && featureDef(f).icebox;
   }
 
+  public isHospitalBed(i: number): boolean {
+    const f = this.world.feature[i];
+    return f !== NONE && featureDef(f).hospital;
+  }
+
   public isDryingRack(i: number): boolean {
     const f = this.world.feature[i];
     return f !== NONE && featureDef(f).dries;
@@ -2121,6 +2127,12 @@ export class Simulation {
     if (this.obsession?.colonist === c.id) {
       keys.push('obsessed');
     }
+    if (c.health.injuries.some(isInfected)) {
+      keys.push('infectedWound');
+    }
+    if (inHospitalBed(this, c)) {
+      keys.push('inHospital');
+    }
     // What's around them: sculptures, flowers, fine floors and furniture lift the spirits; a bare
     // room with nothing pleasant in it drags a little.
     if (!c.sleeping) {
@@ -2446,7 +2458,8 @@ export class Simulation {
     const diagonal = w.xOf(next) !== w.xOf(c.tile) && w.yOf(next) !== w.yOf(c.tile);
     const hunger = starving(c) ? STARVING_MOVE : 1;
     return (
-      (MOVE_SPEED * armorOf(c).speed * hunger * agePace(c).move) / (w.moveCost(next) * (diagonal ? Math.SQRT2 : 1))
+      (MOVE_SPEED * armorOf(c).speed * hunger * agePace(c).move * scarMove(c)) /
+      (w.moveCost(next) * (diagonal ? Math.SQRT2 : 1))
     );
   }
 
@@ -3398,7 +3411,9 @@ export class Simulation {
     const traits = traitFactor(c, 'workSpeed') * (plants ? traitFactor(c, 'plantSpeed') : 1);
     const tools = c.tool && TOOL_WORK.has(type as JobType) ? 1 + TOOL_BONUS * qualityFactor(c.tool.quality) : 1;
     const inspired = c.thoughts.some((t) => t.key === 'inspired') ? INSPIRED_SPEED : 1;
-    return skillFactor(skill) * moodFactor * traits * healthFactor(c) * tools * inspired * agePace(c).work;
+    return (
+      skillFactor(skill) * moodFactor * traits * healthFactor(c) * tools * inspired * agePace(c).work * scarWork(c)
+    );
   }
 
   private stepWork(c: Colonist, job: Job): void {
@@ -5355,6 +5370,17 @@ export class Simulation {
     const free = (i: number) => this.regions.region[i] === region && !this.isReserved(`b${i}`, c) && !lyingThere.has(i);
     const isBed = (i: number) => w.feature[i] !== NONE && featureDef(w.feature[i]).bed;
     const spot =
+      // Patients go to a hospital bed indoors if there's one free (out in the open, an ordinary bed
+      // indoors is better).
+      (type === 'rest'
+        ? this.nearestIn('buildings', c.tile, (i) => this.isHospitalBed(i) && this.isIndoors(i) && free(i), 1)[0]
+        : undefined) ??
+      this.nearestIn(
+        'buildings',
+        c.tile,
+        (i) => isBed(i) && !this.isHospitalBed(i) && this.isIndoors(i) && free(i),
+        1,
+      )[0] ??
       this.nearestIn('buildings', c.tile, (i) => isBed(i) && this.isIndoors(i) && free(i), 1)[0] ??
       this.nearest(c.tile, (i) => w.feature[i] === NONE && w.isPassable(i) && this.isIndoors(i) && free(i), 1)[0] ??
       this.nearestIn('buildings', c.tile, (i) => isBed(i) && free(i), 1)[0] ??

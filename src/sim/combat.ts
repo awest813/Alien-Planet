@@ -1,4 +1,5 @@
 import { hurtAnimal } from './animals';
+import { scarAim } from './body';
 import { qualityFactor } from './apparel';
 import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
 import { FACTIONS, NONE, NORMAL_QUALITY, WeaponDef, featureDef, itemDef, itemId, weaponDef } from './defs';
@@ -708,7 +709,7 @@ function colonistAttack(sim: Simulation, c: Colonist, target: number, weapon: We
   const ranged = weapon.range > 1;
   const hit =
     sim.rng.next() <
-    hitChance(sim, weapon, c.skills.combat, c.tile, target, ranged ? (traitValue(c, 'accuracy') ?? 0) : 0);
+    hitChance(sim, weapon, c.skills.combat, c.tile, target, ranged ? (traitValue(c, 'accuracy') ?? 0) + scarAim(c) : 0);
   recordShot(sim, c.tile, target, hit, ranged);
   c.cooldown = weapon.cooldown;
   learn(sim, c, 'combat', COMBAT_XP);

@@ -35,6 +35,7 @@ import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HO
 import { DOWNED_TICKS, persuasion } from '../sim/prisoners';
 import { DRAFT_AGE, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans';
 import { LEGEND } from '../sim/minds';
+import { PART_LABELS, SCAR_LABELS, isInfected, scarsOf } from '../sim/body';
 import { applyTrade, goodwillOf, prices, standingLabel, tradableItems, tradeOpen, artForSale } from '../sim/trade';
 import { weatherDef } from '../sim/weather';
 import {
@@ -389,6 +390,13 @@ export const TOOLS: ToolDef[] = [
   build('bridge', 'Bridge', '', 'structure', 'Walkway over shallow or deep water'),
   build('bed', 'Bed', 'e', 'furniture', 'Colonists sleep better in beds'),
   build('fineBed', 'Fine bed', '', 'furniture', 'Prettier, and colonists rest 25% faster'),
+  build(
+    'hospitalBed',
+    'Hospital bed',
+    '',
+    'furniture',
+    'Patients heal half again as fast, are tended better and catch fewer infections (Field medicine)',
+  ),
   build('table', 'Table', 'l', 'furniture', 'Colonists dislike eating without a table'),
   build('armchair', 'Armchair', 'h', 'furniture', 'Comfortable recreation (relaxing) and decor'),
   build('horseshoePin', 'Horseshoe pin', 'i', 'furniture', 'Recreation spot (games)'),
@@ -557,7 +565,9 @@ export interface ColonistView {
   status: 'Healthy' | 'Injured' | 'Sick' | 'Downed' | 'Dead';
   bleeding: boolean;
   sleeping: boolean;
-  injuries: { label: string; severity: number; tended: boolean }[];
+  injuries: { label: string; severity: number; tended: boolean; infected: boolean }[];
+  // Lasting marks of old wounds, as lines ("Limp: walks slower").
+  scars: string[];
   bloodLoss: number;
   disease: { label: string; severity: number; immunity: number } | null;
   relations: { name: string; opinion: number; label: string | null }[];
@@ -1499,10 +1509,12 @@ export class GameController {
                 ? 'Injured'
                 : 'Healthy',
         injuries: c.health.injuries.map((injury) => ({
-          label: injury.label,
+          label: injury.part ? `${injury.label} (${PART_LABELS[injury.part]})` : injury.label,
           severity: injury.severity,
           tended: injury.tended > 0,
+          infected: isInfected(injury),
         })),
+        scars: scarsOf(c).map((s) => SCAR_LABELS[s.kind]),
         bloodLoss: c.health.bloodLoss,
         disease: c.health.disease && {
           label: c.health.disease.label,
@@ -1775,6 +1787,12 @@ export class GameController {
         alerts.push({ text: `${c.name} has collapsed and needs a doctor`, tone: 'danger', colonist: c.id });
       } else if (bleedingOf(c) > 0) {
         alerts.push({ text: `${c.name} is bleeding`, tone: 'danger', colonist: c.id });
+      } else if (c.health.injuries.some(isInfected)) {
+        alerts.push({
+          text: `${c.name} has an infected wound: a doctor should treat it, with herbal medicine if there's any`,
+          tone: 'danger',
+          colonist: c.id,
+        });
       }
       const disease = c.health.disease;
       if (disease) {

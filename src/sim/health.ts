@@ -4,6 +4,16 @@ import { comfortRange } from './apparel';
 import { WET_CHILL, isWet } from './weather';
 import { itemId, weaponDef } from './defs';
 import { FRIEND_OPINION, mutualOpinion, traitFactor, traitValue } from './social';
+import {
+  HOSPITAL_HEALING,
+  HOSPITAL_TENDING,
+  healed,
+  inHospitalBed,
+  infectionStep,
+  isInfected,
+  rollPart,
+  scarPain,
+} from './body';
 import type { Simulation } from './simulation';
 import { Filth } from './world';
 import { Colonist, Health } from './types';
@@ -55,7 +65,7 @@ export const POISONING_HOURS = 10;
 export function painOf(c: Colonist): number {
   const h = c.health;
   const injuries = h.injuries.reduce((sum, injury) => sum + injury.severity, 0);
-  return injuries + (h.disease?.severity ?? 0) * 0.4 + (h.hypothermia + h.heatstroke) * 0.6;
+  return injuries + (h.disease?.severity ?? 0) * 0.4 + (h.hypothermia + h.heatstroke) * 0.6 + scarPain(c);
 }
 
 export function bleedingOf(c: Colonist): number {
@@ -64,7 +74,10 @@ export function bleedingOf(c: Colonist): number {
 
 export function needsTending(sim: Simulation, c: Colonist): boolean {
   const h = c.health;
-  return !h.dead && (h.injuries.some((i) => i.tended === 0) || (!!h.disease && h.disease.tendedUntil <= sim.tick));
+  return (
+    !h.dead &&
+    (h.injuries.some((i) => i.tended === 0 || isInfected(i)) || (!!h.disease && h.disease.tendedUntil <= sim.tick))
+  );
 }
 
 // Whether a colonist should stop working and rest in bed.
@@ -110,7 +123,14 @@ export function damage(sim: Simulation, c: Colonist, amount: number, kind: Damag
   const label = { arrow: 'Arrow wound', cut: 'Cut', bruise: 'Bruise', burn: 'Burn' }[kind];
   // Bruises and burns hurt but don't bleed.
   const bleeds = kind === 'arrow' || kind === 'cut';
-  c.health.injuries.push({ label, severity, bleeding: bleeds ? severity * BLEED_RATE : 0, tended: 0 });
+  c.health.injuries.push({
+    label,
+    severity,
+    bleeding: bleeds ? severity * BLEED_RATE : 0,
+    tended: 0,
+    part: rollPart(sim),
+    peak: severity,
+  });
   if (bleeds) {
     sim.world.addFilth(c.tile, Filth.BLOOD);
   }
@@ -128,18 +148,27 @@ export function infect(sim: Simulation, c: Colonist, key: string): void {
 export function tend(sim: Simulation, doctor: Colonist, patient: Colonist, medicine: boolean, mess = 0): void {
   const selfTreatment = doctor === patient ? 0.7 : 1;
   const dirty = Math.min(MAX_DIRTY_TENDING, mess * DIRTY_TENDING);
+  const hospital = inHospitalBed(sim, patient) ? HOSPITAL_TENDING : 0;
   const quality = Math.max(
     0.1,
     Math.min(
       1,
       (0.3 + doctor.skills.medicine * 0.04 + (medicine ? 0.25 : 0) + (sim.isResearched('fieldMedicine') ? 0.15 : 0)) *
-        selfTreatment -
+        selfTreatment +
+        hospital -
         dirty,
     ),
   );
   for (const injury of patient.health.injuries) {
     if (injury.tended === 0) {
       injury.tended = quality;
+      // Tended amid filth, it's more likely to turn bad.
+      injury.dirty = mess >= 3;
+    }
+    // An infection is treated surely with medicine, and otherwise as well as the doctor manages.
+    if (isInfected(injury) && (medicine || sim.rng.next() < quality * 0.6)) {
+      injury.treated = true;
+      injury.wasInfected = true;
     }
   }
   if (patient.health.disease) {
@@ -173,11 +202,20 @@ export function updateHealth(sim: Simulation, c: Colonist, hours: number): void 
     }
   }
   h.poisoned = Math.max(0, h.poisoned - hours);
-  // Lying still, asleep or downed, helps the body mend.
-  const restBonus = c.sleeping || h.downed ? 1.5 : 1;
+  // Lying still, asleep or downed, helps the body mend; a hospital bed more so.
+  const hospital = inHospitalBed(sim, c);
+  const restBonus = (c.sleeping || h.downed ? 1.5 : 1) * (hospital ? HOSPITAL_HEALING : 1);
   for (const injury of h.injuries) {
     const rate = injury.tended > 0 ? 0.015 + 0.03 * injury.tended : 0.004;
-    injury.severity -= rate * restBonus * hours;
+    // An untreated infection worsens the wound instead of letting it heal (worked out first: the step
+    // changes the severity itself).
+    const heals = infectionStep(sim, c, injury, hours, hospital);
+    injury.severity -= rate * restBonus * hours * heals;
+  }
+  for (const injury of h.injuries) {
+    if (injury.severity <= 0) {
+      healed(sim, c, injury);
+    }
   }
   h.injuries = h.injuries.filter((injury) => injury.severity > 0);
 
@@ -206,7 +244,7 @@ export function checkHealth(sim: Simulation, c: Colonist): void {
     return;
   }
   if (injuries >= FATAL_INJURIES) {
-    die(sim, c, 'their wounds');
+    die(sim, c, h.injuries.some(isInfected) ? 'infection' : 'their wounds');
     return;
   }
   if (h.disease && h.disease.severity >= 1) {

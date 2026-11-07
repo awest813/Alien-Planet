@@ -469,6 +469,18 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillStyle = '#5585cc';
       c.fillRect(3, 6, 10, 2);
       break;
+    case 'hospitalBed':
+      // A pale metal frame, clean white sheets and a red cross.
+      c.fillStyle = '#9aa3ad';
+      c.fillRect(2, 1, 12, 14);
+      c.fillStyle = '#f4f2ec';
+      c.fillRect(3, 2, 10, 3);
+      c.fillStyle = '#e4ecf2';
+      c.fillRect(3, 6, 10, 8);
+      c.fillStyle = '#d23c3c';
+      c.fillRect(7, 7, 2, 6);
+      c.fillRect(5, 9, 6, 2);
+      break;
     case 'prisonerBed':
       // A plain iron cot with a coarse orange blanket.
       c.fillStyle = '#55565c';
