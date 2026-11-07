@@ -684,6 +684,23 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
 - A cheaper version: mine shafts that yield ore over time, and cavern breaches as a storyteller event, with
   no second map layer.
 - First slice: decide between the full layer and the shaft version (see the questions below).
+- **Done, the shaft version** (`src/sim/depths.ts`):
+  - Deep mining (1,000 research, after Smelting) unlocks the mine shaft (50 wood, 30 stone). Once built it is
+    marked for digging; Cancel stops it. Miners dig it only when they have nothing else to do, since it never
+    runs out.
+  - Each stretch of digging takes it two metres deeper and brings up stone, and maybe iron ore or silver. The
+    chances and amounts grow with depth (iron from 25%, silver from 8%), and so does the work (450 a stretch
+    at the top, up to 1,200 far down): a busy shaft gives about five iron ore and five silver a day.
+  - Breaches: past 20 metres the storyteller may break through. Cave crawlers (a new creature that never comes
+    in from outside) pour up out of the deepest shaft and attack. Beyond the breach lies a cavern: that shaft
+    yields half as much ore again and stays quiet from then on.
+  - Balance, 48 days on 12 seeds, the test colony researching Deep mining last and sinking one shaft: shafts
+    went to 4–29 stretches deep. Standard lost 1 of 75 (a raid on day 48); Harsh lost 5 of 78 (four in raids,
+    one to crawlers), with six breaches across both.
+  - Tuning from the runs: at first a shaft took 260 work a stretch and paid silver by depth uncapped (1,260
+    silver in six days), and miners preferred it to everything else, which cost the colony its hauling and
+    building and raised raid deaths. Digging is now slower, capped, and done only when idle.
+  - Not done: a second map layer, underground water and cavern plants.
 
 **Phase M: Legends and great threats.** _(Medium.)_
 

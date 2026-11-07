@@ -475,6 +475,8 @@ export interface Stats {
   elections?: number;
   // Favours done for the neighbours (and refused or let lapse), gifts sent, and tribute paid.
   requestsDone?: number;
+  // Breaches from below, through deep mine shafts.
+  breaches?: number;
   requestsFailed?: number;
   gifts?: number;
   tributes?: number;

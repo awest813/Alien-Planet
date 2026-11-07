@@ -171,6 +171,7 @@ import {
   updateVillage,
   villageThoughts,
 } from './village';
+import { Shaft, digDeeper, digWork, shaftAt } from './depths';
 import { Diplomacy, decline, freshDiplomacy, fulfil, gift, payTribute, updateDiplomacy } from './diplomacy';
 import {
   BREAK_LABELS,
@@ -585,6 +586,8 @@ export class Simulation {
   public captives: Captive[] = [];
   // The colony's leader and policies (see village.ts).
   public village: Village = freshVillage();
+  // Mine shafts by tile: how deep each has gone.
+  public shafts: Record<number, Shaft> = {};
   // Favours asked by the neighbours, and peace bought from raiders.
   public diplomacy: Diplomacy = freshDiplomacy();
   // A colonist seized by a vision for a legendary work (see minds.ts).
@@ -1944,7 +1947,11 @@ export class Simulation {
         !(existing !== NONE && (featureDef(existing).bridge || (def.layer === 'floor' && featureDef(existing).crop)))
       );
     }
-    return w.blueprint[i] !== feature && (existing === NONE || !!featureDef(existing).harvest);
+    // Building over a tree or a boulder clears it first; a mine shaft has to be taken down.
+    return (
+      w.blueprint[i] !== feature &&
+      (existing === NONE || (!!featureDef(existing).harvest && !featureDef(existing).shaft))
+    );
   }
 
   private isWaterTile(terrain: number): boolean {
@@ -2679,7 +2686,8 @@ export class Simulation {
         }
       }
     }
-    return false;
+    // A mine shaft is never done, so miners only dig it when there's nothing else for them to do.
+    return c.priorities.mining > 0 && canWork(c, 'mining') && this.tryDesignations(c, [Designation.MINE], true);
   }
 
   // Work types in the order colonists consider them at equal priority. Normally the fixed order the
@@ -3387,7 +3395,13 @@ export class Simulation {
     return this.startWorkJob(c, 'sow', targets, region);
   }
 
-  private tryDesignations(c: Colonist, kinds: number[]): boolean {
+  private isShaftDig(i: number): boolean {
+    const f = this.world.feature[i];
+    return this.world.designation[i] === Designation.MINE && f !== NONE && featureDef(f).shaft;
+  }
+
+  // `shafts`: dig mine shafts (which never run out) rather than everything else.
+  private tryDesignations(c: Colonist, kinds: number[], shafts = false): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
     const targets = this.nearestIn(
@@ -3395,6 +3409,7 @@ export class Simulation {
       c.tile,
       (i) =>
         kinds.includes(w.designation[i]) &&
+        this.isShaftDig(i) === shafts &&
         this.designationValid(i) &&
         !this.isReserved(`w${i}`, c) &&
         this.hasWorkSpot(i, standsOn(JOB_FOR_DESIGNATION[w.designation[i]]), region),
@@ -3449,8 +3464,10 @@ export class Simulation {
         return featureDef(w.feature[job.target]).crop!.harvestWork;
       case 'deconstruct':
         return featureDef(this.deconstructTarget(job.target)).build!.work * 0.5;
-      default:
-        return featureDef(w.feature[job.target]).harvest!.amount;
+      default: {
+        const def = featureDef(w.feature[job.target]);
+        return def.shaft ? digWork(shaftAt(this, job.target)) : def.harvest!.amount;
+      }
     }
   }
 
@@ -3575,6 +3592,10 @@ export class Simulation {
       case 'mine':
       case 'chop':
       case 'forage': {
+        if (featureDef(w.feature[t]).shaft) {
+          digDeeper(this, c, t);
+          break;
+        }
         const harvest = featureDef(w.feature[t]).harvest!;
         w.setFeature(t, NONE);
         w.designation[t] = Designation.NONE;
@@ -3659,6 +3680,14 @@ export class Simulation {
         this.pushColonistsOff(t);
         this.stats.built++;
         const def = featureDef(f);
+        // A new shaft starts at the surface, marked for digging (Cancel it to stop the miners). One rebuilt
+        // where a shaft stood (after a raid, say) goes back down the hole that's already there.
+        if (def.shaft) {
+          this.shafts[t] ??= { depth: 0, cavern: false };
+          w.progress[t] = 0;
+          w.designation[t] = Designation.MINE;
+          w.markDirty(t);
+        }
         if (def.art) {
           this.finishArtwork(c, t, def.name);
           break;

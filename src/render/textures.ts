@@ -392,6 +392,28 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillStyle = '#f08a3a';
       c.fillRect(7, 11, 2, 2);
       break;
+    case 'mineShaft':
+      // A square pit going down into the dark, framed in timber, with a winch over it.
+      c.fillStyle = '#3a3428';
+      c.fillRect(1, 2, 14, 13);
+      c.fillStyle = '#0c0a08';
+      c.fillRect(3, 5, 10, 8);
+      c.fillStyle = '#1e1a14';
+      c.fillRect(3, 5, 10, 2);
+      c.fillStyle = '#8a5e34';
+      c.fillRect(1, 3, 14, 2);
+      c.fillRect(1, 13, 14, 2);
+      c.fillRect(1, 3, 2, 12);
+      c.fillRect(13, 3, 2, 12);
+      c.fillStyle = '#b07a44';
+      c.fillRect(1, 3, 14, 1);
+      c.fillStyle = '#6a4626';
+      c.fillRect(7, 0, 2, 4);
+      c.fillStyle = '#c8c4b8';
+      c.fillRect(8, 4, 1, 6);
+      c.fillStyle = '#6d6c73';
+      c.fillRect(7, 10, 3, 2);
+      break;
     case 'smelter':
       // A tall brick furnace with a chimney and a pouring lip.
       c.fillStyle = 'rgba(0,0,0,0.25)';
@@ -1316,6 +1338,26 @@ function createAnimalTextures(scene: Phaser.Scene): void {
     c.fillStyle = '#c08040';
     c.fillRect(7, 12, 1, 2);
     c.fillRect(9, 12, 1, 2);
+  });
+  draw('crawler', (c) => {
+    // Pale, segmented and many-legged.
+    c.fillStyle = '#3a3440';
+    for (const x of [3, 5, 7, 9, 11]) {
+      c.fillRect(x, 12, 1, 2);
+      c.fillRect(x - 1, 7, 1, 1);
+    }
+    c.fillStyle = '#b8b0a4';
+    c.fillRect(2, 8, 10, 4);
+    c.fillRect(11, 7, 3, 4);
+    c.fillStyle = '#8a8276';
+    for (const x of [4, 7, 10]) {
+      c.fillRect(x, 8, 1, 4);
+    }
+    c.fillStyle = '#d8f0a0';
+    c.fillRect(13, 8, 1, 1);
+    c.fillRect(12, 8, 1, 1);
+    c.fillStyle = '#5a5248';
+    c.fillRect(14, 10, 1, 2);
   });
   draw('boar', (c) => {
     c.fillStyle = '#4a3a34';

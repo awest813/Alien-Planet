@@ -118,5 +118,21 @@
       "item": "egg",
       "count": 2
     }
+  },
+  "crawler": {
+    "name": "Cave crawler",
+    "hp": 0.8,
+    "speed": 1.05,
+    "meat": 3,
+    "leather": 0,
+    "fleeRange": 0,
+    "weight": 0,
+    "revengeChance": 1,
+    "bite": [0.08, 0.16],
+    "description": "A pale, many-legged thing from the dark below. Comes up through deep mine shafts.",
+    "wildness": 1,
+    "breedChance": 0,
+    "plural": "cave crawlers",
+    "group": [2, 4]
   }
 }

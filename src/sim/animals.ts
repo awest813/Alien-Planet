@@ -25,7 +25,8 @@ const chebyshev = (sim: Simulation, a: number, b: number) =>
   Math.max(Math.abs(sim.world.xOf(a) - sim.world.xOf(b)), Math.abs(sim.world.yOf(a) - sim.world.yOf(b)));
 
 function pickKind(sim: Simulation, allow: (key: string) => boolean = () => true): string {
-  const kinds = Object.values(ANIMALS).filter((a) => allow(a.key));
+  // Creatures of the deep (weight 0) never wander in from outside.
+  const kinds = Object.values(ANIMALS).filter((a) => a.weight > 0 && allow(a.key));
   let roll = sim.rng.next() * kinds.reduce((sum, a) => sum + a.weight, 0);
   for (const a of kinds) {
     roll -= a.weight;
@@ -223,6 +224,23 @@ export function addQuarry(sim: Simulation): Animal | null {
   a.hp *= QUARRY_TOUGHNESS;
   a.quarry = true;
   return a;
+}
+
+// Creatures come up out of the ground at `tile` (a breached mine shaft) and go for the nearest colonist.
+// Returns how many came.
+export function creaturesEmerge(sim: Simulation, tile: number, kind: string, count: number): number {
+  const w = sim.world;
+  const around = sim.nearest(tile, (i) => w.isPassable(i), count);
+  if (around.length === 0) {
+    return 0;
+  }
+  for (let n = 0; n < count; n++) {
+    const a = addAnimal(sim, around[n % around.length], kind);
+    a.manhunter = true;
+    a.revengeOn = nearestPrey(sim, a)?.id ?? -1;
+    a.revengeUntil = sim.tick + TICKS_PER_HOUR * 16;
+  }
+  return count;
 }
 
 // A pack of animals driven mad (by hunger, disease or something stranger) comes for the colony.

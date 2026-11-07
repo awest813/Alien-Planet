@@ -154,5 +154,12 @@
     "cost": 1400,
     "requires": ["pottery"],
     "description": "Unlocks the smelter, to turn iron ore into iron for tool kits, swords and mail."
+  },
+  {
+    "key": "deepMining",
+    "name": "Deep mining",
+    "cost": 1000,
+    "requires": ["smelting"],
+    "description": "Unlocks the mine shaft: miners dig down for stone, iron ore and silver, richer the deeper they go. Dig deep enough and something may dig back."
   }
 ]

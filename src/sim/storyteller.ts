@@ -6,6 +6,7 @@ import { ANIMALS, FACTIONS, NONE, featureDef, itemDef, itemId, terrainDef } from
 import { damage, infect } from './health';
 import { caravanArrives, goodwillOf } from './trade';
 import { atPeace, onGoodTerms } from './diplomacy';
+import { breach, breachWeight } from './depths';
 import { ignite } from './weather';
 import { Season } from './seasons';
 import { DRAFT_AGE } from './lifespans';
@@ -355,6 +356,26 @@ const EVENTS: EventDef[] = [
         'danger',
         true,
       );
+      sim.events.push('manhunters');
+      sim.story.manhuntersActive = true;
+      return true;
+    },
+  },
+  {
+    // Dig too deep and something digs back: cave crawlers come up through the deepest mine shaft.
+    key: 'breach',
+    minDay: 6,
+    cooldownDays: 8,
+    threat: true,
+    weight: (sim) => (sim.story.difficulty === 'peaceful' ? 0 : breachWeight(sim)),
+    run: (sim) => {
+      const count = Math.max(
+        2,
+        Math.round((2 + Math.floor(sim.day / 15) + (sim.story.difficulty === 'harsh' ? 1 : 0)) * threatScale(sim)),
+      );
+      if (!breach(sim, count)) {
+        return false;
+      }
       sim.events.push('manhunters');
       sim.story.manhuntersActive = true;
       return true;

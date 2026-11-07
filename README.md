@@ -129,6 +129,11 @@ How the living simulation works:
   pleases some and annoys others (gluttons hate frugal rations, the lazy hate long hours, hard workers don't mind).
   On a day of rest the sick are still tended, prisoners fed and fires kept going, and when the stores are nearly
   empty the day off is called off.
+- **Into the rock:** research Deep mining (after Smelting) and sink a mine shaft. Miners with nothing else to do
+  dig it deeper, a stretch at a time, for stone, iron ore and silver; the deeper it goes the richer the rock and
+  the harder the digging. Past twenty metres something may break through from below: cave crawlers pour up out
+  of the shaft. Beat them off and the cavern beyond makes the shaft richer still. Cancel the shaft to stop the
+  digging.
 - **Neighbours:** every week or so the Meadow Kin ask a favour: some goods from your stockpiles, or a great boar
   hunted down, within a few days. Doing it pays silver (sometimes a new colonist) and wins goodwill; turning it
   down or letting it lapse costs some. Goodwill means better prices, more caravans and more gifts of supplies;
@@ -297,6 +302,7 @@ src/
     body.ts         Body parts, infection, lasting injuries, hospital beds
     village.ts      The colony's leader, chosen by vote, and its policies
     diplomacy.ts    Neighbours' requests, gifts, and tribute to raiders
+    depths.ts       Mine shafts, what they bring up, and breaches from below
     simulation.ts   Fixed-tick loop, needs and mood, colonist AI, job system, reservations, objectives
     serialize.ts    Save format
   game/       Glue between the simulation, renderer, and UI
@@ -353,6 +359,7 @@ earshot and concerts, `src/game/music.test.ts` covers the tunes,
 `src/sim/body.test.ts` covers body parts, infection, lasting injuries and hospital beds,
 `src/sim/village.test.ts` covers the vote, the leader's sway and the policies,
 `src/sim/diplomacy.test.ts` covers requests, the great boar, gifts, goodwill and tribute,
+`src/sim/depths.test.ts` covers mine shafts, their ore and breaches from below,
 `src/sim/minds.test.ts` covers kinds of mental break, inspirations and obsessions,
 `src/sim/lifespans.test.ts` covers ages, backstories, births, growing up, learning by watching and old age,
 `src/sim/production.test.ts` covers grain and bread, drying racks, clay and iron, kilns and smelters,

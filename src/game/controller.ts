@@ -47,6 +47,7 @@ import {
   tradeOpen,
   artForSale,
 } from '../sim/trade';
+import { BREACH_DEPTH, METRES_PER_LEVEL, oreChances } from '../sim/depths';
 import { GIFT_SIZES, atPeace, describeRequest, giftGoodwill, tributeCost } from '../sim/diplomacy';
 import { weatherDef } from '../sim/weather';
 import {
@@ -470,6 +471,13 @@ export const TOOLS: ToolDef[] = [
     '',
     'production',
     'Smelts iron ore from the rock into iron for tools, swords and mail; burns wood while in use (Smelting)',
+  ),
+  build(
+    'mineShaft',
+    'Mine shaft',
+    '',
+    'production',
+    'Drag Mine over it and miners dig it deeper for stone, iron ore and silver; dig too deep and something may come up (Deep mining)',
   ),
   build(
     'fishingSpot',
@@ -2292,6 +2300,22 @@ export class GameController {
     }
     if (def?.bed && sim.messAround(i) > 0) {
       details.push('Mess nearby makes for worse tending of anyone laid up here');
+    }
+    if (def?.shaft) {
+      // Read without creating one (the UI never changes the sim).
+      const shaft = sim.shafts[i] ?? { depth: 0, cavern: false };
+      const odds = oreChances(shaft);
+      details.push(
+        `${shaft.depth * METRES_PER_LEVEL} m deep${shaft.cavern ? ', into a cavern' : ''}: each dig brings up stone, iron ore ${Math.round(odds.iron * 100)}% of the time, silver ${Math.round(odds.silver * 100)}%`,
+      );
+      details.push(
+        w.designation[i] === Designation.MINE
+          ? 'Miners are digging it deeper (Cancel to stop them)'
+          : 'Not being dug: drag Mine over it to start',
+      );
+      if (!shaft.cavern && shaft.depth >= BREACH_DEPTH) {
+        details.push('Deep enough that something below may break through');
+      }
     }
     if (art && def) {
       details.push(`${qualityLabel(art.quality)} ${def.name.toLowerCase()} by ${art.artist}, day ${art.day}`);

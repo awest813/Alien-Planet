@@ -1208,6 +1208,31 @@
     }
   },
   {
+    "key": "mineShaft",
+    "name": "Mine shaft",
+    "research": "deepMining",
+    "shaft": true,
+    "harvest": {
+      "work": "mine",
+      "amount": 260,
+      "item": "stone",
+      "count": 8
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 50
+        },
+        {
+          "item": "stone",
+          "count": 30
+        }
+      ],
+      "work": 400
+    }
+  },
+  {
     "key": "brickWall",
     "name": "Brick wall",
     "blocksRoom": true,

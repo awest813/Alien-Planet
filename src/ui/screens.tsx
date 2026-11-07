@@ -382,6 +382,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             silver and goodwill. Gifts win goodwill too, and silver paid to raiders buys twelve days of peace.
           </li>
           <li>
+            After Deep mining, a <b>mine shaft</b> gives miners endless digging for stone, iron ore and silver, richer
+            the deeper it goes. Dig past twenty metres and something may come up out of it: have fighters ready.
+          </li>
+          <li>
             Unhappy colonists break in their own ways: a daze, a sulk, a binge, or a rage that smashes furniture.
             Sometimes a skilled artist is seized by a vision: deliver what they ask in time for a legendary sculpture.
           </li>

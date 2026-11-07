@@ -130,6 +130,8 @@ export interface FeatureDef {
   bridge: boolean;
   // A colonist standing here can fish the open water next to it.
   fishing: boolean;
+  // A mine shaft: its harvest never runs out, but goes deeper each time (see depths.ts).
+  shaft: boolean;
   joy?: JoySpec;
   harvest?: { work: WorkType; amount: number; item: number; count: number };
   crop?: { item: number; count: number; growDays: number; sowWork: number; harvestWork: number };
@@ -223,6 +225,7 @@ interface RawFeature {
   harvest?: { work: string; amount: number; item: string; count: number };
   crop?: { item: string; count: number; growDays: number; sowWork: number; harvestWork: number };
   build?: { cost: { item: string; count: number }[]; work: number };
+  shaft?: boolean;
   layer?: 'floor' | 'roof';
   seeThrough?: boolean;
   trap?: boolean;
@@ -353,6 +356,7 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   growLight: f.growLight ?? 0,
   bridge: !!f.bridge,
   fishing: !!f.fishing,
+  shaft: !!f.shaft,
   joy: f.joy && {
     activity: f.joy.activity,
     kind: joyKind(f.joy.kind, f.key),

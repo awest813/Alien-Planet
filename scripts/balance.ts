@@ -68,6 +68,9 @@ const RESEARCH_ORDER = [
   'sunLamps',
   'optics',
   'signalBeacon',
+  'pottery',
+  'smelting',
+  'deepMining',
 ];
 
 // Finds the nearest w×h rectangle to the colonists where every tile can take a blueprint.
@@ -163,6 +166,8 @@ interface Result {
   fellWounded: number;
   captured: number;
   elections: number;
+  shaftDepth: number;
+  breaches: number;
   requestsDone: number;
   requestsFailed: number;
   gifts: number;
@@ -298,6 +303,7 @@ function play(seed: number): Result {
   let prisonPlaced = false;
   const fell = new Set<number>();
   let beaconPlaced = false;
+  let shaftPlaced = false;
   let shipsLanded = 0;
   let bannerPlaced = false;
   let labTile = -1;
@@ -427,6 +433,15 @@ function play(seed: number): Result {
       const next = RESEARCH_ORDER.find((key) => !sim.research.done.includes(key));
       if (next) {
         sim.apply({ type: 'research', project: next });
+      }
+    }
+    // Deep mining researched: sink a shaft (it's marked for digging once built).
+    if (!shaftPlaced && sim.isResearched('deepMining')) {
+      shaftPlaced = true;
+      const site = findSite(sim, 1, 1, avoid);
+      if (site) {
+        claim(avoid, sim, site.x, site.y, 1, 1);
+        sim.apply({ type: 'build', feature: featureId('mineShaft'), tiles: [at(site.x, site.y)] });
       }
     }
     // The long game: once the signal beacon is researched, build it beside two wood generators.
@@ -782,6 +797,8 @@ function play(seed: number): Result {
     fellWounded: fell.size,
     captured: sim.stats.captured ?? 0,
     elections: sim.stats.elections ?? 0,
+    shaftDepth: Math.max(0, ...Object.values(sim.shafts).map((s) => s.depth)),
+    breaches: sim.stats.breaches ?? 0,
     requestsDone: sim.stats.requestsDone ?? 0,
     requestsFailed: sim.stats.requestsFailed ?? 0,
     gifts: sim.stats.gifts ?? 0,
@@ -967,6 +984,12 @@ console.log(
       .map((r) => r.kinGoodwill)
       .sort((a, b) => a - b)
       .join(' ')}`,
+);
+console.log(
+  `  depths: shafts dug to ${results
+    .map((r) => r.shaftDepth)
+    .sort((a, b) => a - b)
+    .join(' ')} levels; ${sum((r) => r.breaches)} breaches`,
 );
 console.log(
   `  village: ${sum((r) => r.elections)} votes held, ${sum((r) => r.leaderless)} colonies left without a leader; ` +

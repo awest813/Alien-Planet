@@ -1,6 +1,7 @@
 import type { Obsession } from './minds';
 import { Village, freshVillage } from './village';
 import { Diplomacy, freshDiplomacy } from './diplomacy';
+import { Shaft } from './depths';
 import type { BeaconState } from './beacon';
 import { NONE, featureDef } from './defs';
 import type { JoyKind } from './defs';
@@ -153,6 +154,7 @@ export interface SaveData {
   obsession?: Obsession | null;
   village?: Village;
   diplomacy?: Diplomacy;
+  shafts?: Record<number, Shaft>;
   nextInfantId?: number;
   animals: Animal[];
   nextAnimalId: number;
@@ -275,6 +277,7 @@ export function serialize(sim: Simulation): SaveData {
     obsession: sim.obsession && { ...sim.obsession },
     village: { ...sim.village },
     diplomacy: structuredClone(sim.diplomacy),
+    shafts: structuredClone(sim.shafts),
     nextInfantId: sim.nextInfantId,
     animals: structuredClone(sim.animals),
     caravan: structuredClone(sim.caravan),
@@ -387,6 +390,7 @@ export function deserialize(data: SaveData): Simulation {
   sim.obsession = data.obsession ? { ...data.obsession } : null;
   sim.village = { ...freshVillage(), ...data.village };
   sim.diplomacy = { ...freshDiplomacy(), ...structuredClone(data.diplomacy) };
+  sim.shafts = structuredClone(data.shafts ?? {});
   sim.nextInfantId = data.nextInfantId ?? 0;
   sim.animals = structuredClone(data.animals);
   sim.caravan = structuredClone(data.caravan);
