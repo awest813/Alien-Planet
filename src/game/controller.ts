@@ -414,6 +414,7 @@ export const TOOLS: ToolDef[] = [
     'Build on the shore; hunters fish here when food runs short and all winter',
   ),
   build('icebox', 'Icebox', '', 'production', 'Food storage that keeps food fresh while powered (50 W)'),
+  build('shelf', 'Shelf', '', 'production', 'Storage for three stacks of one kind of item on a single tile'),
   build('sunLamp', 'Sun lamp', '', 'production', 'Crops nearby grow day and night, all year (300 W)'),
   build('woodGenerator', 'Wood generator', '', 'power', '1000 W while fuelled; haulers refuel it with wood'),
   build('solarPanel', 'Solar panel', '', 'power', 'Up to 1200 W in daylight, less in winter'),
@@ -552,6 +553,8 @@ export interface TileView {
   // On a stockpile: its settings (the groups it refuses, as a bit mask over STORAGE_GROUPS, and its
   // priority), for the controls in the tile card.
   stockpile: { tile: number; refused: number; priority: StockpilePriority } | null;
+  // On a door: whether it's locked, for the lock button.
+  door: { tile: number; locked: boolean } | null;
 }
 
 export interface CaptiveView {
@@ -1786,6 +1789,21 @@ export class GameController {
         tile: manhunters[0].tile,
       });
     }
+    // Cold indoors: a warm room is the only answer, and this one isn't warm enough. Said as soon as it's
+    // colder than their clothes can take, not once they're dying of it.
+    const coldInside = sim
+      .living()
+      .filter(
+        (c) => c.health.hypothermia > 0.05 && sim.isIndoors(c.tile) && sim.temperatureAt(c.tile) < comfortRange(c).min,
+      );
+    if (coldInside.length > 0) {
+      const room = sim.roomAt(coldInside[0].tile);
+      alerts.push({
+        text: `It's ${Math.round(sim.temperatureAt(coldInside[0].tile))}°C in the ${room?.role.toLowerCase() ?? 'room'} and colonists are getting dangerously cold: add a campfire or a hearth, or make parkas`,
+        tone: 'danger',
+        colonist: coldInside[0].id,
+      });
+    }
     for (const c of sim.living()) {
       if (sim.inMentalBreak(c)) {
         alerts.push({ text: `${c.name} is having a mental break`, tone: 'danger', colonist: c.id });
@@ -1985,6 +2003,12 @@ export class GameController {
     const art = sim.artworkAt(i);
     const feature = f !== NONE ? (art ? `“${art.title}”` : featureDef(f).name) : null;
     const details: string[] = [];
+    if (w.locked[i]) {
+      details.push('Locked: nobody gets through, though raiders can break it down');
+    }
+    if (f !== NONE && featureDef(f).shelf && w.itemType[i] !== NONE) {
+      details.push(`Shelf: ${w.itemCount[i]}/${w.capacity(i, w.itemType[i])}`);
+    }
     if (w.forbidden[i] && w.itemType[i] !== NONE) {
       details.push('Forbidden: colonists leave it alone (Allow to use it)');
     }
@@ -2130,6 +2154,7 @@ export class GameController {
       temperature: Math.round(sim.temperatureAt(i)),
       animal,
       details,
+      door: def?.door ? { tile: i, locked: w.locked[i] === 1 } : null,
       stockpile: isStockpileZone(w.zone[i])
         ? { tile: i, refused: refusedGroups(w.zone[i]), priority: stockpilePriority(w.zone[i]) }
         : null,

@@ -90,4 +90,19 @@ describe('alerts', () => {
     w.fuel[fire] = 0;
     expect(texts().some((t) => /gone out: colonists with Haul work bring wood/.test(t))).toBe(true);
   });
+
+  it('say when colonists freeze even indoors', () => {
+    const { sim, w, x, y } = colony('6');
+    for (const i of outline(w, x + 2, y - 3, x + 7, y + 2)) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    w.setFeature(w.idx(x + 4, y + 2), featureId('door'));
+    const c = sim.colonists[0];
+    c.tile = w.idx(x + 4, y);
+    c.health.hypothermia = 0.1;
+    const real = sim.temperatureAt.bind(sim);
+    sim.temperatureAt = () => -3;
+    expect(texts().some((t) => /getting dangerously cold: add a campfire/.test(t))).toBe(true);
+    sim.temperatureAt = real;
+  });
 });

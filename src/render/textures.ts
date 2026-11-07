@@ -938,6 +938,22 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillStyle = '#2e2e34';
       c.fillRect(2, 13, 12, 1);
       break;
+    case 'shelf':
+      // Three wooden boards on uprights, seen from above.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(2, 2, 13, 13);
+      c.fillStyle = '#5c3d22';
+      c.fillRect(1, 1, 2, 14);
+      c.fillRect(13, 1, 2, 14);
+      c.fillStyle = '#9a6b3e';
+      for (const y of [2, 7, 12]) {
+        c.fillRect(1, y, 14, 2);
+      }
+      c.fillStyle = '#b8854f';
+      for (const y of [2, 7, 12]) {
+        c.fillRect(1, y, 14, 1);
+      }
+      break;
     case 'icebox':
       c.fillStyle = '#9ad1ff';
       c.fillRect(1, 1, 14, 14);

@@ -112,6 +112,8 @@ export class World {
   public readonly filth: Uint8Array;
   // 1: the items here are forbidden, and colonists leave them alone. Cleared when the tile empties.
   public readonly forbidden: Uint8Array;
+  // 1: the door here is locked, and nobody passes until it's unlocked (or broken down).
+  public readonly locked: Uint8Array;
   // Bumped whenever the mess anywhere changes.
   public filthVersion = 0;
 
@@ -156,6 +158,30 @@ export class World {
     this.progress = new Float32Array(this.size);
     this.filth = new Uint8Array(this.size);
     this.forbidden = new Uint8Array(this.size);
+    this.locked = new Uint8Array(this.size);
+  }
+
+  // How many of an item fit on a tile: a stack, or several on a shelf.
+  public capacity(i: number, item: number): number {
+    const f = this.feature[i];
+    return itemDef(item).stackLimit * (f !== NONE && featureDef(f).shelf > 0 ? featureDef(f).shelf : 1);
+  }
+
+  // Locks or unlocks the door on a tile (anything else is left alone).
+  public setLocked(i: number, locked: boolean): boolean {
+    const f = this.feature[i];
+    if (f === NONE || !featureDef(f).door || (this.locked[i] === 1) === locked) {
+      return false;
+    }
+    this.locked[i] = locked ? 1 : 0;
+    // Nothing lies on a shut door.
+    if (locked && this.filth[i] !== 0) {
+      this.filth[i] = 0;
+      this.filthVersion++;
+    }
+    this.structureVersion++;
+    this.markDirty(i);
+    return true;
   }
 
   public filthKind(i: number): number {
@@ -241,6 +267,9 @@ export class World {
   }
 
   public isPassable(i: number): boolean {
+    if (this.locked[i] === 1) {
+      return false;
+    }
     const f = this.feature[i];
     if (f !== NONE && featureDef(f).bridge) {
       return true;
@@ -309,6 +338,7 @@ export class World {
     this.progress[i] = 0;
     this.damage[i] = 0;
     this.growth[i] = 0;
+    this.locked[i] = 0;
     // A fire is built with a first load of fuel; a generator starts empty.
     this.fuel[i] = f !== NONE ? (featureDef(f).burns?.capacity ?? 0) : 0;
     this.featureVersion++;
@@ -409,7 +439,7 @@ export class World {
       return false;
     }
     const type = this.itemType[i];
-    return type === NONE || (type === item && this.itemCount[i] < itemDef(item).stackLimit);
+    return type === NONE || (type === item && this.itemCount[i] < this.capacity(i, item));
   }
 
   // Adds to the tile's stack and returns whatever did not fit. `fresh` is how many days the
@@ -419,7 +449,7 @@ export class World {
       return count;
     }
     const def = itemDef(item);
-    const space = def.stackLimit - (this.itemType[i] === item ? this.itemCount[i] : 0);
+    const space = this.capacity(i, item) - (this.itemType[i] === item ? this.itemCount[i] : 0);
     const added = Math.min(space, count);
     if (added <= 0) {
       return count;

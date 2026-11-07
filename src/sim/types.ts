@@ -391,6 +391,8 @@ export type Command =
   | { type: 'capture'; rect: Rect; add: boolean }
   // Let a prisoner go.
   | { type: 'release'; captive: number }
+  // Lock (or unlock) a door: nobody passes a locked door, though raiders can break it down.
+  | { type: 'lock'; tile: number; locked: boolean }
   // Forbid (or allow) the items in a rectangle: colonists leave forbidden items alone.
   | { type: 'forbid'; rect: Rect; on: boolean }
   | { type: 'research'; project: string | null }

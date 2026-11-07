@@ -118,6 +118,8 @@ export interface FeatureDef {
   cooler?: { amount: number; target: number };
   // Storage tile that keeps food from rotting while powered.
   icebox: boolean;
+  // Storage that holds this many stacks of one kind of item on its tile (shelves).
+  shelf: number;
   // Radius of a sun lamp's light (crops grow beneath it day and night).
   growLight: number;
   // Built over water and makes it walkable.
@@ -199,6 +201,7 @@ interface RawFeature {
   power?: { output?: number; draw?: number; storage?: number; solar?: boolean; fuel?: RawFuel };
   cooler?: { amount: number; target: number };
   icebox?: boolean;
+  shelf?: number;
   growLight?: number;
   bridge?: boolean;
   fishing?: boolean;
@@ -338,6 +341,7 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   },
   cooler: f.cooler,
   icebox: !!f.icebox,
+  shelf: f.shelf ?? 0,
   growLight: f.growLight ?? 0,
   bridge: !!f.bridge,
   fishing: !!f.fishing,

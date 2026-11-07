@@ -203,6 +203,8 @@ const TRACK_DIRT = 0.04;
 // colony's middle anyone bothers cleaning outdoors.
 const CLEAN_WORK = 30;
 const CLEAN_RANGE = 12;
+// How far below (or above) their comfort colonists will still go out for fun or idle about.
+const JOY_CHILL = 6;
 // The best a storage tile can be for an item (critical priority, cold for perishables).
 const MAX_STORE_VALUE = 9;
 // Levels of mess around someone indoors that make a room feel filthy, and the most a dirty kitchen
@@ -1096,6 +1098,17 @@ export class Simulation {
       case 'release':
         release(this, cmd.captive);
         break;
+      case 'lock':
+        if (w.setLocked(cmd.tile, cmd.locked) && cmd.locked) {
+          // Whoever stands in the doorway steps aside, and anything lying there is moved off it.
+          this.pushColonistsOff(cmd.tile);
+          if (w.itemType[cmd.tile] !== NONE) {
+            const moved = w.pickUp(cmd.tile, w.itemCount[cmd.tile]);
+            w.dropItemNear(cmd.tile, moved.item, moved.count, moved.fresh, moved.quality);
+          }
+          this.addLog(`The door at (${w.xOf(cmd.tile)}, ${w.yOf(cmd.tile)}) is locked: nobody gets through.`);
+        }
+        break;
       case 'forbid':
         this.forRect(cmd.rect, (i) => {
           if (w.itemType[i] !== NONE && w.forbidden[i] !== (cmd.on ? 1 : 0)) {
@@ -1705,6 +1718,11 @@ export class Simulation {
   public isIcebox(i: number): boolean {
     const f = this.world.feature[i];
     return f !== NONE && featureDef(f).icebox;
+  }
+
+  public isShelf(i: number): boolean {
+    const f = this.world.feature[i];
+    return f !== NONE && featureDef(f).shelf > 0;
   }
 
   // Storage where food doesn't spoil: a running icebox, or a stockpile in a freezing room.
@@ -2815,11 +2833,7 @@ export class Simulation {
     const region = this.regionOf(c.tile);
     const home = this.homeTile();
     // Mess isn't worth going out into weather they're not dressed for.
-    const { min, max } = comfortRange(c);
-    const bearable = (i: number) => {
-      const t = this.temperatureAt(i);
-      return t >= min && t <= max;
-    };
+    const bearable = (i: number) => this.bearable(c, i);
     // A few of the nearest, in case one can't be reached after all.
     const tiles = this.nearestIn(
       'filth',
@@ -3546,7 +3560,7 @@ export class Simulation {
 
   public isStockpile(i: number): boolean {
     const zone = this.world.zone[i];
-    return (zone !== 0 && zone < GROW_ZONE) || this.isIcebox(i);
+    return (zone !== 0 && zone < GROW_ZONE) || this.isIcebox(i) || this.isShelf(i);
   }
 
   // Whether storage on this tile takes this item (its stockpile's settings allow it).
@@ -3620,7 +3634,7 @@ export class Simulation {
       this.reserve(c, `i${source}`);
       this.reserve(c, `s${dest}`);
       // Only carry what fits, so the rest isn't hauled straight back.
-      const room = itemDef(item).stackLimit - (w.itemType[dest] === item ? w.itemCount[dest] : 0);
+      const room = w.capacity(dest, item) - (w.itemType[dest] === item ? w.itemCount[dest] : 0);
       this.assign(c, this.makeJob('haul', dest, { source, item, stage: 0, count: room }), path);
       return true;
     }
@@ -4268,7 +4282,11 @@ export class Simulation {
     for (let attempt = 0; attempt < 8; attempt++) {
       const tx = x + this.rng.int(-10, 10);
       const ty = y + this.rng.int(-10, 10);
-      if (!w.inBounds(tx, ty) || this.regions.region[w.idx(tx, ty)] !== region) {
+      if (
+        !w.inBounds(tx, ty) ||
+        this.regions.region[w.idx(tx, ty)] !== region ||
+        !this.bearable(c, w.idx(tx, ty), JOY_CHILL)
+      ) {
         continue;
       }
       const path = this.pathfinder.find(c.tile, [w.idx(tx, ty)]);
@@ -4284,13 +4302,21 @@ export class Simulation {
   // the open sky, and not a table a rival is already sitting at.
   private joyOpen(spot: number, c: Colonist, region: number): boolean {
     const joy = featureDef(this.world.feature[spot]).joy!;
-    if (!this.hasWorkSpot(spot, !joy.beside, region)) {
+    if (!this.hasWorkSpot(spot, !joy.beside, region) || !this.bearable(c, spot, JOY_CHILL)) {
       return false;
     }
     if (joy.stargazing && !this.starsOut(spot)) {
       return false;
     }
     return !this.playersAt(spot, c).some((o) => relationLabel(c, o) === 'Rival');
+  }
+
+  // Whether a spot is within what a colonist's clothes can take: nobody goes out to tidy up into cold
+  // or heat that hurts. For fun, or idling, they'll put up with a bit of a chill (`margin` degrees).
+  private bearable(c: Colonist, i: number, margin = 0): boolean {
+    const { min, max } = comfortRange(c);
+    const t = this.temperatureAt(i);
+    return t >= min - margin && t <= max + margin;
   }
 
   private starsOut(spot: number): boolean {
@@ -6409,7 +6435,12 @@ export class Simulation {
         continue;
       }
       const t = w.idx(tx, ty);
-      if (t === c.tile || this.regions.region[t] !== region) {
+      // Idling, they stay somewhere bearable; in a daze, they wander anywhere.
+      if (
+        t === c.tile ||
+        this.regions.region[t] !== region ||
+        (!this.inMentalBreak(c) && !this.bearable(c, t, JOY_CHILL))
+      ) {
         continue;
       }
       const path = this.pathfinder.find(c.tile, [t]);

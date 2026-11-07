@@ -437,7 +437,24 @@ can ship on its own.
   - Balance, 48 days on 12 seeds: everyone survived on Standard and Harsh (75 of 75 each). In the
     100-player playtest every sensible style kept its colony once its test player chopped more wood when the
     woodpile ran low; colonies that never shelter or that tear their shelter down still freeze.
-  - Still to do: shelves (several stacks on a tile) and locked doors.
+- **Done (second part):**
+  - Shelves (25 wood): storage that holds three stacks of one kind of item on a tile. A stockpile painted
+    over a shelf sets what it takes; without one, it takes anything at normal priority.
+  - Locked doors: lock or unlock a door from its tile card. Nobody passes a locked door: not colonists, not
+    animals, not raiders, who have to break their way in as through a wall (and in practice pick the
+    nearest wall). Rooms and reachability follow the lock, so nobody plans a route through it. A door
+    broken down or rebuilt comes back unlocked.
+  - Found by the 100-player playtest:
+    - Colonists went out for recreation (and idled about) on freezing nights while a warm hut stood
+      nearby, and whole colonies froze on the first winter night. Recreation and idling now stay within
+      6°C of a colonist's comfort (cleaning within it), unless they're in a daze.
+    - A new alert when colonists get dangerously cold indoors (the room needs another fire, a hearth, or
+      parkas), as soon as it's colder than their clothes can take.
+    - Mess left on a door once it's locked is cleared.
+  - Balance, 48 days on 12 seeds: Standard kept everyone (82 of 82; 2 breaks, mood 50.5, recreation
+    short 18% of the time, as before). Harsh lost 7 of 79 to raids (blood loss), within its usual range.
+    In the 100-player playtest the only colonies lost were those that never built or finished a shelter
+    (neglectful, random clicking, random priorities, tearing it down, or a map with too little wood).
 
 **Phase F: Food, materials and the seasons.** _(Medium–large.)_
 

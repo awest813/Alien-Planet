@@ -470,6 +470,22 @@
     }
   },
   {
+    "key": "shelf",
+    "name": "Shelf",
+    "passable": true,
+    "moveCost": 1.2,
+    "shelf": 3,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 25
+        }
+      ],
+      "work": 100
+    }
+  },
+  {
     "key": "icebox",
     "name": "Icebox",
     "passable": true,

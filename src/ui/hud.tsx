@@ -540,6 +540,22 @@ function TileCard({ t, onClose }: { t: TileView; onClose?: () => void }) {
         </div>
       ))}
       {onClose && t.stockpile && <StockpileSettings s={t.stockpile} />}
+      {onClose && t.door && (
+        <div className="row">
+          <button
+            className={t.door.locked ? 'active' : ''}
+            aria-pressed={t.door.locked}
+            title={
+              t.door.locked
+                ? 'Let everyone through again'
+                : 'Keep everyone out (or in): colonists, animals and raiders, until raiders break it down'
+            }
+            onClick={() => controller.command({ type: 'lock', tile: t.door!.tile, locked: !t.door!.locked })}
+          >
+            {t.door.locked ? '🔒 Locked: unlock' : 'Lock the door'}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

@@ -897,8 +897,20 @@ export class ColonyScene extends Phaser.Scene {
       }
     }
 
-    // Forbidden items: a small red cross in the corner.
     const view = this.visibleTiles();
+    // Locked doors: a padlock.
+    for (let ty = view.y0; ty <= view.y1; ty++) {
+      for (let tx = view.x0; tx <= view.x1; tx++) {
+        if (world.locked[world.idx(tx, ty)]) {
+          const x = tx * TILE + TILE / 2;
+          const y = ty * TILE + TILE / 2;
+          g.lineStyle(1.5, 0xffd166, 1).strokeCircle(x, y - 2, 2);
+          g.fillStyle(0xffd166, 1).fillRect(x - 3, y - 1, 6, 5);
+          g.fillStyle(0x3a2a10, 1).fillRect(x - 0.5, y + 1, 1, 2);
+        }
+      }
+    }
+    // Forbidden items: a small red cross in the corner.
     for (const i of world.tilesWith('items')) {
       if (!world.forbidden[i]) {
         continue;

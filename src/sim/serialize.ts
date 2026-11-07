@@ -105,6 +105,7 @@ export interface SaveData {
     progress: Float32Array;
     filth?: Uint8Array;
     forbidden?: Uint8Array;
+    locked?: Uint8Array;
     growth: Float32Array;
     fresh: Float32Array;
     quality: Float32Array;
@@ -174,6 +175,7 @@ export function serialize(sim: Simulation): SaveData {
       progress: w.progress.slice(),
       filth: w.filth.slice(),
       forbidden: w.forbidden.slice(),
+      locked: w.locked.slice(),
       growth: w.growth.slice(),
       fresh: w.fresh.slice(),
       quality: w.quality.slice(),
@@ -284,6 +286,9 @@ export function deserialize(data: SaveData): Simulation {
   }
   if (layers.forbidden) {
     world.forbidden.set(layers.forbidden);
+  }
+  if (layers.locked) {
+    world.locked.set(layers.locked);
   }
   world.growth.set(layers.growth);
   world.fresh.set(layers.fresh);

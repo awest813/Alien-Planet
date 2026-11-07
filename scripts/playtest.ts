@@ -10,6 +10,7 @@
 // FIRE=day (each fire's fuel and who could reach it), BORDER=day (what walls off the fire's region),
 // SAVEAT=day SAVEDIR=dir (keep a save from that day, for loading into the browser).
 import { writeFileSync } from 'node:fs';
+import { comfortRange } from '../src/sim/apparel';
 import { MAP_SIZES } from '../src/sim/constants';
 import { FEATURES, NONE, RECIPES, featureDef, featureId, terrainDef } from '../src/sim/defs';
 import { deserialize, serialize } from '../src/sim/serialize';
@@ -315,6 +316,7 @@ function play(player: number): Report {
   // Who's been doing the same thing in the same place for how long.
   const sameSince = new Map<number, { key: string; since: number }>();
 
+  let hut: { x: number; y: number } | null = null;
   if (persona !== 'chaos') {
     stockpileFirst();
   }
@@ -324,7 +326,7 @@ function play(player: number): Report {
       stockpile(w().xOf(c.tile) + 2, w().yOf(c.tile) + 2, w().xOf(c.tile) + 5, w().yOf(c.tile) + 4);
       return;
     }
-    basics(sim, avoid, stockpile);
+    hut = basics(sim, avoid, stockpile);
     if (persona === 'farmer') {
       for (const key of ['potatoPlant', 'healrootPlant', 'cottonPlant', 'potatoPlant']) {
         const field = findSite(sim, 8, 5, avoid);
@@ -341,6 +343,7 @@ function play(player: number): Report {
   }
 
   let chopRadius = 14;
+  let secondFire = false;
   const research = [
     'hearths',
     'cropRotation',
@@ -362,11 +365,29 @@ function play(player: number): Report {
         placeOne(sim, avoid, 'stove');
         placeOne(sim, avoid, 'researchBench');
         placeOne(sim, avoid, 'table');
+        placeOne(sim, avoid, 'shelf');
         sim.apply({ type: 'bill', recipe: RECIPES.find((r) => r.key === 'cookMeal')!.id, target: 20 });
       }
       if (hour % 24 === 0 && persona !== 'neglectful') {
         const next = research.find((k) => !sim.isResearched(k));
         sim.apply({ type: 'research', project: next ?? null });
+      }
+      // A sensible player answers the freezing-indoors warning once: a second fire in the hut.
+      const built = hut as { x: number; y: number } | null;
+      if (
+        !secondFire &&
+        built &&
+        persona !== 'neglectful' &&
+        persona !== 'chaos' &&
+        sim
+          .living()
+          .some(
+            (c) =>
+              c.health.hypothermia > 0.05 && sim.isIndoors(c.tile) && sim.temperatureAt(c.tile) < comfortRange(c).min,
+          )
+      ) {
+        secondFire = true;
+        sim.apply({ type: 'build', feature: featureId('campfire'), tiles: [w().idx(built.x + 2, built.y + 4)] });
       }
       // A sensible player answers the wood warning: chop further afield.
       if (hour % 12 === 0 && persona !== 'neglectful' && persona !== 'chaos' && sim.stockOf(itemId('wood')) < 60) {
@@ -724,6 +745,17 @@ function play(player: number): Report {
       () => ({ type: 'festivals', on: rng.chance(0.7) }),
       () => ({ type: 'shipChoice', board: rng.chance(0.5) }),
       () => ({ type: 'sellArt', tile: nearHome(10) }),
+      () => ({ type: 'forbid', rect: randomRect(8), on: rng.chance(0.5) }),
+      () => {
+        const doors = [...w().tilesWith('features')].filter((i) => featureDef(w().feature[i]).door);
+        return { type: 'lock', tile: doors.length > 0 ? rng.pick(doors) : nearHome(5), locked: rng.chance(0.5) };
+      },
+      () => ({
+        type: 'stockpile',
+        tile: nearHome(12),
+        refused: rng.int(0, 15),
+        priority: rng.pick(['low', 'normal', 'high', 'critical'] as const),
+      }),
     ];
     sim.apply(rng.pick(kinds)());
   }

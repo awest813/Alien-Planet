@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { featureDef, featureId, itemId } from './defs';
+import { featureDef, featureId, itemDef, itemId } from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
+import { triggerEvent } from './storyteller';
 import { HOUR, clearAround, outline, run } from './test-helpers';
 import { WORK_TYPES } from './types';
 import { STOCKPILE_ZONE, refusedGroups, stockpilePriority, stockpileZone } from './world';
@@ -156,5 +157,100 @@ describe('forbidding', () => {
     w.forbidden[pile] = 1;
     w.takeItem(pile, 5);
     expect(w.forbidden[pile]).toBe(0);
+  });
+});
+
+describe('shelves', () => {
+  it('hold three stacks of one kind of item on a tile, and haulers fill them', () => {
+    const { sim, w, x, y } = camp(30);
+    for (const i of [...w.tilesWith('items')]) {
+      w.takeItem(i, w.itemCount[i]);
+    }
+    const shelf = w.idx(x - 4, y - 4);
+    w.setFeature(shelf, featureId('shelf'));
+    const limit = itemDef(itemId('stone')).stackLimit;
+    expect(w.capacity(shelf, itemId('stone'))).toBe(limit * 3);
+    expect(sim.isStockpile(shelf)).toBe(true);
+    w.dropItemNear(w.idx(x - 8, y + 6), itemId('stone'), limit * 2);
+    sim.colonists[0].priorities.hauling = 1;
+    run(sim, HOUR * 4);
+    expect(w.itemType[shelf]).toBe(itemId('stone'));
+    expect(w.itemCount[shelf]).toBe(limit * 2);
+    // A stockpile painted over a shelf sets what it takes.
+    sim.apply({ type: 'zone', rect: { x0: x - 4, y0: y - 4, x1: x - 4, y1: y - 4 }, zone: STOCKPILE_ZONE });
+    sim.apply({ type: 'stockpile', tile: shelf, refused: 2, priority: 'normal' });
+    expect(sim.storeValue(shelf, itemId('stone'))).toBe(0);
+  });
+});
+
+describe('locked doors', () => {
+  it('keep everyone out until unlocked, and are saved', () => {
+    const { sim, w, x, y, inside } = camp(31);
+    const door = w.idx(x + 2, y);
+    const outside = w.idx(x - 3, y);
+    expect(sim.pathfinder.find(outside, [inside])).not.toBeNull();
+    w.addFilth(door, 2);
+    sim.apply({ type: 'lock', tile: door, locked: true });
+    expect(w.filth[door]).toBe(0);
+    expect(w.locked[door]).toBe(1);
+    expect(w.isPassable(door)).toBe(false);
+    expect(sim.pathfinder.find(outside, [inside])).toBeNull();
+    expect(sim.regionOf(outside)).not.toBe(sim.regionOf(inside));
+    const copy = deserialize(structuredClone(serialize(sim)));
+    expect(copy.world.locked[door]).toBe(1);
+    sim.apply({ type: 'lock', tile: door, locked: false });
+    expect(sim.pathfinder.find(outside, [inside])).not.toBeNull();
+    // Only doors lock.
+    sim.apply({ type: 'lock', tile: w.idx(x + 4, y - 3), locked: true });
+    expect(w.locked[w.idx(x + 4, y - 3)]).toBe(0);
+  });
+
+  it('hold raiders like a wall: they have to break their way in', () => {
+    const { sim, w, x, y } = camp(32);
+    const door = w.idx(x + 2, y);
+    const walls = () => [...w.tilesWith('features')].filter((i) => w.feature[i] === featureId('woodWall')).length;
+    const before = walls();
+    // Everyone inside, door locked.
+    for (const c of sim.colonists) {
+      c.tile = w.idx(x + 6, y + 1);
+    }
+    sim.apply({ type: 'lock', tile: door, locked: true });
+    expect(triggerEvent(sim, 'raid')).toBe(true);
+    for (let h = 0; h < 12 && walls() === before && w.feature[door] === featureId('door'); h++) {
+      for (const c of sim.colonists) {
+        c.needs.food = 1;
+        c.needs.rest = 1;
+      }
+      run(sim, HOUR);
+    }
+    expect(walls() < before || w.feature[door] !== featureId('door')).toBe(true);
+    // A broken door comes back unlocked.
+    w.setFeature(door, 0);
+    expect(w.locked[door]).toBe(0);
+  });
+});
+
+describe('cold weather', () => {
+  it('keeps colonists from going out for fun or idling outdoors in cold their clothes can’t take', () => {
+    const { sim, w, x, y } = camp(40);
+    const c = sim.colonists[0];
+    c.tile = w.idx(x + 6, y + 1);
+    c.needs.joy = 0.1;
+    c.schedule.fill('J');
+    for (const o of sim.colonists.slice(1)) {
+      o.tile = c.tile;
+      o.schedule.fill('J');
+    }
+    // A horseshoe pin outside, and a bitter night out there.
+    w.setFeature(w.idx(x - 3, y), featureId('horseshoePin'));
+    const real = sim.temperatureAt.bind(sim);
+    sim.temperatureAt = (i: number) => (sim.isIndoors(i) ? real(i) : -20);
+    for (let t = 0; t < HOUR * 3; t++) {
+      sim.step();
+      for (const o of sim.colonists) {
+        expect(sim.isIndoors(o.tile) || w.locked[o.tile] === 1 || o.tile === w.idx(x + 2, y)).toBe(true);
+      }
+    }
+    sim.temperatureAt = real;
   });
 });
