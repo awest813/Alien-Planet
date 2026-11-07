@@ -110,6 +110,32 @@ describe('downed raiders', () => {
     expect(sim.stats.captured).toBe(1);
   });
 
+  it('stay where they are if the order is called off on the way', () => {
+    const { sim, w, x, y } = camp(10);
+    const p = downed(sim, w.idx(x - 6, y + 4), { capture: true });
+    for (let t = 0; t < HOUR && sim.colonists[0].job?.type !== 'capture'; t++) {
+      sim.step();
+    }
+    expect(sim.colonists[0].job?.type).toBe('capture');
+    sim.apply({ type: 'capture', rect: { x0: 0, y0: 0, x1: w.width - 1, y1: w.height - 1 }, add: false });
+    run(sim, HOUR * 3);
+    expect(p.state).toBe('downed');
+  });
+
+  it('are moved aside when a wall goes up where they lie', () => {
+    const { sim, w, x, y } = camp(11);
+    const tile = w.idx(x - 4, y + 4);
+    const p = downed(sim, tile);
+    sim.apply({ type: 'build', feature: featureId('woodWall'), tiles: [tile] });
+    w.dropItemNear(w.idx(x - 6, y + 6), itemId('wood'), 20);
+    sim.colonists[1].priorities.construction = 1;
+    sim.colonists[1].priorities.hauling = 1;
+    run(sim, HOUR * 4);
+    expect(w.feature[tile]).toBe(featureId('woodWall'));
+    expect(p.tile).not.toBe(tile);
+    expect(w.isPassable(p.tile)).toBe(true);
+  });
+
   it('wait for a free prisoner bed', () => {
     const { sim, w, x, y, bed } = camp(4);
     downed(sim, bed, { state: 'prisoner' });
@@ -138,6 +164,20 @@ describe('prisoners', () => {
     expect(sim.stats.recruited).toBe(1);
     expect(sim.objectivesDone.recruit).toBe(true);
     expect(warden.health.dead).toBe(false);
+  });
+
+  it('are still visited while another goes hungry with no food to be had', () => {
+    const { sim, w, x, y, bed } = camp(12);
+    for (const i of [...w.tilesWith('items')]) {
+      w.takeItem(i, w.itemCount[i]);
+    }
+    const second = w.idx(x + 6, y);
+    w.setFeature(second, featureId('prisonerBed'));
+    downed(sim, bed, { state: 'prisoner', food: 0.1, lastVisit: sim.tick });
+    const fed = downed(sim, second, { state: 'prisoner', food: 1, resistance: 9 });
+    days(sim, 1);
+    expect(fed.lastVisit).toBeGreaterThan(0);
+    expect(fed.resistance).toBeLessThan(9);
   });
 
   it('starve if nobody feeds them', () => {

@@ -205,6 +205,7 @@ const NO_RESCUE_RETRY = TICKS_PER_HOUR / 2;
 const BUSY_FOR_RITES = new Set<JobType>([
   'tend',
   'rescue',
+  'capture',
   'feed',
   'eat',
   'extinguish',
@@ -3266,6 +3267,11 @@ export class Simulation {
         this.endJob(other);
       }
     }
+    for (const p of this.captives) {
+      if (p.tile === t && free !== undefined) {
+        p.tile = free;
+      }
+    }
     for (const e of this.enemies) {
       if (e.tile === t && free !== undefined) {
         e.tile = free;
@@ -5884,7 +5890,8 @@ export class Simulation {
   private stepCapture(c: Colonist, job: Job): void {
     const w = this.world;
     const captive = this.captives.find((p) => p.id === job.patient);
-    if (!captive || captive.state !== 'downed') {
+    // Gone, already taken, or the order to capture them called off.
+    if (!captive || captive.state !== 'downed' || !captive.capture) {
       this.endJob(c);
       return;
     }
@@ -5939,12 +5946,8 @@ export class Simulation {
       (p) => p.state === 'prisoner' && this.regions.region[p.tile] === region && !this.isReserved(`pr${p.id}`, c),
     );
     const hungry = held.find((p) => p.food < FEED_BELOW);
-    const prisoner = hungry ?? held.find((p) => visitDue(this, p));
-    if (!prisoner) {
-      return false;
-    }
     let source: number | undefined;
-    if (prisoner.food < FEED_BELOW) {
+    if (hungry) {
       source = this.nearestIn(
         'items',
         c.tile,
@@ -5956,10 +5959,16 @@ export class Simulation {
         1,
         (i) => (itemDef(w.itemType[i]).category === 'meal' ? 0 : 10),
       )[0];
-      // Nothing to bring: a visit can still do some good.
-      if (source === undefined && !visitDue(this, prisoner)) {
-        return false;
-      }
+    }
+    // Food for the hungry one if there's any to bring; otherwise whoever's due a talk (the hungry one
+    // first, since a visit can still do some good).
+    const prisoner =
+      hungry && (source !== undefined || visitDue(this, hungry)) ? hungry : held.find((p) => visitDue(this, p));
+    if (!prisoner) {
+      return false;
+    }
+    if (prisoner !== hungry) {
+      source = undefined;
     }
     const goals =
       source !== undefined ? [source] : [prisoner.tile, ...w.neighbors(prisoner.tile)].filter((i) => w.isPassable(i));
