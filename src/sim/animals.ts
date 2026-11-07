@@ -230,7 +230,14 @@ export function addQuarry(sim: Simulation): Animal | null {
 // Returns how many came.
 export function creaturesEmerge(sim: Simulation, tile: number, kind: string, count: number): number {
   const w = sim.world;
-  const around = sim.nearest(tile, (i) => w.isPassable(i), count);
+  // They come up on the side of the shaft where someone is (not shut away behind a wall from everyone).
+  const reachable = new Set(
+    sim
+      .living()
+      .filter((c) => !c.health.downed)
+      .map((c) => sim.regionOf(c.tile)),
+  );
+  const around = w.neighbors(tile, true).filter((i) => w.isPassable(i) && reachable.has(sim.regionOf(i)));
   if (around.length === 0) {
     return 0;
   }
@@ -469,6 +476,16 @@ export function updateAnimals(sim: Simulation): void {
     }
     const def = ANIMALS[a.kind];
     a.cooldown--;
+    // A maddened animal with nobody it can reach goes back where it came from.
+    if (a.manhunter && a.revengeOn < 0) {
+      const next = a.revengeUntil > sim.tick ? nearestPrey(sim, a) : undefined;
+      if (next) {
+        a.revengeOn = next.id;
+      } else {
+        a.manhunter = false;
+        a.leaving = true;
+      }
+    }
 
     // Revenge: chase and bite whoever hurt us, until they're down.
     if (a.revengeOn >= 0) {

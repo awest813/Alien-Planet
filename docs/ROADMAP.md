@@ -692,14 +692,24 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
     chances and amounts grow with depth (iron from 25%, silver from 8%), and so does the work (450 a stretch
     at the top, up to 1,200 far down): a busy shaft gives about five iron ore and five silver a day.
   - Breaches: past 20 metres the storyteller may break through. Cave crawlers (a new creature that never comes
-    in from outside) pour up out of the deepest shaft and attack. Beyond the breach lies a cavern: that shaft
-    yields half as much ore again and stays quiet from then on.
+    in from outside) pour up beside the deepest shaft and attack. Beyond the breach lies a cavern: that shaft
+    yields half as much ore again, and is quiet for the next 30 metres, after which it can happen again.
   - Balance, 48 days on 12 seeds, the test colony researching Deep mining last and sinking one shaft: shafts
     went to 4–29 stretches deep. Standard lost 1 of 75 (a raid on day 48); Harsh lost 5 of 78 (four in raids,
     one to crawlers), with six breaches across both.
   - Tuning from the runs: at first a shaft took 260 work a stretch and paid silver by depth uncapped (1,260
     silver in six days), and miners preferred it to everything else, which cost the colony its hauling and
     building and raised raid deaths. Digging is now slower, capped, and done only when idle.
+  - From the audit:
+    - Floors and roofs now go round a shaft; a roof over one used to wait forever and set the miners digging.
+    - Crawlers only come up beside the shaft where someone can be reached, and a maddened beast with nobody
+      to chase goes home instead of lingering.
+    - Ordering a shaft taken down (or dug again) sends whoever was at the other job away.
+    - A shaft rebuilt after the player stopped it stays stopped.
+    - The idle alert no longer counts an endless shaft as mining waiting to be done.
+    - Breaches recur every 30 metres; in 96-day runs shafts went 80-plus stretches deep and, with one breach
+      each, were safe forever after.
+    - Request quantities read properly ("10 simple meals").
   - Not done: a second map layer, underground water and cavern plants.
 
 **Phase M: Legends and great threats.** _(Medium.)_

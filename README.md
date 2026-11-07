@@ -132,8 +132,8 @@ How the living simulation works:
 - **Into the rock:** research Deep mining (after Smelting) and sink a mine shaft. Miners with nothing else to do
   dig it deeper, a stretch at a time, for stone, iron ore and silver; the deeper it goes the richer the rock and
   the harder the digging. Past twenty metres something may break through from below: cave crawlers pour up out
-  of the shaft. Beat them off and the cavern beyond makes the shaft richer still. Cancel the shaft to stop the
-  digging.
+  of the shaft. Beat them off and the cavern beyond makes the shaft richer still, and quiet for another thirty
+  metres or so; dig on and it happens again. Cancel the shaft to stop the digging.
 - **Neighbours:** every week or so the Meadow Kin ask a favour: some goods from your stockpiles, or a great boar
   hunted down, within a few days. Doing it pays silver (sometimes a new colonist) and wins goodwill; turning it
   down or letting it lapse costs some. Goodwill means better prices, more caravans and more gifts of supplies;

@@ -1022,12 +1022,18 @@ export class Simulation {
           if (ok) {
             w.designation[i] = value;
             w.markDirty(i);
+            if (def.shaft) {
+              shaftAt(this, i).stopped = false;
+            }
           }
         });
         break;
       }
       case 'cancel':
         this.forRect(cmd.rect, (i) => {
+          if (w.feature[i] !== NONE && featureDef(w.feature[i]).shaft) {
+            shaftAt(this, i).stopped = true;
+          }
           if (w.designation[i] !== Designation.NONE) {
             w.designation[i] = Designation.NONE;
             w.markDirty(i);
@@ -2001,7 +2007,9 @@ export class Simulation {
     if (w.blueprint[i] !== NONE) {
       this.cancelBlueprint(i);
     }
-    const harvest = w.feature[i] !== NONE ? featureDef(w.feature[i]).harvest : undefined;
+    // A tree or rock in the way gets cleared first (a mine shaft is a building: floors and roofs go round it).
+    const existing = w.feature[i] !== NONE ? featureDef(w.feature[i]) : undefined;
+    const harvest = existing && !existing.shaft ? existing.harvest : undefined;
     if (harvest) {
       w.designation[i] = { mine: Designation.MINE, chop: Designation.CHOP, forage: Designation.FORAGE }[harvest.work];
     } else {
@@ -3094,7 +3102,10 @@ export class Simulation {
     // A floor or roof can go in around a building, but a tree or rock has to be cleared first.
     const f = w.feature[i];
     const layer = featureDef(bp).layer;
-    return f === NONE || (!!layer && !featureDef(f).harvest && !(layer === 'floor' && featureDef(f).crop));
+    return (
+      f === NONE ||
+      (!!layer && (!featureDef(f).harvest || featureDef(f).shaft) && !(layer === 'floor' && featureDef(f).crop))
+    );
   }
 
   // What deconstructing this tile takes down: the building, else the roof, else the floor. A crop or
@@ -3448,7 +3459,11 @@ export class Simulation {
       case 'harvestCrop':
         return this.harvestable(job.target);
       default:
-        return this.designationValid(job.target);
+        // Still the work the tile is marked for (a shaft switched from digging to taking down, or back,
+        // sends whoever was at it away).
+        return (
+          JOB_FOR_DESIGNATION[this.world.designation[job.target]] === job.type && this.designationValid(job.target)
+        );
     }
   }
 
@@ -3683,10 +3698,13 @@ export class Simulation {
         // A new shaft starts at the surface, marked for digging (Cancel it to stop the miners). One rebuilt
         // where a shaft stood (after a raid, say) goes back down the hole that's already there.
         if (def.shaft) {
-          this.shafts[t] ??= { depth: 0, cavern: false };
+          const shaft = (this.shafts[t] ??= { depth: 0, cavern: false });
           w.progress[t] = 0;
-          w.designation[t] = Designation.MINE;
-          w.markDirty(t);
+          // ...unless the digging had been stopped before it came down.
+          if (!shaft.stopped) {
+            w.designation[t] = Designation.MINE;
+            w.markDirty(t);
+          }
         }
         if (def.art) {
           this.finishArtwork(c, t, def.name);

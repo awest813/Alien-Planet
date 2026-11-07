@@ -14,6 +14,7 @@ import {
   featureDef,
   featureId,
   itemDef,
+  quantity,
   itemId,
   researchDef,
   terrainDef,
@@ -47,7 +48,7 @@ import {
   tradeOpen,
   artForSale,
 } from '../sim/trade';
-import { BREACH_DEPTH, METRES_PER_LEVEL, oreChances } from '../sim/depths';
+import { METRES_PER_LEVEL, breachFrom, oreChances } from '../sim/depths';
 import { GIFT_SIZES, atPeace, describeRequest, giftGoodwill, tributeCost } from '../sim/diplomacy';
 import { weatherDef } from '../sim/weather';
 import {
@@ -1926,7 +1927,7 @@ export class GameController {
         text:
           request.kind === 'hunt'
             ? `${FACTIONS[request.faction].name} ask: hunt the great boar (${left} left). Drag Hunt over it`
-            : `${FACTIONS[request.faction].name} ask for ${request.count} ${itemDef(request.item).name.toLowerCase()} (${colonyStock(sim, request.item)} stored, ${left} left): send it from Factions`,
+            : `${FACTIONS[request.faction].name} ask for ${quantity(request.item, request.count)} (${colonyStock(sim, request.item)} stored, ${left} left): send it from Factions`,
         tone: hours <= 24 ? 'warn' : 'calm',
         tile: quarry?.tile,
       });
@@ -1978,7 +1979,9 @@ export class GameController {
     const manhunters = sim.animals.filter((a) => a.manhunter && a.hp > 0 && a.revengeOn >= 0);
     if (manhunters.length > 0) {
       alerts.push({
-        text: `${manhunters.length} maddened animal${manhunters.length > 1 ? 's are' : ' is'} hunting colonists: draft and fight (Q)`,
+        text: manhunters.every((a) => a.kind === 'crawler')
+          ? `${manhunters.length} cave crawler${manhunters.length > 1 ? 's are' : ' is'} hunting colonists: draft and fight (Q)`
+          : `${manhunters.length} maddened animal${manhunters.length > 1 ? 's are' : ' is'} hunting colonists: draft and fight (Q)`,
         tone: 'danger',
         tile: manhunters[0].tile,
       });
@@ -2149,7 +2152,13 @@ export class GameController {
     const w = sim.world;
     const staffed = (work: keyof Priorities) => sim.living().some((c) => c.priorities[work] > 0 && canWork(c, work));
     const waiting: [keyof Priorities, boolean][] = [
-      ['mining', w.designation.includes(Designation.MINE)],
+      // A mine shaft is never done, and only dug when there's nothing else: it doesn't count.
+      [
+        'mining',
+        w.designation.some(
+          (d, i) => d === Designation.MINE && !(w.feature[i] !== NONE && featureDef(w.feature[i]).shaft),
+        ),
+      ],
       ['plantCutting', w.designation.includes(Designation.CHOP) || w.designation.includes(Designation.FORAGE)],
       ['construction', w.blueprint.some((b) => b !== NONE) || w.designation.includes(Designation.DECONSTRUCT)],
       ['hunting', sim.animals.some((a) => a.hunted)],
@@ -2310,10 +2319,12 @@ export class GameController {
       );
       details.push(
         w.designation[i] === Designation.MINE
-          ? 'Miners are digging it deeper (Cancel to stop them)'
-          : 'Not being dug: drag Mine over it to start',
+          ? 'Miners dig it deeper when they have nothing else to do (Cancel to stop them)'
+          : w.designation[i] === Designation.DECONSTRUCT
+            ? 'To be taken down'
+            : 'Not being dug: drag Mine over it to start',
       );
-      if (!shaft.cavern && shaft.depth >= BREACH_DEPTH) {
+      if (shaft.depth >= breachFrom(shaft) && sim.story.difficulty !== 'peaceful') {
         details.push('Deep enough that something below may break through');
       }
     }

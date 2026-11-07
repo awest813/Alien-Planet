@@ -420,6 +420,28 @@ export const THOUGHTS: Record<string, ThoughtDef> = Object.fromEntries(
 
 export const terrainDef = (id: number): TerrainDef => TERRAIN[id];
 export const itemDef = (id: number): ItemDef => ITEMS[id - 1];
+
+// Things counted one by one (meals, eggs, kit) take a plural; the rest (wood, cloth, silver) don't.
+const PLURALS: Record<string, string> = { knife: 'knives' };
+const COUNTED = new Set([
+  'meal',
+  'fineMeal',
+  'tunic',
+  'parka',
+  'egg',
+  'toolKit',
+  'knife',
+  'club',
+  'spear',
+  'ironSword',
+]);
+// "10 simple meals", "40 wood", in lower case.
+export function quantity(id: number, count: number): string {
+  const def = itemDef(id);
+  const name = def.name.toLowerCase();
+  const counted = COUNTED.has(def.key) || name.endsWith('bow') || name.endsWith('armor');
+  return `${count} ${count === 1 || !counted ? name : (PLURALS[def.key] ?? `${name}s`)}`;
+}
 export const featureDef = (id: number): FeatureDef => FEATURES[id - 1];
 
 const terrainIdByKey = new Map(TERRAIN.map((t) => [t.key, t.id]));

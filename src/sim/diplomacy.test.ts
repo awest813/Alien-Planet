@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { QUARRY_TOUGHNESS } from './animals';
-import { FACTIONS, itemId } from './defs';
+import { FACTIONS, itemId, quantity } from './defs';
 import {
   atPeace,
   decline,
@@ -188,5 +188,16 @@ describe('gifts and tribute', () => {
     const loaded = deserialize(structuredClone(serialize(sim)));
     expect(loaded.diplomacy).toEqual(sim.diplomacy);
     expect(loaded.animals.find((a) => a.quarry)?.id).toBe(sim.diplomacy.request!.quarry);
+  });
+});
+
+describe('quantities', () => {
+  it('count meals and kit one by one, and wood and silver by the heap', () => {
+    expect(quantity(itemId('meal'), 10)).toBe('10 simple meals');
+    expect(quantity(itemId('meal'), 1)).toBe('1 simple meal');
+    expect(quantity(itemId('knife'), 2)).toBe('2 knives');
+    expect(quantity(itemId('recurveBow'), 3)).toBe('3 recurve bows');
+    expect(quantity(itemId('wood'), 40)).toBe('40 wood');
+    expect(quantity(itemId('herbalMedicine'), 5)).toBe('5 herbal medicine');
   });
 });

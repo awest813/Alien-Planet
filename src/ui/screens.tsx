@@ -595,7 +595,11 @@ export function VillageScreen({ state, onClose }: { state: UiState; onClose: () 
           </span>
         </p>
       ) : (
-        <p className="muted">No leader yet: the colony holds a vote as soon as it has three adults to cast one.</p>
+        <p className="muted">
+          {v.standings.length > 0
+            ? 'No leader yet: the colony will hold a vote within the hour.'
+            : 'No leader yet: the colony holds a vote as soon as it has three adults to cast one.'}
+        </p>
       )}
       <p className="muted small">
         A vote is held at the start of every season. Each adult backs whoever they think best of; a kind nature helps.
@@ -617,9 +621,11 @@ export function VillageScreen({ state, onClose }: { state: UiState; onClose: () 
         {choice('long', v.hours, 'Long', () => set({ hours: 'long' }))}
       </div>
       <p className="muted small">{POLICY_TEXT.hours[v.hours]}</p>
-      <label className="row">
+      <label className="setting">
+        <span>
+          Days of rest: one day in six, nobody works but to keep everyone safe and fed, and all are the happier for it
+        </span>
         <input type="checkbox" checked={v.restDays} onChange={(e) => set({ restDays: e.target.checked })} />
-        <span>Days of rest: one day in six, nobody works, and everyone is the happier for it</span>
       </label>
     </Modal>
   );

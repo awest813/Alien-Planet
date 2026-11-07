@@ -1,6 +1,6 @@
 import { addQuarry, maxHp } from './animals';
 import { TICKS_PER_HOUR, populationFor } from './constants';
-import { FACTIONS, itemDef, itemId, weaponDef } from './defs';
+import { FACTIONS, itemDef, itemId, quantity, weaponDef } from './defs';
 import type { Simulation } from './simulation';
 import { STARTING_GOODWILL, colonyStock, goodwillOf, takeFromStockpiles } from './trade';
 
@@ -182,7 +182,7 @@ export function describeRequest(r: FactionRequest): string {
   const reward = `${r.recruit ? 'one of their own, who would like to join the colony' : `${r.silver} silver`}`;
   return r.kind === 'hunt'
     ? `hunt down the ${QUARRY_NAME} troubling their herds, for ${reward}`
-    : `${r.count} ${itemDef(r.item).name.toLowerCase()}, for ${reward}`;
+    : `${quantity(r.item, r.count)}, for ${reward}`;
 }
 
 function complete(sim: Simulation, what: string): void {
@@ -239,7 +239,7 @@ export function fulfil(sim: Simulation): string | null {
     return `Only ${have} of ${r.count} in the stockpiles.`;
   }
   takeFromStockpiles(sim, r.item, r.count);
-  complete(sim, `${FACTIONS[r.faction].name} collected the ${itemDef(r.item).name.toLowerCase()}.`);
+  complete(sim, `${FACTIONS[r.faction].name} collected the ${quantity(r.item, r.count)}.`);
   return null;
 }
 

@@ -82,6 +82,49 @@ describe('mine shafts', () => {
     expect(shaftAt(sim, tile).depth).toBeGreaterThanOrEqual(9);
   });
 
+  it('can be roofed over, without the roof marking it for digging', () => {
+    const { sim, w, tile } = mine(7);
+    for (let h = 0; h < 24 && w.feature[tile] !== featureId('mineShaft'); h++) {
+      run(sim, HOUR);
+    }
+    const at = { x0: w.xOf(tile), y0: w.yOf(tile), x1: w.xOf(tile), y1: w.yOf(tile) };
+    sim.apply({ type: 'cancel', rect: at });
+    w.addItem(w.idx(w.xOf(tile) - 5, w.yOf(tile) + 3), itemId('wood'), 10);
+    sim.apply({ type: 'build', tiles: [tile], feature: featureId('roof') });
+    expect(w.designation[tile]).toBe(Designation.NONE);
+    run(sim, HOUR * 8);
+    expect(w.roof[tile]).toBe(featureId('roof'));
+    expect(w.feature[tile]).toBe(featureId('mineShaft'));
+  });
+
+  it('stopped, stay stopped when rebuilt; ordered down, the miner leaves off', () => {
+    const { sim, w, tile } = mine(8);
+    for (let h = 0; h < 24 && w.feature[tile] !== featureId('mineShaft'); h++) {
+      run(sim, HOUR);
+    }
+    const at = { x0: w.xOf(tile), y0: w.yOf(tile), x1: w.xOf(tile), y1: w.yOf(tile) };
+    // Someone's digging; then it's ordered taken down.
+    for (let t = 0; t < HOUR * 6 && !sim.colonists.some((c) => c.job?.type === 'mine'); t++) {
+      sim.step();
+    }
+    expect(sim.colonists.some((c) => c.job?.type === 'mine')).toBe(true);
+    sim.apply({ type: 'designate', kind: 'deconstruct', rect: at });
+    run(sim, 30);
+    expect(sim.colonists.some((c) => c.job?.type === 'mine')).toBe(false);
+    // Stopped, smashed and rebuilt: still stopped.
+    sim.apply({ type: 'cancel', rect: at });
+    w.setFeature(tile, 0);
+    w.addItem(w.idx(w.xOf(tile) - 5, w.yOf(tile) + 3), itemId('wood'), 50);
+    w.addItem(w.idx(w.xOf(tile) - 5, w.yOf(tile) + 4), itemId('stone'), 20);
+    w.addItem(w.idx(w.xOf(tile) - 5, w.yOf(tile) + 5), itemId('stone'), 20);
+    sim.apply({ type: 'build', tiles: [tile], feature: featureId('mineShaft') });
+    for (let h = 0; h < 24 && w.feature[tile] !== featureId('mineShaft'); h++) {
+      run(sim, HOUR);
+    }
+    expect(w.feature[tile]).toBe(featureId('mineShaft'));
+    expect(w.designation[tile]).toBe(Designation.NONE);
+  });
+
   it("can't be built over (unlike a tree or a boulder)", () => {
     const { sim, w, tile } = mine(2);
     w.setFeature(tile, featureId('mineShaft'));
@@ -102,10 +145,36 @@ describe('breaches', () => {
     const crawlers = sim.animals.filter((a) => a.kind === 'crawler');
     expect(crawlers.length).toBe(3);
     expect(crawlers.every((a) => a.manhunter && w.distance(a.tile, tile) <= 3)).toBe(true);
-    // Beyond it a cavern: richer ore, and no more breaches from that shaft.
+    // Beyond it a cavern: richer ore, and quiet for a while...
     expect(shaftAt(sim, tile).cavern).toBe(true);
     expect(breachWeight(sim)).toBe(0);
+    expect(breach(sim, 3)).toBe(false);
+    // ...until they dig on far enough.
+    shaftAt(sim, tile).depth += 15;
+    expect(breachWeight(sim)).toBeGreaterThan(0);
     expect(shafts(sim)[0].tile).toBe(tile);
+  });
+
+  it('bring nothing up where nobody could be reached, and maddened beasts with no one to chase go home', () => {
+    const { sim, w, tile } = mine(9);
+    w.setFeature(tile, featureId('mineShaft'));
+    shaftAt(sim, tile).depth = BREACH_DEPTH + 2;
+    // Walled in on every side.
+    for (const n of w.neighbors(tile, true)) {
+      w.setFeature(n, featureId('woodWall'));
+    }
+    expect(breach(sim, 3)).toBe(false);
+    // One that somehow has nobody to go for gives up.
+    for (const n of w.neighbors(tile, true)) {
+      w.setFeature(n, 0);
+    }
+    expect(breach(sim, 1)).toBe(true);
+    const crawler = sim.animals.find((a) => a.kind === 'crawler')!;
+    crawler.revengeOn = -1;
+    crawler.revengeUntil = sim.tick;
+    run(sim, 5);
+    expect(crawler.manhunter).toBe(false);
+    expect(crawler.leaving).toBe(true);
   });
 
   it('crawlers never wander in on their own', () => {
