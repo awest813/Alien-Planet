@@ -651,6 +651,30 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
 - Expeditions: send colonists off the map (a world view of nearby sites) to trade, scavenge a ruin or rescue
   someone, and come back days later (or not).
 - First slice: requests and gifts. Success: goodwill swings matter and requests get done in the harness.
+- **Done** (`src/sim/diplomacy.ts`, the Factions screen):
+  - Requests: every five to eight days, if they're on good terms, the Meadow Kin ask a favour. Either some
+    goods from the stockpiles within four days (wood, meals, cloth, leather, stone blocks or medicine, more as
+    the colony grows, mostly things it has or nearly has), or, from day 6 and only if a hunter with a bow
+    can reach the valley, a great boar (two and a half times as tough, and it never wanders off) hunted down
+    within three. Doing it pays silver (now and then a new colonist instead) and +12 goodwill (+15 for the
+    boar); turning it down costs 3, letting it lapse 8. An alert and a "Factions (!)" button say what's asked
+    and how long is left.
+  - Goodwill matters: besides prices, it sets how often caravans and gifts of supplies come; below 0 the Kin
+    stop trading, sending and asking altogether. Hard feelings fade, a point every two days, back up to where
+    they started.
+  - Gifts of 25, 50 or 100 silver win goodwill (less the more they already like you).
+  - Tribute: silver to a raider faction (60, plus 5 a day of the colony's age) buys twelve days in which only
+    the other faction raids; pay both and no raids come. Paid mid-raid, their raiders take it and leave.
+  - Balance, 48 days on 12 seeds, the test colony sending goods once it has them, hunting the boar, and
+    gifting 50 silver whenever it has over 400: Standard kept everyone (77 of 77); Harsh lost 4 of 76 in
+    raids, within its usual range. About half the requests got done (35 of 72), the rest mostly wood and meals
+    the test colony used as fast as it made them. Goodwill ended anywhere from 0 to 100, and the friendliest
+    colonies saw about a third more caravans and gifts of supplies.
+  - From the audit: a day of rest still has doctors, wardens and refuelling done, is called off when there's
+    under a day and a half of food, and free-time checks (idle alerts, games, concerts, gatherings) follow
+    it. A gift has to be some silver; a recruit only comes if there's room; the vote standings only show once
+    a vote can be held.
+  - Not done: envoys, alliances and allied help in raids, and expeditions.
 
 **Phase L: Into the rock.** _(Very large; decide whether to do it at all.)_
 

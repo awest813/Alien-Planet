@@ -1,4 +1,5 @@
 import { seasonDay } from './seasons';
+import { foodDays } from './storyteller';
 import { ADULT } from './lifespans';
 import type { Simulation } from './simulation';
 import { traitValue } from './social';
@@ -19,6 +20,10 @@ export interface Village {
   hours: Hours;
   // One day in six, nobody works.
   restDays: boolean;
+  // Whether today is a day of rest after all (called off when the stores are nearly empty), and the
+  // day that was decided.
+  resting: boolean;
+  restDecidedOn: number;
 }
 
 export const freshVillage = (): Village => ({
@@ -27,6 +32,8 @@ export const freshVillage = (): Village => ({
   rations: 'normal',
   hours: 'normal',
   restDays: false,
+  resting: false,
+  restDecidedOn: -1,
 });
 
 export const POLICY_TEXT = {
@@ -58,6 +65,9 @@ const adults = (sim: Simulation) => sim.living().filter((c) => c.age >= ADULT &&
 export function tally(sim: Simulation): Map<number, number> {
   const voters = adults(sim);
   const votes = new Map<number, number>();
+  if (voters.length < MIN_VOTERS) {
+    return votes;
+  }
   for (const voter of voters) {
     let best: Colonist | undefined;
     let bestScore = -Infinity;
@@ -119,6 +129,7 @@ export function elect(sim: Simulation): Colonist | null {
 // Called every in-game hour: a vote at dawn on the first day of each season, and as soon as the colony
 // finds itself without a leader (and has the adults to choose one).
 export function updateVillage(sim: Simulation): void {
+  updateRest(sim);
   const v = sim.village;
   // (A leader who dies leaves office at once; see `die`. This catches anything else, like an old save.)
   const leader = sim.colonists[v.leader];
@@ -140,7 +151,28 @@ export const rationsHunger = (v: Village): number =>
 export const rationsEatBelow = (v: Village): number => (v.rations === 'generous' ? 0.45 : 0.3);
 export const hoursSpeed = (v: Village): number => (v.hours === 'long' ? 1.1 : v.hours === 'short' ? 0.9 : 1);
 // Whether today is a day of rest.
-export const restDay = (sim: Simulation): boolean => sim.village.restDays && sim.day % 6 === 0;
+export const restDay = (sim: Simulation): boolean => sim.village.resting;
+// Less than this many days of food and nobody takes the day off.
+const REST_NEEDS_FOOD_DAYS = 1.5;
+
+// Whether today is a day of rest: one day in six, decided once that day, and called off if the stores are
+// nearly empty. Called every hour and when the policy changes.
+export function updateRest(sim: Simulation): void {
+  const v = sim.village;
+  if (!v.restDays || sim.day % 6 !== 0) {
+    v.resting = false;
+    v.restDecidedOn = -1;
+    return;
+  }
+  if (v.restDecidedOn === sim.day) {
+    return;
+  }
+  v.restDecidedOn = sim.day;
+  v.resting = foodDays(sim) >= REST_NEEDS_FOOD_DAYS;
+  if (!v.resting) {
+    sim.addLog('The stores are nearly empty: the day of rest is called off.', 'warn');
+  }
+}
 
 // How each colonist feels about the leader and the policies, as thought keys.
 export function villageThoughts(sim: Simulation, c: Colonist): string[] {

@@ -13,7 +13,7 @@ import type { Hours, Rations } from '../src/sim/village';
 import { writeFileSync } from 'node:fs';
 import { comfortRange } from '../src/sim/apparel';
 import { MAP_SIZES } from '../src/sim/constants';
-import { FEATURES, NONE, RECIPES, featureDef, featureId, terrainDef } from '../src/sim/defs';
+import { FACTIONS, FEATURES, NONE, RECIPES, featureDef, featureId, terrainDef } from '../src/sim/defs';
 import { deserialize, serialize } from '../src/sim/serialize';
 import { Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { Difficulty } from '../src/sim/storyteller';
@@ -301,6 +301,18 @@ function check(sim: Simulation, problems: Map<string, number>, hourly: boolean):
         note(`fuel out of range (${w.fuel[i]}/${fuel.capacity})`);
       }
     }
+    const request = sim.diplomacy.request;
+    if (request?.kind === 'hunt' && sim.animals.some((a) => a.id === request.quarry && !a.quarry)) {
+      note('the great boar lost its mark while still wanted');
+    }
+    if (sim.animals.some((a) => a.quarry && a.id !== request?.quarry)) {
+      note('a great boar nobody asked for');
+    }
+    for (const [id, g] of Object.entries(sim.goodwill)) {
+      if (!Number.isFinite(g) || g < -100 || g > 100) {
+        note(`goodwill out of range (${id}: ${g})`);
+      }
+    }
     const leader = sim.colonists[sim.village.leader];
     if (sim.village.leader >= 0 && (!leader || leader.health.dead)) {
       note('a dead or missing leader');
@@ -449,6 +461,20 @@ function play(player: number): Report {
           rect: { x0: cx - chopRadius, y0: cy - chopRadius, x1: cx + chopRadius, y1: cy + chopRadius },
           kind: 'chop',
         });
+      }
+      // Most players answer the neighbours: send what's asked when they have it, and hunt the boar.
+      const request = sim.diplomacy.request;
+      if (request && persona !== 'neglectful' && persona !== 'chaos' && persona !== 'demolisher') {
+        if (request.kind === 'deliver') {
+          sim.apply({ type: 'fulfilRequest' });
+        } else {
+          const beast = sim.animals.find((a) => a.id === request.quarry);
+          if (beast && !beast.hunted) {
+            const bx = w().xOf(beast.tile);
+            const by = w().yOf(beast.tile);
+            sim.apply({ type: 'hunt', rect: { x0: bx, y0: by, x1: bx, y1: by }, add: true });
+          }
+        }
       }
       switch (persona) {
         case 'militarist':
@@ -800,6 +826,10 @@ function play(player: number): Report {
       () => ({ type: 'release', captive: sim.captives[0]?.id ?? -1 }),
       () => ({ type: 'research', project: rng.chance(0.2) ? null : rng.pick(research) }),
       () => ({ type: 'festivals', on: rng.chance(0.7) }),
+      () => ({ type: 'fulfilRequest' }),
+      () => ({ type: 'declineRequest' }),
+      () => ({ type: 'gift', faction: rng.int(0, FACTIONS.length - 1), silver: rng.pick([25, 50, 100, 1000]) }),
+      () => ({ type: 'tribute', faction: rng.int(0, FACTIONS.length - 1) }),
       () => ({
         type: 'policy',
         rations: rng.pick<Rations>(['frugal', 'normal', 'generous']),

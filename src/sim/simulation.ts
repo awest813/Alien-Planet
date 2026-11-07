@@ -167,9 +167,11 @@ import {
   rationsEatBelow,
   rationsHunger,
   restDay,
+  updateRest,
   updateVillage,
   villageThoughts,
 } from './village';
+import { Diplomacy, decline, freshDiplomacy, fulfil, gift, payTribute, updateDiplomacy } from './diplomacy';
 import {
   BREAK_LABELS,
   BreakKind,
@@ -583,6 +585,8 @@ export class Simulation {
   public captives: Captive[] = [];
   // The colony's leader and policies (see village.ts).
   public village: Village = freshVillage();
+  // Favours asked by the neighbours, and peace bought from raiders.
+  public diplomacy: Diplomacy = freshDiplomacy();
   // A colonist seized by a vision for a legendary work (see minds.ts).
   public obsession: Obsession | null = null;
   // Babies, carried by a parent until they can walk (see lifespans.ts).
@@ -949,6 +953,7 @@ export class Simulation {
       updateLifespans(this);
       updateObsession(this);
       updateVillage(this);
+      updateDiplomacy(this);
       this.weatherFilth();
     }
 
@@ -1084,6 +1089,30 @@ export class Simulation {
       case 'festivals':
         this.story.festivals = cmd.on;
         break;
+      case 'fulfilRequest': {
+        const why = fulfil(this);
+        if (why) {
+          this.addLog(why, 'warn');
+        }
+        break;
+      }
+      case 'declineRequest':
+        decline(this);
+        break;
+      case 'gift': {
+        const why = gift(this, cmd.faction, cmd.silver);
+        if (why) {
+          this.addLog(why, 'warn');
+        }
+        break;
+      }
+      case 'tribute': {
+        const why = payTribute(this, cmd.faction);
+        if (why) {
+          this.addLog(why, 'warn');
+        }
+        break;
+      }
       case 'policy':
         if (cmd.rations) {
           this.village.rations = cmd.rations;
@@ -1093,6 +1122,7 @@ export class Simulation {
         }
         if (cmd.restDays !== undefined) {
           this.village.restDays = cmd.restDays;
+          updateRest(this);
         }
         break;
       case 'sellArt': {
@@ -1204,8 +1234,8 @@ export class Simulation {
           if (cmd.type === 'hunt') {
             a.hunted = cmd.add && !(spareTame && a.tame);
           } else {
-            // Already-tame animals have nothing left to tame.
-            a.taming = cmd.add && !a.tame;
+            // Already-tame animals have nothing left to tame, and the great boar won't be tamed.
+            a.taming = cmd.add && !a.tame && !a.quarry;
           }
         }
         break;
@@ -2381,7 +2411,7 @@ export class Simulation {
         this.endJob(c);
       }
     } else {
-      const slot = c.schedule[Math.floor(this.hour)];
+      const slot = this.slotOf(c);
       // Doctors get out of bed (or drop their work) for someone who is bleeding or collapsed.
       if (
         this.tick % SLOW_TICKS === 0 &&
@@ -2600,6 +2630,11 @@ export class Simulation {
       this.startRest(c);
       return;
     }
+    // A day of rest isn't a day off from keeping everyone alive: patients and prisoners are still fed and
+    // tended, and fires that are about to go out are still fed.
+    if (slot === 'J' && restDay(this) && this.tryEssentialWork(c)) {
+      return;
+    }
     if ((slot === 'J' || (slot === 'A' && c.needs.joy < 0.3)) && c.needs.joy < 0.95 && this.tryJoy(c)) {
       return;
     }
@@ -2612,6 +2647,15 @@ export class Simulation {
       return;
     }
     this.startWander(c);
+  }
+
+  private tryEssentialWork(c: Colonist): boolean {
+    for (const work of ['doctor', 'warden'] as const) {
+      if (c.priorities[work] > 0 && canWork(c, work) && this.tryWorkType(c, work)) {
+        return true;
+      }
+    }
+    return c.priorities.hauling > 0 && canWork(c, 'hauling') && this.tryRefuel(c, true);
   }
 
   private tryWorkByPriority(c: Colonist): boolean {
@@ -4669,7 +4713,6 @@ export class Simulation {
 
   // Whether anyone else in reach is off duty and could do with some recreation.
   private someoneFreeToPlay(c: Colonist, region: number): boolean {
-    const hour = Math.floor(this.hour);
     return this.living().some(
       (o) =>
         o !== c &&
@@ -4677,7 +4720,7 @@ export class Simulation {
         !o.sleeping &&
         !o.health.downed &&
         o.needs.joy < 0.9 &&
-        (o.schedule[hour] === 'J' || (o.schedule[hour] === 'A' && o.needs.joy < 0.3)) &&
+        (this.slotOf(o) === 'J' || (this.slotOf(o) === 'A' && o.needs.joy < 0.3)) &&
         (!o.job || o.job.type === 'joy' || o.job.type === 'wander') &&
         this.regions.region[o.tile] === region,
     );
@@ -4812,8 +4855,8 @@ export class Simulation {
           !o.job?.listening &&
           !o.job?.gathering &&
           !this.inMentalBreak(o) &&
-          o.schedule[hour] !== 'W' &&
-          o.schedule[hour] !== 'S'
+          this.slotOf(o) !== 'W' &&
+          this.slotOf(o) !== 'S'
         ) {
           const was = o.job;
           this.endJob(o);
@@ -4998,9 +5041,8 @@ export class Simulation {
       this.endGathering(false);
       return;
     }
-    const hour = Math.floor(this.hour);
     for (const c of this.living()) {
-      if (c.job?.gathering || !this.mayAttend(c, def.rite, hour)) {
+      if (c.job?.gathering || !this.mayAttend(c, def.rite)) {
         continue;
       }
       const region = this.regionOf(c.tile);
@@ -5022,7 +5064,7 @@ export class Simulation {
 
   // Who comes: anyone off duty and doing nothing much for fun; for a rite, anyone not dealing
   // with an emergency (asleep, hurt, starving, fighting, rescuing, doctoring or in a break).
-  private mayAttend(c: Colonist, rite: boolean, hour: number): boolean {
+  private mayAttend(c: Colonist, rite: boolean): boolean {
     const h = c.health;
     if (
       c.drafted ||
@@ -5041,7 +5083,7 @@ export class Simulation {
     if (rite) {
       return !job || !BUSY_FOR_RITES.has(job);
     }
-    return c.schedule[hour] !== 'W' && (!job || job === 'wander' || (job === 'joy' && !c.job?.listening));
+    return this.slotOf(c) !== 'W' && (!job || job === 'wander' || (job === 'joy' && !c.job?.listening));
   }
 
   // At a gathering: company and good cheer, and talk with whoever else is there.

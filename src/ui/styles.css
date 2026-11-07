@@ -177,6 +177,12 @@ button:disabled {
   cursor: default;
 }
 
+/* Something waiting on the player (a neighbour's request). */
+button.attention {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 button.danger {
   border-color: var(--danger);
   color: #ffb0b0;

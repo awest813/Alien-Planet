@@ -18,6 +18,7 @@ import {
   HelpScreen,
   PrisonersScreen,
   VillageScreen,
+  FactionsScreen,
   ProductionScreen,
   ResearchScreen,
   ScheduleScreen,
@@ -188,6 +189,7 @@ export function App() {
           {screen === 'story' && <StoryScreen state={state} onClose={close} />}
           {screen === 'prisoners' && <PrisonersScreen state={state} onClose={close} />}
           {screen === 'village' && <VillageScreen state={state} onClose={close} />}
+          {screen === 'factions' && <FactionsScreen state={state} onClose={close} />}
           {screen === 'trade' && <TradeScreen state={state} onClose={close} />}
         </>
       )}

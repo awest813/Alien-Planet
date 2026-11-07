@@ -260,6 +260,8 @@ export interface Animal {
   lashOut?: boolean;
   // A predator that lost its quarry waits until then before hunting again.
   huntAgainAt?: number;
+  // The beast a neighbouring faction asked the colony to hunt down: tougher, and stays until it's dead.
+  quarry?: boolean;
 }
 
 export interface Injury {
@@ -433,6 +435,10 @@ export type Command =
   | { type: 'research'; project: string | null }
   // Whether the colony keeps the seasonal festivals.
   | { type: 'festivals'; on: boolean }
+  | { type: 'fulfilRequest' }
+  | { type: 'declineRequest' }
+  | { type: 'gift'; faction: number; silver: number }
+  | { type: 'tribute'; faction: number }
   // The colony's policies (any left out stay as they are).
   | {
       type: 'policy';
@@ -467,6 +473,11 @@ export interface Stats {
   // Furniture smashed in tantrums, and legendary works made.
   smashed?: number;
   elections?: number;
+  // Favours done for the neighbours (and refused or let lapse), gifts sent, and tribute paid.
+  requestsDone?: number;
+  requestsFailed?: number;
+  gifts?: number;
+  tributes?: number;
   // Wounds that turned infected, and lasting injuries left by old wounds.
   infections?: number;
   scars?: number;

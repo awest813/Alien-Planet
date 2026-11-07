@@ -11,6 +11,7 @@
 import { colonistTarget, lineOfSight } from '../src/sim/combat';
 import {
   ANIMALS,
+  FACTIONS,
   FEATURES,
   NONE,
   RECIPES,
@@ -22,6 +23,7 @@ import {
   weaponDef,
 } from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
+import { colonyStock, goodwillOf } from '../src/sim/trade';
 import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { mutualOpinion } from '../src/sim/social';
 import { Difficulty } from '../src/sim/storyteller';
@@ -161,6 +163,10 @@ interface Result {
   fellWounded: number;
   captured: number;
   elections: number;
+  requestsDone: number;
+  requestsFailed: number;
+  gifts: number;
+  kinGoodwill: number;
   goods: number;
   leaderless: number;
   recruited: number;
@@ -462,6 +468,23 @@ function play(seed: number): Result {
         add: true,
       });
     }
+    // The neighbours' requests: send the goods once they're in store; hunt the great boar down.
+    const request = sim.diplomacy.request;
+    if (!passive && request?.kind === 'deliver' && colonyStock(sim, request.item) >= request.count) {
+      sim.apply({ type: 'fulfilRequest' });
+    }
+    if (!passive && request?.kind === 'hunt') {
+      const beast = sim.animals.find((a) => a.id === request.quarry);
+      if (beast && !beast.hunted) {
+        const bx = w.xOf(beast.tile);
+        const by = w.yOf(beast.tile);
+        sim.apply({ type: 'hunt', rect: { x0: bx, y0: by, x1: bx, y1: by }, add: true });
+      }
+    }
+    // Spare silver goes on keeping the Meadow Kin sweet.
+    if (!passive && hour % 24 === 12 && colonyStock(sim, itemId('silver')) > 400) {
+      sim.apply({ type: 'gift', faction: FACTIONS.find((f) => !f.hostile)!.id, silver: 50 });
+    }
     if (!gravesPlaced && sim.day >= 6) {
       gravesPlaced = true;
       const plot = findSite(sim, 3, 1, avoid);
@@ -759,6 +782,10 @@ function play(seed: number): Result {
     fellWounded: fell.size,
     captured: sim.stats.captured ?? 0,
     elections: sim.stats.elections ?? 0,
+    requestsDone: sim.stats.requestsDone ?? 0,
+    requestsFailed: sim.stats.requestsFailed ?? 0,
+    gifts: sim.stats.gifts ?? 0,
+    kinGoodwill: goodwillOf(sim, FACTIONS.find((f) => !f.hostile)!.id),
     goods: sim.resourceTotals().reduce((n, t) => n + t.total, 0),
     leaderless: sim.village.leader < 0 ? 1 : 0,
     recruited: sim.stats.recruited ?? 0,
@@ -933,6 +960,13 @@ console.log(
 console.log(
   `  prisoners: ${sum((r) => r.fellWounded)} raiders fell wounded, ${sum((r) => r.captured)} taken prisoner, ` +
     `${sum((r) => r.recruited)} won over`,
+);
+console.log(
+  `  neighbours: ${sum((r) => r.requestsDone)} requests done, ${sum((r) => r.requestsFailed)} turned down or lapsed, ` +
+    `${sum((r) => r.gifts)} gifts; goodwill at the end ${results
+      .map((r) => r.kinGoodwill)
+      .sort((a, b) => a - b)
+      .join(' ')}`,
 );
 console.log(
   `  village: ${sum((r) => r.elections)} votes held, ${sum((r) => r.leaderless)} colonies left without a leader; ` +

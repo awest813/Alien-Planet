@@ -378,6 +378,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             rest on the <b>Village</b> screen: each pleases some colonists and annoys others.
           </li>
           <li>
+            The <b>Factions</b> screen shows what the neighbours ask of you: send it, or hunt down the great boar, for
+            silver and goodwill. Gifts win goodwill too, and silver paid to raiders buys twelve days of peace.
+          </li>
+          <li>
             Unhappy colonists break in their own ways: a daze, a sulk, a binge, or a rage that smashes furniture.
             Sometimes a skilled artist is seized by a vision: deliver what they ask in time for a legendary sculpture.
           </li>
@@ -456,6 +460,108 @@ export function ResearchScreen({ state, onClose }: { state: UiState; onClose: ()
             </li>
           ))}
       </ul>
+    </Modal>
+  );
+}
+
+// The neighbours: a favour they've asked, gifts to win them over, and tribute to keep raiders away.
+export function FactionsScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+  const d = state.diplomacy;
+  const r = d.request;
+  const left = (hours: number) => (hours > 24 ? `${Math.ceil(hours / 24)} days left` : `${hours}h left`);
+  return (
+    <Modal title="Factions" onClose={onClose}>
+      <h3>Request</h3>
+      {r ? (
+        <>
+          <p>
+            <b>{r.faction}</b> ask: {r.text}. <span className="muted">{left(r.hoursLeft)}.</span>
+          </p>
+          <div className="row">
+            {r.kind === 'deliver' ? (
+              <button
+                disabled={r.have < r.count}
+                onClick={() => controller.command({ type: 'fulfilRequest' })}
+                title="They collect it from your stockpiles"
+              >
+                Send {r.count} ({r.have} stored)
+              </button>
+            ) : (
+              <span className="muted small">
+                Find it and drag <b>Hunt</b> over it. Hunters need a bow, and it fights back hard: draft help if it
+                turns on them.
+              </span>
+            )}
+            {r.quarryTile !== null && (
+              <button
+                onClick={() => {
+                  controller.focusAlert({ text: '', tone: 'calm', tile: r.quarryTile! });
+                  onClose();
+                }}
+              >
+                Show me
+              </button>
+            )}
+            <ConfirmButton
+              label="Turn down"
+              confirm="They'll think a little less of you. Sure?"
+              onConfirm={() => controller.command({ type: 'declineRequest' })}
+            />
+          </div>
+        </>
+      ) : (
+        <p className="muted">
+          Nothing asked of the colony just now. The Meadow Kin ask a favour every week or so, if they're on good terms
+          with you: doing it earns silver (or a new colonist) and their goodwill; turning it down or letting it lapse
+          costs some.
+        </p>
+      )}
+      <h3>Neighbours</h3>
+      <p className="muted small">
+        Your silver: {d.silver}. Goodwill brings better prices, more caravans and more gifts of supplies; below 0 they
+        stop trading altogether.
+      </p>
+      <table className="summary">
+        <tbody>
+          {state.factions.map((f) => (
+            <tr key={f.id}>
+              <td>
+                <b>{f.name}</b>
+                <div className="muted small">{f.description}</div>
+              </td>
+              <td className="num">
+                {f.relation}
+                {f.goodwill !== null && <span className="muted"> ({f.goodwill})</span>}
+                {f.peaceDays > 0 && <div className="muted small">{f.peaceDays} days of peace left</div>}
+              </td>
+              <td>
+                {f.hostile ? (
+                  <button
+                    disabled={d.silver < d.tributeCost}
+                    onClick={() => controller.command({ type: 'tribute', faction: f.id })}
+                    title="Pay them to leave the colony alone for 12 days"
+                  >
+                    Pay {d.tributeCost} silver for peace
+                  </button>
+                ) : (
+                  <div className="row">
+                    {d.giftSizes.map((s, k) => (
+                      <button
+                        key={s}
+                        disabled={d.silver < s}
+                        onClick={() => controller.command({ type: 'gift', faction: f.id, silver: s })}
+                        title={`Goodwill +${f.giftGains[k]}`}
+                      >
+                        Gift {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </Modal>
   );
 }
@@ -587,23 +693,6 @@ export function PrisonersScreen({ state, onClose }: { state: UiState; onClose: (
 export function StoryScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
   return (
     <Modal title="The story so far" onClose={onClose}>
-      <h3>Factions</h3>
-      <table className="summary">
-        <tbody>
-          {state.factions.map((f) => (
-            <tr key={f.name}>
-              <td>
-                <b>{f.name}</b>
-                <div className="muted small">{f.description}</div>
-              </td>
-              <td className="num">
-                {f.relation}
-                {f.goodwill !== null && <span className="muted"> ({f.goodwill})</span>}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
       <h3>Festivals</h3>
       <label className="setting">
         <span>Keep the seasonal festivals (Planting Day, the harvest festival, the midwinter bonfire)</span>

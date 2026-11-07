@@ -127,6 +127,13 @@ How the living simulation works:
   leader dies. A cheerful leader lifts everyone; a miserable one drags them down. The Village screen sets the
   policies: frugal or generous rations, short or long working hours, and a day of rest one day in six. Each
   pleases some and annoys others (gluttons hate frugal rations, the lazy hate long hours, hard workers don't mind).
+  On a day of rest the sick are still tended, prisoners fed and fires kept going, and when the stores are nearly
+  empty the day off is called off.
+- **Neighbours:** every week or so the Meadow Kin ask a favour: some goods from your stockpiles, or a great boar
+  hunted down, within a few days. Doing it pays silver (sometimes a new colonist) and wins goodwill; turning it
+  down or letting it lapse costs some. Goodwill means better prices, more caravans and more gifts of supplies;
+  fall below zero and they stop dealing with you until hard feelings fade. Send gifts of silver to win them
+  round, or pay raiders tribute for twelve days' peace, all from the Factions screen.
 - **Food and materials:** grow grain, mill it into flour and bake bread that keeps a month; hang meat, fish and
   berries on drying racks to keep them for months without power. Dig clay from the riverbanks and fire it into
   bricks in a kiln, and mine the rusty iron veins in the rock for a smelter's iron: tool kits, swords and mail.
@@ -238,7 +245,7 @@ How the storytelling layer works:
 - **Trade and factions:** now and then a caravan from the friendly Meadow Kin walks in and stays for most of a
   day. Open Trade in the top bar to buy their goods and sell anything in your stockpiles for silver (the colony
   lands with 100). Prices depend on goodwill, which grows with every sizeable deal and brings caravans more
-  often; the Story screen lists every faction and where you stand with it.
+  often; the Factions screen lists every faction and where you stand with it.
 - **Water:** shallow water is slow to wade through and leaves colonists soaked (a small mood hit); deep water
   is impassable until you build a bridge over it. Fishing spots on the shore let hunters catch raw fish while
   the colony is short of food. In hard frost the shallows freeze from the shore inwards and can be walked
@@ -289,6 +296,7 @@ src/
     minds.ts        Kinds of mental break, inspirations, obsessions and legendary works
     body.ts         Body parts, infection, lasting injuries, hospital beds
     village.ts      The colony's leader, chosen by vote, and its policies
+    diplomacy.ts    Neighbours' requests, gifts, and tribute to raiders
     simulation.ts   Fixed-tick loop, needs and mood, colonist AI, job system, reservations, objectives
     serialize.ts    Save format
   game/       Glue between the simulation, renderer, and UI
@@ -300,7 +308,7 @@ src/
   ui/         React management UI
     App.tsx         Layout: top bar, colonist bar, inspector, side panel, architect menu
     hud.tsx         The always-on HUD components
-    screens.tsx     Dialogs: work, schedule, production, research, story, help, menu
+    screens.tsx     Dialogs: work, schedule, production, research, story, village, factions, help, menu
 ```
 
 - **Fixed-step simulation:** 20 ticks per second at 1× speed, driven from real elapsed time.
@@ -344,6 +352,7 @@ earshot and concerts, `src/game/music.test.ts` covers the tunes,
 `src/sim/cleaning.test.ts` covers mess, where it comes from, its cost to beauty and cleaning it,
 `src/sim/body.test.ts` covers body parts, infection, lasting injuries and hospital beds,
 `src/sim/village.test.ts` covers the vote, the leader's sway and the policies,
+`src/sim/diplomacy.test.ts` covers requests, the great boar, gifts, goodwill and tribute,
 `src/sim/minds.test.ts` covers kinds of mental break, inspirations and obsessions,
 `src/sim/lifespans.test.ts` covers ages, backstories, births, growing up, learning by watching and old age,
 `src/sim/production.test.ts` covers grain and bread, drying racks, clay and iron, kilns and smelters,

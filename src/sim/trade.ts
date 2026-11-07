@@ -211,7 +211,7 @@ export function colonyStock(sim: Simulation, item: number): number {
 }
 
 // Takes `count` of an item out of the colony's stockpiles.
-function takeFromStockpiles(sim: Simulation, item: number, count: number): void {
+export function takeFromStockpiles(sim: Simulation, item: number, count: number): void {
   const w = sim.world;
   let left = count;
   for (const i of [...w.tilesWith('items')]) {

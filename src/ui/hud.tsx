@@ -32,6 +32,7 @@ export type Screen =
   | 'ship'
   | 'prisoners'
   | 'village'
+  | 'factions'
   | null;
 
 const SPEEDS = [
@@ -124,6 +125,13 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
         <button onClick={() => onOpen('story')}>Story</button>
         <button onClick={() => onOpen('village')} title="The colony's leader and policies">
           Village
+        </button>
+        <button
+          className={state.diplomacy.request ? 'attention' : ''}
+          onClick={() => onOpen('factions')}
+          title="Neighbours, their requests, gifts and tribute"
+        >
+          Factions{state.diplomacy.request ? ' (!)' : ''}
         </button>
         {state.captives.length > 0 && (
           <button onClick={() => onOpen('prisoners')} title="Captured and wounded raiders">

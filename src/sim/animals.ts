@@ -201,6 +201,30 @@ function nearestPrey(sim: Simulation, a: Animal): Colonist | undefined {
     .sort((x, y) => sim.world.distance(a.tile, x.tile) - sim.world.distance(a.tile, y.tile))[0];
 }
 
+// A beast a neighbour wants dealt with: a great boar, far tougher than most, that roams the valley
+// (and never leaves) until it's hunted down or the request lapses.
+export const QUARRY_TOUGHNESS = 2.5;
+export const maxHp = (a: Animal): number => ANIMALS[a.kind].hp * (a.quarry ? QUARRY_TOUGHNESS : 1);
+export function addQuarry(sim: Simulation): Animal | null {
+  const region = sim.outsideRegion();
+  const w = sim.world;
+  if (region === undefined) {
+    return null;
+  }
+  const edge = sim.nearest(
+    w.idx(sim.rng.int(0, w.width - 1), sim.rng.pick([0, w.height - 1])),
+    (i) => onEdge(sim, i) && sim.regionOf(i) === region,
+    1,
+  )[0];
+  if (edge === undefined) {
+    return null;
+  }
+  const a = addAnimal(sim, edge, 'boar');
+  a.hp *= QUARRY_TOUGHNESS;
+  a.quarry = true;
+  return a;
+}
+
 // A pack of animals driven mad (by hunger, disease or something stranger) comes for the colony.
 // Returns how many arrived.
 export function manhuntersArrive(sim: Simulation, kind: string, count: number): number {
@@ -299,7 +323,7 @@ export function animalsAtDawn(sim: Simulation): void {
   // Wounds mend, a quarter of an animal's health a day.
   for (const a of sim.animals) {
     if (a.hp > 0) {
-      a.hp = Math.min(ANIMALS[a.kind].hp, a.hp + ANIMALS[a.kind].hp * 0.25);
+      a.hp = Math.min(maxHp(a), a.hp + ANIMALS[a.kind].hp * 0.25);
     }
   }
   for (const a of tame) {
@@ -342,6 +366,7 @@ function moveOn(sim: Simulation): void {
     !a.hunted &&
     !a.leaving &&
     !a.manhunter &&
+    !a.quarry &&
     a.revengeOn < 0 &&
     (outside === undefined || sim.regionOf(a.tile) === outside);
   for (const a of sim.animals) {
@@ -531,7 +556,7 @@ export function hurtAnimal(sim: Simulation, a: Animal, amount: number, attacker:
     if (!a.tame && a.hunted) {
       sim.stats.hunted++;
     }
-    sim.addLog(`${attacker.name} brought down a ${def.name.toLowerCase()}.`, 'good');
+    sim.addLog(`${attacker.name} brought down a ${animalName(a).toLowerCase()}.`, 'good');
     return;
   }
   if (a.revengeOn < 0 && def.revengeChance && sim.rng.next() < def.revengeChance) {
@@ -561,5 +586,5 @@ function homeward(sim: Simulation, a: Animal, home: number): number | undefined 
 }
 
 export function animalName(a: Animal): string {
-  return ANIMALS[a.kind].name;
+  return a.quarry ? 'Great boar' : ANIMALS[a.kind].name;
 }

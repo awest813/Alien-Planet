@@ -5,6 +5,7 @@ import { TICKS_PER_HOUR, populationFor } from './constants';
 import { ANIMALS, FACTIONS, NONE, featureDef, itemDef, itemId, terrainDef } from './defs';
 import { damage, infect } from './health';
 import { caravanArrives, goodwillOf } from './trade';
+import { atPeace, onGoodTerms } from './diplomacy';
 import { ignite } from './weather';
 import { Season } from './seasons';
 import { DRAFT_AGE } from './lifespans';
@@ -80,7 +81,7 @@ export function readyForThreat(sim: Simulation): boolean {
 
 // Days of food in the colony at the current headcount (as the top bar counts it).
 const DAILY_NUTRITION = 1.4;
-function foodDays(sim: Simulation): number {
+export function foodDays(sim: Simulation): number {
   const nutrition = sim.resourceTotals().reduce((sum, t) => sum + itemDef(t.item).nutrition * t.total, 0);
   return nutrition / (Math.max(1, sim.living().length) * DAILY_NUTRITION);
 }
@@ -111,6 +112,8 @@ const threatScale = (sim: Simulation) => {
 const roomToGrow = (sim: Simulation) => sim.living().length < populationFor(sim.world.width).maxColonists;
 
 const hostileFactions = () => FACTIONS.filter((f) => f.hostile);
+// Raiders who haven't been paid to stay away.
+const raiders = (sim: Simulation) => hostileFactions().filter((f) => !atPeace(sim, f.id));
 const animalLabel = (kind: string) => ANIMALS[kind].plural;
 const friendlyFaction = () => FACTIONS.find((f) => !f.hostile)!;
 
@@ -121,7 +124,10 @@ const EVENTS: EventDef[] = [
     cooldownDays: 3,
     threat: true,
     // Raiders home in on a transmitting beacon.
-    weight: (sim) => (sim.story.difficulty === 'peaceful' ? 0 : 3 * (transmitting(sim) ? SIGNAL_RAID_WEIGHT : 1)),
+    weight: (sim) =>
+      sim.story.difficulty === 'peaceful' || raiders(sim).length === 0
+        ? 0
+        : 3 * (transmitting(sim) ? SIGNAL_RAID_WEIGHT : 1),
     run: (sim) => {
       // Two raiders on day 4 and one more every three days, plus extra for a well-armed colony. The cap
       // is seven at first (nine on harsh), rising by one every eight days after day 19; then all of it
@@ -133,7 +139,8 @@ const EVENTS: EventDef[] = [
       const cap = Math.min(9 + harsh, 7 + harsh + Math.max(0, Math.floor((sim.day - 19) / 8)));
       const size = 2 + harsh + Math.floor((sim.day - 4) / 3) + Math.floor(armed / 3);
       const count = Math.max(2, Math.round(Math.min(cap, size) * threatScale(sim)));
-      return spawnRaid(sim, sim.rng.pick(hostileFactions()).id, count);
+      const factions = raiders(sim);
+      return factions.length > 0 && spawnRaid(sim, sim.rng.pick(factions).id, count);
     },
   },
   {
@@ -225,14 +232,16 @@ const EVENTS: EventDef[] = [
     key: 'caravan',
     minDay: 3,
     cooldownDays: 5,
-    weight: (sim) => (sim.caravan ? 0 : 0.6 + goodwillOf(sim, friendlyFaction().id) / 100),
+    weight: (sim) =>
+      sim.caravan || !onGoodTerms(sim, friendlyFaction().id) ? 0 : 0.6 + goodwillOf(sim, friendlyFaction().id) / 100,
     run: (sim) => caravanArrives(sim),
   },
   {
     key: 'supplies',
     minDay: 2,
     cooldownDays: 3,
-    weight: () => 1.2,
+    // More often the better they think of the colony; never when they're wary of it.
+    weight: (sim) => (onGoodTerms(sim, friendlyFaction().id) ? 0.9 + goodwillOf(sim, friendlyFaction().id) / 100 : 0),
     run: (sim) => {
       const home = sim.homeTile();
       if (home === undefined) {

@@ -4,6 +4,9 @@ import { deserialize, serialize } from './serialize';
 import { seasonDay } from './seasons';
 import { Simulation } from './simulation';
 import { TICKS_PER_HOUR } from './constants';
+import { HOUR, run } from './test-helpers';
+import { featureId, itemId } from './defs';
+import { ignite } from './weather';
 import {
   elect,
   hoursSpeed,
@@ -20,6 +23,16 @@ function at(sim: Simulation, day: number, hour: number) {
   const target = (day - 1) * 24 + hour;
   sim.tick += Math.round((target - sim.totalHours) * TICKS_PER_HOUR);
   sim.syncClock();
+}
+
+// Puts a few days' food by, so a day of rest isn't called off.
+function stock(sim: Simulation) {
+  const w = sim.world;
+  let t = sim.colonists[0].tile - 3;
+  while (!w.isPassable(t) || w.itemCount[t] > 0) {
+    t--;
+  }
+  w.addItem(t, itemId('meal'), 40);
 }
 
 function colony(seed: number) {
@@ -129,6 +142,7 @@ describe('policies', () => {
     const sim = colony(7);
     const c = sim.colonists[0];
     c.schedule[10] = 'W';
+    stock(sim);
     at(sim, 6, 10);
     expect(sim.slotOf(c)).toBe('W');
     sim.apply({ type: 'policy', restDays: true });
@@ -136,7 +150,72 @@ describe('policies', () => {
     expect(sim.slotOf(c)).toBe('J');
     expect(villageThoughts(sim, c)).toContain('dayOfRest');
     at(sim, 7, 10);
+    updateVillage(sim);
     expect(sim.slotOf(c)).toBe('W');
+  });
+
+  it('a day of rest is called off when the stores are nearly empty', () => {
+    const sim = colony(11);
+    for (const t of [...sim.world.tilesWith('items')]) {
+      sim.world.takeItem(t, sim.world.itemCount[t]);
+    }
+    at(sim, 6, 0);
+    sim.apply({ type: 'policy', restDays: true });
+    expect(restDay(sim)).toBe(false);
+    expect(sim.log.some((l) => l.text.includes('called off'))).toBe(true);
+  });
+
+  it('a day of rest still sees fires put out', () => {
+    const sim = colony(9);
+    const w = sim.world;
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    sim.weather = { ...sim.weather, kind: 'clear', until: 1e9 };
+    stock(sim);
+    at(sim, 6, 10);
+    sim.apply({ type: 'policy', restDays: true });
+    const near = sim.colonists[0].tile;
+    let target = -1;
+    for (let d = 3; d < 8 && target < 0; d++) {
+      if (w.isPassable(near + d) && w.feature[near + d] === 0) {
+        target = near + d;
+      }
+    }
+    w.setFeature(target, featureId('tree'));
+    expect(ignite(sim, target)).toBe(true);
+    let firefighting = 0;
+    for (let t = 0; t < HOUR && sim.burning.size > 0; t++) {
+      sim.step();
+      firefighting = Math.max(firefighting, sim.colonists.filter((c) => c.job?.type === 'extinguish').length);
+    }
+    expect(restDay(sim)).toBe(true);
+    expect(firefighting).toBeGreaterThan(0);
+  });
+
+  it('a day of rest still keeps the fires fed', () => {
+    const sim = colony(10);
+    const w = sim.world;
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    sim.weather = { ...sim.weather, kind: 'clear', until: 1e9 };
+    stock(sim);
+    at(sim, 6, 10);
+    sim.apply({ type: 'policy', restDays: true });
+    const near = sim.colonists[0].tile;
+    const spots: number[] = [];
+    for (let d = 2; d < 12 && spots.length < 2; d++) {
+      if (w.isPassable(near + d) && w.feature[near + d] === 0 && w.itemCount[near + d] === 0) {
+        spots.push(near + d);
+      }
+    }
+    const [fire, pile] = spots;
+    w.setFeature(fire, featureId('campfire'));
+    w.fuel[fire] = 1;
+    w.addItem(pile, itemId('wood'), 30);
+    for (const c of sim.colonists) {
+      c.priorities.hauling = 1;
+    }
+    run(sim, HOUR * 3);
+    expect(restDay(sim)).toBe(true);
+    expect(w.fuel[fire]).toBeGreaterThan(1);
   });
 
   it('are saved with the colony, along with the leader', () => {

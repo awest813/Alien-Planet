@@ -37,7 +37,17 @@ import { DRAFT_AGE, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans
 import { LEGEND } from '../sim/minds';
 import { PART_LABELS, SCAR_LABELS, isInfected, scarsOf } from '../sim/body';
 import { Hours, Rations, tally } from '../sim/village';
-import { applyTrade, goodwillOf, prices, standingLabel, tradableItems, tradeOpen, artForSale } from '../sim/trade';
+import {
+  applyTrade,
+  colonyStock,
+  goodwillOf,
+  prices,
+  standingLabel,
+  tradableItems,
+  tradeOpen,
+  artForSale,
+} from '../sim/trade';
+import { GIFT_SIZES, atPeace, describeRequest, giftGoodwill, tributeCost } from '../sim/diplomacy';
 import { weatherDef } from '../sim/weather';
 import {
   Colonist,
@@ -703,6 +713,35 @@ export interface ObjectiveView {
   screen?: 'work' | 'production' | 'research' | 'schedule' | 'ship';
 }
 
+export interface FactionView {
+  id: number;
+  name: string;
+  description: string;
+  relation: string;
+  hostile: boolean;
+  goodwill: number | null;
+  // Friendly: the goodwill each gift size would earn. Hostile: days of bought peace left (0: none).
+  giftGains: number[];
+  peaceDays: number;
+}
+
+export interface DiplomacyView {
+  request: {
+    faction: string;
+    kind: 'deliver' | 'hunt';
+    text: string;
+    // Deliveries: how many the stockpiles hold of what's asked.
+    have: number;
+    count: number;
+    hoursLeft: number;
+    // Hunts: where the beast is.
+    quarryTile: number | null;
+  } | null;
+  silver: number;
+  tributeCost: number;
+  giftSizes: readonly number[];
+}
+
 export interface Alert {
   text: string;
   // Calm: good news to look forward to (a festival, a wedding).
@@ -784,7 +823,9 @@ export interface UiState {
   trade: TradeView | null;
   // Raiders lying wounded, and prisoners.
   captives: CaptiveView[];
-  factions: { name: string; description: string; relation: string; goodwill: number | null }[];
+  factions: FactionView[];
+  // A favour the neighbours have asked, and what the colony can pay with.
+  diplomacy: DiplomacyView;
   // Current weather, e.g. { label: 'Rain', icon: '🌧' } (no icon when clear).
   weather: { label: string; icon: string };
   // Tiles on fire anywhere on the map.
@@ -1653,11 +1694,18 @@ export class GameController {
       trade: this.tradeView(),
       captives: this.captivesView(),
       factions: FACTIONS.map((f) => ({
+        id: f.id,
         name: f.name,
         description: f.description,
-        relation: standingLabel(goodwillOf(sim, f.id), f.hostile),
+        relation: f.hostile && atPeace(sim, f.id) ? 'Paid off' : standingLabel(goodwillOf(sim, f.id), f.hostile),
+        hostile: f.hostile,
         goodwill: f.hostile ? null : goodwillOf(sim, f.id),
+        giftGains: f.hostile ? [] : GIFT_SIZES.map((s) => giftGoodwill(sim, f.id, s)),
+        peaceDays: atPeace(sim, f.id)
+          ? Math.ceil((sim.diplomacy.peaceUntil[f.id] - sim.tick) / (TICKS_PER_HOUR * 24))
+          : 0,
       })),
+      diplomacy: this.diplomacyView(),
       fires: sim.burning.size,
       stats: {
         raidsRepelled: sim.stats.raidsRepelled,
@@ -1861,6 +1909,20 @@ export class GameController {
         tile: cold[0],
       });
     }
+    const request = sim.diplomacy.request;
+    if (request) {
+      const hours = Math.max(0, Math.ceil((request.until - sim.tick) / TICKS_PER_HOUR));
+      const left = hours > 24 ? `${Math.ceil(hours / 24)} days` : `${hours}h`;
+      const quarry = request.kind === 'hunt' ? sim.animals.find((a) => a.id === request.quarry) : undefined;
+      alerts.push({
+        text:
+          request.kind === 'hunt'
+            ? `${FACTIONS[request.faction].name} ask: hunt the great boar (${left} left). Drag Hunt over it`
+            : `${FACTIONS[request.faction].name} ask for ${request.count} ${itemDef(request.item).name.toLowerCase()} (${colonyStock(sim, request.item)} stored, ${left} left): send it from Factions`,
+        tone: hours <= 24 ? 'warn' : 'calm',
+        tile: quarry?.tile,
+      });
+    }
     const untilWinter = daysUntilWinter(sim.totalHours);
     // Winter kills a colony with nowhere warm to go: say so plainly, before and during.
     // A room whose fire has merely gone out counts: the fire alert says to bring wood.
@@ -2040,7 +2102,7 @@ export class GameController {
     }
     const idle = sim.living().filter((c) => {
       // Only working hours count: wandering during recreation time is expected.
-      const slot = c.schedule[Math.floor(sim.hour)];
+      const slot = sim.slotOf(c);
       const isIdle =
         c.age >= TEEN &&
         (slot === 'A' || slot === 'W') &&
@@ -2086,6 +2148,28 @@ export class GameController {
       ['handling', sim.animals.some((a) => a.taming)],
     ];
     return waiting.filter(([work, has]) => has && !staffed(work)).map(([work]) => WORK_NAMES[work] ?? work);
+  }
+
+  private diplomacyView(): DiplomacyView {
+    const sim = this.sim;
+    const r = sim.diplomacy.request;
+    const quarry = r?.kind === 'hunt' ? sim.animals.find((a) => a.id === r.quarry) : undefined;
+    return {
+      request: r
+        ? {
+            faction: FACTIONS[r.faction].name,
+            kind: r.kind,
+            text: describeRequest(r),
+            have: r.kind === 'deliver' ? colonyStock(sim, r.item) : 0,
+            count: r.count,
+            hoursLeft: Math.max(0, Math.ceil((r.until - sim.tick) / TICKS_PER_HOUR)),
+            quarryTile: quarry?.tile ?? null,
+          }
+        : null,
+      silver: colonyStock(sim, itemId('silver')),
+      tributeCost: tributeCost(sim),
+      giftSizes: GIFT_SIZES,
+    };
   }
 
   private villageView(): UiState['village'] {
