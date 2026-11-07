@@ -288,14 +288,14 @@ Done since:
   - Rubble is left by mining, demolition, walls broken by raiders and buildings lost to fire.
   - Dirt is tracked onto floors by anyone stepping in off bare ground, three times as often in rain or storm.
   - Each tile holds one kind, up to three levels. Each level takes beauty off the room and the surroundings:
-    dirt 0.5, rubble 1, blood 1.5. Room beauty takes mess into account once an hour.
+    dirt 0.5, rubble 1, blood 1.5. Rooms count it as soon as it appears or is cleaned.
   - A new Cleaning work type (last in the work order, no skill) scrubs mess indoors, on floors, and within
     12 tiles of the colony's middle, a level about every seventh of an hour. Out in the open, weather wears
     mess away in a day or two, and rain does it within hours. A wall built over mess buries it.
   - The inspector names the mess on a tile.
   - Balance, 48 days on 12 seeds: everyone survived (72 of 72) on Standard and Harsh, with 1 and 10 breaks.
     Cleaning took about half a percent of colonists' time; a few messy tiles stand under a roof at the end,
-    and the barracks lose some impressiveness to it (58 against 67 before).
+    and the barracks lose some impressiveness to it (about 50 against 67 before, depending on what was just spilled).
 - **A distinct look for sculptures by quality.** Poor work shows cracks, excellent work a silver trim and a
   gleam, and a masterwork a gold-trimmed plinth with a slow twinkle.
 

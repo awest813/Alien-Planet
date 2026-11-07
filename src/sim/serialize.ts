@@ -27,6 +27,7 @@ import {
   TimedThought,
   WornApparel,
   SKILL_KEYS,
+  WORK_TYPES,
   Artwork,
   Fallen,
   Gathering,
@@ -300,6 +301,10 @@ export function deserialize(data: SaveData): Simulation {
         c.skillXp[key] = 0;
       }
       c.passions[key] ??= 0;
+    }
+    // Work types added since the save was made start at normal priority.
+    for (const work of WORK_TYPES) {
+      c.priorities[work] ??= 3;
     }
   }
 

@@ -279,8 +279,8 @@ export class World {
     if (before !== this.isPassable(i) || roomBefore !== this.blocksRoom(i)) {
       this.structureVersion++;
     }
-    // A wall or the like built over mess buries it.
-    if (this.filth[i] !== 0 && !this.isPassable(i)) {
+    // A wall or the like built over mess buries it; a bridge taken up lets the water wash it away.
+    if (this.filth[i] !== 0 && (!this.isPassable(i) || this.isOpenWater(i))) {
       this.filth[i] = 0;
       this.filthVersion++;
     }
@@ -301,6 +301,11 @@ export class World {
   public setTerrain(i: number, t: number): void {
     this.terrain[i] = t;
     this.structureVersion++;
+    // Ice thawing takes anything left on it.
+    if (this.filth[i] !== 0 && (!this.isPassable(i) || this.isOpenWater(i))) {
+      this.filth[i] = 0;
+      this.filthVersion++;
+    }
     this.markDirty(i);
   }
 

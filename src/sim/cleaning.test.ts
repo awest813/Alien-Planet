@@ -129,4 +129,35 @@ describe('mess', () => {
     expect(copy.world.filthAmount(inside(1, 1))).toBe(2);
     expect([...copy.world.tilesWith('filth')]).toEqual([inside(1, 1)]);
   });
+
+  it('gives colonists from an older save normal priority for cleaning', () => {
+    const { sim } = hut(7);
+    const data = structuredClone(serialize(sim));
+    for (const c of data.colonists) {
+      delete (c.priorities as Partial<typeof c.priorities>).cleaning;
+    }
+    const copy = deserialize(data);
+    expect(copy.colonists.every((c) => c.priorities.cleaning === 3)).toBe(true);
+    copy.apply({ type: 'priority', colonist: 0, work: 'cleaning', value: NaN });
+    expect(copy.colonists[0].priorities.cleaning).toBe(3);
+  });
+
+  it('counts against a room the same before and after a save and load', () => {
+    const { sim, w, inside } = hut(8);
+    run(sim, HOUR * 2 + 40);
+    sim.roomAt(inside(0, 0));
+    w.addFilth(inside(1, 1), Filth.BLOOD, 3);
+    const copy = deserialize(structuredClone(serialize(sim)));
+    expect(sim.roomAt(inside(0, 0))!.impressiveness).toBe(copy.roomAt(inside(0, 0))!.impressiveness);
+  });
+
+  it('washes away when the ice it lies on thaws', () => {
+    const { w, x, y } = hut(9);
+    const tile = w.idx(x - 3, y + 6);
+    w.setTerrain(tile, terrainId('ice'));
+    w.addFilth(tile, Filth.BLOOD);
+    expect(w.filth[tile]).not.toBe(0);
+    w.setTerrain(tile, terrainId('shallowWater'));
+    expect(w.filth[tile]).toBe(0);
+  });
 });

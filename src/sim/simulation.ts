@@ -624,8 +624,6 @@ export class Simulation {
   // Tick after which a starving colonist may search for food again.
   private readonly nextFoodSearch = new Map<number, number>();
   private contentsVersion = '';
-  // The mess as of the last hour, for room beauty.
-  private filthSeen = 0;
   private wasNight = false;
 
   constructor(
@@ -843,7 +841,6 @@ export class Simulation {
       updateWeather(this);
       updateBeacon(this);
       this.weatherFilth();
-      this.filthSeen = this.world.filthVersion;
     }
 
     for (const c of this.colonists) {
@@ -963,7 +960,9 @@ export class Simulation {
         }
         break;
       case 'priority':
-        this.colonists[cmd.colonist].priorities[cmd.work] = Math.max(0, Math.min(4, cmd.value));
+        if (Number.isFinite(cmd.value)) {
+          this.colonists[cmd.colonist].priorities[cmd.work] = Math.max(0, Math.min(4, Math.round(cmd.value)));
+        }
         break;
       case 'schedule':
         this.colonists[cmd.colonist].schedule[cmd.hour] = cmd.slot;
@@ -1371,9 +1370,9 @@ export class Simulation {
 
   private contents(): ReturnType<typeof measureRooms> {
     this.ensureRegions();
-    // Flowers fade in winter, so the season is part of what the room's beauty depends on. Mess
-    // comes and goes all the time: it's taken into account once an hour.
-    const key = `${this.world.featureVersion}:${this.season === 'Winter'}:${this.filthSeen}`;
+    // Flowers fade in winter, so the season is part of what the room's beauty depends on, and so is
+    // the mess on the floor. (Worked out from what's there now, so a loaded game sees the same.)
+    const key = `${this.world.featureVersion}:${this.season === 'Winter'}:${this.world.filthVersion}`;
     if (this.contentsVersion !== key) {
       this.contentsVersion = key;
       this.roomContents = measureRooms(this.world, this.rooms, (i) => this.beautyAt(i));
@@ -2649,7 +2648,8 @@ export class Simulation {
     const w = this.world;
     const region = this.regionOf(c.tile);
     const home = this.homeTile();
-    const [tile] = this.nearestIn(
+    // A few of the nearest, in case one can't be reached after all.
+    const tiles = this.nearestIn(
       'filth',
       c.tile,
       (i) =>
@@ -2657,12 +2657,13 @@ export class Simulation {
         w.fire[i] === 0 &&
         (this.isRoofed(i) || w.floor[i] !== NONE || (home !== undefined && w.distance(home, i) <= CLEAN_RANGE)) &&
         !this.isReserved(`c${i}`, c),
-      1,
+      4,
     );
-    const path = tile !== undefined ? this.pathfinder.find(c.tile, [tile]) : null;
-    if (tile === undefined || !path) {
+    const path = tiles.length > 0 ? this.pathfinder.find(c.tile, tiles) : null;
+    if (!path) {
       return false;
     }
+    const tile = path.length > 0 ? path[path.length - 1] : c.tile;
     this.reserve(c, `c${tile}`);
     this.assign(c, this.makeJob('clean', tile), path);
     return true;
