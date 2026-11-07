@@ -1688,7 +1688,17 @@ export class GameController {
       alerts.push({ text: 'No medicine: grow healroot for better treatment', tone: 'warn' });
     }
     const untilWinter = daysUntilWinter(sim.totalHours);
-    if (untilWinter > 0 && untilWinter <= 5) {
+    // Winter kills a colony with nowhere warm to go: say so plainly, before and during.
+    const warmRoom = sim.allRooms().some((r) => r.enclosed && r.heaters > 0);
+    if (!warmRoom && sim.living().length > 0 && (sim.season === 'Winter' || (untilWinter > 0 && untilWinter <= 6))) {
+      alerts.push({
+        text:
+          sim.season === 'Winter'
+            ? 'Nowhere warm to shelter: build an enclosed room with a campfire before the colonists freeze'
+            : `Winter in ${Math.ceil(untilWinter)} day${untilWinter > 1 ? 's' : ''} and nowhere warm to shelter: build an enclosed room with a campfire`,
+        tone: 'danger',
+      });
+    } else if (untilWinter > 0 && untilWinter <= 5) {
       alerts.push({
         text: `Winter in ${Math.ceil(untilWinter)} day${untilWinter > 1 ? 's' : ''}: harvest crops and stock food`,
         tone: 'warn',
@@ -1755,6 +1765,23 @@ export class GameController {
     if (sim.day > 1 && alive > 0 && beds < alive) {
       const missing = alive - beds;
       alerts.push({ text: `${missing} colonist${missing > 1 ? 's' : ''} without a bed`, tone: 'warn' });
+    }
+    // Beds nobody can get to: a door opening onto rock, say, or a room walled in on every side.
+    if (beds > 0) {
+      const bedTiles = [...sim.world.tilesWith('features')].filter((i) => featureDef(sim.world.feature[i]).bed);
+      const regions = new Set(
+        sim
+          .living()
+          .filter((c) => !c.health.downed)
+          .map((c) => sim.regionOf(c.tile)),
+      );
+      if (regions.size > 0 && !bedTiles.some((i) => regions.has(sim.regionOf(i)))) {
+        alerts.push({
+          text: 'Nobody can get to the beds: check the way in (is the door blocked, or the room walled in?)',
+          tone: 'danger',
+          tile: bedTiles[0],
+        });
+      }
     }
     if (!sim.world.zone.some((z) => z === STOCKPILE_ZONE) && totals.some((t) => t.total > 0)) {
       alerts.push({ text: 'No stockpile: items are left where they fall', tone: 'warn' });

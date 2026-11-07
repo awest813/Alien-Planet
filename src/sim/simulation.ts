@@ -2726,6 +2726,12 @@ export class Simulation {
     const w = this.world;
     const region = this.regionOf(c.tile);
     const home = this.homeTile();
+    // Mess isn't worth going out into weather they're not dressed for.
+    const { min, max } = comfortRange(c);
+    const bearable = (i: number) => {
+      const t = this.temperatureAt(i);
+      return t >= min && t <= max;
+    };
     // A few of the nearest, in case one can't be reached after all.
     const tiles = this.nearestIn(
       'filth',
@@ -2734,6 +2740,7 @@ export class Simulation {
         this.regions.region[i] === region &&
         w.fire[i] === 0 &&
         (this.isRoofed(i) || w.floor[i] !== NONE || (home !== undefined && w.distance(home, i) <= CLEAN_RANGE)) &&
+        bearable(i) &&
         !this.isReserved(`c${i}`, c),
       4,
       // Indoors first, where mess spoils meals, tending and moods.

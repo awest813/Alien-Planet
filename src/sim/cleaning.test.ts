@@ -120,6 +120,22 @@ describe('mess', () => {
     expect(w.filth[far]).toBe(0);
   });
 
+  it('isn’t worth going out into the freezing cold for', () => {
+    const { sim, w, x, y } = hut(12);
+    sim.colonists[0].priorities.cleaning = 1;
+    const out = w.idx(x - 3, y + 3);
+    w.addFilth(out, Filth.RUBBLE, 3);
+    const real = sim.temperatureAt.bind(sim);
+    sim.temperatureAt = (i: number) => (sim.isRoofed(i) ? real(i) : -25);
+    for (let t = 0; t < HOUR; t++) {
+      sim.step();
+      expect(sim.colonists[0].job?.type).not.toBe('clean');
+    }
+    sim.temperatureAt = real;
+    run(sim, HOUR * 2);
+    expect(w.filth[out]).toBe(0);
+  });
+
   it('is saved with the colony', () => {
     const { sim, w, inside } = hut(6);
     w.addFilth(inside(1, 1), Filth.RUBBLE, 2);

@@ -335,6 +335,19 @@ With the current tuning (8 seeds × 26 days, through the first winter), a Standa
 keeps everyone alive but goes hungry for a while late in winter; Harsh costs around one colonist in six, with
 no colony wiped out. First friendships appear around day 6–7, with a few rivalries and couples.
 
+`scripts/playtest.ts` plays 100 simulated players with ten play styles (by the book, farmer, militarist,
+neglectful, micromanager, random clicking, artist, warden, save-scummer, demolisher) across every difficulty
+and map size. It checks for crashes and impossible state as they play: needs out of range, colonists or items
+inside walls, leaked reservations, prisoners off their beds, jobs stuck for a day, saves that don't load back
+exactly, and saves that don't play out the same twice. It also reports how each colony fared and why anyone
+died:
+
+```
+npx tsx scripts/playtest.ts days=20              # all 100 players (from=0 to=25 runs a share of them)
+npx tsx scripts/playtest.ts days=20 only=warden  # one play style
+npx tsx scripts/playtest.ts days=20 players=3,40 # particular players (TRACE=17 or BUILD=1 for detail)
+```
+
 ## Roadmap
 
 - **Phase 1 – The playable colony** (done): procedural terrain, 5 autonomous colonists, mining, chopping,
