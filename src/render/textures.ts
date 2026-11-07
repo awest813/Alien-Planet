@@ -284,6 +284,132 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillRect(3, 6, 4, 1);
       c.fillRect(9, 11, 4, 1);
       break;
+    case 'ironVein':
+      // Granite shot through with rusty streaks.
+      c.fillStyle = '#4b4a4f';
+      c.fillRect(0, 0, TILE, TILE);
+      speckle(c, 6, ['#55545a', '#424146', '#605f66'], 0.3);
+      c.fillStyle = '#6d6c73';
+      c.fillRect(0, 0, TILE, 2);
+      c.fillStyle = '#a2582e';
+      c.fillRect(2, 5, 5, 2);
+      c.fillRect(6, 7, 3, 1);
+      c.fillRect(9, 10, 5, 2);
+      c.fillRect(4, 12, 3, 1);
+      c.fillStyle = '#d27a3e';
+      c.fillRect(3, 5, 2, 1);
+      c.fillRect(10, 10, 2, 1);
+      break;
+    case 'clayBank':
+      // A low mound of wet reddish clay.
+      c.fillStyle = 'rgba(0,0,0,0.15)';
+      c.fillRect(2, 9, 13, 5);
+      c.fillStyle = '#9c5a3c';
+      c.fillRect(2, 7, 12, 6);
+      c.fillRect(4, 5, 8, 2);
+      c.fillStyle = '#b8714f';
+      c.fillRect(4, 5, 6, 1);
+      c.fillRect(3, 7, 4, 1);
+      c.fillStyle = '#7d4430';
+      c.fillRect(8, 10, 4, 1);
+      break;
+    case 'brickWall':
+      c.fillStyle = '#6e3a2a';
+      c.fillRect(0, 0, TILE, TILE);
+      c.fillStyle = '#a65a3e';
+      for (let row = 0; row < 4; row++) {
+        const offset = row % 2 ? 4 : 0;
+        for (let x = -offset; x < TILE; x += 8) {
+          c.fillRect(x + 1, row * 4 + 1, 6, 3);
+        }
+      }
+      c.fillStyle = '#c47a58';
+      c.fillRect(1, 1, 6, 1);
+      c.fillRect(5, 5, 6, 1);
+      break;
+    case 'brickFloor':
+      // Flat pavers in a basket weave, with pale mortar: plainly a floor, not a wall.
+      c.fillStyle = '#cbb8a4';
+      c.fillRect(0, 0, TILE, TILE);
+      c.fillStyle = '#b8734f';
+      for (let by = 0; by < 2; by++) {
+        for (let bx = 0; bx < 2; bx++) {
+          const ox = bx * 8;
+          const oy = by * 8;
+          if ((bx + by) % 2 === 0) {
+            c.fillRect(ox + 1, oy + 1, 6, 3);
+            c.fillRect(ox + 1, oy + 4, 6, 3);
+          } else {
+            c.fillRect(ox + 1, oy + 1, 3, 6);
+            c.fillRect(ox + 4, oy + 1, 3, 6);
+          }
+        }
+      }
+      break;
+    case 'millstone':
+      // Two round stones, one on the other, turned by a wooden arm.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(2, 3, 13, 12);
+      c.fillStyle = '#7d7c82';
+      c.beginPath();
+      c.arc(8, 8, 6, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#a4a3a9';
+      c.beginPath();
+      c.arc(8, 8, 4, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#5c5b60';
+      c.fillRect(7, 7, 2, 2);
+      c.fillStyle = '#7a5434';
+      c.fillRect(8, 7, 7, 2);
+      break;
+    case 'dryingRack':
+      // A wooden frame with strips hung along it.
+      c.fillStyle = '#6b4a2e';
+      c.fillRect(1, 2, 2, 12);
+      c.fillRect(13, 2, 2, 12);
+      c.fillStyle = '#8a6040';
+      c.fillRect(1, 3, 14, 1);
+      c.fillRect(1, 9, 14, 1);
+      c.fillStyle = '#9c4a3a';
+      for (const x of [4, 7, 10]) {
+        c.fillRect(x, 4, 1, 3);
+        c.fillRect(x, 10, 1, 3);
+      }
+      break;
+    case 'kiln':
+      // A domed brick oven with a glowing mouth.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(1, 4, 15, 11);
+      c.fillStyle = '#7a5a4a';
+      c.fillRect(2, 5, 12, 9);
+      c.fillRect(4, 3, 8, 2);
+      c.fillStyle = '#9a7462';
+      c.fillRect(4, 3, 6, 1);
+      c.fillRect(2, 5, 3, 1);
+      c.fillStyle = '#2a1a12';
+      c.fillRect(6, 9, 4, 4);
+      c.fillStyle = '#f08a3a';
+      c.fillRect(7, 11, 2, 2);
+      break;
+    case 'smelter':
+      // A tall brick furnace with a chimney and a pouring lip.
+      c.fillStyle = 'rgba(0,0,0,0.25)';
+      c.fillRect(2, 3, 13, 12);
+      c.fillStyle = '#6e3a2a';
+      c.fillRect(3, 4, 10, 10);
+      c.fillStyle = '#a65a3e';
+      c.fillRect(3, 4, 10, 1);
+      c.fillRect(3, 8, 10, 1);
+      c.fillStyle = '#4a4a50';
+      c.fillRect(10, 0, 3, 5);
+      c.fillStyle = '#2a1a12';
+      c.fillRect(5, 9, 4, 3);
+      c.fillStyle = '#ffb347';
+      c.fillRect(6, 10, 2, 2);
+      c.fillStyle = '#8a8990';
+      c.fillRect(1, 11, 3, 1);
+      break;
     case 'woodWall':
       c.fillStyle = '#7a4e27';
       c.fillRect(0, 0, TILE, TILE);
@@ -997,8 +1123,22 @@ function drawFeature(c: Ctx, key: string): void {
 }
 
 function drawCrop(c: Ctx, key: string, stage: number): void {
-  const leaf = key === 'potatoPlant' ? '#4f9a3a' : key === 'healrootPlant' ? '#3f8f6a' : '#6d8f4a';
-  const fruit = key === 'potatoPlant' ? '#d6b25e' : key === 'healrootPlant' ? '#e8f0a0' : '#f4f1e8';
+  const leaf =
+    key === 'potatoPlant'
+      ? '#4f9a3a'
+      : key === 'healrootPlant'
+        ? '#3f8f6a'
+        : key === 'grainPlant'
+          ? '#8fa64a'
+          : '#6d8f4a';
+  const fruit =
+    key === 'potatoPlant'
+      ? '#d6b25e'
+      : key === 'healrootPlant'
+        ? '#e8f0a0'
+        : key === 'grainPlant'
+          ? '#e6c35a'
+          : '#f4f1e8';
   const spots: [number, number][] = [
     [3, 4],
     [10, 4],
@@ -1207,6 +1347,124 @@ function drawItem(c: Ctx, key: string): void {
       c.fillStyle = '#c9b48a';
       c.fillRect(7, 8, 1, 1);
       c.fillRect(9, 10, 1, 1);
+      break;
+    case 'grain':
+      // A bundle of golden stalks.
+      c.fillStyle = '#b08a3a';
+      c.fillRect(5, 6, 1, 8);
+      c.fillRect(7, 5, 1, 9);
+      c.fillRect(9, 6, 1, 8);
+      c.fillStyle = '#e6c35a';
+      c.fillRect(4, 3, 3, 4);
+      c.fillRect(7, 2, 2, 4);
+      c.fillRect(9, 3, 3, 4);
+      c.fillStyle = '#7a5434';
+      c.fillRect(4, 10, 7, 1);
+      break;
+    case 'flour':
+      // A tied sack, dusted white.
+      c.fillStyle = '#d8d0bc';
+      c.fillRect(4, 6, 8, 8);
+      c.fillRect(5, 4, 6, 2);
+      c.fillStyle = '#b8ae96';
+      c.fillRect(6, 4, 4, 1);
+      c.fillRect(4, 13, 8, 1);
+      c.fillStyle = '#f6f2e8';
+      c.fillRect(5, 7, 3, 2);
+      break;
+    case 'bread':
+      c.fillStyle = '#9c5e2a';
+      c.fillRect(3, 7, 10, 6);
+      c.fillRect(4, 6, 8, 1);
+      c.fillStyle = '#c8873e';
+      c.fillRect(4, 7, 8, 2);
+      c.fillStyle = '#e8b870';
+      c.fillRect(5, 8, 1, 3);
+      c.fillRect(8, 8, 1, 3);
+      c.fillRect(11, 8, 1, 3);
+      break;
+    case 'driedMeat':
+      c.fillStyle = '#6a2e22';
+      c.fillRect(3, 5, 3, 9);
+      c.fillRect(7, 4, 3, 10);
+      c.fillRect(11, 6, 3, 8);
+      c.fillStyle = '#8a4434';
+      c.fillRect(3, 5, 1, 9);
+      c.fillRect(7, 4, 1, 10);
+      c.fillRect(11, 6, 1, 8);
+      break;
+    case 'driedBerries':
+      c.fillStyle = '#5a2438';
+      [
+        [4, 8],
+        [7, 6],
+        [10, 9],
+        [6, 11],
+        [9, 12],
+      ].forEach(([x, y]) => c.fillRect(x, y, 2, 2));
+      c.fillStyle = '#7a3a52';
+      c.fillRect(7, 6, 1, 1);
+      c.fillRect(10, 9, 1, 1);
+      break;
+    case 'clay':
+      c.fillStyle = '#9c5a3c';
+      c.fillRect(3, 8, 10, 5);
+      c.fillRect(5, 6, 6, 2);
+      c.fillStyle = '#b8714f';
+      c.fillRect(5, 6, 4, 1);
+      c.fillRect(3, 8, 3, 1);
+      break;
+    case 'bricks':
+      c.fillStyle = '#8a4430';
+      c.fillRect(2, 10, 6, 3);
+      c.fillRect(8, 10, 6, 3);
+      c.fillRect(5, 6, 6, 3);
+      c.fillStyle = '#c06a4a';
+      c.fillRect(2, 10, 6, 1);
+      c.fillRect(8, 10, 6, 1);
+      c.fillRect(5, 6, 6, 1);
+      break;
+    case 'ironOre':
+      c.fillStyle = '#5c5b60';
+      c.fillRect(3, 8, 5, 4);
+      c.fillRect(8, 6, 5, 6);
+      c.fillStyle = '#b0602e';
+      c.fillRect(4, 9, 2, 1);
+      c.fillRect(9, 8, 3, 2);
+      c.fillRect(6, 11, 1, 1);
+      break;
+    case 'iron':
+      // Two dark bars.
+      c.fillStyle = '#4a4c52';
+      c.fillRect(2, 9, 12, 4);
+      c.fillStyle = '#7a7e86';
+      c.fillRect(3, 7, 10, 3);
+      c.fillStyle = '#a4a8b0';
+      c.fillRect(4, 7, 5, 1);
+      break;
+    case 'ironSword':
+      c.fillStyle = '#c4c8d0';
+      c.fillRect(7, 1, 2, 10);
+      c.fillStyle = '#e8ecf2';
+      c.fillRect(7, 1, 1, 9);
+      c.fillStyle = '#6a6e76';
+      c.fillRect(4, 11, 8, 1);
+      c.fillStyle = '#7a5434';
+      c.fillRect(7, 12, 2, 3);
+      break;
+    case 'ironMail':
+      c.fillStyle = '#6a6e76';
+      c.fillRect(3, 3, 10, 11);
+      c.fillRect(1, 4, 2, 5);
+      c.fillRect(13, 4, 2, 5);
+      c.fillStyle = '#9ca0a8';
+      for (let y = 4; y < 14; y += 2) {
+        for (let x = 3 + (y % 4 ? 1 : 0); x < 13; x += 2) {
+          c.fillRect(x, y, 1, 1);
+        }
+      }
+      c.fillStyle = '#3a3c42';
+      c.fillRect(6, 3, 4, 2);
       break;
     case 'stoneBlocks':
       c.fillStyle = '#8a8990';

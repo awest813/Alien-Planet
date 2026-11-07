@@ -234,5 +234,87 @@
     "category": "rawFood",
     "foodKind": "meat",
     "value": 1
+  },
+  {
+    "key": "grain",
+    "name": "Grain",
+    "stackLimit": 50,
+    "value": 1
+  },
+  {
+    "key": "flour",
+    "name": "Flour",
+    "stackLimit": 50,
+    "value": 2
+  },
+  {
+    "key": "bread",
+    "name": "Bread",
+    "stackLimit": 20,
+    "category": "meal",
+    "nutrition": 0.45,
+    "shelfLife": 30,
+    "value": 6
+  },
+  {
+    "key": "driedMeat",
+    "name": "Dried meat",
+    "stackLimit": 50,
+    "category": "rawFood",
+    "nutrition": 0.1,
+    "shelfLife": 60,
+    "foodKind": "meat",
+    "value": 2
+  },
+  {
+    "key": "driedBerries",
+    "name": "Dried berries",
+    "stackLimit": 50,
+    "category": "rawFood",
+    "nutrition": 0.1,
+    "shelfLife": 60,
+    "foodKind": "veg",
+    "value": 2
+  },
+  {
+    "key": "clay",
+    "name": "Clay",
+    "stackLimit": 50,
+    "value": 1
+  },
+  {
+    "key": "bricks",
+    "name": "Bricks",
+    "stackLimit": 50,
+    "value": 2
+  },
+  {
+    "key": "ironOre",
+    "name": "Iron ore",
+    "stackLimit": 50,
+    "value": 2
+  },
+  {
+    "key": "iron",
+    "name": "Iron",
+    "stackLimit": 50,
+    "value": 8
+  },
+  {
+    "key": "ironSword",
+    "name": "Iron sword",
+    "stackLimit": 1,
+    "value": 90,
+    "weapon": "ironSword"
+  },
+  {
+    "key": "ironMail",
+    "name": "Iron mail",
+    "stackLimit": 1,
+    "value": 170,
+    "armor": {
+      "protection": 0.55,
+      "speed": 0.9
+    }
   }
 ]

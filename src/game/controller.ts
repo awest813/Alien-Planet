@@ -140,6 +140,14 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
   friends: { how: 'Colonists chat while they work and relax together; a table and recreation help.' },
   raid: { how: 'When raiders come, press Q to draft everyone and fight from cover.' },
   hunt: { how: 'Pick Hunt and drag over animals; hunters track and shoot them.', tool: 'hunt' },
+  bread: {
+    how: 'Research Milling, grow grain (Zones), build a millstone and a stove, and set bills to mill flour and bake bread.',
+    tool: 'growGrain',
+  },
+  iron: {
+    how: 'Mine iron veins (rusty streaks in the rock), research Pottery then Smelting, and fire up a smelter with wood.',
+    tool: 'mine',
+  },
   recruit: {
     how: 'Build a prisoner bed (Security). After a raid, drag Capture over raiders lying wounded; Warden colonists bring them in, feed them and talk them round.',
     tool: 'capture',
@@ -319,6 +327,14 @@ export const TOOLS: ToolDef[] = [
     hint: 'Drag over soil or grass to plant potatoes (food)',
   },
   {
+    id: 'growGrain',
+    label: 'Grow grain',
+    hotkey: '',
+    tool: { kind: 'zone', zone: GROW_ZONE + featureId('grainPlant') },
+    group: 'zones',
+    hint: 'Drag over soil or grass to plant grain: milled into flour and baked into bread that keeps (Milling)',
+  },
+  {
     id: 'growCotton',
     label: 'Grow cotton',
     hotkey: 't',
@@ -351,6 +367,7 @@ export const TOOLS: ToolDef[] = [
     'structure',
     'Sturdier and prettier than granite: raiders take twice as long to break through',
   ),
+  build('brickWall', 'Brick wall', '', 'structure', 'Sturdy fired bricks: between granite and blocks (Pottery)'),
   build('door', 'Door', 'o', 'structure', 'Click a wall gap to place a door'),
   build(
     'roof',
@@ -361,6 +378,7 @@ export const TOOLS: ToolDef[] = [
   ),
   build('woodFloor', 'Wood floor', '', 'floors', 'Faster to walk on, and a little prettier'),
   build('stoneTiles', 'Stone tiles', '', 'floors', 'Fast underfoot and handsome; made from granite blocks'),
+  build('brickFloor', 'Brick floor', '', 'floors', 'A warm-coloured floor of fired bricks (Pottery)'),
   build('carpet', 'Carpet', '', 'floors', 'The prettiest floor; woven from cloth'),
   build('bridge', 'Bridge', '', 'structure', 'Walkway over shallow or deep water'),
   build('bed', 'Bed', 'e', 'furniture', 'Colonists sleep better in beds'),
@@ -406,6 +424,28 @@ export const TOOLS: ToolDef[] = [
   build('craftingBench', 'Crafting bench', 'j', 'production', 'Weaves cloth and crafts bows'),
   build('researchBench', 'Research bench', '', 'production', 'Where colonists research new technology'),
   build('stonecutterTable', "Stonecutter's table", '', 'production', 'Cuts granite chunks into blocks for block walls'),
+  build('millstone', 'Millstone', '', 'production', 'Cooks grind grain into flour here, for baking bread (Milling)'),
+  build(
+    'dryingRack',
+    'Drying rack',
+    '',
+    'production',
+    'Haulers hang meat, fish and berries here; in half a day they dry into food that keeps for months',
+  ),
+  build(
+    'kiln',
+    'Kiln',
+    '',
+    'production',
+    'Fires clay from the riverbanks into bricks; burns wood while in use (Pottery)',
+  ),
+  build(
+    'smelter',
+    'Smelter',
+    '',
+    'production',
+    'Smelts iron ore from the rock into iron for tools, swords and mail; burns wood while in use (Smelting)',
+  ),
   build(
     'fishingSpot',
     'Fishing spot',
@@ -455,6 +495,9 @@ const BENCH_NAMES: Record<BenchType, string> = {
   cooking: 'stove',
   crafting: 'crafting bench',
   stonecutting: "stonecutter's table",
+  mill: 'millstone',
+  kiln: 'kiln',
+  smelter: 'smelter',
 };
 
 const FOOD_KIND_NAMES: Record<string, string> = { meat: 'meat or fish', veg: 'vegetables', dairy: 'dairy' };
@@ -1724,7 +1767,10 @@ export class GameController {
       (i) => featureDef(w.feature[i]).burns && featureDef(w.feature[i]).heater > 0 && w.fuel[i] <= 0,
     );
     // Burning through the woodpile: warn while there's still time to chop more.
-    const burning = [...w.tilesWith('features')].filter((i) => featureDef(w.feature[i]).burns && w.fuel[i] > 0);
+    // Fires that burn all the time (a kiln or smelter only burns while it's worked).
+    const burning = [...w.tilesWith('features')].filter(
+      (i) => featureDef(w.feature[i]).burns && !featureDef(w.feature[i]).workbench && w.fuel[i] > 0,
+    );
     const perDay = burning.reduce((sum, i) => sum + featureDef(w.feature[i]).burns!.perDay, 0);
     if (cold.length === 0 && perDay > 0 && sim.stockOf(itemId('wood')) < perDay * 3) {
       alerts.push({

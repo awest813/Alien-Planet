@@ -355,5 +355,143 @@
       }
     ],
     "research": "scaleArmor"
+  },
+  {
+    "key": "millFlour",
+    "name": "Mill flour",
+    "bench": "mill",
+    "ingredients": [
+      {
+        "item": "grain",
+        "count": 10
+      }
+    ],
+    "product": {
+      "item": "flour",
+      "count": 5
+    },
+    "work": 100,
+    "defaultTarget": 20,
+    "research": "milling"
+  },
+  {
+    "key": "bakeBread",
+    "name": "Bake bread",
+    "bench": "cooking",
+    "ingredients": [
+      {
+        "item": "flour",
+        "count": 5
+      }
+    ],
+    "product": {
+      "item": "bread",
+      "count": 3
+    },
+    "work": 120,
+    "defaultTarget": 15,
+    "research": "milling"
+  },
+  {
+    "key": "fireBricks",
+    "name": "Fire bricks",
+    "bench": "kiln",
+    "ingredients": [
+      {
+        "item": "clay",
+        "count": 4
+      }
+    ],
+    "product": {
+      "item": "bricks",
+      "count": 6
+    },
+    "work": 100,
+    "defaultTarget": 30,
+    "research": "pottery"
+  },
+  {
+    "key": "smeltIron",
+    "name": "Smelt iron",
+    "bench": "smelter",
+    "ingredients": [
+      {
+        "item": "ironOre",
+        "count": 4
+      }
+    ],
+    "product": {
+      "item": "iron",
+      "count": 2
+    },
+    "work": 150,
+    "defaultTarget": 20,
+    "research": "smelting"
+  },
+  {
+    "key": "makeIronTools",
+    "name": "Make iron tool kits",
+    "bench": "crafting",
+    "product": {
+      "item": "toolKit",
+      "count": 1
+    },
+    "work": 160,
+    "defaultTarget": 0,
+    "ingredients": [
+      {
+        "item": "iron",
+        "count": 3
+      },
+      {
+        "item": "wood",
+        "count": 4
+      }
+    ],
+    "research": "smelting"
+  },
+  {
+    "key": "makeIronSword",
+    "name": "Make iron sword",
+    "bench": "crafting",
+    "product": {
+      "item": "ironSword",
+      "count": 1
+    },
+    "work": 300,
+    "defaultTarget": 0,
+    "ingredients": [
+      {
+        "item": "iron",
+        "count": 6
+      },
+      {
+        "item": "wood",
+        "count": 2
+      }
+    ],
+    "research": "smelting"
+  },
+  {
+    "key": "makeIronMail",
+    "name": "Make iron mail",
+    "bench": "crafting",
+    "product": {
+      "item": "ironMail",
+      "count": 1
+    },
+    "work": 700,
+    "defaultTarget": 0,
+    "ingredients": [
+      {
+        "item": "iron",
+        "count": 14
+      },
+      {
+        "item": "leather",
+        "count": 6
+      }
+    ],
+    "research": "smelting"
   }
 ]

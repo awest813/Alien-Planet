@@ -347,6 +347,11 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             Grow <b>healroot</b> for medicine, hunt and fish for meat and leather, forage berries for quick food.
           </li>
           <li>
+            Food that keeps without power: grow <b>grain</b>, mill it and bake bread (research Milling), or hang meat,
+            fish and berries on a <b>drying rack</b>. Clay from the riverbanks makes bricks in a kiln; the rusty veins
+            in the rock give iron in a smelter.
+          </li>
+          <li>
             <b>Tame</b> animals for their produce: deer give milk, muskoxen wool (spin it into cloth), grouse eggs.
             Wolves hunt deer and hares but leave people alone unless hunted themselves.
           </li>

@@ -169,12 +169,15 @@ describe('parties', () => {
     let partied = false;
     for (let d = 2; d < 12 && !partied; d++) {
       at(sim, d, 17);
-      for (const c of sim.colonists) {
-        c.mood = 80;
-        c.needs.food = 1;
-        c.needs.rest = 1;
+      // Kept in good spirits all evening (mood otherwise settles back within a couple of hours).
+      for (let h = 0; h < 6; h++) {
+        for (const c of sim.colonists) {
+          c.mood = 80;
+          c.needs.food = 1;
+          c.needs.rest = 1;
+        }
+        run(sim, HOUR);
       }
-      run(sim, HOUR * 6);
       partied = (sim.stats.parties ?? 0) > 0;
     }
     expect(partied).toBe(true);

@@ -1,4 +1,4 @@
-import { MAX_COST_LINES, NONE, NORMAL_QUALITY, featureDef, itemDef, terrainDef } from './defs';
+import { MAX_COST_LINES, NONE, NORMAL_QUALITY, driedFrom, featureDef, itemDef, terrainDef } from './defs';
 import type { Carried } from './types';
 
 export type TileKind = 'items' | 'features' | 'designations' | 'blueprints' | 'zones' | 'filth';
@@ -434,8 +434,11 @@ export class World {
     if (!this.isPassable(i) || this.blueprintBlocks(i)) {
       return false;
     }
-    // Iceboxes only take food.
+    // Iceboxes only take food, and drying racks only what dries.
     if (this.feature[i] !== NONE && featureDef(this.feature[i]).icebox && !itemDef(item).nutrition) {
+      return false;
+    }
+    if (this.feature[i] !== NONE && featureDef(this.feature[i]).dries && driedFrom(item) === undefined) {
       return false;
     }
     const type = this.itemType[i];
@@ -510,6 +513,7 @@ export class World {
         this.isPassable(i) &&
         !this.blueprintBlocks(i) &&
         (this.feature[i] === NONE || !featureDef(this.feature[i]).icebox || !!itemDef(item).nutrition) &&
+        (this.feature[i] === NONE || !featureDef(this.feature[i]).dries || driedFrom(item) !== undefined) &&
         // One-per-tile things (bows, clothes) never pile up, even as a last resort.
         (this.itemType[i] === NONE || (this.itemType[i] === item && itemDef(item).stackLimit > 1))
       ) {

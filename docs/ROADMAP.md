@@ -468,6 +468,25 @@ can ship on its own.
 - First slice: grain, mill, bread and the drying rack. Success: Standard colonies reach winter with more days
   of food, and fewer starving hours without needing power.
 
+- **Done:**
+  - Grain (a crop, 12 a plant over two and a half days) is milled at a millstone (Milling) into flour, and
+    a cook bakes flour into bread at the stove: food that keeps a month without power. Cooking work runs
+    the millstone.
+  - Drying racks (15 wood) are storage for raw meat, fish and berries only; haulers bring them there first,
+    and in 12 hours (twice as long in the rain) they dry into dried meat or dried berries that keep two
+    months. Dried food is then hauled to a stockpile.
+  - Clay banks along the shore and iron veins in the rock (with a small vein guaranteed near the landing),
+    both mined. A kiln (Pottery) fires clay into bricks for brick walls and floors; a smelter (Smelting,
+    after Pottery) turns iron ore into iron for tool kits, an iron sword and iron mail. Both burn wood, but
+    only while they're worked, and nobody works them cold.
+  - Goals (Prosperity): bake bread; smelt iron.
+  - Balance, 48 days on 12 seeds, with the test colony building a drying rack on day 3 and, once Milling
+    is done, a grain field and a millstone: Standard kept everyone (77 of 77), starving hours a little down
+    (1,672 against 1,714), food stores about the same, now partly bread and dried meat that keep without
+    power. Harsh lost 2 of 79, both in raids. The 100-player playtest was clean (no crashes or invariant
+    problems).
+  - Not done from the plan: the fibre crop, the hardy root, the root cellar and pots (clay storage).
+
 **Phase G: Lifespans and families.** _(Large: touches colonists everywhere.)_
 
 - Ages and a calendar of birthdays (a year is 24 days, so ages advance at roughly a year per in-game year

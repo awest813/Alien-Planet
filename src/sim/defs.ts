@@ -14,7 +14,7 @@ import traitsJson from '../data/traits.json';
 // simulation can store the world in compact typed arrays.
 
 export type WorkType = 'mine' | 'chop' | 'forage';
-export type BenchType = 'cooking' | 'crafting' | 'stonecutting';
+export type BenchType = 'cooking' | 'crafting' | 'stonecutting' | 'mill' | 'kiln' | 'smelter';
 
 export interface TerrainDef {
   id: number;
@@ -120,6 +120,8 @@ export interface FeatureDef {
   icebox: boolean;
   // Storage that holds this many stacks of one kind of item on its tile (shelves).
   shelf: number;
+  // A drying rack: storage for meat, fish and berries, which dry on it into food that keeps.
+  dries: boolean;
   // Radius of a sun lamp's light (crops grow beneath it day and night).
   growLight: number;
   // Built over water and makes it walkable.
@@ -202,6 +204,7 @@ interface RawFeature {
   cooler?: { amount: number; target: number };
   icebox?: boolean;
   shelf?: number;
+  dries?: boolean;
   growLight?: number;
   bridge?: boolean;
   fishing?: boolean;
@@ -342,6 +345,7 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   cooler: f.cooler,
   icebox: !!f.icebox,
   shelf: f.shelf ?? 0,
+  dries: !!f.dries,
   growLight: f.growLight ?? 0,
   bridge: !!f.bridge,
   fishing: !!f.fishing,
@@ -568,3 +572,14 @@ export const COLONIST_COLORS: string[] = colonistsJson.colors;
 // The fuel a building runs on, if any: a generator's, or a fire's.
 export const fuelOf = (def: FeatureDef): { item: number; capacity: number; perDay: number } | undefined =>
   def.power?.fuel ?? def.burns;
+
+// Which skill (and work type) a bench uses: the stove and millstone are cooking, the rest crafting.
+export const benchSkill = (bench: BenchType): 'cooking' | 'crafting' =>
+  bench === 'cooking' || bench === 'mill' ? 'cooking' : 'crafting';
+
+// What a raw food dries into on a drying rack, if anything.
+const DRIED: Record<string, string> = { rawMeat: 'driedMeat', rawFish: 'driedMeat', berries: 'driedBerries' };
+export const driedFrom = (item: number): number | undefined => {
+  const key = DRIED[itemDef(item).key];
+  return key ? itemId(key) : undefined;
+};

@@ -18,6 +18,8 @@ import {
   THOUGHTS,
   researchDef,
   TRAITS,
+  benchSkill,
+  driedFrom,
   featureDef,
   fuelOf,
   featureId,
@@ -203,6 +205,8 @@ const TRACK_DIRT = 0.04;
 // colony's middle anyone bothers cleaning outdoors.
 const CLEAN_WORK = 30;
 const CLEAN_RANGE = 12;
+// Hours on a drying rack (in the dry) to turn meat, fish or berries into food that keeps.
+const DRYING_HOURS = 12;
 // How far below (or above) their comfort colonists will still go out for fun or idle about.
 const JOY_CHILL = 6;
 // The best a storage tile can be for an item (critical priority, cold for perishables).
@@ -1652,8 +1656,10 @@ export class Simulation {
   private burnFuel(hours: number): void {
     const w = this.world;
     for (const i of this.fireTiles) {
-      const burns = featureDef(w.feature[i]).burns!;
-      if (w.fuel[i] <= 0) {
+      const def = featureDef(w.feature[i]);
+      const burns = def.burns!;
+      // Kilns and smelters burn only while they're worked (see stepCraft).
+      if (w.fuel[i] <= 0 || def.workbench) {
         continue;
       }
       w.fuel[i] = Math.max(0, w.fuel[i] - (burns.perDay / 24) * hours);
@@ -1720,6 +1726,11 @@ export class Simulation {
     return f !== NONE && featureDef(f).icebox;
   }
 
+  public isDryingRack(i: number): boolean {
+    const f = this.world.feature[i];
+    return f !== NONE && featureDef(f).dries;
+  }
+
   public isShelf(i: number): boolean {
     const f = this.world.feature[i];
     return f !== NONE && featureDef(f).shelf > 0;
@@ -1744,6 +1755,19 @@ export class Simulation {
         continue;
       }
       if (this.power.powered && this.isIcebox(i)) {
+        continue;
+      }
+      // On a drying rack, food dries instead of rotting (slower in the rain), and keeps for months.
+      const dried = this.isDryingRack(i) ? driedFrom(item) : undefined;
+      if (dried !== undefined) {
+        w.progress[i] += hours * (isWet(this, i) ? 0.5 : 1);
+        if (w.progress[i] >= DRYING_HOURS) {
+          w.progress[i] = 0;
+          w.itemType[i] = dried;
+          w.fresh[i] = itemDef(dried).shelfLife!;
+          w.markDirty(i);
+          this.produce(dried, w.itemCount[i]);
+        }
         continue;
       }
       const temp = this.temperatureAt(i);
@@ -2546,9 +2570,14 @@ export class Simulation {
       case 'research':
         return this.tryResearch(c);
       case 'cooking':
-        return this.tryBill(c, 'cooking');
+        return this.tryBill(c, 'cooking') || this.tryBill(c, 'mill');
       case 'crafting':
-        return this.tryBill(c, 'crafting') || this.tryBill(c, 'stonecutting');
+        return (
+          this.tryBill(c, 'crafting') ||
+          this.tryBill(c, 'stonecutting') ||
+          this.tryBill(c, 'kiln') ||
+          this.tryBill(c, 'smelter')
+        );
       case 'art':
         return this.trySculpt(c) || this.tryDeliver(c, true);
       case 'hauling':
@@ -3560,7 +3589,7 @@ export class Simulation {
 
   public isStockpile(i: number): boolean {
     const zone = this.world.zone[i];
-    return (zone !== 0 && zone < GROW_ZONE) || this.isIcebox(i) || this.isShelf(i);
+    return (zone !== 0 && zone < GROW_ZONE) || this.isIcebox(i) || this.isShelf(i) || this.isDryingRack(i);
   }
 
   // Whether storage on this tile takes this item (its stockpile's settings allow it).
@@ -3573,6 +3602,10 @@ export class Simulation {
   public storeValue(i: number, item: number): number {
     if (!this.storesItem(i, item)) {
       return 0;
+    }
+    // A drying rack takes only what dries, and nothing beats putting it there.
+    if (this.isDryingRack(i)) {
+      return driedFrom(item) !== undefined ? MAX_STORE_VALUE : 0;
     }
     const zone = this.world.zone[i];
     const rank = isStockpileZone(zone) ? priorityRank(zone) : 2;
@@ -3884,7 +3917,7 @@ export class Simulation {
       if (
         recipe.bench !== bench ||
         !this.isResearched(recipe.research) ||
-        (bench === 'cooking' ? c.skills.cooking : c.skills.crafting) < recipe.minSkill
+        c.skills[benchSkill(bench)] < recipe.minSkill
       ) {
         continue;
       }
@@ -3906,6 +3939,8 @@ export class Simulation {
           (i) =>
             w.feature[i] !== NONE &&
             featureDef(w.feature[i]).workbench === bench &&
+            // A kiln or smelter needs wood in it.
+            (!featureDef(w.feature[i]).burns || w.fuel[i] > 0) &&
             !this.isReserved(`w${i}`, c) &&
             this.hasWorkSpot(i, false, region),
           1,
@@ -4079,7 +4114,16 @@ export class Simulation {
       this.endJob(c);
       return;
     }
-    const bench = recipe.bench === 'cooking' ? 'cooking' : 'crafting';
+    const bench = benchSkill(recipe.bench);
+    // A kiln or smelter burns wood while it's worked, and work stops when the fire's out.
+    const burns = featureDef(w.feature[job.target]).burns;
+    if (burns) {
+      if (w.fuel[job.target] <= 0) {
+        this.endJob(c);
+        return;
+      }
+      w.fuel[job.target] = Math.max(0, w.fuel[job.target] - burns.perDay / 24 / TICKS_PER_HOUR);
+    }
     job.progress += this.workSpeed(c, bench);
     learn(this, c, bench);
     if (job.progress >= recipe.work) {
@@ -6750,6 +6794,18 @@ export const OBJECTIVES: ObjectiveDef[] = [
     phase: 5,
     check: (s) => s.living().length >= populationFor(s.world.width).maxColonists,
     progress: (s) => `${s.living().length}/${populationFor(s.world.width).maxColonists}`,
+  },
+  {
+    id: 'bread',
+    label: 'Bake bread from your own grain',
+    phase: 5,
+    check: (s) => (s.stats.produced.bread ?? 0) > 0,
+  },
+  {
+    id: 'iron',
+    label: 'Smelt iron from ore',
+    phase: 5,
+    check: (s) => (s.stats.produced.iron ?? 0) > 0,
   },
   {
     id: 'recruit',

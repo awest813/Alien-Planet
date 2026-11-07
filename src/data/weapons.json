@@ -81,5 +81,15 @@
     "falloff": 0.02,
     "damage": [0.4, 0.55],
     "pierce": 0.55
+  },
+  {
+    "key": "ironSword",
+    "name": "Iron sword",
+    "item": "ironSword",
+    "range": 1,
+    "cooldown": 42,
+    "accuracy": 0.85,
+    "damage": [0.28, 0.4],
+    "pierce": 0.4
   }
 ]

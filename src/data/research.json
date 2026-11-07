@@ -135,5 +135,24 @@
     "cost": 3000,
     "requires": ["electricity"],
     "description": "Unlocks the signal beacon: transmit for five days and a ship may answer."
+  },
+  {
+    "key": "milling",
+    "name": "Milling",
+    "cost": 600,
+    "description": "Unlocks the millstone, to grind grain into flour, and baking bread that keeps for a month."
+  },
+  {
+    "key": "pottery",
+    "name": "Pottery",
+    "cost": 800,
+    "description": "Unlocks the kiln, to fire clay from the riverbanks into bricks, and brick walls and floors."
+  },
+  {
+    "key": "smelting",
+    "name": "Smelting",
+    "cost": 1400,
+    "requires": ["pottery"],
+    "description": "Unlocks the smelter, to turn iron ore into iron for tool kits, swords and mail."
   }
 ]

@@ -47,6 +47,7 @@ const crop = (key: string) => GROW_ZONE + featureId(key);
 const RESEARCH_ORDER = [
   'hearths',
   'cropRotation',
+  'milling',
   'tailoring',
   'archery',
   'fieldMedicine',
@@ -161,7 +162,21 @@ function roomsAtEnd(sim: Simulation): { role: string; impressiveness: number }[]
 
 // What the "flow" report tracks each dawn.
 const FLOW_STOCKS = ['wood', 'stone', 'stoneBlocks', 'cloth', 'leather', 'herbalMedicine', 'silver'];
-const FLOW_MADE = ['potatoes', 'berries', 'rawMeat', 'rawFish', 'meal', 'fineMeal', 'milk', 'egg', 'wood', 'stone'];
+const FLOW_MADE = [
+  'potatoes',
+  'berries',
+  'rawMeat',
+  'rawFish',
+  'meal',
+  'fineMeal',
+  'milk',
+  'egg',
+  'grain',
+  'bread',
+  'driedMeat',
+  'wood',
+  'stone',
+];
 function snapshot(sim: Simulation): Record<string, number> {
   const totals = sim.resourceTotals();
   const nutrition = totals.reduce((sum, t) => sum + itemDef(t.item).nutrition * t.total, 0);
@@ -246,6 +261,8 @@ function play(seed: number): Result {
   let artPlaced = false;
   let lutePlaced = false;
   let gravesPlaced = false;
+  let rackPlaced = false;
+  let millPlaced = false;
   let prisonPlaced = false;
   const fell = new Set<number>();
   let beaconPlaced = false;
@@ -457,6 +474,37 @@ function play(seed: number): Result {
       if (spot) {
         claim(avoid, sim, spot.x, spot.y, 1, 1);
         sim.apply({ type: 'build', feature: featureId('telescope'), tiles: [at(spot.x, spot.y)] });
+      }
+    }
+    // A drying rack on day 3, so meat and fish keep without power.
+    if (!rackPlaced && sim.day >= 3) {
+      rackPlaced = true;
+      const spot = findSite(sim, 2, 1, avoid);
+      if (spot) {
+        claim(avoid, sim, spot.x, spot.y, 2, 1);
+        sim.apply({
+          type: 'build',
+          feature: featureId('dryingRack'),
+          tiles: [at(spot.x, spot.y), at(spot.x + 1, spot.y)],
+        });
+      }
+    }
+    // Once milling is known: a grain field, a millstone, and bread on the bills.
+    if (!millPlaced && sim.isResearched('milling')) {
+      millPlaced = true;
+      const field = findSite(sim, 6, 4, avoid);
+      const mill = findSite(sim, 1, 1, avoid);
+      if (field && mill) {
+        claim(avoid, sim, field.x, field.y, 6, 4);
+        claim(avoid, sim, mill.x, mill.y, 1, 1);
+        sim.apply({
+          type: 'zone',
+          rect: { x0: field.x, y0: field.y, x1: field.x + 5, y1: field.y + 3 },
+          zone: crop('grainPlant'),
+        });
+        sim.apply({ type: 'build', feature: featureId('millstone'), tiles: [at(mill.x, mill.y)] });
+        sim.apply({ type: 'bill', recipe: RECIPES.find((r) => r.key === 'millFlour')!.id, target: 20 });
+        sim.apply({ type: 'bill', recipe: RECIPES.find((r) => r.key === 'bakeBread')!.id, target: 30 });
       }
     }
     if (hut && !hearthPlaced && sim.isResearched('hearths')) {

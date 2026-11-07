@@ -233,7 +233,11 @@
     "key": "campfire",
     "name": "Campfire",
     "heater": 12,
-    "burns": { "item": "wood", "capacity": 30, "perDay": 10 },
+    "burns": {
+      "item": "wood",
+      "capacity": 30,
+      "perDay": 10
+    },
     "build": {
       "cost": [
         {
@@ -294,7 +298,11 @@
     "name": "Stone hearth",
     "heater": 22,
     "research": "hearths",
-    "burns": { "item": "wood", "capacity": 60, "perDay": 15 },
+    "burns": {
+      "item": "wood",
+      "capacity": 60,
+      "perDay": 15
+    },
     "build": {
       "cost": [
         {
@@ -1011,7 +1019,11 @@
       "color": "#ffa040",
       "flicker": true
     },
-    "burns": { "item": "wood", "capacity": 10, "perDay": 2 },
+    "burns": {
+      "item": "wood",
+      "capacity": 10,
+      "perDay": 2
+    },
     "build": {
       "cost": [
         {
@@ -1077,5 +1089,156 @@
       "work": 1500
     },
     "research": "signalBeacon"
+  },
+  {
+    "key": "grainPlant",
+    "name": "Grain",
+    "passable": true,
+    "moveCost": 1.2,
+    "crop": {
+      "item": "grain",
+      "count": 12,
+      "growDays": 2.5,
+      "sowWork": 40,
+      "harvestWork": 60
+    }
+  },
+  {
+    "key": "clayBank",
+    "name": "Clay bank",
+    "natural": true,
+    "passable": true,
+    "moveCost": 1.5,
+    "harvest": {
+      "work": "mine",
+      "amount": 120,
+      "item": "clay",
+      "count": 8
+    }
+  },
+  {
+    "key": "ironVein",
+    "name": "Iron vein",
+    "natural": true,
+    "blocksRoom": true,
+    "harvest": {
+      "work": "mine",
+      "amount": 300,
+      "item": "ironOre",
+      "count": 5
+    }
+  },
+  {
+    "key": "millstone",
+    "name": "Millstone",
+    "workbench": "mill",
+    "research": "milling",
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 30
+        },
+        {
+          "item": "wood",
+          "count": 10
+        }
+      ],
+      "work": 200
+    }
+  },
+  {
+    "key": "dryingRack",
+    "name": "Drying rack",
+    "passable": true,
+    "moveCost": 1.2,
+    "dries": true,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 15
+        }
+      ],
+      "work": 80
+    }
+  },
+  {
+    "key": "kiln",
+    "name": "Kiln",
+    "workbench": "kiln",
+    "research": "pottery",
+    "burns": {
+      "item": "wood",
+      "capacity": 40,
+      "perDay": 30
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "stone",
+          "count": 40
+        }
+      ],
+      "work": 220
+    }
+  },
+  {
+    "key": "smelter",
+    "name": "Smelter",
+    "workbench": "smelter",
+    "research": "smelting",
+    "burns": {
+      "item": "wood",
+      "capacity": 60,
+      "perDay": 40
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "bricks",
+          "count": 20
+        },
+        {
+          "item": "stone",
+          "count": 20
+        }
+      ],
+      "work": 300
+    }
+  },
+  {
+    "key": "brickWall",
+    "name": "Brick wall",
+    "blocksRoom": true,
+    "beauty": 1,
+    "research": "pottery",
+    "build": {
+      "cost": [
+        {
+          "item": "bricks",
+          "count": 5
+        }
+      ],
+      "work": 300
+    }
+  },
+  {
+    "key": "brickFloor",
+    "name": "Brick floor",
+    "layer": "floor",
+    "passable": true,
+    "moveCost": 0.8,
+    "beauty": 0.6,
+    "research": "pottery",
+    "build": {
+      "cost": [
+        {
+          "item": "bricks",
+          "count": 2
+        }
+      ],
+      "work": 60
+    }
   }
 ]

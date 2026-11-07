@@ -111,6 +111,9 @@ How the living simulation works:
   colonists with Warden work bring them in, feed them and talk them round until they join the colony, bringing
   their fighting skill. Left lying they die within a day; a starved prisoner dies too, and one can be released
   from the Prisoners screen.
+- **Food and materials:** grow grain, mill it into flour and bake bread that keeps a month; hang meat, fish and
+  berries on drying racks to keep them for months without power. Dig clay from the riverbanks and fire it into
+  bricks in a kiln, and mine the rusty iron veins in the rock for a smelter's iron: tool kits, swords and mail.
 - **Storage and fuel:** click a stockpile to choose what it takes (food, materials, gear, medicine) and its priority;
   haulers fill higher priority stockpiles first and move things up to them. Forbid items to keep everyone's hands
   off them. Shelves hold three stacks on one tile. Lock a door from its tile card to keep everyone out (or in);
@@ -319,7 +322,9 @@ sculpting, quality, titles, beauty, galleries and surroundings, `src/sim/music.t
 earshot and concerts, `src/game/music.test.ts` covers the tunes,
 `src/sim/gatherings.test.ts` covers funerals and graves, weddings, festivals and feasts, parties and memorials,
 `src/sim/cleaning.test.ts` covers mess, where it comes from, its cost to beauty and cleaning it,
-`src/sim/prisoners.test.ts` covers wounded raiders, capture, feeding, recruiting, starving and release, and
+`src/sim/production.test.ts` covers grain and bread, drying racks, clay and iron, kilns and smelters,
+`src/sim/storage.test.ts` covers fires burning wood, stockpile settings, forbidding, shelves, locked doors and
+staying out of the cold, `src/sim/prisoners.test.ts` covers wounded raiders, capture, feeding, recruiting, starving and release, and
 `src/render/tileset-layout.test.ts` checks the art layout.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,

@@ -138,6 +138,47 @@ export function generateWorld(width: number, height: number, seed: number): Gene
     }
   }
 
+  // Clay along the water's edge, and veins of iron through the rock.
+  const CLAY = featureId('clayBank');
+  const IRON = featureId('ironVein');
+  const oreNoise = new Float32Array(world.size);
+  for (let i = 0; i < world.size; i++) {
+    oreNoise[i] = fbm(world.xOf(i), world.yOf(i), seed + 7741, 2, 0.35);
+  }
+  const ore = toPercentiles(oreNoise);
+  for (let i = 0; i < world.size; i++) {
+    const x = world.xOf(i);
+    const y = world.yOf(i);
+    if (world.feature[i] === ROCK && ore[i] > 0.93) {
+      world.feature[i] = IRON;
+    } else if (
+      world.feature[i] === NONE &&
+      world.terrain[i] === SAND &&
+      hash2(x, y, seed + 5503) < 0.3 &&
+      world.neighbors(i).some((n) => world.terrain[n] === SHALLOW)
+    ) {
+      world.feature[i] = CLAY;
+    }
+  }
+  // Every colony can find some iron: if none is near, the nearest rock holds a small vein.
+  const near = (i: number) => Math.hypot(world.xOf(i) - sx, world.yOf(i) - sy);
+  let ironNear = false;
+  for (let i = 0; i < world.size && !ironNear; i++) {
+    ironNear = world.feature[i] === IRON && near(i) <= 30;
+  }
+  if (!ironNear) {
+    const rocks: number[] = [];
+    for (let i = 0; i < world.size; i++) {
+      if (world.feature[i] === ROCK) {
+        rocks.push(i);
+      }
+    }
+    rocks.sort((a, b) => near(a) - near(b));
+    for (const i of rocks.slice(0, 4)) {
+      world.feature[i] = IRON;
+    }
+  }
+
   // Clear a small landing area around the spawn point.
   for (let y = sy - 2; y <= sy + 2; y++) {
     for (let x = sx - 2; x <= sx + 2; x++) {
