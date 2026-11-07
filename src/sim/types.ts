@@ -28,6 +28,8 @@ export type JobType =
   | 'extinguish'
   | 'shelter'
   | 'clean'
+  | 'capture'
+  | 'warden'
   | 'wander';
 
 export interface Job {
@@ -96,6 +98,7 @@ export const WORK_TYPES = [
   'mining',
   'hunting',
   'handling',
+  'warden',
   'crafting',
   'art',
   'research',
@@ -314,6 +317,30 @@ export interface Enemy {
   nerveCheckAt?: number;
 }
 
+// A raider who went down rather than dying: lying where they fell until captured (or until they die
+// of their wounds), then held in a prisoner bed until they join the colony or are let go.
+export interface Captive {
+  id: number;
+  name: string;
+  faction: number;
+  tile: number;
+  state: 'downed' | 'prisoner';
+  // Marked with the Capture order.
+  capture: boolean;
+  // When they fell, and (once a prisoner) when they were taken.
+  since: number;
+  // 0..1, as a colonist's food need.
+  food: number;
+  // Talks still needed to win them over (fractional): at zero, each visit may recruit them.
+  resistance: number;
+  // Their Combat skill, kept if they join.
+  skill: number;
+  // Tick of the last warden's talk.
+  lastVisit: number;
+  // Hours spent starving, which can kill a prisoner left unfed.
+  hungryHours: number;
+}
+
 // A recent attack, kept briefly so the renderer can draw it.
 export interface Shot {
   from: number;
@@ -356,6 +383,10 @@ export type Command =
   | { type: 'focus'; colonist: number; enemy: number }
   | { type: 'hunt'; rect: Rect; add: boolean }
   | { type: 'tame'; rect: Rect; add: boolean }
+  // Mark (or unmark) downed raiders in the rectangle to be taken prisoner.
+  | { type: 'capture'; rect: Rect; add: boolean }
+  // Let a prisoner go.
+  | { type: 'release'; captive: number }
   | { type: 'research'; project: string | null }
   // Whether the colony keeps the seasonal festivals.
   | { type: 'festivals'; on: boolean }
@@ -382,6 +413,9 @@ export interface Stats {
   wintersSurvived: number;
   // Games of chess played with someone.
   chessGames?: number;
+  // Raiders taken prisoner, and prisoners won over.
+  captured?: number;
+  recruited?: number;
   // Sculptures sold to traders.
   artSold?: number;
   // Concerts given, and the gatherings held.

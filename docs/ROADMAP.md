@@ -22,6 +22,7 @@ Shelter, Living, Story, Seasons, Prosperity, Legacy.
 | Social     | Chats, deep talks and insults; friends, rivals, lovers and marriage.                                |
 | Story      | Storyteller events, gatherings and festivals, story log, the signal beacon ending.                  |
 | Sound      | Made in code, off by default: instruments, concerts, ambience.                                      |
+| Prisoners  | Wounded raiders captured, held in prisoner beds and won over by wardens.                            |
 | Death      | Graves, funerals and memorials.                                                                     |
 
 Balance figures are kept with each phase's results below.
@@ -281,6 +282,25 @@ Nothing waiting: everything listed here has been done.
 
 Done since:
 
+- **Prisoners and recruiting** (`src/sim/prisoners.ts`).
+  - Half the raiders brought down fall wounded instead of dying. They lie where they fell and die within
+    a day unless taken in.
+  - A **prisoner bed** (Security, 20 wood) holds one prisoner; colonists never sleep in it.
+  - The **Capture** order (Orders tab) marks wounded raiders. Once no raider is left fighting, colonists
+    with the new **Warden** work type carry them to a free prisoner bed.
+  - Wardens bring a prisoner food below 40% (they get hungry half as fast as someone up and about), and
+    talk with each prisoner every six hours between 8:00 and 21:00. Each talk wears down resistance
+    (5–8 to begin with, more from a hardened faction) by the warden's persuasion: their mood, better
+    when kind, worse when abrasive. Once it's gone, each talk has about a one-in-three chance of winning
+    them over; they join with their Combat skill.
+  - A prisoner left starving hardens, and dies after two days of it. Taking their bed down lets them
+    slip away. A prisoner can be released from the **Prisoners** screen (top bar, while anyone is held).
+  - Alerts point out wounded raiders, a missing prisoner bed or warden, and a starving prisoner. New goal
+    (Prosperity): take a raider prisoner and win them over.
+  - Balance, 48 days on 12 seeds, with the test colony building one prisoner bed on day 8 and marking
+    every wounded raider: on Standard, 63 raiders fell wounded, 12 were taken and 10 won over, and 82 of
+    83 colonists survived (mood 49). On Harsh, 39 fell wounded, 7 were taken and 5 won over, and 77 of 81
+    survived (mood 47; the four lost bled out in raids as before).
 - **Hygiene: mess has consequences.** Mess within two tiles (indoors, the same room only) now matters
   beyond beauty:
   - A meal comes out a grade worse for each level of mess around the stove, up to six. A worse meal is

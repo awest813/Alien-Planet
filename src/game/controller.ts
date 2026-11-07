@@ -32,6 +32,7 @@ import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
+import { DOWNED_TICKS, persuasion } from '../sim/prisoners';
 import { applyTrade, goodwillOf, prices, standingLabel, tradableItems, tradeOpen, artForSale } from '../sim/trade';
 import { weatherDef } from '../sim/weather';
 import {
@@ -57,7 +58,8 @@ export type Tool =
   | { kind: 'zone'; zone: number }
   | { kind: 'build'; feature: number }
   | { kind: 'hunt' }
-  | { kind: 'tame' };
+  | { kind: 'tame' }
+  | { kind: 'capture' };
 
 export interface ToolDef {
   id: string;
@@ -128,6 +130,10 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
   friends: { how: 'Colonists chat while they work and relax together; a table and recreation help.' },
   raid: { how: 'When raiders come, press Q to draft everyone and fight from cover.' },
   hunt: { how: 'Pick Hunt and drag over animals; hunters track and shoot them.', tool: 'hunt' },
+  recruit: {
+    how: 'Build a prisoner bed (Security). After a raid, drag Capture over raiders lying wounded; Warden colonists bring them in, feed them and talk them round.',
+    tool: 'capture',
+  },
   researchBench: { how: 'Build a research bench, then pick a project in Research.', tool: 'researchBench' },
   research3: { how: 'Pick projects in Research; colonists with Research work study them.', screen: 'research' },
   hearth: { how: 'Research Hearths, then build a stone hearth in your bedrooms.', screen: 'research' },
@@ -253,6 +259,14 @@ export const TOOLS: ToolDef[] = [
     tool: { kind: 'tame' },
     group: 'orders',
     hint: 'Drag over wild animals to tame them: deer give milk, muskoxen wool, grouse eggs; boars and wolves guard the colony; pairs breed',
+  },
+  {
+    id: 'capture',
+    label: 'Capture',
+    hotkey: '',
+    tool: { kind: 'capture' },
+    group: 'orders',
+    hint: 'Drag over raiders lying wounded: Warden colonists carry them to a prisoner bed, to win them over',
   },
   {
     id: 'cancel',
@@ -399,6 +413,13 @@ export const TOOLS: ToolDef[] = [
     'A stone wall slot: colonists shoot out through it while it shields them, and nobody walks through',
   ),
   build('spikeTrap', 'Spike trap', '', 'security', 'Wounds the first raider to step on it, then gets rebuilt'),
+  build(
+    'prisonerBed',
+    'Prisoner bed',
+    '',
+    'security',
+    'Where a captured raider is held while Warden colonists feed them and win them over',
+  ),
 ];
 
 export const SPEEDS = [0, 1, 2, 4];
@@ -502,6 +523,19 @@ export interface TileView {
   animal: string | null;
   // Extra lines about the building or items (fuel, power, freshness…).
   details: string[];
+}
+
+export interface CaptiveView {
+  id: number;
+  name: string;
+  faction: string;
+  state: 'downed' | 'prisoner';
+  capture: boolean;
+  // Downed: hours before they die of their wounds. Prisoner: 0.
+  hoursLeft: number;
+  food: number;
+  // Talks still needed before they'll consider joining (0: ready).
+  talksLeft: number;
 }
 
 export interface PowerView {
@@ -640,6 +674,8 @@ export interface UiState {
   latestSave: SaveMeta | null;
   // A trade caravan: on its way (not open yet), here (open), or null when none is about.
   trade: TradeView | null;
+  // Raiders lying wounded, and prisoners.
+  captives: CaptiveView[];
   factions: { name: string; description: string; relation: string; goodwill: number | null }[];
   // Current weather, e.g. { label: 'Rain', icon: '🌧' } (no icon when clear).
   weather: { label: string; icon: string };
@@ -1497,6 +1533,7 @@ export class GameController {
       latestSave: this.latestSave(),
       weather: { label: weatherDef(sim).label, icon: weatherDef(sim).icon },
       trade: this.tradeView(),
+      captives: this.captivesView(),
       factions: FACTIONS.map((f) => ({
         name: f.name,
         description: f.description,
@@ -1593,6 +1630,30 @@ export class GameController {
         tone: 'danger',
         tile: sim.enemies.find((e) => !e.fleeing)?.tile,
       });
+    }
+    // Wounded raiders worth taking in, while there's time.
+    const lying = sim.captives.filter((p) => p.state === 'downed');
+    if (lying.length > 0 && raiders === 0) {
+      const marked = lying.filter((p) => p.capture);
+      const hasBed = sim.countFeature((f) => featureDef(f).key === 'prisonerBed') > 0;
+      const hasWarden = sim.living().some((c) => c.priorities.warden > 0 && !c.health.downed);
+      alerts.push({
+        text:
+          marked.length === 0
+            ? `${lying.length} raider${lying.length > 1 ? 's lie' : ' lies'} wounded: drag Capture over them to take them prisoner`
+            : !hasBed
+              ? 'Build a prisoner bed (Security) so captives can be brought in'
+              : !hasWarden
+                ? 'Nobody does Warden work: give someone Warden priority to bring captives in'
+                : `${marked.length} wounded raider${marked.length > 1 ? 's' : ''} to be brought in`,
+        tone: marked.length > 0 && hasBed && hasWarden ? 'calm' : 'warn',
+        tile: (marked[0] ?? lying[0]).tile,
+      });
+    }
+    for (const p of sim.captives) {
+      if (p.state === 'prisoner' && p.hungryHours > 0) {
+        alerts.push({ text: `The prisoner ${p.name} is starving`, tone: 'danger', tile: p.tile });
+      }
     }
     for (const c of sim.living()) {
       if (c.health.downed) {
@@ -1796,6 +1857,21 @@ export class GameController {
     return waiting.filter(([work, has]) => has && !staffed(work)).map(([work]) => WORK_NAMES[work] ?? work);
   }
 
+  private captivesView(): CaptiveView[] {
+    const sim = this.sim;
+    return sim.captives.map((p) => ({
+      id: p.id,
+      name: p.name,
+      faction: FACTIONS[p.faction].name,
+      state: p.state,
+      capture: p.capture,
+      hoursLeft:
+        p.state === 'downed' ? Math.max(0, Math.ceil((p.since + DOWNED_TICKS - sim.tick) / TICKS_PER_HOUR)) : 0,
+      food: p.food,
+      talksLeft: Math.ceil(p.resistance / Math.max(0.3, Math.max(...sim.living().map(persuasion), 0.3))),
+    }));
+  }
+
   private describeTile(i: number): TileView {
     const sim = this.sim;
     const w = sim.world;
@@ -1900,6 +1976,15 @@ export class GameController {
     }
     if (w.fire[i] > 0) {
       details.push('On fire!');
+    }
+    for (const p of sim.captives) {
+      if (p.tile === i) {
+        details.push(
+          p.state === 'downed'
+            ? `${p.name}, raider, lying wounded${p.capture ? ' · marked for capture' : ' · drag Capture over them to take them prisoner'}`
+            : `Prisoner ${p.name}: ${p.resistance > 0 ? 'resisting' : 'ready to be won over'}, ${Math.round(p.food * 100)}% fed`,
+        );
+      }
     }
     for (const e of sim.enemies) {
       if (e.tile === i && e.hp > 0) {

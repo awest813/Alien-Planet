@@ -343,6 +343,21 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillStyle = '#5585cc';
       c.fillRect(3, 6, 10, 2);
       break;
+    case 'prisonerBed':
+      // A plain iron cot with a coarse orange blanket.
+      c.fillStyle = '#55565c';
+      c.fillRect(2, 1, 12, 14);
+      c.fillStyle = '#8a8b92';
+      c.fillRect(2, 1, 12, 1);
+      c.fillRect(2, 14, 12, 1);
+      c.fillStyle = '#d8d2c4';
+      c.fillRect(3, 2, 10, 3);
+      c.fillStyle = '#c8682a';
+      c.fillRect(3, 6, 10, 8);
+      c.fillStyle = '#a4521f';
+      c.fillRect(3, 9, 10, 1);
+      c.fillRect(3, 12, 10, 1);
+      break;
     case 'potatoPlant':
     case 'cottonPlant':
     case 'healrootPlant':

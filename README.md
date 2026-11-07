@@ -107,6 +107,10 @@ How the living simulation works:
   makes a room and its surroundings uglier until someone with Cleaning work scrubs it away; outdoors, the
   weather wears it off in time. A dirty kitchen cooks worse, riskier meals, a dirty sickroom slows healing,
   and a filthy room sours the mood.
+- **Prisoners:** some raiders fall wounded instead of dying. Build a prisoner bed, drag Capture over them, and
+  colonists with Warden work bring them in, feed them and talk them round until they join the colony, bringing
+  their fighting skill. Left lying they die within a day; a starved prisoner dies too, and one can be released
+  from the Prisoners screen.
 - **Rooms and temperature:** enclosed rooms get a role (bedroom, barracks, kitchen, …) and an impressiveness
   score from furniture beauty and size. Outdoor temperature follows a day/night cycle; rooms drift towards it
   and campfires heat them.
@@ -256,6 +260,7 @@ src/
     plants.ts       Trees and berry bushes spreading back over open ground
     art.ts          Sculpture quality, beauty and titles drawn from the colony's story
     gatherings.ts   Parties, festivals, weddings and funerals: what each is and when
+    prisoners.ts    Wounded raiders, capture, prisoners' upkeep and recruiting
     simulation.ts   Fixed-tick loop, needs and mood, colonist AI, job system, reservations, objectives
     serialize.ts    Save format
   game/       Glue between the simulation, renderer, and UI
@@ -308,7 +313,8 @@ before chopping when builders wait on stone, grazers returning to a hunted-out v
 sculpting, quality, titles, beauty, galleries and surroundings, `src/sim/music.test.ts` covers instruments,
 earshot and concerts, `src/game/music.test.ts` covers the tunes,
 `src/sim/gatherings.test.ts` covers funerals and graves, weddings, festivals and feasts, parties and memorials,
-`src/sim/cleaning.test.ts` covers mess, where it comes from, its cost to beauty and cleaning it, and
+`src/sim/cleaning.test.ts` covers mess, where it comes from, its cost to beauty and cleaning it,
+`src/sim/prisoners.test.ts` covers wounded raiders, capture, feeding, recruiting, starving and release, and
 `src/render/tileset-layout.test.ts` checks the art layout.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,

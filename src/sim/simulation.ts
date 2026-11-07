@@ -130,6 +130,7 @@ import {
   WORK_TYPES,
   WorkTypeKey,
   Artwork,
+  Captive,
   Fallen,
   Gathering,
   GatheringKind,
@@ -151,6 +152,7 @@ import {
   WEDDING_OPINION,
 } from './gatherings';
 import { BeaconState, TRANSMIT_HOURS, chooseToStay, depart, freshBeacon, updateBeacon } from './beacon';
+import { FEED_BELOW, PRISONER_BED, TALK_TICKS, release, talk, updateCaptives, visitDue } from './prisoners';
 import { spreadWildPlants, wildPlantCover } from './plants';
 import { Designation, Filth, GROW_ZONE, TileKind, World, growZoneCrop } from './world';
 import { generateWorld } from './worldgen';
@@ -345,6 +347,10 @@ const FROST = -5;
 const standsOn = (type: JobType): boolean =>
   type === 'chop' || type === 'forage' || type === 'sow' || type === 'harvestCrop';
 
+// Chessboard distance between two tiles.
+const chebyshevTiles = (w: World, a: number, b: number): number =>
+  Math.max(Math.abs(w.xOf(a) - w.xOf(b)), Math.abs(w.yOf(a) - w.yOf(b)));
+
 const defaultSchedule = (): ScheduleSlot[] =>
   Array.from({ length: 24 }, (_, h) => (h >= NIGHT_START || h < NIGHT_END ? 'S' : 'A'));
 
@@ -475,6 +481,7 @@ const FIRE_INTERRUPTS = new Set<JobType>([
   'fish',
   'tame',
   'clean',
+  'warden',
   'wander',
 ]);
 
@@ -514,6 +521,8 @@ export class Simulation {
   public artworks = new Map<number, Artwork>();
   public story: StoryState = freshStory();
   public enemies: Enemy[] = [];
+  // Raiders lying wounded, and prisoners (see prisoners.ts).
+  public captives: Captive[] = [];
   public nextEnemyId = 0;
   public raid: RaidState | null = null;
   public animals: Animal[] = [];
@@ -709,6 +718,21 @@ export class Simulation {
     return best;
   }
 
+  // Someone joins the colony on a given tile (a prisoner won over, say).
+  public adopt(name: string, tile: number): Colonist {
+    const taken = new Set(this.colonists.map((o) => o.name));
+    let unique = name;
+    for (let n = 2; taken.has(unique); n++) {
+      unique = `${name} ${n}`;
+    }
+    const c = createColonist(this.colonists.length, unique, tile, this.rng);
+    for (const other of this.colonists) {
+      introduce(c, other, this.rng);
+    }
+    this.colonists.push(c);
+    return c;
+  }
+
   // A traveller joins at the map edge nearest the colony. Returns the new colonist, if any.
   public addWanderer(): Colonist | null {
     const anchor = this.living()[0];
@@ -844,6 +868,7 @@ export class Simulation {
       this.updateIce();
       updateWeather(this);
       updateBeacon(this);
+      updateCaptives(this);
       this.weatherFilth();
     }
 
@@ -993,6 +1018,26 @@ export class Simulation {
         }
         break;
       }
+      case 'capture': {
+        const { x0, y0, x1, y1 } = cmd.rect;
+        for (const p of this.captives) {
+          const x = w.xOf(p.tile);
+          const y = w.yOf(p.tile);
+          if (
+            p.state === 'downed' &&
+            x >= Math.min(x0, x1) &&
+            x <= Math.max(x0, x1) &&
+            y >= Math.min(y0, y1) &&
+            y <= Math.max(y0, y1)
+          ) {
+            p.capture = cmd.add;
+          }
+        }
+        break;
+      }
+      case 'release':
+        release(this, cmd.captive);
+        break;
       case 'hunt':
       case 'tame': {
         const { x0, y0, x1, y1 } = cmd.rect;
@@ -1221,6 +1266,14 @@ export class Simulation {
         return `Harvesting ${featureName(job.target)}`;
       case 'clean':
         return 'Cleaning';
+      case 'capture': {
+        const name = this.captives.find((p) => p.id === job.patient)?.name ?? 'a raider';
+        return job.stage === 1 ? `Carrying ${name} to a cell` : `Going to capture ${name}`;
+      }
+      case 'warden': {
+        const name = this.captives.find((p) => p.id === job.patient)?.name ?? 'a prisoner';
+        return job.stage === 0 ? `Fetching food for ${name}` : `Visiting the prisoner ${name}`;
+      }
       case 'haul':
         return `Hauling ${itemDef(job.item).name.toLowerCase()}`;
       case 'deliver':
@@ -1312,6 +1365,9 @@ export class Simulation {
     }
     if (job.type === 'craft' && job.stage === 1 && this.isAtWorkSpot(c, job.target, false)) {
       return { tile: job.target, ratio: Math.min(1, job.progress / RECIPES[job.line].work) };
+    }
+    if (job.type === 'warden' && job.stage === 2) {
+      return { tile: c.tile, ratio: Math.min(1, job.progress / TALK_TICKS) };
     }
     if (job.type === 'clean' && c.tile === job.target) {
       return { tile: job.target, ratio: Math.min(1, job.progress / CLEAN_WORK) };
@@ -2213,6 +2269,12 @@ export class Simulation {
       c.tile = next;
       c.path.shift();
       c.moveProgress = 0;
+      if (c.job?.type === 'capture' && c.job.stage === 1) {
+        const captive = this.captives.find((p) => p.id === c.job!.patient);
+        if (captive) {
+          captive.tile = next;
+        }
+      }
       if (c.job?.type === 'rescue' && c.job.stage === 1) {
         const patient = this.colonists[c.job.patient];
         if (patient?.health.downed) {
@@ -2384,6 +2446,8 @@ export class Simulation {
         return this.trySculpt(c) || this.tryDeliver(c, true);
       case 'hauling':
         return this.tryRefuel(c) || this.tryHaul(c) || this.tryChill(c, this.regionOf(c.tile));
+      case 'warden':
+        return this.tryCapture(c) || this.tryWarden(c);
       case 'cleaning':
         return this.tryClean(c);
     }
@@ -2407,6 +2471,12 @@ export class Simulation {
         break;
       case 'clean':
         this.stepClean(c, job);
+        break;
+      case 'capture':
+        this.stepCapture(c, job);
+        break;
+      case 'warden':
+        this.stepWarden(c, job);
         break;
       case 'haul':
         this.stepHaul(c, job);
@@ -5756,6 +5826,217 @@ export class Simulation {
     c.path = path;
   }
 
+  // ---- Prisoners ----
+
+  // A prisoner bed with nobody in it (or on the way to it), in the region, nearest the tile.
+  private freePrisonerBed(near: number, region: number, c: Colonist): number | undefined {
+    const w = this.world;
+    const held = new Set(this.captives.filter((p) => p.state === 'prisoner').map((p) => p.tile));
+    return this.nearestIn(
+      'features',
+      near,
+      (i) =>
+        w.feature[i] === PRISONER_BED &&
+        !held.has(i) &&
+        this.regions.region[i] === region &&
+        !this.isReserved(`b${i}`, c),
+      1,
+    )[0];
+  }
+
+  // A warden carries a downed raider marked for capture to a free prisoner bed, once the fighting's over.
+  private tryCapture(c: Colonist): boolean {
+    if (this.enemies.some((e) => e.hp > 0 && !e.fleeing)) {
+      return false;
+    }
+    const w = this.world;
+    const region = this.regionOf(c.tile);
+    const captive = this.captives
+      .filter(
+        (p) =>
+          p.state === 'downed' &&
+          p.capture &&
+          this.regions.region[p.tile] === region &&
+          !this.isReserved(`cp${p.id}`, c),
+      )
+      .sort((a, b) => w.distance(c.tile, a.tile) - w.distance(c.tile, b.tile))[0];
+    if (!captive) {
+      return false;
+    }
+    const bed = this.freePrisonerBed(captive.tile, region, c);
+    if (bed === undefined) {
+      return false;
+    }
+    const path = this.pathfinder.find(
+      c.tile,
+      [captive.tile, ...w.neighbors(captive.tile)].filter((i) => w.isPassable(i)),
+    );
+    if (!path) {
+      return false;
+    }
+    this.dropCarried(c);
+    this.reserve(c, `cp${captive.id}`);
+    this.reserve(c, `b${bed}`);
+    this.assign(c, this.makeJob('capture', bed, { patient: captive.id }), path);
+    return true;
+  }
+
+  private stepCapture(c: Colonist, job: Job): void {
+    const w = this.world;
+    const captive = this.captives.find((p) => p.id === job.patient);
+    if (!captive || captive.state !== 'downed') {
+      this.endJob(c);
+      return;
+    }
+    if (job.stage === 1) {
+      // Arrived (or stopped short): lay them in the bed if it's still there and free.
+      const taken = this.captives.some((p) => p.state === 'prisoner' && p.tile === job.target);
+      if (c.tile === job.target && w.feature[job.target] === PRISONER_BED && !taken) {
+        captive.state = 'prisoner';
+        captive.tile = job.target;
+        captive.since = this.tick;
+        captive.capture = false;
+        this.stats.captured = (this.stats.captured ?? 0) + 1;
+        this.addLog(`${c.name} took ${captive.name} prisoner.`, 'good', true);
+      } else {
+        captive.tile = c.tile;
+      }
+      this.endJob(c);
+      return;
+    }
+    const near = chebyshevTiles(w, c.tile, captive.tile) <= 1;
+    if (!near) {
+      const path = this.pathfinder.find(
+        c.tile,
+        [captive.tile, ...w.neighbors(captive.tile)].filter((i) => w.isPassable(i)),
+      );
+      if (!path || path.length === 0) {
+        this.endJob(c);
+      } else {
+        c.path = path;
+      }
+      return;
+    }
+    const path = w.feature[job.target] === PRISONER_BED ? this.pathfinder.find(c.tile, [job.target]) : null;
+    if (!path) {
+      this.endJob(c);
+      return;
+    }
+    captive.tile = c.tile;
+    job.stage = 1;
+    c.path = path;
+    // Already standing on the bed.
+    if (path.length === 0) {
+      this.stepCapture(c, job);
+    }
+  }
+
+  // A warden brings food to a hungry prisoner, or goes to talk with one who's due a visit.
+  private tryWarden(c: Colonist): boolean {
+    const w = this.world;
+    const region = this.regionOf(c.tile);
+    const held = this.captives.filter(
+      (p) => p.state === 'prisoner' && this.regions.region[p.tile] === region && !this.isReserved(`pr${p.id}`, c),
+    );
+    const hungry = held.find((p) => p.food < FEED_BELOW);
+    const prisoner = hungry ?? held.find((p) => visitDue(this, p));
+    if (!prisoner) {
+      return false;
+    }
+    let source: number | undefined;
+    if (prisoner.food < FEED_BELOW) {
+      source = this.nearestIn(
+        'items',
+        c.tile,
+        (i) =>
+          w.itemType[i] !== NONE &&
+          isFood(w.itemType[i]) &&
+          this.regions.region[i] === region &&
+          !this.isReserved(`i${i}`, c),
+        1,
+        (i) => (itemDef(w.itemType[i]).category === 'meal' ? 0 : 10),
+      )[0];
+      // Nothing to bring: a visit can still do some good.
+      if (source === undefined && !visitDue(this, prisoner)) {
+        return false;
+      }
+    }
+    const goals =
+      source !== undefined ? [source] : [prisoner.tile, ...w.neighbors(prisoner.tile)].filter((i) => w.isPassable(i));
+    const path = this.pathfinder.find(c.tile, goals);
+    if (!path) {
+      return false;
+    }
+    this.dropCarried(c);
+    this.reserve(c, `pr${prisoner.id}`);
+    if (source !== undefined) {
+      this.reserve(c, `i${source}`);
+    }
+    this.assign(
+      c,
+      this.makeJob('warden', prisoner.tile, {
+        patient: prisoner.id,
+        source: source ?? -1,
+        item: source !== undefined ? w.itemType[source] : NONE,
+        stage: source !== undefined ? 0 : 1,
+      }),
+      path,
+    );
+    return true;
+  }
+
+  private stepWarden(c: Colonist, job: Job): void {
+    const w = this.world;
+    const prisoner = this.captives.find((p) => p.id === job.patient);
+    if (!prisoner || prisoner.state !== 'prisoner') {
+      this.endJob(c);
+      return;
+    }
+    if (job.stage === 0) {
+      if (c.tile !== job.source || w.itemType[job.source] !== job.item || c.carrying) {
+        this.endJob(c);
+        return;
+      }
+      const def = itemDef(job.item);
+      const wanted = def.category === 'meal' ? 1 : Math.max(1, Math.ceil((1 - prisoner.food) / def.nutrition));
+      c.carrying = w.pickUp(job.source, wanted);
+      this.release(c, `i${job.source}`);
+      job.stage = 1;
+    }
+    if (job.stage === 1) {
+      if (chebyshevTiles(w, c.tile, prisoner.tile) > 1) {
+        const region = this.regionOf(c.tile);
+        const path = this.pathfinder.find(
+          c.tile,
+          [prisoner.tile, ...w.neighbors(prisoner.tile)].filter(
+            (i) => w.isPassable(i) && this.regions.region[i] === region,
+          ),
+        );
+        if (!path || path.length === 0) {
+          this.endJob(c);
+        } else {
+          c.path = path;
+        }
+        return;
+      }
+      job.stage = 2;
+      job.progress = 0;
+    }
+    if (++job.progress < TALK_TICKS) {
+      return;
+    }
+    const meal = c.carrying;
+    if (meal && isFood(meal.item)) {
+      prisoner.food = Math.min(1, prisoner.food + itemDef(meal.item).nutrition * meal.count);
+      c.carrying = null;
+      this.addLog(`${c.name} brought food to the prisoner ${prisoner.name}.`);
+    }
+    if (visitDue(this, prisoner)) {
+      talk(this, c, prisoner);
+    }
+    this.endJob(c);
+  }
+
   // Tends the most urgent patient (only those bleeding, if asked).
   private tryTend(c: Colonist, bleedingOnly = false): boolean {
     const w = this.world;
@@ -6299,6 +6580,12 @@ export const OBJECTIVES: ObjectiveDef[] = [
     phase: 5,
     check: (s) => s.living().length >= populationFor(s.world.width).maxColonists,
     progress: (s) => `${s.living().length}/${populationFor(s.world.width).maxColonists}`,
+  },
+  {
+    id: 'recruit',
+    label: 'Take a raider prisoner and win them over',
+    phase: 5,
+    check: (s) => (s.stats.recruited ?? 0) > 0,
   },
   {
     id: 'secondWinter',

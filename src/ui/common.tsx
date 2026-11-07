@@ -13,6 +13,7 @@ export const WORK_LABELS: Record<WorkTypeKey, string> = {
   plantCutting: 'Cut plants',
   hunting: 'Hunt',
   handling: 'Handle',
+  warden: 'Warden',
   crafting: 'Craft',
   art: 'Art',
   research: 'Research',

@@ -3,6 +3,7 @@ import { qualityFactor } from './apparel';
 import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
 import { FACTIONS, NONE, NORMAL_QUALITY, WeaponDef, featureDef, itemDef, itemId, weaponDef } from './defs';
 import { damage, painOf } from './health';
+import { fallWounded } from './prisoners';
 import { learn } from './skills';
 import { traitValue } from './social';
 import type { Simulation } from './simulation';
@@ -399,7 +400,13 @@ export function woundEnemy(sim: Simulation, e: Enemy, amount: number, by: string
   if (sim.raid) {
     sim.raid.killed++;
   }
-  sim.addLog(`${by} brought down ${e.name}.`, 'good');
+  const wounded = fallWounded(sim, e);
+  sim.addLog(
+    wounded
+      ? `${by} brought down ${e.name}, who lies wounded: mark them with Capture to take them prisoner.`
+      : `${by} brought down ${e.name}.`,
+    'good',
+  );
   const w = sim.world;
   const weapon = weaponDef(e.weapon);
   // Some of a fallen raider's gear survives the fight.

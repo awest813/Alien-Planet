@@ -104,6 +104,7 @@ const TOOL_COLORS: Record<string, number> = {
   zone: 0xffd65c,
   build: 0x7fd0ff,
   hunt: 0xff5c5c,
+  capture: 0xffa040,
   select: 0xffffff,
 };
 
@@ -114,6 +115,8 @@ export class ColonyScene extends Phaser.Scene {
   private layers: Layers;
   private pawns = new Map<number, PawnView>();
   private raiders = new Map<number, Phaser.GameObjects.Container>();
+  // Raiders lying wounded and prisoners, by id.
+  private captives = new Map<number, Phaser.GameObjects.Container>();
   private traders = new Map<number, Phaser.GameObjects.Container>();
   private beasts = new Map<number, Phaser.GameObjects.Container>();
   private itemLabels = new Map<number, Phaser.GameObjects.Text>();
@@ -194,6 +197,7 @@ export class ColonyScene extends Phaser.Scene {
     }
     this.syncPawns();
     this.syncRaiders();
+    this.syncCaptives();
     this.syncTraders();
     this.syncAnimals();
     this.drawOverlay();
@@ -386,6 +390,8 @@ export class ColonyScene extends Phaser.Scene {
     this.pawns.clear();
     this.raiders.forEach((raider) => raider.destroy());
     this.raiders.clear();
+    this.captives.forEach((captive) => captive.destroy());
+    this.captives.clear();
     this.traders.forEach((trader) => trader.destroy());
     this.traders.clear();
     this.beasts.forEach((beast) => beast.destroy());
@@ -804,6 +810,53 @@ export class ColonyScene extends Phaser.Scene {
     }
   }
 
+  // Raiders lying where they fell, and prisoners in their beds (in prison orange), both lying down.
+  private syncCaptives(): void {
+    const sim = controller.sim;
+    const world = sim.world;
+    const present = new Set(sim.captives.map((p) => p.id));
+    for (const [id, captive] of this.captives) {
+      if (!present.has(id)) {
+        captive.destroy();
+        this.captives.delete(id);
+      }
+    }
+    for (const p of sim.captives) {
+      let captive = this.captives.get(p.id);
+      if (!captive) {
+        const body = this.add.image(0, 0, 'pawn-body');
+        const head = this.add.image(0, 0, 'raider-head');
+        const label = this.add
+          .text(0, -7, p.name, {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '6px',
+            color: '#ffb070',
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5, 1)
+          .setResolution(4);
+        // Lying down: the figure turned on its side, the label kept upright.
+        const figure = this.add.container(0, 0, [body, head]).setAngle(-90);
+        captive = this.add.container(0, 0, [figure, label]).setDepth(Depth.PAWNS);
+        this.captives.set(p.id, captive);
+      }
+      const figure = captive.getAt(0) as Phaser.GameObjects.Container;
+      (figure.getAt(0) as Phaser.GameObjects.Image).setTint(
+        p.state === 'prisoner' ? 0xd0702c : p.faction === 0 ? 0x8a5a3c : 0x5a5a64,
+      );
+      // Being carried: drawn upright beside whoever carries them.
+      const carried = sim.colonists.some(
+        (c) => c.job?.type === 'capture' && c.job.stage === 1 && c.job.patient === p.id && c.tile === p.tile,
+      );
+      figure.setAngle(carried ? 0 : -90);
+      captive
+        .setPosition((world.xOf(p.tile) + 0.5) * TILE + (carried ? 4 : 0), (world.yOf(p.tile) + 0.5) * TILE)
+        .setAlpha(p.state === 'downed' ? 0.85 : 1);
+      (captive.getAt(1) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames);
+    }
+  }
+
   // ---- Overlay: progress bars, hover, selection, drag preview ----
 
   private drawOverlay(): void {
@@ -838,6 +891,18 @@ export class ColonyScene extends Phaser.Scene {
         g.lineStyle(1, shot.hit ? 0xffe08a : 0x9aa0a8, 0.8).lineBetween(fx, fy, tx, ty);
       } else if (shot.hit) {
         g.fillStyle(0xff5c5c, 0.9).fillCircle(tx, ty, 3);
+      }
+    }
+
+    // Downed raiders marked for capture.
+    for (const p of sim.captives) {
+      if (p.state === 'downed' && p.capture) {
+        g.lineStyle(1, 0xffa040, 0.9).strokeRect(
+          world.xOf(p.tile) * TILE + 1,
+          world.yOf(p.tile) * TILE + 1,
+          TILE - 2,
+          TILE - 2,
+        );
       }
     }
 
@@ -1045,12 +1110,16 @@ export class ColonyScene extends Phaser.Scene {
         controller.command({ type: 'cancel', rect });
         controller.command({ type: 'hunt', rect, add: false });
         controller.command({ type: 'tame', rect, add: false });
+        controller.command({ type: 'capture', rect, add: false });
         break;
       case 'hunt':
         controller.command({ type: 'hunt', rect, add: true });
         break;
       case 'tame':
         controller.command({ type: 'tame', rect, add: true });
+        break;
+      case 'capture':
+        controller.command({ type: 'capture', rect, add: true });
         break;
       case 'zone':
         controller.command({ type: 'zone', rect, zone: tool.zone });

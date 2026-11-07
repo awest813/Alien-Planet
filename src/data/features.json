@@ -100,6 +100,22 @@
     }
   },
   {
+    "key": "prisonerBed",
+    "name": "Prisoner bed",
+    "passable": true,
+    "moveCost": 1.5,
+    "beauty": 0,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 20
+        }
+      ],
+      "work": 150
+    }
+  },
+  {
     "key": "potatoPlant",
     "name": "Potato plant",
     "passable": true,

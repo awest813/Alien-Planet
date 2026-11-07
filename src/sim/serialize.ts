@@ -10,6 +10,7 @@ import {
   Animal,
   Bill,
   Carried,
+  Captive,
   Colonist,
   Stance,
   WornArmor,
@@ -133,6 +134,7 @@ export interface SaveData {
   story: StoryState;
   enemies: Enemy[];
   nextEnemyId: number;
+  captives?: Captive[];
   animals: Animal[];
   nextAnimalId: number;
   caravan: Caravan | null;
@@ -241,6 +243,7 @@ export function serialize(sim: Simulation): SaveData {
     story: structuredClone(sim.story),
     enemies: structuredClone(sim.enemies),
     nextEnemyId: sim.nextEnemyId,
+    captives: structuredClone(sim.captives),
     animals: structuredClone(sim.animals),
     caravan: structuredClone(sim.caravan),
     goodwill: { ...sim.goodwill },
@@ -326,6 +329,7 @@ export function deserialize(data: SaveData): Simulation {
   sim.story = { ...structuredClone(data.story), difficulty: data.story.difficulty ?? 'standard' };
   sim.enemies = structuredClone(data.enemies);
   sim.nextEnemyId = data.nextEnemyId;
+  sim.captives = structuredClone(data.captives ?? []);
   sim.animals = structuredClone(data.animals);
   sim.caravan = structuredClone(data.caravan);
   sim.goodwill = { ...data.goodwill };

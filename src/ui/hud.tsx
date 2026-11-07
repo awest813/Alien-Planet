@@ -28,6 +28,7 @@ export type Screen =
   | 'story'
   | 'help'
   | 'ship'
+  | 'prisoners'
   | null;
 
 const SPEEDS = [
@@ -118,6 +119,11 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
         <button onClick={() => onOpen('production')}>Production</button>
         <button onClick={() => onOpen('research')}>Research</button>
         <button onClick={() => onOpen('story')}>Story</button>
+        {state.captives.length > 0 && (
+          <button onClick={() => onOpen('prisoners')} title="Captured and wounded raiders">
+            Prisoners ({state.captives.filter((p) => p.state === 'prisoner').length})
+          </button>
+        )}
         {state.trade && (
           <button
             className={state.trade.open ? 'primary' : ''}

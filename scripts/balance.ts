@@ -142,6 +142,9 @@ interface Result {
   // Impressiveness of each enclosed room at the end, by role.
   rooms: { role: string; impressiveness: number }[];
   mess: number;
+  fellWounded: number;
+  captured: number;
+  recruited: number;
 }
 
 // Every enclosed room on the map, once each.
@@ -243,6 +246,8 @@ function play(seed: number): Result {
   let artPlaced = false;
   let lutePlaced = false;
   let gravesPlaced = false;
+  let prisonPlaced = false;
+  const fell = new Set<number>();
   let beaconPlaced = false;
   let shipsLanded = 0;
   let bannerPlaced = false;
@@ -386,6 +391,25 @@ function play(seed: number): Result {
       sim.apply({ type: 'shipChoice', board: false });
     }
     // Two graves on day 6, so the fallen can be laid to rest.
+    // A prisoner bed on day 8; every wounded raider is marked for capture once the fighting stops.
+    if (!prisonPlaced && sim.day >= 8) {
+      prisonPlaced = true;
+      const spot = findSite(sim, 1, 1, avoid);
+      if (spot) {
+        claim(avoid, sim, spot.x, spot.y, 1, 1);
+        sim.apply({ type: 'build', feature: featureId('prisonerBed'), tiles: [at(spot.x, spot.y)] });
+      }
+    }
+    for (const p of sim.captives) {
+      fell.add(p.id);
+    }
+    if (!passive && sim.captives.some((p) => p.state === 'downed' && !p.capture)) {
+      sim.apply({
+        type: 'capture',
+        rect: { x0: 0, y0: 0, x1: sim.world.width - 1, y1: sim.world.height - 1 },
+        add: true,
+      });
+    }
     if (!gravesPlaced && sim.day >= 6) {
       gravesPlaced = true;
       const plot = findSite(sim, 3, 1, avoid);
@@ -602,6 +626,9 @@ function play(seed: number): Result {
     colonistHours,
     joyLowHours,
     rooms: roomsAtEnd(sim),
+    fellWounded: fell.size,
+    captured: sim.stats.captured ?? 0,
+    recruited: sim.stats.recruited ?? 0,
     mess: [...sim.world.tilesWith('filth')].filter((i) => sim.isRoofed(i)).length,
   };
 }
@@ -760,6 +787,10 @@ console.log(
         `${role} ${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(0)} (${values.length})`,
     )
     .join(', ')}`,
+);
+console.log(
+  `  prisoners: ${sum((r) => r.fellWounded)} raiders fell wounded, ${sum((r) => r.captured)} taken prisoner, ` +
+    `${sum((r) => r.recruited)} won over`,
 );
 console.log(
   `  cleaning: ${((100 * cleaningHours) / Math.max(1, allHours)).toFixed(1)}% of colonist-hours, ` +

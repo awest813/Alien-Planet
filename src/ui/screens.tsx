@@ -329,6 +329,11 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
           </li>
           <li>Research better bows, armor, sandbags, embrasures and spike traps.</li>
           <li>Maddened animals sometimes come for the colony too: draft and fight them like raiders.</li>
+          <li>
+            Some raiders fall wounded rather than dying. Build a <b>prisoner bed</b> (Security), drag <b>Capture</b>{' '}
+            over them, and colonists with <b>Warden</b> work bring them in, feed them and talk them round until they
+            join. Left lying, they die within a day.
+          </li>
         </ul>
       </details>
       <details>
@@ -401,6 +406,75 @@ export function ResearchScreen({ state, onClose }: { state: UiState; onClose: ()
             </li>
           ))}
       </ul>
+    </Modal>
+  );
+}
+
+// Raiders lying wounded and the prisoners held, with how each is doing, and a way to let one go.
+export function PrisonersScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+  const held = state.captives.filter((p) => p.state === 'prisoner');
+  const lying = state.captives.filter((p) => p.state === 'downed');
+  return (
+    <Modal title="Prisoners" onClose={onClose}>
+      <p className="muted">
+        Colonists with <b>Warden</b> work bring captives to a prisoner bed, feed them, and talk with them twice a day or
+        so. Once their resistance is worn down, each talk may win them over to join the colony; a happy, kind warden
+        does best.
+      </p>
+      {held.length === 0 && lying.length === 0 && <p className="muted">Nobody is held.</p>}
+      {held.length > 0 && (
+        <table className="summary">
+          <tbody>
+            {held.map((p) => (
+              <tr key={p.id}>
+                <td>
+                  <b>{p.name}</b>
+                  <div className="muted small">{p.faction}</div>
+                </td>
+                <td>
+                  <Bar
+                    value={p.food}
+                    color={p.food < 0.25 ? '#ff6b6b' : '#8fd16b'}
+                    label={`Fed ${Math.round(p.food * 100)}%`}
+                  />
+                </td>
+                <td className="num">
+                  {p.talksLeft > 0
+                    ? `About ${p.talksLeft} talk${p.talksLeft > 1 ? 's' : ''} from ready`
+                    : 'Ready to be won over'}
+                </td>
+                <td>
+                  <ConfirmButton
+                    label="Release"
+                    confirm="Let them go?"
+                    onConfirm={() => controller.command({ type: 'release', captive: p.id })}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {lying.length > 0 && (
+        <>
+          <h3>Lying wounded</h3>
+          <table className="summary">
+            <tbody>
+              {lying.map((p) => (
+                <tr key={p.id}>
+                  <td>
+                    <b>{p.name}</b>
+                    <div className="muted small">{p.faction}</div>
+                  </td>
+                  <td className="num">
+                    {p.capture ? 'To be brought in' : 'Not marked for capture'} · dies in {p.hoursLeft}h
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
     </Modal>
   );
 }

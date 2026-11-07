@@ -14,7 +14,15 @@ import {
   TradeScreen,
 } from './menus';
 import { Minimap } from './minimap';
-import { HelpScreen, ProductionScreen, ResearchScreen, ScheduleScreen, StoryScreen, WorkScreen } from './screens';
+import {
+  HelpScreen,
+  PrisonersScreen,
+  ProductionScreen,
+  ResearchScreen,
+  ScheduleScreen,
+  StoryScreen,
+  WorkScreen,
+} from './screens';
 
 // Layout: top bar and colonist bar across the top, inspector on the left, alerts and goals on
 // the right, the architect menu along the bottom, and the map showing through the middle. Before
@@ -177,6 +185,7 @@ export function App() {
           {screen === 'production' && <ProductionScreen state={state} onClose={close} />}
           {screen === 'research' && <ResearchScreen state={state} onClose={close} />}
           {screen === 'story' && <StoryScreen state={state} onClose={close} />}
+          {screen === 'prisoners' && <PrisonersScreen state={state} onClose={close} />}
           {screen === 'trade' && <TradeScreen state={state} onClose={close} />}
         </>
       )}
