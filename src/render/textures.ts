@@ -72,6 +72,11 @@ export function createTextures(scene: Phaser.Scene): void {
       at(Frames.crop(f.id, stage / 3), (c) => drawCrop(c, f.key, stage));
     }
   });
+  for (let kind = 1; kind <= 3; kind++) {
+    for (let amount = 1; amount <= 3; amount++) {
+      at(Frames.filth(kind, amount), (c) => drawFilth(c, kind, amount));
+    }
+  }
   at(Frames.INDOOR, (c) => {
     c.fillStyle = 'rgba(30, 20, 10, 0.2)';
     c.fillRect(0, 0, TILE, TILE);
@@ -86,6 +91,40 @@ export function createTextures(scene: Phaser.Scene): void {
   }
 
   createPawnTextures(scene);
+}
+
+// Mess on the ground: smudges of dirt, splashes of blood, scattered rubble, more with each amount.
+function drawFilth(c: Ctx, kind: number, amount: number): void {
+  const seed = 900 + kind * 10 + amount;
+  const blob = (x: number, y: number, r: number) => {
+    c.beginPath();
+    c.ellipse(x, y, r, r * 0.75, 0, 0, Math.PI * 2);
+    c.fill();
+  };
+  const spots = amount * 3;
+  for (let k = 0; k < spots; k++) {
+    const x = 2 + hash2(k, 1, seed) * (TILE - 4);
+    const y = 2 + hash2(k, 2, seed) * (TILE - 4);
+    const r = 0.8 + hash2(k, 3, seed) * (kind === 3 ? 1.2 : 1.8);
+    if (kind === 1) {
+      // Dark enough to show on wood and earth alike.
+      c.fillStyle = k % 2 ? 'rgba(48, 36, 26, 0.6)' : 'rgba(70, 54, 38, 0.55)';
+      blob(x, y, r + 0.4);
+    } else if (kind === 2) {
+      c.fillStyle = k % 3 ? 'rgba(130, 16, 20, 0.75)' : 'rgba(170, 30, 30, 0.65)';
+      blob(x, y, r);
+    } else {
+      c.fillStyle = k % 2 ? '#8a8378' : '#6d675e';
+      c.fillRect(Math.round(x), Math.round(y), Math.ceil(r), Math.ceil(r));
+      c.fillStyle = 'rgba(30, 26, 22, 0.5)';
+      c.fillRect(Math.round(x), Math.round(y) + Math.ceil(r), Math.ceil(r), 1);
+    }
+  }
+  // Heavier blood pools in the middle.
+  if (kind === 2 && amount >= 2) {
+    c.fillStyle = 'rgba(120, 12, 16, 0.7)';
+    blob(8, 8, amount * 1.6);
+  }
 }
 
 function speckle(c: Ctx, seed: number, colors: string[], density: number): void {

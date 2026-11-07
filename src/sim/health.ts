@@ -5,6 +5,7 @@ import { WET_CHILL, isWet } from './weather';
 import { itemId, weaponDef } from './defs';
 import { FRIEND_OPINION, mutualOpinion, traitFactor, traitValue } from './social';
 import type { Simulation } from './simulation';
+import { Filth } from './world';
 import { Colonist, Health } from './types';
 
 interface DiseaseDef {
@@ -25,6 +26,8 @@ const FATAL_INJURIES = 1.6;
 const DOWNED_BLOOD_LOSS = 0.6;
 const BLOOD_REGEN_PER_HOUR = 0.06;
 const CLOT_PER_HOUR = 0.15;
+// How often an open wound drips blood on the ground, for each unit of blood lost.
+const DRIP = 30;
 // Below this a wound has stopped bleeding.
 const CLOTTED = 0.005;
 
@@ -105,6 +108,9 @@ export function damage(sim: Simulation, c: Colonist, amount: number, kind: Damag
   // Bruises and burns hurt but don't bleed.
   const bleeds = kind === 'arrow' || kind === 'cut';
   c.health.injuries.push({ label, severity, bleeding: bleeds ? severity * BLEED_RATE : 0, tended: 0 });
+  if (bleeds) {
+    sim.world.addFilth(c.tile, Filth.BLOOD);
+  }
   checkHealth(sim, c);
 }
 
@@ -146,6 +152,10 @@ export function updateHealth(sim: Simulation, c: Colonist, hours: number): void 
   }
   const bleeding = bleedingOf(c);
   h.bloodLoss = bleeding > 0 ? h.bloodLoss + bleeding * hours : Math.max(0, h.bloodLoss - BLOOD_REGEN_PER_HOUR * hours);
+  // An open wound leaves a trail.
+  if (bleeding > 0 && sim.rng.next() < Math.min(0.5, bleeding * hours * DRIP)) {
+    sim.world.addFilth(c.tile, Filth.BLOOD);
+  }
 
   // Untended wounds slowly clot: light wounds stop on their own, many wounds still kill.
   for (const injury of h.injuries) {

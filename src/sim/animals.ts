@@ -5,6 +5,7 @@ import { damage } from './health';
 import type { Season } from './seasons';
 import type { Simulation } from './simulation';
 import { Animal, Colonist } from './types';
+import { Filth } from './world';
 
 // Wild animals on the standard 64×64 map; bigger maps hold proportionally more.
 export const MAX_ANIMALS = 14;
@@ -518,6 +519,7 @@ export function hurtAnimal(sim: Simulation, a: Animal, amount: number, attacker:
   }
   const def = ANIMALS[a.kind];
   a.hp -= amount;
+  sim.world.addFilth(a.tile, Filth.BLOOD);
   if (a.hp <= 0) {
     sim.world.dropItemNear(a.tile, itemId('rawMeat'), def.meat);
     if (def.leather > 0) {

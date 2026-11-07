@@ -27,6 +27,7 @@ export type JobType =
   | 'tame'
   | 'extinguish'
   | 'shelter'
+  | 'clean'
   | 'wander';
 
 export interface Job {
@@ -99,6 +100,7 @@ export const WORK_TYPES = [
   'art',
   'research',
   'hauling',
+  'cleaning',
 ] as const;
 export type WorkTypeKey = (typeof WORK_TYPES)[number];
 

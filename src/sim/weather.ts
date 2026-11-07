@@ -3,7 +3,7 @@ import { NONE, featureDef, itemDef, itemId } from './defs';
 import { damage } from './health';
 import { Season } from './seasons';
 import type { Simulation } from './simulation';
-import { Designation } from './world';
+import { Designation, Filth } from './world';
 
 // Weather comes in spells of hours (droughts last days). It shifts the temperature, soaks
 // colonists caught outside, speeds or stunts crops, thickens into fog that spoils aim, and
@@ -208,6 +208,7 @@ function burnOut(sim: Simulation, tile: number): void {
     // Trees and crops burning is expected; losing a building is worth a mention, and it goes
     // back on the build list.
     if (!def.natural && !def.crop) {
+      w.addFilth(tile, Filth.RUBBLE, 2);
       sim.rebuild(tile, feature);
       sim.addLog(`Fire destroyed a ${def.name.toLowerCase()}. It's marked for rebuilding.`, 'warn');
     }

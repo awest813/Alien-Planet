@@ -1,7 +1,15 @@
 import { MAX_COST_LINES, NONE, NORMAL_QUALITY, featureDef, itemDef, terrainDef } from './defs';
 import type { Carried } from './types';
 
-export type TileKind = 'items' | 'features' | 'designations' | 'blueprints' | 'zones';
+export type TileKind = 'items' | 'features' | 'designations' | 'blueprints' | 'zones' | 'filth';
+
+// Mess left on the ground: tracked-in dirt, blood, and rubble from mining and demolition. A tile holds
+// one kind at a time, in amounts of 1 to 3.
+export const Filth = { DIRT: 1, BLOOD: 2, RUBBLE: 3 } as const;
+export type FilthKind = (typeof Filth)[keyof typeof Filth];
+const FILTH_MAX = 3;
+// Beauty lost to each level of each kind of mess (dirt, blood, rubble).
+const FILTH_BEAUTY = [0, 0.5, 1.5, 1];
 
 function toggle(set: Set<number>, i: number, present: boolean): void {
   if (present) {
@@ -68,6 +76,10 @@ export class World {
   public readonly itemCount: Uint16Array;
   // Work done towards the current harvest/construction on this tile.
   public readonly progress: Float32Array;
+  // Mess on the tile: kind × 4 + amount (0: clean). See Filth.
+  public readonly filth: Uint8Array;
+  // Bumped whenever the mess anywhere changes.
+  public filthVersion = 0;
 
   // Tiles whose visuals changed since the renderer last looked.
   public readonly dirty = new Set<number>();
@@ -79,6 +91,7 @@ export class World {
     designations: new Set(),
     blueprints: new Set(),
     zones: new Set(),
+    filth: new Set(),
   };
   // Bumped whenever passability or room boundaries may have changed.
   public structureVersion = 0;
@@ -107,6 +120,44 @@ export class World {
     this.itemType = new Uint8Array(this.size);
     this.itemCount = new Uint16Array(this.size);
     this.progress = new Float32Array(this.size);
+    this.filth = new Uint8Array(this.size);
+  }
+
+  public filthKind(i: number): number {
+    return this.filth[i] >> 2;
+  }
+
+  public filthAmount(i: number): number {
+    return this.filth[i] & 3;
+  }
+
+  // What the mess on a tile takes off its beauty (zero or less).
+  public filthBeauty(i: number): number {
+    return this.filth[i] === 0 ? 0 : -FILTH_BEAUTY[this.filthKind(i)] * this.filthAmount(i);
+  }
+
+  // Leaves mess on a tile (not in water, or where nothing can stand). More of the same kind piles up
+  // to the most there can be; a different kind covers a light mess and adds to a heavy one.
+  public addFilth(i: number, kind: FilthKind, amount = 1): void {
+    if (i < 0 || i >= this.size || !this.isPassable(i) || this.isOpenWater(i)) {
+      return;
+    }
+    const had = this.filthAmount(i);
+    const keep = had >= 2 && this.filthKind(i) !== kind ? this.filthKind(i) : kind;
+    const total = Math.min(FILTH_MAX, had + amount);
+    if (keep * 4 + total !== this.filth[i]) {
+      this.filth[i] = keep * 4 + total;
+      this.filthVersion++;
+      this.markDirty(i);
+    }
+  }
+
+  // Takes one level of mess off a tile (all of it with `all`).
+  public cleanFilth(i: number, all = false): void {
+    const left = all ? 0 : Math.max(0, this.filthAmount(i) - 1);
+    this.filth[i] = left > 0 ? this.filthKind(i) * 4 + left : 0;
+    this.filthVersion++;
+    this.markDirty(i);
   }
 
   public idx(x: number, y: number): number {
@@ -140,6 +191,7 @@ export class World {
         toggle(this.lists.designations, i, this.designation[i] !== 0);
         toggle(this.lists.blueprints, i, this.blueprint[i] !== NONE);
         toggle(this.lists.zones, i, this.zone[i] !== 0);
+        toggle(this.lists.filth, i, this.filth[i] !== 0);
       }
       this.stale.clear();
     }
@@ -226,6 +278,11 @@ export class World {
     this.featureVersion++;
     if (before !== this.isPassable(i) || roomBefore !== this.blocksRoom(i)) {
       this.structureVersion++;
+    }
+    // A wall or the like built over mess buries it.
+    if (this.filth[i] !== 0 && !this.isPassable(i)) {
+      this.filth[i] = 0;
+      this.filthVersion++;
     }
     this.markDirty(i);
   }

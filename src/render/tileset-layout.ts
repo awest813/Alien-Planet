@@ -16,6 +16,8 @@ const TERRAIN_FRAMES = TERRAIN_VARIANTS * TERRAIN_SEASONS;
 const DESIGNATION_FRAMES = 5;
 const OVERLAY_FRAMES = 3;
 const CROP_STAGES = 3;
+// Dirt, blood and rubble, each in three amounts.
+const FILTH_FRAMES = 9;
 
 const rowsFor = (frames: number) => Math.max(1, Math.ceil(frames / TILESET_COLUMNS));
 
@@ -38,6 +40,7 @@ const { starts, rows } = layout({
   items: ITEMS.length,
   overlays: OVERLAY_FRAMES,
   crops: CROPS.length * CROP_STAGES,
+  filth: FILTH_FRAMES,
 });
 
 export const TILESET_ROWS = rows;
@@ -59,4 +62,6 @@ export const Frames = {
     starts.crops +
     CROPS.findIndex((f) => f.id === feature) * CROP_STAGES +
     Math.min(CROP_STAGES - 1, Math.floor(growth * CROP_STAGES)),
+  // `kind` and `amount` from 1 to 3 (see Filth in the sim's world).
+  filth: (kind: number, amount: number) => starts.filth + (kind - 1) * 3 + amount - 1,
 };

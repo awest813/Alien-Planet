@@ -152,7 +152,7 @@ import {
 } from './gatherings';
 import { BeaconState, TRANSMIT_HOURS, chooseToStay, depart, freshBeacon, updateBeacon } from './beacon';
 import { spreadWildPlants, wildPlantCover } from './plants';
-import { Designation, GROW_ZONE, TileKind, World, growZoneCrop } from './world';
+import { Designation, Filth, GROW_ZONE, TileKind, World, growZoneCrop } from './world';
 import { generateWorld } from './worldgen';
 
 export { MAP_SIZE, MAP_SIZES, NIGHT_END, NIGHT_START, START_HOUR, TICKS_PER_HOUR, populationFor } from './constants';
@@ -182,6 +182,13 @@ const musicQuality = (c: Colonist) => 0.5 + c.skills.artistic / 20;
 // Below this after a meal, a colonist eats again straight away.
 const STILL_HUNGRY = 0.3;
 // Downed with nobody to help: below this much food they crawl to something to eat, this far at most.
+// How often a step in off bare ground leaves dirt on a floor (dry, and in the wet).
+const TRACK_DIRT = 0.04;
+// Work to scrub away one level of mess (about a seventh of an hour), and how far out from the
+// colony's middle anyone bothers cleaning outdoors.
+const CLEAN_WORK = 30;
+const CLEAN_RANGE = 12;
+const TRACK_DIRT_WET = 0.12;
 const CRAWL_HUNGRY = 0.15;
 // A downed patient this hungry is fed before wounds that aren't bleeding are tended.
 const STARVING_PATIENT = 0.1;
@@ -463,6 +470,7 @@ const FIRE_INTERRUPTS = new Set<JobType>([
   'research',
   'fish',
   'tame',
+  'clean',
   'wander',
 ]);
 
@@ -616,6 +624,8 @@ export class Simulation {
   // Tick after which a starving colonist may search for food again.
   private readonly nextFoodSearch = new Map<number, number>();
   private contentsVersion = '';
+  // The mess as of the last hour, for room beauty.
+  private filthSeen = 0;
   private wasNight = false;
 
   constructor(
@@ -832,6 +842,8 @@ export class Simulation {
       this.updateIce();
       updateWeather(this);
       updateBeacon(this);
+      this.weatherFilth();
+      this.filthSeen = this.world.filthVersion;
     }
 
     for (const c of this.colonists) {
@@ -1204,6 +1216,8 @@ export class Simulation {
       }
       case 'harvestCrop':
         return `Harvesting ${featureName(job.target)}`;
+      case 'clean':
+        return 'Cleaning';
       case 'haul':
         return `Hauling ${itemDef(job.item).name.toLowerCase()}`;
       case 'deliver':
@@ -1354,8 +1368,9 @@ export class Simulation {
 
   private contents(): ReturnType<typeof measureRooms> {
     this.ensureRegions();
-    // Flowers fade in winter, so the season is part of what the room's beauty depends on.
-    const key = `${this.world.featureVersion}:${this.season === 'Winter'}`;
+    // Flowers fade in winter, so the season is part of what the room's beauty depends on. Mess
+    // comes and goes all the time: it's taken into account once an hour.
+    const key = `${this.world.featureVersion}:${this.season === 'Winter'}:${this.filthSeen}`;
     if (this.contentsVersion !== key) {
       this.contentsVersion = key;
       this.roomContents = measureRooms(this.world, this.rooms, (i) => this.beautyAt(i));
@@ -2185,6 +2200,7 @@ export class Simulation {
     }
     c.moveProgress += this.moveRate(c);
     if (c.moveProgress >= 1) {
+      this.trackDirt(c.tile, next);
       c.tile = next;
       c.path.shift();
       c.moveProgress = 0;
@@ -2196,6 +2212,29 @@ export class Simulation {
       }
       if (this.world.isWading(next)) {
         this.addThought(c, 'soaked');
+      }
+    }
+  }
+
+  // Coming in off bare ground, feet carry dirt onto floors (more of it when the ground is wet).
+  private trackDirt(from: number, to: number): void {
+    const w = this.world;
+    if (w.floor[to] === NONE || w.floor[from] !== NONE || w.isOpenWater(from)) {
+      return;
+    }
+    const chance = weatherDef(this).wet ? TRACK_DIRT_WET : TRACK_DIRT;
+    if (hash2(to, this.tick, this.seed) < chance) {
+      w.addFilth(to, Filth.DIRT);
+    }
+  }
+
+  // Out in the open, weather wears mess away in a day or two (rain much faster).
+  private weatherFilth(): void {
+    const w = this.world;
+    const chance = weatherDef(this).wet ? 0.3 : 1 / 24;
+    for (const i of [...w.tilesWith('filth')]) {
+      if (!this.isRoofed(i) && hash2(i, this.tick, this.seed + 7) < chance) {
+        w.cleanFilth(i);
       }
     }
   }
@@ -2336,6 +2375,8 @@ export class Simulation {
         return this.trySculpt(c) || this.tryDeliver(c, true);
       case 'hauling':
         return this.tryRefuel(c) || this.tryHaul(c) || this.tryChill(c, this.regionOf(c.tile));
+      case 'cleaning':
+        return this.tryClean(c);
     }
   }
 
@@ -2354,6 +2395,9 @@ export class Simulation {
         break;
       case 'deliver':
         this.stepDeliver(c, job);
+        break;
+      case 'clean':
+        this.stepClean(c, job);
         break;
       case 'haul':
         this.stepHaul(c, job);
@@ -2597,6 +2641,58 @@ export class Simulation {
   }
 
   // Artists carve sculptures in place once the materials are there.
+  // Mess worth cleaning: indoors, or out around the colony's buildings, on ground someone can reach.
+  private tryClean(c: Colonist): boolean {
+    const w = this.world;
+    const region = this.regionOf(c.tile);
+    const home = this.homeTile();
+    const [tile] = this.nearestIn(
+      'filth',
+      c.tile,
+      (i) =>
+        this.regions.region[i] === region &&
+        w.fire[i] === 0 &&
+        (this.isRoofed(i) || w.floor[i] !== NONE || (home !== undefined && w.distance(home, i) <= CLEAN_RANGE)) &&
+        !this.isReserved(`c${i}`, c),
+      1,
+    );
+    const path = tile !== undefined ? this.pathfinder.find(c.tile, [tile]) : null;
+    if (tile === undefined || !path) {
+      return false;
+    }
+    this.reserve(c, `c${tile}`);
+    this.assign(c, this.makeJob('clean', tile), path);
+    return true;
+  }
+
+  // Scrubbing at a tile, a layer of mess at a time, until it's clean.
+  private stepClean(c: Colonist, job: Job): void {
+    const w = this.world;
+    const t = job.target;
+    if (w.filthAmount(t) === 0) {
+      this.endJob(c);
+      return;
+    }
+    if (c.tile !== t) {
+      const path = this.pathfinder.find(c.tile, [t]);
+      if (path && path.length > 0) {
+        c.path = path;
+      } else {
+        this.endJob(c);
+      }
+      return;
+    }
+    const mood = c.mood < 25 ? 0.85 : c.mood > 70 ? 1.1 : 1;
+    job.progress += traitFactor(c, 'workSpeed') * healthFactor(c) * mood;
+    if (job.progress >= CLEAN_WORK) {
+      job.progress = 0;
+      w.cleanFilth(t);
+      if (w.filthAmount(t) === 0) {
+        this.endJob(c);
+      }
+    }
+  }
+
   private trySculpt(c: Colonist): boolean {
     const region = this.regionOf(c.tile);
     const targets = this.nearestIn(
@@ -2681,7 +2777,7 @@ export class Simulation {
         if (indoors && this.rooms.room[i] !== room && !w.blocksRoom(i)) {
           continue;
         }
-        total += this.beautyAt(i) + (w.floor[i] !== NONE ? featureDef(w.floor[i]).beauty : 0);
+        total += this.beautyAt(i) + (w.floor[i] !== NONE ? featureDef(w.floor[i]).beauty : 0) + w.filthBeauty(i);
       }
     }
     return total;
@@ -2933,6 +3029,9 @@ export class Simulation {
         w.designation[t] = Designation.NONE;
         w.dropItemNear(t, harvest.item, harvest.count);
         this.produce(harvest.item, harvest.count);
+        if (job.type === 'mine') {
+          w.addFilth(t, Filth.RUBBLE);
+        }
         c.workStreak++;
         break;
       }
@@ -2975,6 +3074,9 @@ export class Simulation {
         this.rescueStranded();
         for (const cost of build.cost) {
           w.dropItemNear(t, cost.item, refund(cost.count));
+        }
+        if (!def.layer) {
+          w.addFilth(t, Filth.RUBBLE);
         }
         break;
       }

@@ -17,6 +17,7 @@ export const WORK_LABELS: Record<WorkTypeKey, string> = {
   art: 'Art',
   research: 'Research',
   hauling: 'Haul',
+  cleaning: 'Clean',
 };
 
 export const SLOT_LABELS: Record<ScheduleSlot, string> = { A: 'Anything', W: 'Work', J: 'Recreation', S: 'Sleep' };

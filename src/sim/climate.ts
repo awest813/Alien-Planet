@@ -62,6 +62,9 @@ export function measureRooms(
     if (room >= 0 && world.floor[i] !== NONE) {
       contents[room].beauty += featureDef(world.floor[i]).beauty;
     }
+    if (room >= 0 && world.filth[i] !== 0) {
+      contents[room].beauty += world.filthBeauty(i);
+    }
     const f = world.feature[i];
     if (room < 0 || f === NONE) {
       continue;

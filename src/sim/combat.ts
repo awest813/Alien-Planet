@@ -8,7 +8,7 @@ import { traitValue } from './social';
 import type { Simulation } from './simulation';
 import { Animal, Colonist, Enemy } from './types';
 import { weatherDef } from './weather';
-import { World } from './world';
+import { Filth, World } from './world';
 
 // Combat. Colonists and raiders share one weapon table (melee: fists, knives, clubs, spears;
 // ranged: bows and crossbows), each with its own range, rate, accuracy, drop-off and armor
@@ -313,6 +313,7 @@ function breach(sim: Simulation, e: Enemy): boolean {
       if (w.damage[wall] >= def.build!.work) {
         const feature = w.feature[wall];
         w.setFeature(wall, NONE);
+        w.addFilth(wall, Filth.RUBBLE, 2);
         sim.rebuild(wall, feature);
         sim.addLog(`Raiders broke through a ${def.name.toLowerCase()}!`, 'danger');
       }
@@ -390,6 +391,7 @@ export function woundEnemy(sim: Simulation, e: Enemy, amount: number, by: string
     return;
   }
   e.hp -= amount;
+  sim.world.addFilth(e.tile, Filth.BLOOD);
   if (e.hp > 0) {
     return;
   }

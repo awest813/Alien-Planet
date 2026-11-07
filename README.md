@@ -101,7 +101,11 @@ How the living simulation works:
   Flower pots (faded in winter) and banners need no artist. Colonists feel beauty within a couple of tiles
   ("Pleasant" or "Beautiful surroundings"), a bare room drags a little, sculptures are art recreation, and a room
   that's mostly art is a gallery. Visiting traders buy sculptures where they stand (memorials excepted): the finer
-  the piece and the better they think of the colony, the more silver it fetches.
+  the piece and the better they think of the colony, the more silver it fetches. You can tell a piece's quality
+  at a glance: poor work is cracked, excellent work trimmed in silver, a masterwork in gold.
+- **Cleaning:** wounds leave blood, mining and demolition leave rubble, and feet track dirt onto floors. Mess
+  makes a room and its surroundings uglier until someone with Cleaning work scrubs it away; outdoors, the
+  weather wears it off in time.
 - **Rooms and temperature:** enclosed rooms get a role (bedroom, barracks, kitchen, …) and an impressiveness
   score from furniture beauty and size. Outdoor temperature follows a day/night cycle; rooms drift towards it
   and campfires heat them.
@@ -302,7 +306,8 @@ before chopping when builders wait on stone, grazers returning to a hunted-out v
 `src/sim/recreation.test.ts` covers tolerance, games, stargazing and nature walks, `src/sim/art.test.ts` covers
 sculpting, quality, titles, beauty, galleries and surroundings, `src/sim/music.test.ts` covers instruments,
 earshot and concerts, `src/game/music.test.ts` covers the tunes,
-`src/sim/gatherings.test.ts` covers funerals and graves, weddings, festivals and feasts, parties and memorials, and
+`src/sim/gatherings.test.ts` covers funerals and graves, weddings, festivals and feasts, parties and memorials,
+`src/sim/cleaning.test.ts` covers mess, where it comes from, its cost to beauty and cleaning it, and
 `src/render/tileset-layout.test.ts` checks the art layout.
 
 `scripts/balance.ts` is a headless balance harness. An autoplayer builds a sensible colony on several seeds,

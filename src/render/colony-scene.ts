@@ -3,6 +3,7 @@ import { TOOLS, Tool, controller } from '../game/controller';
 import { NONE, featureDef, terrainId } from '../sim/defs';
 import { hash2 } from '../sim/rng';
 import { beaconTile, transmitting } from '../sim/beacon';
+import { EXCELLENT, MASTERWORK } from '../sim/art';
 import { NIGHT_END, NIGHT_START } from '../sim/simulation';
 import { Animal, Colonist, Enemy } from '../sim/types';
 import { Designation, GROW_ZONE, World } from '../sim/world';
@@ -22,6 +23,7 @@ interface Layers {
   terrain: Phaser.Tilemaps.TilemapLayer;
   floor: Phaser.Tilemaps.TilemapLayer;
   floorPlan: Phaser.Tilemaps.TilemapLayer;
+  filth: Phaser.Tilemaps.TilemapLayer;
   zone: Phaser.Tilemaps.TilemapLayer;
   indoor: Phaser.Tilemaps.TilemapLayer;
   feature: Phaser.Tilemaps.TilemapLayer;
@@ -87,6 +89,8 @@ const terrainVariant = (x: number, y: number) => {
   const r = hash2(x, y, 17);
   return r < 0.5 ? 0 : r < 0.75 ? 1 : r < 0.9 ? 2 : 3;
 };
+// Sculptures below this quality are poor work.
+const POOR_ART = 4;
 const SEASON_INDEX: Record<string, number> = { Spring: 0, Summer: 1, Autumn: 2, Winter: 3 };
 
 const Depth = { WATER: 0.5, OVERLAY: 20, NIGHT: 30, PAWNS: 40, LABELS: 41, PREVIEW: 50 };
@@ -117,6 +121,8 @@ export class ColonyScene extends Phaser.Scene {
   private preview: Phaser.GameObjects.Graphics;
   private night: Phaser.GameObjects.Rectangle;
   private beaconFx!: Phaser.GameObjects.Graphics;
+  // Marks of quality drawn over sculptures.
+  private artFx!: Phaser.GameObjects.Graphics;
   private ship: Phaser.GameObjects.Image | undefined;
   // The season the ground is drawn for (0 spring … 3 winter); a change repaints it.
   private terrainSeason = 1;
@@ -162,6 +168,8 @@ export class ColonyScene extends Phaser.Scene {
     // Flames show through the night shading; weather sits over everything on the map.
     this.fireFx = this.add.graphics().setDepth(Depth.NIGHT + 1);
     this.beaconFx = this.add.graphics().setDepth(Depth.NIGHT + 1);
+    // With the buildings, so night shades it like the sculpture under it.
+    this.artFx = this.add.graphics().setDepth(3.5);
     this.weatherFx = this.add.graphics().setDepth(Depth.NIGHT + 3);
     // Above the tiles and night shading, below colonists.
     this.heatmap = this.add.graphics().setDepth(Depth.NIGHT + 2);
@@ -192,6 +200,7 @@ export class ColonyScene extends Phaser.Scene {
     this.updateCamera(delta);
     this.updateNight();
     this.syncBeacon();
+    this.drawArt();
     this.drawHeatmap();
     this.drawWater();
     this.drawFires();
@@ -390,6 +399,7 @@ export class ColonyScene extends Phaser.Scene {
       floor: layer('floor', 0.6),
       // Planned floors show under furniture rather than over it.
       floorPlan: layer('floorPlan', 0.7).setAlpha(0.55),
+      filth: layer('filth', 0.8),
       zone: layer('zone', 1),
       indoor: layer('indoor', 2),
       feature: layer('feature', 3),
@@ -449,6 +459,48 @@ export class ColonyScene extends Phaser.Scene {
     }
   }
 
+  // Each sculpture shows how well it was made: poor work is cracked, excellent work gleams silver,
+  // and a masterwork stands on a gold-trimmed plinth that catches the light.
+  private drawArt(): void {
+    const g = this.artFx;
+    g.clear();
+    const sim = controller.sim;
+    const world = sim.world;
+    const view = this.visibleTiles();
+    const time = this.time.now;
+    for (const [i, art] of sim.artworks) {
+      const x0 = world.xOf(i);
+      const y0 = world.yOf(i);
+      if (x0 < view.x0 || x0 > view.x1 || y0 < view.y0 || y0 > view.y1 || !sim.artworkAt(i)) {
+        continue;
+      }
+      const x = x0 * TILE;
+      const y = y0 * TILE;
+      if (art.quality < POOR_ART) {
+        g.lineStyle(1, 0x2a221c, 0.8);
+        g.lineBetween(x + 6, y + 4, x + 8, y + 7).lineBetween(x + 8, y + 7, x + 7, y + 10);
+        g.lineBetween(x + 10, y + 11, x + 12, y + 13);
+      } else if (art.quality >= MASTERWORK) {
+        g.fillStyle(0xe8b93a, 1).fillRect(x + 3, y + 13, 10, 1);
+        g.fillStyle(0xfff1a8, 1).fillRect(x + 4, y + 13, 2, 1);
+        // A slow twinkle, off-beat from its neighbours.
+        const twinkle = 0.5 + 0.5 * Math.sin(time / 380 + i * 1.7);
+        const sx = x + 3 + Math.floor(hash2(i, 1, 41) * 10);
+        const sy = y + 2 + Math.floor(hash2(i, 2, 41) * 6);
+        g.fillStyle(0xfff6c8, twinkle).fillRect(sx, sy, 1, 1);
+        g.fillStyle(0xfff6c8, twinkle * 0.6)
+          .fillRect(sx - 1, sy, 1, 1)
+          .fillRect(sx + 1, sy, 1, 1)
+          .fillRect(sx, sy - 1, 1, 1)
+          .fillRect(sx, sy + 1, 1, 1);
+      } else if (art.quality >= EXCELLENT) {
+        g.fillStyle(0xd8e4ee, 0.9).fillRect(x + 3, y + 13, 10, 1);
+        const gleam = 0.35 + 0.35 * Math.sin(time / 600 + i);
+        g.fillStyle(0xffffff, gleam).fillRect(x + 7, y + 3, 1, 3);
+      }
+    }
+  }
+
   // The ground changes with the seasons: green in spring and summer, golden in autumn, frosted in winter.
   private syncSeason(world: World): void {
     const season = SEASON_INDEX[controller.sim.season] ?? 1;
@@ -470,6 +522,7 @@ export class ColonyScene extends Phaser.Scene {
     this.put(L.terrain, x, y, Frames.terrain(world.terrain[i], terrainVariant(x, y), this.terrainSeason));
     this.put(L.floor, x, y, world.floor[i] !== NONE ? Frames.feature(world.floor[i]) : -1);
     this.put(L.roof, x, y, world.roof[i] !== NONE ? Frames.feature(world.roof[i]) : -1);
+    this.put(L.filth, x, y, world.filth[i] !== 0 ? Frames.filth(world.filthKind(i), world.filthAmount(i)) : -1);
     const zone = world.zone[i];
     this.put(L.zone, x, y, zone === 0 ? -1 : zone >= GROW_ZONE ? Frames.GROW_ZONE : Frames.ZONE);
     const f = world.feature[i];

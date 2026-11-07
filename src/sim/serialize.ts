@@ -101,6 +101,7 @@ export interface SaveData {
     itemType: Uint8Array;
     itemCount: Uint16Array;
     progress: Float32Array;
+    filth?: Uint8Array;
     growth: Float32Array;
     fresh: Float32Array;
     quality: Float32Array;
@@ -167,6 +168,7 @@ export function serialize(sim: Simulation): SaveData {
       itemType: w.itemType.slice(),
       itemCount: w.itemCount.slice(),
       progress: w.progress.slice(),
+      filth: w.filth.slice(),
       growth: w.growth.slice(),
       fresh: w.fresh.slice(),
       quality: w.quality.slice(),
@@ -271,6 +273,9 @@ export function deserialize(data: SaveData): Simulation {
   world.itemType.set(layers.itemType);
   world.itemCount.set(layers.itemCount);
   world.progress.set(layers.progress);
+  if (layers.filth) {
+    world.filth.set(layers.filth);
+  }
   world.growth.set(layers.growth);
   world.fresh.set(layers.fresh);
   world.quality.set(layers.quality);

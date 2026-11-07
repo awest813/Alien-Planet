@@ -1826,6 +1826,11 @@ export class GameController {
     const art = sim.artworkAt(i);
     const feature = f !== NONE ? (art ? `“${art.title}”` : featureDef(f).name) : null;
     const details: string[] = [];
+    if (w.filth[i] !== 0) {
+      const mess = ['', 'Dirt', 'Blood', 'Rubble'][w.filthKind(i)];
+      const amount = ['', 'a little', 'some', 'a lot'][w.filthAmount(i)];
+      details.push(`${mess} on the ground (${amount})`);
+    }
     const def = f !== NONE ? featureDef(f) : undefined;
     if (art && def) {
       details.push(`${qualityLabel(art.quality)} ${def.name.toLowerCase()} by ${art.artist}, day ${art.day}`);

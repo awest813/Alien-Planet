@@ -15,6 +15,7 @@ describe('tileset layout', () => {
       Frames.INDOOR,
       Frames.GROW_ZONE,
       ...FEATURES.filter((f) => f.crop).flatMap((f) => [0, 0.4, 0.9].map((g) => Frames.crop(f.id, g))),
+      ...[1, 2, 3].flatMap((kind) => [1, 2, 3].map((amount) => Frames.filth(kind, amount))),
     ];
     expect(new Set(frames).size).toBe(frames.length);
     expect(Math.min(...frames)).toBeGreaterThanOrEqual(0);

@@ -141,6 +141,7 @@ interface Result {
   joyLowHours: number;
   // Impressiveness of each enclosed room at the end, by role.
   rooms: { role: string; impressiveness: number }[];
+  mess: number;
 }
 
 // Every enclosed room on the map, once each.
@@ -515,6 +516,9 @@ function play(seed: number): Result {
               : 'walk';
         joyTime[doing] = (joyTime[doing] ?? 0) + 1;
       }
+      if (c.job?.type === 'clean') {
+        cleaningHours++;
+      }
       for (const t of sim.thoughtsOf(c)) {
         moodBy[t.label] = (moodBy[t.label] ?? 0) + t.mood;
       }
@@ -598,6 +602,7 @@ function play(seed: number): Result {
     colonistHours,
     joyLowHours,
     rooms: roomsAtEnd(sim),
+    mess: [...sim.world.tilesWith('filth')].filter((i) => sim.isRoofed(i)).length,
   };
 }
 
@@ -680,6 +685,9 @@ Simulation.prototype.addLog = function (this: Simulation, text, tone, story) {
 const starvingDoing: Record<string, number> = {};
 // Colonist-hours spent on each kind of recreation (a building, or a walk).
 const joyTime: Record<string, number> = {};
+// Colonist-hours spent cleaning, and mess left indoors at the end of each run.
+let cleaningHours = 0;
+let messIndoors = 0;
 const results: Result[] = [];
 const started = performance.now();
 // "seed=47514" replays just that colony.
@@ -690,6 +698,7 @@ const seedList = onlySeed ? [onlySeed] : Array.from({ length: seeds }, (_, s) =>
 for (const seed of seedList) {
   const r = play(seed);
   results.push(r);
+  messIndoors += r.mess;
   console.log(
     `seed ${String(r.seed).padStart(6)}  alive ${r.living}/${r.total}  raids ${r.raids} (kills ${r.raidKills})  ` +
       `fever ${r.diseaseCases} (deaths ${r.diseaseDeaths})  breaks ${r.breaks}  mood avg ${r.avgMood.toFixed(0)} min ${r.minMood.toFixed(0)}  ` +
@@ -751,6 +760,10 @@ console.log(
         `${role} ${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(0)} (${values.length})`,
     )
     .join(', ')}`,
+);
+console.log(
+  `  cleaning: ${((100 * cleaningHours) / Math.max(1, allHours)).toFixed(1)}% of colonist-hours, ` +
+    `${(messIndoors / results.length).toFixed(1)} messy tiles under a roof at the end (average)`,
 );
 if (Object.keys(starvingDoing).length > 0) {
   const sorted = Object.entries(starvingDoing).sort((a, b) => b[1] - a[1]);
