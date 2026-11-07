@@ -105,4 +105,22 @@ describe('alerts', () => {
     expect(texts().some((t) => /getting dangerously cold: add a campfire/.test(t))).toBe(true);
     sim.temperatureAt = real;
   });
+
+  it('leave children out of "nothing to do", and drop an obsession alert once the artist is gone', () => {
+    const { sim, w, x, y } = colony('7');
+    const kid = sim.colonists[0];
+    kid.age = 7;
+    kid.schedule.fill('W');
+    const idleSince = (controller as unknown as { idleSince: Map<number, number> }).idleSince;
+    idleSince.set(kid.id, sim.tick - HOUR * 3);
+    expect(texts().some((t) => t.startsWith('Nothing to do') && t.includes(kid.name))).toBe(false);
+    // An obsession whose artist has died: no alert, even before the hourly update notices.
+    const artist = sim.colonists[1];
+    const tile = w.idx(x + 4, y + 4);
+    w.blueprint[tile] = featureId('legendarySculpture');
+    sim.obsession = { colonist: artist.id, tile, started: sim.tick, deadline: sim.tick + HOUR * 48 };
+    expect(texts().some((t) => t.includes('obsessed'))).toBe(true);
+    artist.health.dead = true;
+    expect(texts().some((t) => t.includes('obsessed'))).toBe(false);
+  });
 });

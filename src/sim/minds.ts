@@ -73,6 +73,9 @@ export function smashable(sim: Simulation, i: number): boolean {
     !def.door &&
     !def.art &&
     !def.layer &&
+    !def.bridge &&
+    !def.trap &&
+    def.cover >= 1 &&
     def.key !== 'grave' &&
     def.key !== 'signalBeacon' &&
     def.key !== 'prisonerBed'
@@ -203,7 +206,8 @@ export function updateObsession(sim: Simulation): void {
     sim.obsession = null;
     sim.dropLegend(o.tile);
     sim.addThought(c, 'obsessionFailed');
-    sim.startBreak(c, 'tantrum', 8);
+    // A long break, in their own way (a kind soul doesn't rage).
+    sim.startBreak(c, chooseBreak(sim, c), 8);
     sim.addLog(`${c.name}'s vision came to nothing, and they've snapped.`, 'danger', true);
   }
 }

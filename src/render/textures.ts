@@ -485,6 +485,7 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillRect(3, 12, 10, 1);
       break;
     case 'potatoPlant':
+    case 'grainPlant':
     case 'cottonPlant':
     case 'healrootPlant':
       drawCrop(c, key, 2);

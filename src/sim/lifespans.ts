@@ -4,7 +4,8 @@ import { DAYS_PER_YEAR } from './seasons';
 import { learn } from './skills';
 import type { Rng } from './rng';
 import type { Simulation } from './simulation';
-import { Colonist, Infant, SKILL_KEYS, SkillKey, WorkTypeKey } from './types';
+import { TRAITS } from './defs';
+import { Colonist, Infant, SKILL_KEYS, SkillKey, WORK_TYPES, WorkTypeKey } from './types';
 
 // Lifespans and families. Colonists have ages and backstories; married couples have children, who
 // are carried as babies, then grow up through childhood (playing, and learning by watching the adults
@@ -118,8 +119,14 @@ export function updateLifespans(sim: Simulation): void {
 function birthday(sim: Simulation, c: Colonist): void {
   const age = Math.floor(c.age);
   if (age === TEEN) {
+    for (const work of TEEN_WORK) {
+      c.priorities[work] ||= 3;
+    }
     sim.addLog(`${c.name} is ${TEEN} now: old enough to lend a hand with light work.`, 'good');
   } else if (age === ADULT) {
+    for (const work of WORK_TYPES) {
+      c.priorities[work] ||= 3;
+    }
     sim.addThought(c, 'grewUp');
     sim.addLog(`${c.name} has come of age, and takes on a full share of the work.`, 'good', true);
   } else if (age === ELDER) {
@@ -134,7 +141,8 @@ function birthday(sim: Simulation, c: Colonist): void {
 function conceive(sim: Simulation): void {
   const living = sim.living();
   const room = populationFor(sim.world.width).maxColonists + FAMILY_ROOM;
-  if (living.length + sim.infants.length >= room) {
+  const expecting = living.filter((c) => c.expectingUntil !== undefined).length;
+  if (living.length + sim.infants.length + expecting >= room) {
     return;
   }
   for (const a of living) {
@@ -187,9 +195,14 @@ function growInfants(sim: Simulation): void {
     if (!carer || carer.health.dead) {
       const next =
         infant.parents.map((p) => sim.colonists[p]).find((p) => p && !p.health.dead) ??
-        sim.living().find((c) => isAdult(c));
+        sim.living().find((c) => isAdult(c)) ??
+        sim
+          .living()
+          .filter((c) => c.age >= TEEN)
+          .sort((a, b) => b.age - a.age)[0];
       if (!next) {
         sim.infants = sim.infants.filter((i) => i !== infant);
+        sim.addLog(`Baby ${infant.name} was left with nobody to care for them, and did not survive.`, 'danger', true);
         continue;
       }
       infant.carer = next.id;
@@ -214,7 +227,18 @@ function toddle(sim: Simulation, infant: Infant): Colonist {
   // Traits, and what they love doing, from their parents.
   const parents = infant.parents.map((p) => sim.colonists[p]).filter(Boolean);
   const inherited = parents.flatMap((p) => p.traits).filter(() => sim.rng.chance(0.5));
-  c.traits = [...new Set([...inherited, ...c.traits])].slice(0, 2);
+  const traits: string[] = [];
+  for (const t of [...inherited, ...c.traits]) {
+    const clash = traits.some((o) => o === t || TRAITS[o].excludes === t || TRAITS[t].excludes === o);
+    if (!clash && traits.length < 2) {
+      traits.push(t);
+    }
+  }
+  c.traits = traits;
+  // Too young for any work yet: priorities come on as they grow (see birthday).
+  for (const work of WORK_TYPES) {
+    c.priorities[work] = 0;
+  }
   for (const p of parents) {
     for (const key of SKILL_KEYS) {
       if (p.passions[key] > 0 && sim.rng.chance(0.4)) {

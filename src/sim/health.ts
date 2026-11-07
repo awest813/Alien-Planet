@@ -257,6 +257,7 @@ export function die(sim: Simulation, c: Colonist, cause: string): void {
   }
   c.health.dead = true;
   c.health.downed = false;
+  c.expectingUntil = undefined;
   c.drafted = false;
   // Waiting to be buried (a grave and a funeral), and remembered by name.
   sim.unburied.push({ id: c.id, name: c.name, day: sim.day, cause });

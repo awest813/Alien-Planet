@@ -557,6 +557,37 @@ can ship on its own.
     they're rarer, need less, allow more time, and come only to a content artist.
   - Not done from the plan: hiding sprees, walking off for a day, and a fighting rage.
 
+**Audit of phases E to H.** Three independent reviews and a 30-day, 100-player playtest with new checks
+(babies always have a carer, ages make sense, only doors lock, storage within capacity, racks hold only what
+dries, fuel within its tank, an obsession always has its blueprint). Fixed:
+
+- Hauled or dropped items merged into a forbidden stack and became forbidden too: forbidden stacks now take
+  nothing more.
+- Drying progress belonged to the rack tile, so a new stack could finish in an hour; it now goes with the
+  stack, and fresh food added to a drying stack dilutes it.
+- Saves from before fires burned wood loaded with every fire empty; they're lit with a full load.
+- An obsessed artist carrying anything looped forever, and skipped eating and bed rest; their vision now
+  comes after their own needs.
+- Children could be pulled into tending, firefighting and refuelling through emergency paths. A child joins
+  with every work priority off, gets light work at 13 and the rest at 18, and the Work screen can't turn on
+  work they're too young for. Rescue and raid size count only those old enough.
+- Rages could smash bridges (stranding whoever was on them), traps and sandbags; they don't any more.
+- A legendary sculpture lost to fire came back as a blueprint nobody could carve; lost art isn't rebuilt.
+- Children could inherit clashing traits (optimist and pessimist); conceptions could overshoot the colony's
+  room; a baby whose adults were all gone vanished silently (a teen now takes them in, or it's told).
+- A failed obsession always ended in a rage, even for the kind; it now breaks in their own way. Sulks end
+  with the break. Visitors are moved out of a doorway that gets locked.
+- Alerts: forbidden wood no longer counts as wood in the fire and woodpile alerts, nor forbidden materials in
+  the obsession alert (which also clears at once if the artist dies, and says "1 day"); a fire that's merely
+  out no longer says "nowhere warm to shelter"; children no longer show as having nothing to do; shelves and
+  iceboxes count as storage; "stockpiles are full" respects what stockpiles take; blueprints now say how to
+  get bricks, clay, iron and silver; a kiln's wood is shown as hours of work; a colonist who died expecting no
+  longer shows it.
+- The Allow tool drags in green; "too young" cells on the Work screen have screen-reader labels; grain has
+  feature art for its blueprint.
+- Left for later: relatives a generation apart (grandparents, cousins) aren't yet treated as family for
+  romance, and the forbidden flag doesn't follow items moved off a doorway being locked.
+
 **Phase I: Bodies and medicine.** _(Medium.)_
 
 - Wounds land on body parts (head, torso, arms, legs, hands, eyes). A lost or ruined part means a lasting

@@ -1,5 +1,6 @@
 import type { Obsession } from './minds';
 import type { BeaconState } from './beacon';
+import { NONE, featureDef } from './defs';
 import type { JoyKind } from './defs';
 import { RaidState } from './combat';
 import { PowerState } from './power';
@@ -114,6 +115,7 @@ export interface SaveData {
     filth?: Uint8Array;
     forbidden?: Uint8Array;
     locked?: Uint8Array;
+    drying?: Float32Array;
     growth: Float32Array;
     fresh: Float32Array;
     quality: Float32Array;
@@ -187,6 +189,7 @@ export function serialize(sim: Simulation): SaveData {
       filth: w.filth.slice(),
       forbidden: w.forbidden.slice(),
       locked: w.locked.slice(),
+      drying: w.drying.slice(),
       growth: w.growth.slice(),
       fresh: w.fresh.slice(),
       quality: w.quality.slice(),
@@ -309,6 +312,9 @@ export function deserialize(data: SaveData): Simulation {
   if (layers.locked) {
     world.locked.set(layers.locked);
   }
+  if (layers.drying) {
+    world.drying.set(layers.drying);
+  }
   world.growth.set(layers.growth);
   world.fresh.set(layers.fresh);
   world.quality.set(layers.quality);
@@ -317,6 +323,15 @@ export function deserialize(data: SaveData): Simulation {
   world.floor.set(layers.floor);
   world.roof.set(layers.roof);
   world.fuel.set(layers.fuel);
+  // Saves from before fires burned wood have every fire empty: light them with a full load.
+  if (!layers.forbidden) {
+    for (let i = 0; i < world.size; i++) {
+      const burns = world.feature[i] !== NONE ? featureDef(world.feature[i]).burns : undefined;
+      if (burns) {
+        world.fuel[i] = burns.capacity;
+      }
+    }
+  }
   world.structureVersion++;
 
   const colonists: Colonist[] = data.colonists.map((saved) => ({

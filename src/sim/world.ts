@@ -114,6 +114,8 @@ export class World {
   public readonly forbidden: Uint8Array;
   // 1: the door here is locked, and nobody passes until it's unlocked (or broken down).
   public readonly locked: Uint8Array;
+  // Hours the stack on a drying rack has dried (kept with the stack, not the tile's work progress).
+  public readonly drying: Float32Array;
   // Bumped whenever the mess anywhere changes.
   public filthVersion = 0;
 
@@ -159,6 +161,7 @@ export class World {
     this.filth = new Uint8Array(this.size);
     this.forbidden = new Uint8Array(this.size);
     this.locked = new Uint8Array(this.size);
+    this.drying = new Float32Array(this.size);
   }
 
   // How many of an item fit on a tile: a stack, or several on a shelf.
@@ -442,6 +445,10 @@ export class World {
       return false;
     }
     const type = this.itemType[i];
+    // A forbidden stack takes nothing more: what's added would be forbidden too.
+    if (type !== NONE && this.forbidden[i] === 1) {
+      return false;
+    }
     return type === NONE || (type === item && this.itemCount[i] < this.capacity(i, item));
   }
 
@@ -465,6 +472,8 @@ export class World {
         this.fresh[i] = merge(this.fresh[i], fresh ?? life);
       }
       this.quality[i] = merge(this.quality[i], quality ?? NORMAL_QUALITY);
+      // Fresh food added to a drying stack dilutes how far along it is.
+      this.drying[i] = merge(this.drying[i], 0);
     }
     this.itemType[i] = item;
     this.itemCount[i] += added;
@@ -487,6 +496,7 @@ export class World {
     if (this.itemCount[i] === 0) {
       this.itemType[i] = NONE;
       this.forbidden[i] = 0;
+      this.drying[i] = 0;
     }
     this.markDirty(i);
     return taken;

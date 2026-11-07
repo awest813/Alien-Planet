@@ -957,7 +957,8 @@ export class ColonyScene extends Phaser.Scene {
     const p = this.preview;
     p.clear();
     const tool = controller.tool;
-    const color = TOOL_COLORS[tool.kind];
+    // Allowing is the friendly half of forbidding: green, not red.
+    const color = tool.kind === 'forbid' && !tool.on ? 0x8fe36b : TOOL_COLORS[tool.kind];
     if (this.drag) {
       for (const i of this.dragTiles(tool, this.drag.start, this.drag.end)) {
         const blocked = tool.kind === 'build' && !controller.sim.canPlaceBlueprint(i, tool.feature);

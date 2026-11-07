@@ -19,7 +19,7 @@ import { Difficulty } from '../src/sim/storyteller';
 import { Command, DesignationKind, ScheduleSlot, Stance, WORK_TYPES } from '../src/sim/types';
 import { GROW_ZONE, STOCKPILE_ZONE } from '../src/sim/world';
 import { Rng } from '../src/sim/rng';
-import { itemDef, itemId } from '../src/sim/defs';
+import { driedFrom, fuelOf, itemDef, itemId } from '../src/sim/defs';
 const itemDefName = (i: number) => itemDef(i).key;
 
 const arg = (name: string, fallback: number) =>
@@ -254,6 +254,50 @@ function check(sim: Simulation, problems: Map<string, number>, hourly: boolean):
     for (const e of sim.enemies) {
       if (!Number.isFinite(e.hp)) {
         note('raider hp is not a number');
+      }
+    }
+    // Families: every baby has a living carer; ages make sense.
+    for (const b of sim.infants) {
+      const carer = sim.colonists[b.carer];
+      if (!carer || carer.health.dead) {
+        note('baby without a living carer');
+      }
+      if (!Number.isFinite(b.age) || b.age < 0 || b.age > 3.5) {
+        note(`baby with a bad age (${b.age})`);
+      }
+    }
+    for (const c of sim.colonists) {
+      if (!Number.isFinite(c.age) || c.age < 0 || c.age > 120) {
+        note(`colonist with a bad age (${c.age})`);
+      }
+      if (sim.colonists[c.id] !== c) {
+        note('colonist id does not match their place in the list');
+      }
+      if (!c.health.dead && c.drafted && c.age < 16) {
+        note('a child drafted');
+      }
+    }
+    // An obsession always has its blueprint (or has just been finished).
+    if (sim.obsession && w.blueprint[sim.obsession.tile] !== featureId('legendarySculpture')) {
+      note('obsession without its blueprint');
+    }
+    for (let i = 0; i < w.size; i++) {
+      if (w.locked[i] && (w.feature[i] === NONE || !featureDef(w.feature[i]).door)) {
+        note('a lock on something that is not a door');
+      }
+      const item = w.itemType[i];
+      if (item !== NONE && w.itemCount[i] > w.capacity(i, item) && w.isPassable(i) && sim.isStockpile(i)) {
+        note(`storage over capacity (${w.itemCount[i]}/${w.capacity(i, item)})`);
+      }
+      // A rack holds what dries, and what has dried on it until it's hauled away.
+      const dried = new Set(['driedMeat', 'driedBerries']);
+      if (item !== NONE && sim.isDryingRack(i) && !driedFrom(item) && !dried.has(itemDef(item).key)) {
+        note(`a drying rack holding ${itemDef(item).key}`);
+      }
+      const f = w.feature[i];
+      const fuel = f !== NONE ? fuelOf(featureDef(f)) : undefined;
+      if (fuel && (!Number.isFinite(w.fuel[i]) || w.fuel[i] < 0 || w.fuel[i] > fuel.capacity + 1e-6)) {
+        note(`fuel out of range (${w.fuel[i]}/${fuel.capacity})`);
       }
     }
     const totals = sim.resourceTotals();

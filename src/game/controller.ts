@@ -33,7 +33,7 @@ import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
 import { DOWNED_TICKS, persuasion } from '../sim/prisoners';
-import { DRAFT_AGE, backstoryOf, stageOf } from '../sim/lifespans';
+import { DRAFT_AGE, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans';
 import { LEGEND } from '../sim/minds';
 import { applyTrade, goodwillOf, prices, standingLabel, tradableItems, tradeOpen, artForSale } from '../sim/trade';
 import { weatherDef } from '../sim/weather';
@@ -1725,17 +1725,22 @@ export class GameController {
     }
     // An obsessed artist's vision: what it still needs, and how long is left.
     const ob = sim.obsession;
-    if (ob) {
-      const artist = sim.colonists[ob.colonist];
+    const artist = ob ? sim.colonists[ob.colonist] : undefined;
+    if (ob && artist && !artist.health.dead && w.blueprint[ob.tile] === LEGEND) {
       const cost = featureDef(LEGEND).build!.cost;
       const missing = cost
-        .map((k, line) => ({ item: k.item, need: k.count - w.deliveredAt(ob.tile, line) }))
-        .filter((m) => m.need > 0 && sim.stockOf(m.item) < m.need)
-        .map((m) => `${m.need - sim.stockOf(m.item)} ${itemDef(m.item).name.toLowerCase()}`);
+        .map((k, line) => ({
+          item: k.item,
+          need: k.count - w.deliveredAt(ob.tile, line),
+          have: this.availableStock(k.item),
+        }))
+        .filter((m) => m.need > 0 && m.have < m.need)
+        .map((m) => `${m.need - m.have} ${itemDef(m.item).name.toLowerCase()}`);
       const days = Math.max(0, (ob.deadline - sim.tick) / (TICKS_PER_HOUR * 24));
+      const left = days < 1 ? 'less than a day' : Math.floor(days) === 1 ? '1 day' : `${Math.floor(days)} days`;
       alerts.push({
         text:
-          `${artist.name} is obsessed with a vision (${days < 1 ? 'less than a day' : `${Math.floor(days)} days`} left)` +
+          `${artist.name} is obsessed with a vision (${left} left)` +
           (missing.length > 0 ? `: still short of ${missing.join(', ')}` : ': everything is there'),
         tone: missing.length > 0 && days < 2 ? 'danger' : 'warn',
         tile: ob.tile,
@@ -1807,14 +1812,14 @@ export class GameController {
       (i) => featureDef(w.feature[i]).burns && !featureDef(w.feature[i]).workbench && w.fuel[i] > 0,
     );
     const perDay = burning.reduce((sum, i) => sum + featureDef(w.feature[i]).burns!.perDay, 0);
-    if (cold.length === 0 && perDay > 0 && sim.stockOf(itemId('wood')) < perDay * 3) {
+    if (cold.length === 0 && perDay > 0 && this.availableStock(itemId('wood')) < perDay * 3) {
       alerts.push({
         text: `Wood is running low: the fires burn about ${Math.round(perDay)} a day. Chop trees (C)`,
         tone: sim.season === 'Winter' || daysUntilWinter(sim.totalHours) < 4 ? 'danger' : 'warn',
       });
     }
     if (cold.length > 0) {
-      const wood = sim.stockOf(itemId('wood'));
+      const wood = this.availableStock(itemId('wood'));
       alerts.push({
         text:
           wood === 0
@@ -1826,7 +1831,13 @@ export class GameController {
     }
     const untilWinter = daysUntilWinter(sim.totalHours);
     // Winter kills a colony with nowhere warm to go: say so plainly, before and during.
-    const warmRoom = sim.allRooms().some((r) => r.enclosed && r.heaters > 0);
+    // A room whose fire has merely gone out counts: the fire alert says to bring wood.
+    const warmRoom =
+      sim.allRooms().some((r) => r.enclosed && r.heaters > 0) ||
+      cold.some((i) => {
+        const room = sim.roomAt(i);
+        return !!room && room.enclosed;
+      });
     if (!warmRoom && sim.living().length > 0 && (sim.season === 'Winter' || (untilWinter > 0 && untilWinter <= 6))) {
       alerts.push({
         text:
@@ -1935,7 +1946,10 @@ export class GameController {
         });
       }
     }
-    if (!sim.world.zone.some(isStockpileZone) && totals.some((t) => t.total > 0)) {
+    // Shelves, iceboxes and drying racks are storage too.
+    const anyStorage =
+      sim.world.zone.some(isStockpileZone) || [...sim.world.tilesWith('features')].some((i) => sim.isStockpile(i));
+    if (!anyStorage && totals.some((t) => t.total > 0)) {
       alerts.push({ text: 'No stockpile: items are left where they fall', tone: 'warn' });
     }
     // Blueprints waiting on materials the colony doesn't have.
@@ -1951,6 +1965,11 @@ export class GameController {
       cloth: 'weave cotton at a crafting bench',
       stoneBlocks: "cut granite at a stonecutter's table",
       leather: 'hunt animals (V)',
+      bricks: 'fire clay in a kiln (Pottery)',
+      clay: 'mine the clay banks along the shore (M)',
+      iron: 'smelt iron ore in a smelter (Smelting)',
+      ironOre: 'mine the rusty iron veins in the rock (M)',
+      silver: 'trade with caravans',
     };
     for (const [item, count] of outstanding) {
       const short = count - totals[item - 1].total;
@@ -1973,14 +1992,14 @@ export class GameController {
     for (let i = 0; i < w.size && loose > 0 && !room; i++) {
       if (sim.isStockpile(i)) {
         for (const type of looseTypes) {
-          if (w.canHoldItem(i, type)) {
+          if (w.canHoldItem(i, type) && sim.storesItem(i, type)) {
             room = true;
             break;
           }
         }
       }
     }
-    if (!room && loose > 0 && w.zone.some(isStockpileZone)) {
+    if (!room && loose > 0 && anyStorage) {
       alerts.push({ text: `Stockpiles are full: ${loose} stacks lying outside. Zone more storage (Z).`, tone: 'warn' });
     }
     const ateRaw = sim.colonists.some((c) => c.thoughts.some((t) => t.key === 'ateRaw'));
@@ -1991,6 +2010,7 @@ export class GameController {
       // Only working hours count: wandering during recreation time is expected.
       const slot = c.schedule[Math.floor(sim.hour)];
       const isIdle =
+        c.age >= TEEN &&
         (slot === 'A' || slot === 'W') &&
         raiders === 0 &&
         !needsBedRest(c) &&
@@ -2025,7 +2045,7 @@ export class GameController {
   private unstaffedWork(): string[] {
     const sim = this.sim;
     const w = sim.world;
-    const staffed = (work: keyof Priorities) => sim.living().some((c) => c.priorities[work] > 0);
+    const staffed = (work: keyof Priorities) => sim.living().some((c) => c.priorities[work] > 0 && canWork(c, work));
     const waiting: [keyof Priorities, boolean][] = [
       ['mining', w.designation.includes(Designation.MINE)],
       ['plantCutting', w.designation.includes(Designation.CHOP) || w.designation.includes(Designation.FORAGE)],
@@ -2052,11 +2072,23 @@ export class GameController {
     for (const i of sim.infants.filter((b) => b.carer === c.id && !b.parents.includes(c.id))) {
       lines.push(`Caring for baby ${i.name}`);
     }
-    if (c.expectingUntil !== undefined) {
+    if (c.expectingUntil !== undefined && !c.health.dead) {
       const days = Math.max(1, Math.ceil((c.expectingUntil - sim.tick) / (TICKS_PER_HOUR * 24)));
       lines.push(`Expecting a child in about ${days} day${days > 1 ? 's' : ''}`);
     }
     return lines;
+  }
+
+  // How much of an item colonists can actually use: everything lying about, less what's forbidden.
+  private availableStock(item: number): number {
+    const w = this.sim.world;
+    let n = 0;
+    for (const i of w.tilesWith('items')) {
+      if (w.itemType[i] === item && !w.forbidden[i]) {
+        n += w.itemCount[i];
+      }
+    }
+    return n;
   }
 
   private captivesView(): CaptiveView[] {
@@ -2144,10 +2176,15 @@ export class GameController {
       details.push('Out of bloom until spring');
     }
     if (def?.burns) {
+      const hours = Math.max(1, Math.round((w.fuel[i] / def.burns.perDay) * 24));
       details.push(
-        w.fuel[i] > 0
-          ? `Wood ${Math.ceil(w.fuel[i])}/${def.burns.capacity}, about ${Math.max(1, Math.round((w.fuel[i] / def.burns.perDay) * 24))}h left`
-          : 'Out of wood: cold and dark until haulers bring more',
+        def.workbench
+          ? w.fuel[i] > 0
+            ? `Wood ${Math.ceil(w.fuel[i])}/${def.burns.capacity}, about ${hours}h of work (it burns only while worked)`
+            : 'Out of wood: no work here until haulers bring more'
+          : w.fuel[i] > 0
+            ? `Wood ${Math.ceil(w.fuel[i])}/${def.burns.capacity}, about ${hours}h left`
+            : 'Out of wood: cold and dark until haulers bring more',
       );
     }
     if (def?.power) {

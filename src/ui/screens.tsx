@@ -110,7 +110,12 @@ export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => 
                   if (c.age < ADULT && (c.age < TEEN || !TEEN_WORK.includes(work))) {
                     return (
                       <td key={work}>
-                        <span className="priority too-young" title={`${c.name} is too young for this work`}>
+                        <span
+                          className="priority too-young"
+                          role="img"
+                          aria-label={`${c.name}, ${WORK_LABELS[work]}: too young`}
+                          title={`${c.name} is too young for this work`}
+                        >
                           ·
                         </span>
                       </td>

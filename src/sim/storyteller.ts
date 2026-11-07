@@ -7,6 +7,7 @@ import { damage, infect } from './health';
 import { caravanArrives, goodwillOf } from './trade';
 import { ignite } from './weather';
 import { Season } from './seasons';
+import { DRAFT_AGE } from './lifespans';
 import { inspire, obsessionPossible, startObsession } from './minds';
 import type { Simulation } from './simulation';
 
@@ -100,8 +101,9 @@ const EVENT_GAP = TICKS_PER_HOUR * 10;
 const HOURLY_CHANCE = 1 / 14;
 // Raids and packs are sized for a colony of six: in proportion for a smaller one, and more, though
 // not proportionally more, for a bigger one.
+// Threats scale with those who can fight back (children don't count).
 const threatScale = (sim: Simulation) => {
-  const living = sim.living().length;
+  const living = sim.living().filter((c) => c.age >= DRAFT_AGE).length;
   return living <= 6 ? Math.max(living, 2) / 6 : Math.sqrt(living / 6);
 };
 

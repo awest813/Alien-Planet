@@ -225,6 +225,7 @@ const DRYING_HOURS = 12;
 // A rage targets furniture this close; its wander job is marked with this stage.
 const TANTRUM_RANGE = 10;
 const TANTRUM_STAGE = 9;
+const SULK_STAGE = 8;
 // How far below (or above) their comfort colonists will still go out for fun or idle about.
 const JOY_CHILL = 6;
 // The best a storage tile can be for an item (critical priority, cold for perishables).
@@ -1091,7 +1092,11 @@ export class Simulation {
         }
         break;
       case 'priority':
-        if (Number.isFinite(cmd.value)) {
+        if (
+          Number.isFinite(cmd.value) &&
+          this.colonists[cmd.colonist] &&
+          canWork(this.colonists[cmd.colonist], cmd.work)
+        ) {
           this.colonists[cmd.colonist].priorities[cmd.work] = Math.max(0, Math.min(4, Math.round(cmd.value)));
         }
         break;
@@ -1798,9 +1803,9 @@ export class Simulation {
       // On a drying rack, food dries instead of rotting (slower in the rain), and keeps for months.
       const dried = this.isDryingRack(i) ? driedFrom(item) : undefined;
       if (dried !== undefined) {
-        w.progress[i] += hours * (isWet(this, i) ? 0.5 : 1);
-        if (w.progress[i] >= DRYING_HOURS) {
-          w.progress[i] = 0;
+        w.drying[i] += hours * (isWet(this, i) ? 0.5 : 1);
+        if (w.drying[i] >= DRYING_HOURS) {
+          w.drying[i] = 0;
           w.itemType[i] = dried;
           w.fresh[i] = itemDef(dried).shelfLife!;
           w.markDirty(i);
@@ -1884,6 +1889,10 @@ export class Simulation {
   // Not if it was marked for taking down anyway (the mark goes with it), and not while raiders are
   // still about: builders would walk into the breach.
   public rebuild(i: number, feature: number): void {
+    // A work of art is gone for good: nobody can carve the same piece again.
+    if (featureDef(feature).art) {
+      return;
+    }
     const w = this.world;
     if (w.designation[i] !== Designation.NONE) {
       const unwanted = w.designation[i] === Designation.DECONSTRUCT;
@@ -2512,10 +2521,6 @@ export class Simulation {
       this.startWander(c);
       return;
     }
-    // An obsessed artist works on nothing but their vision, when there's anything to do for it.
-    if (this.obsession?.colonist === c.id && this.tryLegend(c)) {
-      return;
-    }
     if (c.carrying && this.tryStash(c)) {
       return;
     }
@@ -2549,6 +2554,11 @@ export class Simulation {
       return;
     }
     if ((slot === 'J' || (slot === 'A' && c.needs.joy < 0.3)) && c.needs.joy < 0.95 && this.tryJoy(c)) {
+      return;
+    }
+    // An obsessed artist works on nothing but their vision, when there's anything to do for it (after
+    // seeing to their own needs).
+    if (slot !== 'J' && this.obsession?.colonist === c.id && this.tryLegend(c)) {
       return;
     }
     if (slot !== 'J' && this.tryWorkByPriority(c)) {
@@ -2744,7 +2754,8 @@ export class Simulation {
           this.endJob(c);
           break;
         }
-        if (job.wait-- <= 0) {
+        // A sulk lasts as long as the break, no longer.
+        if (job.wait-- <= 0 || (job.stage === SULK_STAGE && !this.inMentalBreak(c))) {
           this.endJob(c);
         }
         break;
@@ -2767,7 +2778,11 @@ export class Simulation {
     if (spot === undefined || !path) {
       return false;
     }
-    this.assign(c, this.makeJob('wander', spot, { wait: Math.max(60, c.breakUntil - this.tick) }), path);
+    this.assign(
+      c,
+      this.makeJob('wander', spot, { wait: Math.max(60, c.breakUntil - this.tick), stage: SULK_STAGE }),
+      path,
+    );
     return true;
   }
 
@@ -3108,7 +3123,7 @@ export class Simulation {
 
   // A finished sculpture: its quality from the artist's skill, a subject from the colony's story.
   private finishArtwork(c: Colonist, tile: number, name: string): void {
-    const legend = this.world.feature[tile] === LEGEND;
+    const legend = this.world.feature[tile] === LEGEND && this.obsession?.tile === tile;
     const quality = legend ? LEGEND_QUALITY : rollQuality(this, c);
     const memorial = featureDef(this.world.feature[tile]).key === 'memorial';
     const fallen = this.colonists.filter((o) => o.health.dead);
@@ -3135,6 +3150,7 @@ export class Simulation {
     const what = `${/^[aeiou]/.test(label) ? 'an' : 'a'} ${label} ${name.toLowerCase()}`;
     if (legend) {
       this.obsession = null;
+      // (A legend can only be carved as someone's vision.)
       this.stats.legends = (this.stats.legends ?? 0) + 1;
       this.addThought(c, 'createdLegend');
       for (const o of this.living()) {
@@ -3610,6 +3626,13 @@ export class Simulation {
         a.tile = free;
         a.path = [];
         a.moveProgress = 0;
+      }
+    }
+    for (const v of this.caravan?.visitors ?? []) {
+      if (v.tile === t && free !== undefined) {
+        v.tile = free;
+        v.path = [];
+        v.moveProgress = 0;
       }
     }
   }
@@ -6065,6 +6088,7 @@ export class Simulation {
         o !== c &&
         !o.health.downed &&
         o.priorities.doctor > 0 &&
+        canWork(o, 'doctor') &&
         !this.inMentalBreak(o) &&
         this.regionOf(o.tile) === region,
     );
