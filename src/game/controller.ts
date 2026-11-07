@@ -36,6 +36,7 @@ import { DOWNED_TICKS, persuasion } from '../sim/prisoners';
 import { DRAFT_AGE, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans';
 import { LEGEND } from '../sim/minds';
 import { PART_LABELS, SCAR_LABELS, isInfected, scarsOf } from '../sim/body';
+import { Hours, Rations, tally } from '../sim/village';
 import { applyTrade, goodwillOf, prices, standingLabel, tradableItems, tradeOpen, artForSale } from '../sim/trade';
 import { weatherDef } from '../sim/weather';
 import {
@@ -557,6 +558,8 @@ export interface ColonistView {
   priorities: Priorities;
   schedule: ScheduleSlot[];
   traits: { label: string; description: string }[];
+  // Chosen to lead the colony.
+  leader: boolean;
   // Age in whole years, life stage, past, and family lines ("Mother of …", "Caring for baby …").
   age: number;
   stage: string;
@@ -747,6 +750,15 @@ export interface UiState {
   story: StoryEntry[];
   // Whether the colony keeps the seasonal festivals.
   festivals: boolean;
+  // The colony's leader (null: none yet), when they were chosen, how a vote would go now, and the policies.
+  village: {
+    leader: { id: number; name: string; mood: number } | null;
+    electedOn: number;
+    standings: { name: string; votes: number }[];
+    rations: Rations;
+    hours: Hours;
+    restDays: boolean;
+  };
   raid: RaidView | null;
   hover: TileView | null;
   hoverColonist: number | null;
@@ -1493,6 +1505,7 @@ export class GameController {
         priorities: { ...c.priorities },
         schedule: [...c.schedule],
         traits: c.traits.map((key) => ({ label: TRAITS[key].label, description: TRAITS[key].description })),
+        leader: sim.village.leader === c.id,
         age: Math.floor(c.age),
         stage: stageOf(c.age),
         backstory: (({ title, description }) => ({ title, description }))(backstoryOf(c.backstory)),
@@ -1602,6 +1615,7 @@ export class GameController {
       log: sim.log.slice(-12).reverse(),
       story: [...sim.storyLog].reverse(),
       festivals: sim.story.festivals !== false,
+      village: this.villageView(),
       raid:
         sim.enemies.length > 0
           ? { faction: FACTIONS[sim.enemies[0].faction].name, remaining: sim.enemies.filter((e) => !e.fleeing).length }
@@ -2072,6 +2086,23 @@ export class GameController {
       ['handling', sim.animals.some((a) => a.taming)],
     ];
     return waiting.filter(([work, has]) => has && !staffed(work)).map(([work]) => WORK_NAMES[work] ?? work);
+  }
+
+  private villageView(): UiState['village'] {
+    const sim = this.sim;
+    const v = sim.village;
+    const leader = sim.colonists[v.leader];
+    return {
+      leader:
+        leader && !leader.health.dead ? { id: leader.id, name: leader.name, mood: Math.round(leader.mood) } : null,
+      electedOn: v.electedOn,
+      standings: [...tally(sim).entries()]
+        .map(([id, votes]) => ({ name: sim.colonists[id].name, votes }))
+        .sort((a, b) => b.votes - a.votes),
+      rations: v.rations,
+      hours: v.hours,
+      restDays: v.restDays,
+    };
   }
 
   // A colonist's family, as lines for the inspector.

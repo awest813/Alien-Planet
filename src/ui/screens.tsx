@@ -3,6 +3,7 @@ import { UiState, controller } from '../game/controller';
 import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey } from '../sim/types';
 import { Bar, SLOT_LABELS, WORK_LABELS } from './common';
 import { ADULT, TEEN, TEEN_WORK } from '../sim/lifespans';
+import { Hours, POLICY_TEXT, Rations } from '../sim/village';
 
 // Full-screen dialogs opened from the top bar.
 
@@ -373,6 +374,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             best), and a bad wound may leave a limp, a stiff hand or a lost eye. Hospital beds heal faster.
           </li>
           <li>
+            With three adults, the colony votes for a <b>leader</b> each season. Set rations, working hours and days of
+            rest on the <b>Village</b> screen: each pleases some colonists and annoys others.
+          </li>
+          <li>
             Unhappy colonists break in their own ways: a daze, a sulk, a binge, or a rage that smashes furniture.
             Sometimes a skilled artist is seized by a vision: deliver what they ask in time for a legendary sculpture.
           </li>
@@ -451,6 +456,61 @@ export function ResearchScreen({ state, onClose }: { state: UiState; onClose: ()
             </li>
           ))}
       </ul>
+    </Modal>
+  );
+}
+
+// The colony's leader (chosen by vote each season) and the policies it lives by.
+export function VillageScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+  const v = state.village;
+  const set = (policy: { rations?: Rations; hours?: Hours; restDays?: boolean }) =>
+    controller.command({ type: 'policy', ...policy });
+  const choice = <T extends string>(value: T, current: T, label: string, apply: () => void) => (
+    <button key={value} className={value === current ? 'active' : ''} aria-pressed={value === current} onClick={apply}>
+      {label}
+    </button>
+  );
+  return (
+    <Modal title="The village" onClose={onClose}>
+      <h3>Leader</h3>
+      {v.leader ? (
+        <p>
+          <b>{v.leader.name}</b>, chosen on day {v.electedOn}.{' '}
+          <span className="muted">
+            {v.leader.mood >= 45
+              ? 'In good spirits: everyone feels in good hands.'
+              : v.leader.mood < 25
+                ? 'Struggling, and it shows: the colony feels it too.'
+                : 'Holding up.'}
+          </span>
+        </p>
+      ) : (
+        <p className="muted">No leader yet: the colony holds a vote as soon as it has three adults to cast one.</p>
+      )}
+      <p className="muted small">
+        A vote is held at the start of every season. Each adult backs whoever they think best of; a kind nature helps.
+        {v.standings.length > 0 &&
+          ` If it were held now: ${v.standings.map((s) => `${s.name} ${s.votes}`).join(', ')}.`}
+      </p>
+      <h3>Policies</h3>
+      <div className="muted small">Rations</div>
+      <div className="row">
+        {choice('frugal', v.rations, 'Frugal', () => set({ rations: 'frugal' }))}
+        {choice('normal', v.rations, 'Normal', () => set({ rations: 'normal' }))}
+        {choice('generous', v.rations, 'Generous', () => set({ rations: 'generous' }))}
+      </div>
+      <p className="muted small">{POLICY_TEXT.rations[v.rations]}</p>
+      <div className="muted small">Working hours</div>
+      <div className="row">
+        {choice('short', v.hours, 'Short', () => set({ hours: 'short' }))}
+        {choice('normal', v.hours, 'Normal', () => set({ hours: 'normal' }))}
+        {choice('long', v.hours, 'Long', () => set({ hours: 'long' }))}
+      </div>
+      <p className="muted small">{POLICY_TEXT.hours[v.hours]}</p>
+      <label className="row">
+        <input type="checkbox" checked={v.restDays} onChange={(e) => set({ restDays: e.target.checked })} />
+        <span>Days of rest: one day in six, nobody works, and everyone is the happier for it</span>
+      </label>
     </Modal>
   );
 }

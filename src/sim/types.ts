@@ -433,6 +433,13 @@ export type Command =
   | { type: 'research'; project: string | null }
   // Whether the colony keeps the seasonal festivals.
   | { type: 'festivals'; on: boolean }
+  // The colony's policies (any left out stay as they are).
+  | {
+      type: 'policy';
+      rations?: 'frugal' | 'normal' | 'generous';
+      hours?: 'short' | 'normal' | 'long';
+      restDays?: boolean;
+    }
   // When the ship has landed: board it (the colony's story ends) or stay.
   | { type: 'shipChoice'; board: boolean }
   // Sell the sculpture on a tile to the visiting traders.
@@ -459,6 +466,7 @@ export interface Stats {
   births?: number;
   // Furniture smashed in tantrums, and legendary works made.
   smashed?: number;
+  elections?: number;
   // Wounds that turned infected, and lasting injuries left by old wounds.
   infections?: number;
   scars?: number;

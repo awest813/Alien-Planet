@@ -36,6 +36,12 @@ const noHunt = process.argv.includes('nohunt');
 const flow = process.argv.includes('flow');
 // Nutrition a colonist eats in a day (as the top bar's "days of food" counts it).
 const DAILY_NUTRITION = 1.4;
+// "policy=frugal,long,rest" sets the colony's policies from the start.
+const policy =
+  process.argv
+    .find((a) => a.startsWith('policy='))
+    ?.slice(7)
+    .split(',') ?? [];
 const mapSize = Number(process.argv.find((a) => a.startsWith('size='))?.slice(5) ?? 64);
 const difficulty: Difficulty = process.argv.includes('harsh')
   ? 'harsh'
@@ -154,6 +160,9 @@ interface Result {
   oldAge: number;
   fellWounded: number;
   captured: number;
+  elections: number;
+  goods: number;
+  leaderless: number;
   recruited: number;
 }
 
@@ -214,6 +223,12 @@ function snapshot(sim: Simulation): Record<string, number> {
 
 function play(seed: number): Result {
   const sim = Simulation.newColony(seed, difficulty, mapSize);
+  sim.apply({
+    type: 'policy',
+    rations: policy.includes('frugal') ? 'frugal' : policy.includes('generous') ? 'generous' : 'normal',
+    hours: policy.includes('long') ? 'long' : policy.includes('short') ? 'short' : 'normal',
+    restDays: policy.includes('rest'),
+  });
   const w = sim.world;
   const avoid = new Set<number>();
   const at = (x: number, y: number) => w.idx(x, y);
@@ -743,6 +758,9 @@ function play(seed: number): Result {
       [...sim.graves.values()].filter((g) => g.cause === 'old age').length,
     fellWounded: fell.size,
     captured: sim.stats.captured ?? 0,
+    elections: sim.stats.elections ?? 0,
+    goods: sim.resourceTotals().reduce((n, t) => n + t.total, 0),
+    leaderless: sim.village.leader < 0 ? 1 : 0,
     recruited: sim.stats.recruited ?? 0,
     mess: [...sim.world.tilesWith('filth')].filter((i) => sim.isRoofed(i)).length,
   };
@@ -915,6 +933,11 @@ console.log(
 console.log(
   `  prisoners: ${sum((r) => r.fellWounded)} raiders fell wounded, ${sum((r) => r.captured)} taken prisoner, ` +
     `${sum((r) => r.recruited)} won over`,
+);
+console.log(
+  `  village: ${sum((r) => r.elections)} votes held, ${sum((r) => r.leaderless)} colonies left without a leader; ` +
+    `${(sum((r) => r.goods) / results.length).toFixed(0)} goods on hand at the end (average)` +
+    (policy.length > 0 ? ` [policy ${policy.join(', ')}]` : ''),
 );
 console.log(
   `  cleaning: ${((100 * cleaningHours) / Math.max(1, allHours)).toFixed(1)}% of colonist-hours, ` +

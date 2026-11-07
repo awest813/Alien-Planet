@@ -626,6 +626,21 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
   or exile.
 - First slice: a leader chosen by vote and three policies. Success: policies move mood and output in the
   harness in the directions intended.
+- **Done** (`src/sim/village.ts`, the Village screen):
+  - A leader by vote: with three adults or more, each backs whoever they think best of (never themselves; a
+    kind nature wins votes, an abrasive one loses them, good spirits help a little). The colony votes as soon
+    as it has no leader, and again at dawn on the first day of each season; a leader who dies leaves office at
+    once. A leader in good spirits gives everyone "well led"; a miserable one, "poorly led". The leader wears
+    a tag on their card.
+  - Rations: frugal (hunger 20% slower, everyone grumbles, gluttons most) or generous (eat sooner and 15% more,
+    everyone enjoys it).
+  - Working hours: long (work 10% faster, resented unless hard-working; the lazy most) or short (10% slower,
+    welcomed, the lazy most).
+  - Days of rest: one day in six, work time becomes free time, and everyone is glad of it.
+  - Balance, 30 days on 12 seeds for each policy against none (mood 49.9, 7,326 goods on hand at the end):
+    frugal 47.1 and 7,394; generous 53.1 and 6,267; long hours 45.9 and 7,419; short hours 53.8 and 6,937;
+    days of rest 51.2 and 6,308. Every colony chose a leader and kept one. Survival was unchanged.
+  - Not done: the other offices (quartermaster, warden, healer), speeches at festivals, curfews, and justice.
 
 **Phase K: Factions and the wider world.** _(Large.)_
 

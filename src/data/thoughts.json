@@ -420,5 +420,50 @@
   "inHospital": {
     "label": "Cared for in a hospital bed",
     "mood": 3
+  },
+  "chosenLeader": {
+    "label": "Chosen to lead",
+    "mood": 8,
+    "hours": 96
+  },
+  "wellLed": {
+    "label": "In good hands",
+    "mood": 2
+  },
+  "poorlyLed": {
+    "label": "Our leader is struggling",
+    "mood": -2
+  },
+  "frugalRations": {
+    "label": "Short rations",
+    "mood": -3
+  },
+  "frugalRationsGlutton": {
+    "label": "Short rations, and always hungry",
+    "mood": -7
+  },
+  "generousRations": {
+    "label": "Generous rations",
+    "mood": 3
+  },
+  "longHours": {
+    "label": "Long hours",
+    "mood": -4
+  },
+  "longHoursLazy": {
+    "label": "Long hours, and hates it",
+    "mood": -8
+  },
+  "shortHours": {
+    "label": "Short hours",
+    "mood": 2
+  },
+  "shortHoursLazy": {
+    "label": "Short hours, thank goodness",
+    "mood": 5
+  },
+  "dayOfRest": {
+    "label": "A day of rest",
+    "mood": 4
   }
 }

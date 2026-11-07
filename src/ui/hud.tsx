@@ -31,6 +31,7 @@ export type Screen =
   | 'help'
   | 'ship'
   | 'prisoners'
+  | 'village'
   | null;
 
 const SPEEDS = [
@@ -121,6 +122,9 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
         <button onClick={() => onOpen('production')}>Production</button>
         <button onClick={() => onOpen('research')}>Research</button>
         <button onClick={() => onOpen('story')}>Story</button>
+        <button onClick={() => onOpen('village')} title="The colony's leader and policies">
+          Village
+        </button>
         {state.captives.length > 0 && (
           <button onClick={() => onOpen('prisoners')} title="Captured and wounded raiders">
             Prisoners ({state.captives.filter((p) => p.state === 'prisoner').length})
@@ -298,6 +302,7 @@ function ColonistCard({ c }: { c: ColonistView }) {
             {c.mood}
           </span>
         )}
+        {c.leader && <span className="tag good">leader</span>}
         {c.status !== 'Healthy' && (
           <span className={`tag ${c.status === 'Injured' || c.status === 'Sick' ? 'warn' : 'danger'}`}>
             {c.status.toLowerCase()}

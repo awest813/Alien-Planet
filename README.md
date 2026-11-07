@@ -122,6 +122,11 @@ How the living simulation works:
 - **Families:** colonists have ages and backstories. Married couples have children: babies are carried by a
   parent, then grow up through childhood (learning by watching the adults work) and their teens (light work) into
   full colonists who take after their parents. The old slow down, and in time die of old age.
+- **The village:** once there are three adults, the colony chooses a leader by vote, each backing whoever they
+  think best of (kind natures win votes, abrasive ones lose them), and votes again each season or when the
+  leader dies. A cheerful leader lifts everyone; a miserable one drags them down. The Village screen sets the
+  policies: frugal or generous rations, short or long working hours, and a day of rest one day in six. Each
+  pleases some and annoys others (gluttons hate frugal rations, the lazy hate long hours, hard workers don't mind).
 - **Food and materials:** grow grain, mill it into flour and bake bread that keeps a month; hang meat, fish and
   berries on drying racks to keep them for months without power. Dig clay from the riverbanks and fire it into
   bricks in a kiln, and mine the rusty iron veins in the rock for a smelter's iron: tool kits, swords and mail.
@@ -283,6 +288,7 @@ src/
     lifespans.ts    Ages, backstories, births, growing up, learning by watching, old age
     minds.ts        Kinds of mental break, inspirations, obsessions and legendary works
     body.ts         Body parts, infection, lasting injuries, hospital beds
+    village.ts      The colony's leader, chosen by vote, and its policies
     simulation.ts   Fixed-tick loop, needs and mood, colonist AI, job system, reservations, objectives
     serialize.ts    Save format
   game/       Glue between the simulation, renderer, and UI
@@ -337,6 +343,7 @@ earshot and concerts, `src/game/music.test.ts` covers the tunes,
 `src/sim/gatherings.test.ts` covers funerals and graves, weddings, festivals and feasts, parties and memorials,
 `src/sim/cleaning.test.ts` covers mess, where it comes from, its cost to beauty and cleaning it,
 `src/sim/body.test.ts` covers body parts, infection, lasting injuries and hospital beds,
+`src/sim/village.test.ts` covers the vote, the leader's sway and the policies,
 `src/sim/minds.test.ts` covers kinds of mental break, inspirations and obsessions,
 `src/sim/lifespans.test.ts` covers ages, backstories, births, growing up, learning by watching and old age,
 `src/sim/production.test.ts` covers grain and bread, drying racks, clay and iron, kilns and smelters,

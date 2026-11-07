@@ -9,6 +9,7 @@
 // BUILD=1 (buildings, wood and fires each noon), WHERE=day (where everyone sleeps, and the beds and door),
 // FIRE=day (each fire's fuel and who could reach it), BORDER=day (what walls off the fire's region),
 // SAVEAT=day SAVEDIR=dir (keep a save from that day, for loading into the browser).
+import type { Hours, Rations } from '../src/sim/village';
 import { writeFileSync } from 'node:fs';
 import { comfortRange } from '../src/sim/apparel';
 import { MAP_SIZES } from '../src/sim/constants';
@@ -300,6 +301,10 @@ function check(sim: Simulation, problems: Map<string, number>, hourly: boolean):
         note(`fuel out of range (${w.fuel[i]}/${fuel.capacity})`);
       }
     }
+    const leader = sim.colonists[sim.village.leader];
+    if (sim.village.leader >= 0 && (!leader || leader.health.dead)) {
+      note('a dead or missing leader');
+    }
     const totals = sim.resourceTotals();
     if (totals.some((t) => !Number.isFinite(t.total) || t.total < 0)) {
       note('resource totals broken');
@@ -481,6 +486,14 @@ function play(player: number): Report {
           }
           break;
         case 'micromanager':
+          if (rng.chance(0.05)) {
+            sim.apply({
+              type: 'policy',
+              rations: rng.pick<Rations>(['frugal', 'normal', 'generous']),
+              hours: rng.pick<Hours>(['short', 'normal', 'long']),
+              restDays: rng.chance(0.5),
+            });
+          }
           for (let k = 0; k < 4; k++) {
             const c = rng.pick(sim.colonists);
             sim.apply({ type: 'priority', colonist: c.id, work: rng.pick([...WORK_TYPES]), value: rng.int(0, 4) });
@@ -787,6 +800,12 @@ function play(player: number): Report {
       () => ({ type: 'release', captive: sim.captives[0]?.id ?? -1 }),
       () => ({ type: 'research', project: rng.chance(0.2) ? null : rng.pick(research) }),
       () => ({ type: 'festivals', on: rng.chance(0.7) }),
+      () => ({
+        type: 'policy',
+        rations: rng.pick<Rations>(['frugal', 'normal', 'generous']),
+        hours: rng.pick<Hours>(['short', 'normal', 'long']),
+        restDays: rng.chance(0.5),
+      }),
       () => ({ type: 'shipChoice', board: rng.chance(0.5) }),
       () => ({ type: 'sellArt', tile: nearHome(10) }),
       () => ({ type: 'forbid', rect: randomRect(8), on: rng.chance(0.5) }),

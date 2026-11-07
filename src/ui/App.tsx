@@ -17,6 +17,7 @@ import { Minimap } from './minimap';
 import {
   HelpScreen,
   PrisonersScreen,
+  VillageScreen,
   ProductionScreen,
   ResearchScreen,
   ScheduleScreen,
@@ -186,6 +187,7 @@ export function App() {
           {screen === 'research' && <ResearchScreen state={state} onClose={close} />}
           {screen === 'story' && <StoryScreen state={state} onClose={close} />}
           {screen === 'prisoners' && <PrisonersScreen state={state} onClose={close} />}
+          {screen === 'village' && <VillageScreen state={state} onClose={close} />}
           {screen === 'trade' && <TradeScreen state={state} onClose={close} />}
         </>
       )}

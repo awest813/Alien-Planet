@@ -161,6 +161,16 @@ import { FEED_BELOW, PRISONER_BED, TALK_TICKS, release, talk, updateCaptives, vi
 import { CARER_HUNGER, DRAFT_AGE, agePace, canWork, rollPast, updateLifespans } from './lifespans';
 import { inHospitalBed, isInfected, scarMove, scarWork } from './body';
 import {
+  Village,
+  freshVillage,
+  hoursSpeed,
+  rationsEatBelow,
+  rationsHunger,
+  restDay,
+  updateVillage,
+  villageThoughts,
+} from './village';
+import {
   BREAK_LABELS,
   BreakKind,
   LEGEND,
@@ -571,6 +581,8 @@ export class Simulation {
   public enemies: Enemy[] = [];
   // Raiders lying wounded, and prisoners (see prisoners.ts).
   public captives: Captive[] = [];
+  // The colony's leader and policies (see village.ts).
+  public village: Village = freshVillage();
   // A colonist seized by a vision for a legendary work (see minds.ts).
   public obsession: Obsession | null = null;
   // Babies, carried by a parent until they can walk (see lifespans.ts).
@@ -936,6 +948,7 @@ export class Simulation {
       updateCaptives(this);
       updateLifespans(this);
       updateObsession(this);
+      updateVillage(this);
       this.weatherFilth();
     }
 
@@ -1070,6 +1083,17 @@ export class Simulation {
       }
       case 'festivals':
         this.story.festivals = cmd.on;
+        break;
+      case 'policy':
+        if (cmd.rations) {
+          this.village.rations = cmd.rations;
+        }
+        if (cmd.hours) {
+          this.village.hours = cmd.hours;
+        }
+        if (cmd.restDays !== undefined) {
+          this.village.restDays = cmd.restDays;
+        }
         break;
       case 'sellArt': {
         const why = sellArt(this, cmd.tile);
@@ -1770,6 +1794,12 @@ export class Simulation {
     return f !== NONE && featureDef(f).icebox;
   }
 
+  // What a colonist's schedule says for this hour; on a day of rest, work time is free time.
+  public slotOf(c: Colonist): ScheduleSlot {
+    const slot = c.schedule[Math.floor(this.hour)];
+    return restDay(this) && slot !== 'S' ? 'J' : slot;
+  }
+
   public isHospitalBed(i: number): boolean {
     const f = this.world.feature[i];
     return f !== NONE && featureDef(f).hospital;
@@ -2130,6 +2160,7 @@ export class Simulation {
     if (c.health.injuries.some(isInfected)) {
       keys.push('infectedWound');
     }
+    keys.push(...villageThoughts(this, c));
     if (inHospitalBed(this, c)) {
       keys.push('inHospital');
     }
@@ -2203,7 +2234,10 @@ export class Simulation {
   private updateNeeds(c: Colonist): void {
     const n = c.needs;
     const caring = this.infants.some((i) => i.carer === c.id) ? CARER_HUNGER : 1;
-    n.food = Math.max(0, n.food - FOOD_DECAY * traitFactor(c, 'foodDecay') * (c.sleeping ? 0.5 : 1) * caring);
+    n.food = Math.max(
+      0,
+      n.food - FOOD_DECAY * traitFactor(c, 'foodDecay') * (c.sleeping ? 0.5 : 1) * caring * rationsHunger(this.village),
+    );
     if (!c.sleeping) {
       n.joy = Math.max(0, n.joy - JOY_DECAY * traitFactor(c, 'joyDecay'));
     }
@@ -2537,13 +2571,13 @@ export class Simulation {
     if (c.carrying && this.tryStash(c)) {
       return;
     }
-    const slot = c.schedule[Math.floor(this.hour)];
+    const slot = this.slotOf(c);
     const food = c.needs.food;
     const h = c.health;
     if ((h.hypothermia > 0.5 || h.heatstroke > 0.5) && this.tryWarmUp(c)) {
       return;
     }
-    if (((food < 0.3 && slot !== 'W') || food < 0.15) && this.tryEat(c)) {
+    if (((food < rationsEatBelow(this.village) && slot !== 'W') || food < 0.15) && this.tryEat(c)) {
       return;
     }
     if ((h.hypothermia > 0.3 || h.heatstroke > 0.3) && this.tryWarmUp(c)) {
@@ -3412,7 +3446,15 @@ export class Simulation {
     const tools = c.tool && TOOL_WORK.has(type as JobType) ? 1 + TOOL_BONUS * qualityFactor(c.tool.quality) : 1;
     const inspired = c.thoughts.some((t) => t.key === 'inspired') ? INSPIRED_SPEED : 1;
     return (
-      skillFactor(skill) * moodFactor * traits * healthFactor(c) * tools * inspired * agePace(c).work * scarWork(c)
+      skillFactor(skill) *
+      moodFactor *
+      traits *
+      healthFactor(c) *
+      tools *
+      inspired *
+      agePace(c).work *
+      scarWork(c) *
+      hoursSpeed(this.village)
     );
   }
 
@@ -4717,7 +4759,7 @@ export class Simulation {
         return;
       }
     }
-    const slot = c.schedule[Math.floor(this.hour)];
+    const slot = this.slotOf(c);
     if (c.needs.joy >= 0.99 || --job.wait <= 0 || (slot !== 'J' && c.needs.joy > 0.9)) {
       this.finishJoy(c, job, joy);
     }
