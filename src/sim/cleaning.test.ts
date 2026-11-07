@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { featureId, itemId, terrainId } from './defs';
-import { damage } from './health';
+import { damage, tend } from './health';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
 import { HOUR, clearAround, outline, run } from './test-helpers';
@@ -159,5 +159,63 @@ describe('mess', () => {
     expect(w.filth[tile]).not.toBe(0);
     w.setTerrain(tile, terrainId('shallowWater'));
     expect(w.filth[tile]).toBe(0);
+  });
+});
+
+describe('hygiene', () => {
+  // A cook at a stove in the hut, with potatoes to hand. Returns the quality of the first meal.
+  function cook(seed: number, messy: boolean) {
+    const { sim, w, inside } = hut(seed);
+    // No landing rations, so the first meal found is the one cooked here.
+    for (const i of [...w.tilesWith('items')]) {
+      if (w.itemType[i] === itemId('meal')) {
+        w.takeItem(i, w.itemCount[i]);
+      }
+    }
+    const stove = inside(0, -2);
+    w.setFeature(stove, featureId('stove'));
+    w.dropItemNear(inside(1, 1), itemId('potatoes'), 30);
+    const cook = sim.colonists[0];
+    cook.skills.cooking = 10;
+    cook.priorities.cooking = 1;
+    cook.priorities.hauling = 0;
+    if (messy) {
+      for (let dx = -2; dx <= 2; dx++) {
+        w.addFilth(inside(dx, -1), Filth.BLOOD, 3);
+      }
+    }
+    for (let t = 0; t < HOUR * 6 && (sim.stats.produced.meal ?? 0) === 0; t++) {
+      sim.step();
+    }
+    const meal = [...w.tilesWith('items')].find((i) => w.itemType[i] === itemId('meal'));
+    expect(meal).toBeDefined();
+    return { sim, quality: w.quality[meal!], stove };
+  }
+
+  it('makes for worse meals from a dirty kitchen', () => {
+    const clean = cook(10, false);
+    const dirty = cook(10, true);
+    expect(clean.quality).toBe(10);
+    expect(dirty.quality).toBeLessThan(clean.quality);
+    expect(dirty.sim.messAround(dirty.stove)).toBeGreaterThan(0);
+  });
+
+  it('makes for worse tending, and a filthy room weighs on the mind', () => {
+    const { sim, w, inside } = hut(11);
+    const [doctor, patient] = sim.colonists;
+    patient.tile = inside(0, 0);
+    const tended = (mess: number) => {
+      patient.health.injuries = [{ label: 'Cut', severity: 0.1, bleeding: 0, tended: 0 }];
+      tend(sim, doctor, patient, false, mess);
+      return patient.health.injuries[0].tended;
+    };
+    expect(tended(8)).toBeLessThan(tended(0));
+    const moods = () => sim.thoughtsOf(patient).map((t) => t.label);
+    expect(moods()).not.toContain('Filthy surroundings');
+    for (let dx = -2; dx <= 2; dx++) {
+      w.addFilth(inside(dx, 1), Filth.DIRT, 2);
+    }
+    expect(sim.messAround(patient.tile)).toBe(10);
+    expect(moods()).toContain('Filthy surroundings');
   });
 });

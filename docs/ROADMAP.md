@@ -6,27 +6,25 @@ has, what it needs first, and how we'll know it works. Section 7 records the dec
 
 ## 1. Where the game stands
 
-The simulation covers survival, farming, cooking, crafting, research (17 projects), power, seasons, weather
-and fire, health and disease, raids and manhunters, trade, wildlife and husbandry, traits and relationships.
-The in-game goals run through five phases: Shelter, Living, Story, Seasons, Prosperity.
+Every phase planned here is done (sections 2–6), and so is everything from the "later" list (section 8).
+The simulation covers survival, farming, cooking, crafting, research, power, seasons, weather and fire,
+health and disease, raids and manhunters, trade, wildlife and husbandry, traits and relationships, culture,
+and a long game that lets a run end on the player's terms. The in-game goals run through six phases:
+Shelter, Living, Story, Seasons, Prosperity, Legacy.
 
-What the next phases build on:
+| System     | Today                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------- |
+| Recreation | Kinds (relaxing, physical, games, music, art, nature, social) with tolerance and variety thoughts.  |
+| Beauty     | Furniture, floors, sculptures by quality and flowers by season; felt within two tiles and in rooms. |
+| Hygiene    | Blood, rubble and tracked-in dirt lower beauty, spoil meals and tending, and a Clean work type.     |
+| Rooms      | Roles: bedroom, barracks, kitchen, workshop, dining room, recreation room, gallery.                 |
+| Skills     | Ten, with Artistic for sculpting and music.                                                         |
+| Social     | Chats, deep talks and insults; friends, rivals, lovers and marriage.                                |
+| Story      | Storyteller events, gatherings and festivals, story log, the signal beacon ending.                  |
+| Sound      | Made in code, off by default: instruments, concerts, ambience.                                      |
+| Death      | Graves, funerals and memorials.                                                                     |
 
-| System     | Today                                                                                                     |
-| ---------- | --------------------------------------------------------------------------------------------------------- |
-| Recreation | One "joy" need. Two joy buildings (armchair: relaxing; horseshoe pin: pitching), or a walk.               |
-| Beauty     | Furniture and floors have beauty. It only matters through a room's impressiveness (bedroom, dining room). |
-| Rooms      | Roles: bedroom, barracks, kitchen, workshop, dining room, recreation room.                                |
-| Skills     | Nine: mining, construction, plants, cooking, crafting, medicine, combat, intellectual, animals.           |
-| Social     | Chats, deep talks and insults move opinions; friends, rivals, lovers.                                     |
-| Story      | Storyteller events, story log, Story screen.                                                              |
-| Sound      | None.                                                                                                     |
-| Death      | The body leaves no trace; colonists get a mood thought.                                                   |
-
-**Balance, from the latest harness runs** (`npx tsx scripts/balance.ts 48 12 start=6`, Standard, 48 days, 12
-seeds): 72 of 74 colonists survive and no colony is wiped out. Food runs at 10–30 days of stores from day 10
-on, and cooking starts around day 5. Wildlife holds at 6–10 animals through the first year. Harsh (30 days,
-6 seeds) loses nobody.
+Balance figures are kept with each phase's results below.
 
 ## 2. Groundwork (done)
 
@@ -283,6 +281,18 @@ Nothing waiting: everything listed here has been done.
 
 Done since:
 
+- **Hygiene: mess has consequences.** Mess within two tiles (indoors, the same room only) now matters
+  beyond beauty:
+  - A meal comes out a grade worse for each level of mess around the stove, up to six. A worse meal is
+    less safe to eat (food poisoning already depended on the cook's work).
+  - Tending loses 0.04 of its quality for each level of mess around the patient, up to 0.3, so a dirty
+    sickroom heals wounds more slowly.
+  - Six levels or more around someone awake indoors gives "Filthy surroundings" (−3).
+  - Cleaners see to mess indoors before mess outside. The inspector warns at a stove or bed with mess
+    nearby.
+  - Balance, 48 days on 12 seeds: Standard kept everyone (72 of 72; 6 breaks, mood 50). On 12 fresh Harsh
+    seeds it matched the version before (72 of 75 against 72 of 74, mood 49.5 against 49.4). One Harsh run
+    lost four to a wolf pack that downed all ten colonists: a different run of events, not the mess.
 - **Cleaning and mess** (`world.filth`, a layer saved with the map).
   - Blood is left by wounds (colonists, raiders and animals), and an untended wound drips as its owner walks.
   - Rubble is left by mining, demolition, walls broken by raiders and buildings lost to fire.

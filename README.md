@@ -105,7 +105,8 @@ How the living simulation works:
   at a glance: poor work is cracked, excellent work trimmed in silver, a masterwork in gold.
 - **Cleaning:** wounds leave blood, mining and demolition leave rubble, and feet track dirt onto floors. Mess
   makes a room and its surroundings uglier until someone with Cleaning work scrubs it away; outdoors, the
-  weather wears it off in time.
+  weather wears it off in time. A dirty kitchen cooks worse, riskier meals, a dirty sickroom slows healing,
+  and a filthy room sours the mood.
 - **Rooms and temperature:** enclosed rooms get a role (bedroom, barracks, kitchen, …) and an impressiveness
   score from furniture beauty and size. Outdoor temperature follows a day/night cycle; rooms drift towards it
   and campfires heat them.

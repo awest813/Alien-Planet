@@ -1832,6 +1832,12 @@ export class GameController {
       details.push(`${mess} on the ground (${amount})`);
     }
     const def = f !== NONE ? featureDef(f) : undefined;
+    if (def?.workbench === 'cooking' && sim.messAround(i) > 0) {
+      details.push('Mess nearby makes for worse, riskier meals: clean it up');
+    }
+    if (def?.bed && sim.messAround(i) > 0) {
+      details.push('Mess nearby makes for worse tending of anyone laid up here');
+    }
     if (art && def) {
       details.push(`${qualityLabel(art.quality)} ${def.name.toLowerCase()} by ${art.artist}, day ${art.day}`);
     }

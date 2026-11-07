@@ -188,6 +188,10 @@ const TRACK_DIRT = 0.04;
 // colony's middle anyone bothers cleaning outdoors.
 const CLEAN_WORK = 30;
 const CLEAN_RANGE = 12;
+// Levels of mess around someone indoors that make a room feel filthy, and the most a dirty kitchen
+// takes off a meal's quality.
+const FILTHY = 6;
+const MAX_KITCHEN_TAINT = 6;
 const TRACK_DIRT_WET = 0.12;
 const CRAWL_HUNGRY = 0.15;
 // A downed patient this hungry is fed before wounds that aren't bleeding are tended.
@@ -1895,6 +1899,9 @@ export class Simulation {
       } else if (around <= 0 && this.isIndoors(c.tile)) {
         keys.push('drabSurroundings');
       }
+      if (this.isIndoors(c.tile) && this.messAround(c.tile) >= FILTHY) {
+        keys.push('filthyRoom');
+      }
     }
     // Cold and heat as felt in what they're wearing.
     const temp = this.temperatureAt(c.tile);
@@ -2658,6 +2665,8 @@ export class Simulation {
         (this.isRoofed(i) || w.floor[i] !== NONE || (home !== undefined && w.distance(home, i) <= CLEAN_RANGE)) &&
         !this.isReserved(`c${i}`, c),
       4,
+      // Indoors first, where mess spoils meals, tending and moods.
+      (i) => (this.isRoofed(i) ? 0 : 10),
     );
     const path = tiles.length > 0 ? this.pathfinder.find(c.tile, tiles) : null;
     if (!path) {
@@ -2782,6 +2791,30 @@ export class Simulation {
           continue;
         }
         total += this.beautyAt(i) + (w.floor[i] !== NONE ? featureDef(w.floor[i]).beauty : 0) + w.filthBeauty(i);
+      }
+    }
+    return total;
+  }
+
+  // Levels of mess within two tiles, counted like beauty (indoors, only in the same room).
+  public messAround(tile: number): number {
+    const w = this.world;
+    if (w.tilesWith('filth').size === 0) {
+      return 0;
+    }
+    this.ensureRegions();
+    const room = this.rooms.room[tile];
+    const indoors = room >= 0 && this.rooms.enclosed[room];
+    let total = 0;
+    for (let y = w.yOf(tile) - SURROUNDINGS; y <= w.yOf(tile) + SURROUNDINGS; y++) {
+      for (let x = w.xOf(tile) - SURROUNDINGS; x <= w.xOf(tile) + SURROUNDINGS; x++) {
+        if (!w.inBounds(x, y)) {
+          continue;
+        }
+        const i = w.idx(x, y);
+        if (w.filth[i] !== 0 && (!indoors || this.rooms.room[i] === room)) {
+          total += w.filthAmount(i);
+        }
       }
     }
     return total;
@@ -3856,7 +3889,9 @@ export class Simulation {
       const skill = bench === 'cooking' ? c.skills.cooking : c.skills.crafting;
       const made = itemDef(product);
       const rolled = !!made.apparel || !!made.weapon || !!made.armor || product === TOOL_KIT;
-      const quality = rolled ? Math.max(0, Math.min(20, skill + this.rng.int(-2, 2))) : skill;
+      // A meal cooked amid mess comes out worse, and so less safe to eat.
+      const taint = bench === 'cooking' ? Math.min(MAX_KITCHEN_TAINT, this.messAround(job.target)) : 0;
+      const quality = rolled ? Math.max(0, Math.min(20, skill + this.rng.int(-2, 2))) : Math.max(0, skill - taint);
       w.dropItemNear(c.tile, product, recipe.product.count, fresh, quality);
       this.produce(product, recipe.product.count);
       if (rolled) {
@@ -5818,7 +5853,7 @@ export class Simulation {
       if (medicine && --c.carrying!.count <= 0) {
         c.carrying = null;
       }
-      tend(this, c, patient, medicine);
+      tend(this, c, patient, medicine, this.messAround(patient.tile));
       this.endJob(c);
     }
   }

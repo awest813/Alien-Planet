@@ -26,6 +26,9 @@ const FATAL_INJURIES = 1.6;
 const DOWNED_BLOOD_LOSS = 0.6;
 const BLOOD_REGEN_PER_HOUR = 0.06;
 const CLOT_PER_HOUR = 0.15;
+// Each level of mess around a patient takes this off the quality of their tending, up to the most.
+const DIRTY_TENDING = 0.04;
+const MAX_DIRTY_TENDING = 0.3;
 // How often an open wound drips blood on the ground, for each unit of blood lost.
 const DRIP = 30;
 // Below this a wound has stopped bleeding.
@@ -121,14 +124,17 @@ export function infect(sim: Simulation, c: Colonist, key: string): void {
   c.health.disease = { key, label: DISEASES[key].label, severity: 0.05, immunity: 0, tendedUntil: 0 };
 }
 
-export function tend(sim: Simulation, doctor: Colonist, patient: Colonist, medicine: boolean): void {
+// `mess`: levels of mess around the patient, which make for worse tending (see messAround).
+export function tend(sim: Simulation, doctor: Colonist, patient: Colonist, medicine: boolean, mess = 0): void {
   const selfTreatment = doctor === patient ? 0.7 : 1;
+  const dirty = Math.min(MAX_DIRTY_TENDING, mess * DIRTY_TENDING);
   const quality = Math.max(
     0.1,
     Math.min(
       1,
       (0.3 + doctor.skills.medicine * 0.04 + (medicine ? 0.25 : 0) + (sim.isResearched('fieldMedicine') ? 0.15 : 0)) *
-        selfTreatment,
+        selfTreatment -
+        dirty,
     ),
   );
   for (const injury of patient.health.injuries) {

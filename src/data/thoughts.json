@@ -278,6 +278,10 @@
     "label": "Drab surroundings",
     "mood": -1
   },
+  "filthyRoom": {
+    "label": "Filthy surroundings",
+    "mood": -3
+  },
   "heardMusic": {
     "label": "Heard some music",
     "mood": 2,
