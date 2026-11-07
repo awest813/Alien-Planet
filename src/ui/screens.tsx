@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { UiState, controller } from '../game/controller';
 import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey } from '../sim/types';
 import { Bar, SLOT_LABELS, WORK_LABELS } from './common';
+import { ADULT, TEEN, TEEN_WORK } from '../sim/lifespans';
 
 // Full-screen dialogs opened from the top bar.
 
@@ -91,6 +92,12 @@ export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => 
               <tr key={c.id}>
                 <td className="row-label">
                   <span className="swatch" style={{ background: c.color }} /> {c.name}
+                  {c.age < ADULT && (
+                    <span className="muted small">
+                      {' '}
+                      ({c.stage}, {c.age})
+                    </span>
+                  )}
                 </td>
                 {WORK_TYPES.map((work) => {
                   const value = c.priorities[work];
@@ -99,6 +106,16 @@ export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => 
                   const set = (next: number) =>
                     controller.command({ type: 'priority', colonist: c.id, work, value: next });
                   const stars = skill?.passion ? '★'.repeat(skill.passion) : '';
+                  // Children don't work, and teens only do light work.
+                  if (c.age < ADULT && (c.age < TEEN || !TEEN_WORK.includes(work))) {
+                    return (
+                      <td key={work}>
+                        <span className="priority too-young" title={`${c.name} is too young for this work`}>
+                          ·
+                        </span>
+                      </td>
+                    );
+                  }
                   return (
                     <td key={work}>
                       <button
@@ -345,6 +362,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
           </li>
           <li>
             Grow <b>healroot</b> for medicine, hunt and fish for meat and leather, forage berries for quick food.
+          </li>
+          <li>
+            Married couples may have children. Babies stay with a parent; children play and learn by watching the adults
+            work; teens help with light work; at 18 they're grown. The old slow down, and in time pass on.
           </li>
           <li>
             Food that keeps without power: grow <b>grain</b>, mill it and bake bread (research Milling), or hang meat,

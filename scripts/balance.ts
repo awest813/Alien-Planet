@@ -143,6 +143,10 @@ interface Result {
   // Impressiveness of each enclosed room at the end, by role.
   rooms: { role: string; impressiveness: number }[];
   mess: number;
+  births: number;
+  grown: number;
+  children: number;
+  oldAge: number;
   fellWounded: number;
   captured: number;
   recruited: number;
@@ -362,8 +366,17 @@ function play(seed: number): Result {
         sim.apply({ type: 'build', feature: featureId('researchBench'), tiles: [labTile] });
       }
     }
-    // Mining and building can wall a planned bench off; a player would notice and plan it elsewhere.
+    // No spot for the bench on day 2 (someone standing in the way, say): try again each morning.
     const bench = featureId('researchBench');
+    if (builtDay2 && labTile < 0 && Math.floor(sim.hour) === 6) {
+      const lab = findSite(sim, 1, 1, avoid);
+      if (lab) {
+        claim(avoid, sim, lab.x, lab.y, 1, 1);
+        labTile = at(lab.x, lab.y);
+        sim.apply({ type: 'build', feature: bench, tiles: [labTile] });
+      }
+    }
+    // Mining and building can wall a planned bench off; a player would notice and plan it elsewhere.
     if (
       labTile >= 0 &&
       Math.floor(sim.hour) === 6 &&
@@ -674,6 +687,12 @@ function play(seed: number): Result {
     colonistHours,
     joyLowHours,
     rooms: roomsAtEnd(sim),
+    births: sim.stats.births ?? 0,
+    grown: sim.living().filter((c) => c.backstory === 'colonyBorn' && c.age >= 18).length,
+    children: sim.living().filter((c) => c.age < 18).length + sim.infants.length,
+    oldAge:
+      sim.unburied.filter((f) => f.cause === 'old age').length +
+      [...sim.graves.values()].filter((g) => g.cause === 'old age').length,
     fellWounded: fell.size,
     captured: sim.stats.captured ?? 0,
     recruited: sim.stats.recruited ?? 0,
@@ -835,6 +854,10 @@ console.log(
         `${role} ${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(0)} (${values.length})`,
     )
     .join(', ')}`,
+);
+console.log(
+  `  families: ${sum((r) => r.births)} born, ${sum((r) => r.children)} still children at the end, ` +
+    `${sum((r) => r.grown)} grown up into adults, ${sum((r) => r.oldAge)} died of old age`,
 );
 console.log(
   `  prisoners: ${sum((r) => r.fellWounded)} raiders fell wounded, ${sum((r) => r.captured)} taken prisoner, ` +

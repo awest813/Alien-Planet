@@ -501,6 +501,28 @@ can ship on its own.
 - First slice: ages, backstories and births to married couples (children as non-working colonists who grow
   up). Success: in long harness runs (120 days) a second generation joins the work force.
 
+- **Done** (`src/sim/lifespans.ts`, `src/data/backstories.json`):
+  - Ages: a year is 24 days. Starting colonists are 18 to 52, each with one of 20 original backstories
+    that tilts their skills (a galley cook cooks better, a station guard fights better).
+  - Children: a married couple between 18 and 50 may start expecting (5% a day, one baby at a time, while
+    the colony has room for three more than its usual size). Six days later the baby is born, and a parent
+    carries and cares for them (getting hungry a fifth faster) until they're 3. Then they join the colony
+    as a child, taking after their parents' traits and passions, with "Born in the valley" as their past.
+  - Growing up: children grow six times faster than adults age, so a child born in the colony comes of age
+    within a long game. Children (3–12) don't work, but learn by watching adults at work nearby. Teens
+    (13–17) do light work: hauling, cleaning, growing, cutting plants, art. Nobody under 16 is drafted.
+    Coming of age is a story moment.
+  - Old age: from 65, colonists work and walk a little slower; from 70 each birthday may be their last.
+  - Families: no romance between family members or with the young. Parents grieve a child above all (−25),
+    and everyone is glad of a birth. The inspector shows age, stage, backstory and family; the Work screen
+    shows who is too young for what; children are drawn smaller.
+  - Goal (Prosperity): welcome a child born in the valley. The end-of-story summary counts children born.
+  - Balance, 48 days on 12 seeds: Standard kept everyone (78 of 78; mood 51.6, starving hours down to
+    1,075), with 5 children born. Harsh lost 1 of 79 in a raid, with 7 born. Over 120 days on 6 seeds, 7
+    children were born and 3 grew up into adults.
+  - Found along the way: the balance harness placed its research bench only on day 2, so a colony with no
+    spot that morning never researched anything (no parkas, no hearth) and froze. It now tries every day.
+
 **Phase H: Minds.** _(Medium.)_
 
 - Mental breaks by kind and severity: a sulk in their room, a food binge, a tantrum that breaks something, a

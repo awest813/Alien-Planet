@@ -14,6 +14,7 @@ import { itemIconStyle } from '../render/icons';
 import { PHASE_NAMES } from '../sim/simulation';
 import type { Stance } from '../sim/types';
 import { STORAGE_GROUPS, StockpilePriority } from '../sim/world';
+import { DRAFT_AGE } from '../sim/lifespans';
 import { Bar, moodColor } from './common';
 
 // The always-on game HUD: top bar, colonist bar, inspector, side panel, and architect menu.
@@ -44,7 +45,7 @@ const formatPower = (watts: number) => (Math.abs(watts) >= 1000 ? `${(watts / 10
 export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Screen) => void }) {
   const p = state.power;
   const net = p.supply - p.demand;
-  const anyFree = state.colonists.some((c) => !c.dead && c.status !== 'Downed' && !c.drafted);
+  const anyFree = state.colonists.some((c) => !c.dead && c.status !== 'Downed' && !c.drafted && c.age >= DRAFT_AGE);
   return (
     <header className="panel topbar">
       <div className="tb-time">
@@ -306,8 +307,13 @@ function ColonistCard({ c }: { c: ColonistView }) {
         {!c.dead && c.status !== 'Downed' && (
           <button
             className={c.drafted ? 'active danger' : ''}
+            disabled={c.age < DRAFT_AGE}
             onClick={() => controller.toggleDraft(c.id)}
-            title="Draft for combat (Q). Right-click the map to move."
+            title={
+              c.age < DRAFT_AGE
+                ? `${c.name} is too young to fight`
+                : 'Draft for combat (Q). Right-click the map to move.'
+            }
           >
             {c.drafted ? 'Drafted' : 'Draft'}
           </button>
@@ -472,6 +478,17 @@ function HealthTab({ c }: { c: ColonistView }) {
 function SocialTab({ c }: { c: ColonistView }) {
   return (
     <>
+      <h4>
+        {c.age} years old{c.stage !== 'adult' && <span className="muted"> · {c.stage}</span>}
+      </h4>
+      <div>
+        <b>{c.backstory.title}</b> <span className="muted">{c.backstory.description}</span>
+      </div>
+      {c.family.map((f) => (
+        <div key={f} className="muted">
+          {f}
+        </div>
+      ))}
       <h4>Traits</h4>
       {c.traits.map((t) => (
         <div key={t.label}>

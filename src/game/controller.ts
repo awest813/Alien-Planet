@@ -33,9 +33,11 @@ import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
 import { DOWNED_TICKS, persuasion } from '../sim/prisoners';
+import { DRAFT_AGE, backstoryOf, stageOf } from '../sim/lifespans';
 import { applyTrade, goodwillOf, prices, standingLabel, tradableItems, tradeOpen, artForSale } from '../sim/trade';
 import { weatherDef } from '../sim/weather';
 import {
+  Colonist,
   Command,
   DesignationKind,
   LogEntry,
@@ -140,6 +142,9 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
   friends: { how: 'Colonists chat while they work and relax together; a table and recreation help.' },
   raid: { how: 'When raiders come, press Q to draft everyone and fight from cover.' },
   hunt: { how: 'Pick Hunt and drag over animals; hunters track and shoot them.', tool: 'hunt' },
+  firstChild: {
+    how: 'Lovers who marry may start a family: keep them happy, fed and safe, with room in the colony to grow.',
+  },
   bread: {
     how: 'Research Milling, grow grain (Zones), build a millstone and a stove, and set bills to mill flour and bake bread.',
     tool: 'growGrain',
@@ -543,6 +548,11 @@ export interface ColonistView {
   priorities: Priorities;
   schedule: ScheduleSlot[];
   traits: { label: string; description: string }[];
+  // Age in whole years, life stage, past, and family lines ("Mother of …", "Caring for baby …").
+  age: number;
+  stage: string;
+  backstory: { title: string; description: string };
+  family: string[];
   status: 'Healthy' | 'Injured' | 'Sick' | 'Downed' | 'Dead';
   bleeding: boolean;
   sleeping: boolean;
@@ -860,6 +870,7 @@ export class GameController {
       { label: 'Sculptures carved', value: st.sculptures ?? 0 },
       { label: 'Concerts given', value: st.concerts ?? 0 },
       { label: 'Weddings', value: st.weddings ?? 0 },
+      { label: 'Children born', value: st.births ?? 0 },
       { label: 'Couples leaving together', value: Math.floor(married) },
       { label: 'Buildings built', value: st.built },
     ];
@@ -1098,7 +1109,7 @@ export class GameController {
 
   // Drafts every able colonist, or stands everyone down if they're all drafted already.
   public toggleDraftAll(): void {
-    const able = this.sim.living().filter((c) => !c.health.downed);
+    const able = this.sim.living().filter((c) => !c.health.downed && c.age >= DRAFT_AGE);
     const draft = able.some((c) => !c.drafted);
     for (const c of able) {
       this.command({ type: 'draft', colonist: c.id, drafted: draft });
@@ -1470,6 +1481,10 @@ export class GameController {
         priorities: { ...c.priorities },
         schedule: [...c.schedule],
         traits: c.traits.map((key) => ({ label: TRAITS[key].label, description: TRAITS[key].description })),
+        age: Math.floor(c.age),
+        stage: stageOf(c.age),
+        backstory: (({ title, description }) => ({ title, description }))(backstoryOf(c.backstory)),
+        family: this.familyOf(c),
         bleeding: !c.health.dead && bleedingOf(c) > 0,
         sleeping: c.sleeping,
         status: c.health.dead
@@ -1999,6 +2014,29 @@ export class GameController {
       ['handling', sim.animals.some((a) => a.taming)],
     ];
     return waiting.filter(([work, has]) => has && !staffed(work)).map(([work]) => WORK_NAMES[work] ?? work);
+  }
+
+  // A colonist's family, as lines for the inspector.
+  private familyOf(c: Colonist): string[] {
+    const sim = this.sim;
+    const name = (id: number) => sim.colonists[id]?.name ?? '?';
+    const lines: string[] = [];
+    if (c.parents.length > 0) {
+      lines.push(`Child of ${c.parents.map(name).join(' and ')}`);
+    }
+    const children = sim.colonists.filter((o) => o.parents.includes(c.id)).map((o) => o.name);
+    const babies = sim.infants.filter((i) => i.parents.includes(c.id)).map((i) => `baby ${i.name}`);
+    if (children.length + babies.length > 0) {
+      lines.push(`Parent of ${[...children, ...babies].join(', ')}`);
+    }
+    for (const i of sim.infants.filter((b) => b.carer === c.id && !b.parents.includes(c.id))) {
+      lines.push(`Caring for baby ${i.name}`);
+    }
+    if (c.expectingUntil !== undefined) {
+      const days = Math.max(1, Math.ceil((c.expectingUntil - sim.tick) / (TICKS_PER_HOUR * 24)));
+      lines.push(`Expecting a child in about ${days} day${days > 1 ? 's' : ''}`);
+    }
+    return lines;
   }
 
   private captivesView(): CaptiveView[] {

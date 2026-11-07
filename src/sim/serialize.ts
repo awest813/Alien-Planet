@@ -12,6 +12,7 @@ import {
   Carried,
   Captive,
   Colonist,
+  Infant,
   Stance,
   WornArmor,
   Enemy,
@@ -44,6 +45,11 @@ interface SavedColonist {
   id: number;
   name: string;
   color: string;
+  // Older saves have no ages or backstories.
+  age?: number;
+  backstory?: string;
+  parents?: number[];
+  expectingUntil?: number;
   tile: number;
   skills: Skills;
   priorities: Priorities;
@@ -137,6 +143,8 @@ export interface SaveData {
   enemies: Enemy[];
   nextEnemyId: number;
   captives?: Captive[];
+  infants?: Infant[];
+  nextInfantId?: number;
   animals: Animal[];
   nextAnimalId: number;
   caravan: Caravan | null;
@@ -229,6 +237,10 @@ export function serialize(sim: Simulation): SaveData {
         path: c.drafted ? c.path : [],
         practicedAt: c.practicedAt,
         recentJoy: { ...c.recentJoy },
+        age: c.age,
+        backstory: c.backstory,
+        parents: [...c.parents],
+        expectingUntil: c.expectingUntil,
       }),
     ),
     bills: structuredClone(sim.bills),
@@ -248,6 +260,8 @@ export function serialize(sim: Simulation): SaveData {
     enemies: structuredClone(sim.enemies),
     nextEnemyId: sim.nextEnemyId,
     captives: structuredClone(sim.captives),
+    infants: structuredClone(sim.infants),
+    nextInfantId: sim.nextInfantId,
     animals: structuredClone(sim.animals),
     caravan: structuredClone(sim.caravan),
     goodwill: { ...sim.goodwill },
@@ -306,6 +320,9 @@ export function deserialize(data: SaveData): Simulation {
     job: null,
     reserved: [],
     practicedAt: saved.practicedAt ?? {},
+    age: saved.age ?? 30,
+    backstory: saved.backstory ?? 'drifter',
+    parents: saved.parents ?? [],
   }));
   // Saves from before the Animals skill was tracked properly have no (or broken) progress for it.
   for (const c of colonists) {
@@ -340,6 +357,8 @@ export function deserialize(data: SaveData): Simulation {
   sim.enemies = structuredClone(data.enemies);
   sim.nextEnemyId = data.nextEnemyId;
   sim.captives = structuredClone(data.captives ?? []);
+  sim.infants = structuredClone(data.infants ?? []);
+  sim.nextInfantId = data.nextInfantId ?? 0;
   sim.animals = structuredClone(data.animals);
   sim.caravan = structuredClone(data.caravan);
   sim.goodwill = { ...data.goodwill };

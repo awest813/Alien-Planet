@@ -150,6 +150,14 @@ export interface Colonist {
   id: number;
   name: string;
   color: string;
+  // Age in years (fractional). Children grow faster than adults age (see lifespans.ts).
+  age: number;
+  // Key into backstories.json: who they were before the valley.
+  backstory: string;
+  // Ids of their parents, for those born in the colony.
+  parents: number[];
+  // When their child is due, while the couple is expecting.
+  expectingUntil?: number;
   tile: number;
   // Remaining tiles to walk; path[0] is the tile being entered.
   path: number[];
@@ -342,6 +350,16 @@ export interface Captive {
   hungryHours: number;
 }
 
+// A baby, carried and cared for by a parent until old enough to toddle about as a colonist.
+export interface Infant {
+  id: number;
+  name: string;
+  age: number;
+  parents: number[];
+  // The colonist caring for them (a parent, or anyone if the parents are gone).
+  carer: number;
+}
+
 // A recent attack, kept briefly so the renderer can draw it.
 export interface Shot {
   from: number;
@@ -421,6 +439,7 @@ export interface Stats {
   wintersSurvived: number;
   // Games of chess played with someone.
   chessGames?: number;
+  births?: number;
   // Raiders taken prisoner, and prisoners won over.
   captured?: number;
   recruited?: number;

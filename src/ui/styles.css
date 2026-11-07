@@ -1540,3 +1540,12 @@ button.big {
   padding: 2px 6px;
   text-transform: capitalize;
 }
+
+/* Work a child or teen is too young for. */
+.priority.too-young {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+  color: var(--muted, #888);
+  opacity: 0.5;
+}

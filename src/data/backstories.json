@@ -1,0 +1,129 @@
+[
+  {
+    "key": "hydroponicsTech",
+    "title": "Hydroponics tech",
+    "description": "Kept the greenhouse decks alive on a long-haul freighter, and still talks to plants.",
+    "skills": { "plants": 3, "research": 1, "combat": -1 }
+  },
+  {
+    "key": "salvageDiver",
+    "title": "Salvage diver",
+    "description": "Cut wrecks apart for scrap in the debris belts. Steady hands, few words.",
+    "skills": { "construction": 2, "crafting": 2, "artistic": -1 }
+  },
+  {
+    "key": "galleyCook",
+    "title": "Galley cook",
+    "description": "Fed a crew of two hundred from a kitchen the size of a cupboard.",
+    "skills": { "cooking": 3, "plants": 1, "research": -1 }
+  },
+  {
+    "key": "fieldMedic",
+    "title": "Field medic",
+    "description": "Patched up miners after cave-ins on a frontier moon.",
+    "skills": { "medicine": 3, "combat": 1, "artistic": -1 }
+  },
+  {
+    "key": "surveyor",
+    "title": "Planetary surveyor",
+    "description": "Walked new worlds with a sampling kit before anyone else set foot on them.",
+    "skills": { "research": 2, "mining": 2, "cooking": -1 }
+  },
+  {
+    "key": "stationGuard",
+    "title": "Station guard",
+    "description": "Kept order on a crowded transfer station, mostly by being bigger than the trouble.",
+    "skills": { "combat": 3, "construction": 1, "medicine": -1 }
+  },
+  {
+    "key": "quarryHand",
+    "title": "Quarry hand",
+    "description": "Grew up splitting stone in the terraced quarries of a cold world.",
+    "skills": { "mining": 3, "construction": 1, "research": -1 }
+  },
+  {
+    "key": "herdKeeper",
+    "title": "Herd keeper",
+    "description": "Drove shaggy pack animals across high plateaus for a living.",
+    "skills": { "animals": 3, "plants": 1, "crafting": -1 }
+  },
+  {
+    "key": "muralPainter",
+    "title": "Mural painter",
+    "description": "Covered habitat walls with forests nobody aboard had ever seen.",
+    "skills": { "artistic": 3, "crafting": 1, "mining": -1 }
+  },
+  {
+    "key": "busker",
+    "title": "Corridor busker",
+    "description": "Played for coins in the long corridors of an orbital city.",
+    "skills": { "artistic": 2, "cooking": 1, "construction": -1 }
+  },
+  {
+    "key": "archivist",
+    "title": "Archivist",
+    "description": "Catalogued a library of seeds, songs and star charts that no one else read.",
+    "skills": { "research": 3, "artistic": 1, "combat": -1 }
+  },
+  {
+    "key": "tinkerer",
+    "title": "Tinkerer",
+    "description": "Fixed anything with a power cell, and several things without.",
+    "skills": { "crafting": 3, "research": 1, "animals": -1 }
+  },
+  {
+    "key": "trapper",
+    "title": "Trapper",
+    "description": "Lived off the land on a frontier world, selling pelts twice a year.",
+    "skills": { "combat": 2, "animals": 2, "research": -1 }
+  },
+  {
+    "key": "colonyBuilder",
+    "title": "Habitat builder",
+    "description": "Raised prefab domes on half a dozen new colonies, and saw most of them fail.",
+    "skills": { "construction": 3, "mining": 1, "artistic": -1 }
+  },
+  {
+    "key": "orchardChild",
+    "title": "Orchard child",
+    "description": "Grew up among fruit trees on an old farming moon, picking from dawn.",
+    "skills": { "plants": 2, "cooking": 2, "combat": -1 }
+  },
+  {
+    "key": "nurse",
+    "title": "Ward nurse",
+    "description": "Worked night shifts on a hospital ship, and never forgot a patient's name.",
+    "skills": { "medicine": 2, "cooking": 1, "mining": -1 }
+  },
+  {
+    "key": "smuggler",
+    "title": "Smuggler",
+    "description": "Ran cargo past customs cutters. Knows how to keep calm when it counts.",
+    "skills": { "combat": 2, "crafting": 1, "plants": -1 }
+  },
+  {
+    "key": "teacher",
+    "title": "Schoolteacher",
+    "description": "Taught the children of an asteroid town to read, count and look at the stars.",
+    "skills": { "research": 2, "artistic": 1, "combat": -1 }
+  },
+  {
+    "key": "tailor",
+    "title": "Tailor",
+    "description": "Cut uniforms for a fleet that kept changing its colours.",
+    "skills": { "crafting": 2, "artistic": 2, "mining": -1 }
+  },
+  {
+    "key": "drifter",
+    "title": "Drifter",
+    "description": "Never stayed anywhere long enough to call it home. Until now, maybe.",
+    "skills": { "plants": 1, "construction": 1, "cooking": 1 }
+  },
+  {
+    "key": "colonyBorn",
+    "title": "Born in the valley",
+    "description": "Born here, under this sky. The colony is the only home they've known.",
+    "skills": {},
+    "hidden": true
+  }
+]

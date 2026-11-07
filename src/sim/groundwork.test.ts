@@ -53,7 +53,7 @@ describe('artistic skill', () => {
     expect(SKILL_LABELS.artistic).toBe('Artistic');
     const sim = Simulation.newColony(22);
     for (const c of sim.colonists) {
-      expect(c.skills.artistic).toBeGreaterThanOrEqual(1);
+      expect(c.skills.artistic).toBeGreaterThanOrEqual(0);
       expect(c.skillXp.artistic).toBe(0);
     }
     sim.colonists[0].skills.artistic = 12;

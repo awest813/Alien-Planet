@@ -4,6 +4,7 @@ import { NONE, featureDef, terrainId } from '../sim/defs';
 import { hash2 } from '../sim/rng';
 import { beaconTile, transmitting } from '../sim/beacon';
 import { EXCELLENT, MASTERWORK } from '../sim/art';
+import { ADULT, TEEN } from '../sim/lifespans';
 import { NIGHT_END, NIGHT_START } from '../sim/simulation';
 import { Animal, Colonist, Enemy } from '../sim/types';
 import { Designation, GROW_ZONE, World } from '../sim/world';
@@ -664,6 +665,8 @@ export class ColonyScene extends Phaser.Scene {
       (pawn.figure.getAt(0) as Phaser.GameObjects.Image).setTexture(stride(moving && !downed && !dead, time));
       pawn.root.setAlpha(dead ? 0.55 : 1);
       pawn.figure.setAngle(c.sleeping || dead || downed ? 90 : 0);
+      // Children are small, teens nearly grown.
+      pawn.figure.setScale(c.age < TEEN ? 0.7 : c.age < ADULT ? 0.85 : 1);
       pawn.zzz.setVisible(c.sleeping).setY(-6 - ((time / 400) % 3));
       pawn.label.setVisible(controller.settings.showNames);
       pawn.alert

@@ -79,6 +79,7 @@ import {
   needsTending,
   painOf,
   POISONING_HOURS,
+  die,
   tend,
   updateExposure,
   updateHealth,
@@ -134,6 +135,7 @@ import {
   WorkTypeKey,
   Artwork,
   Captive,
+  Infant,
   Fallen,
   Gathering,
   GatheringKind,
@@ -156,6 +158,7 @@ import {
 } from './gatherings';
 import { BeaconState, TRANSMIT_HOURS, chooseToStay, depart, freshBeacon, updateBeacon } from './beacon';
 import { FEED_BELOW, PRISONER_BED, TALK_TICKS, release, talk, updateCaptives, visitDue } from './prisoners';
+import { CARER_HUNGER, DRAFT_AGE, agePace, canWork, rollPast, updateLifespans } from './lifespans';
 import { spreadWildPlants, wildPlantCover } from './plants';
 import {
   Designation,
@@ -411,10 +414,13 @@ function createColonist(id: number, name: string, tile: number, rng: Rng): Colon
     animals: rng.int(1, 9),
     artistic: rng.int(1, 9),
   };
-  return {
+  const c: Colonist = {
     id,
     name,
     color: COLONIST_COLORS[id % COLONIST_COLORS.length],
+    age: 30,
+    backstory: 'drifter',
+    parents: [],
     tile,
     path: [],
     moveProgress: 0,
@@ -456,6 +462,8 @@ function createColonist(id: number, name: string, tile: number, rng: Rng): Colon
     practicedAt: {},
     recentJoy: {},
   };
+  rollPast(c, rng);
+  return c;
 }
 
 // Which skill a piece of work trains.
@@ -545,6 +553,9 @@ export class Simulation {
   public enemies: Enemy[] = [];
   // Raiders lying wounded, and prisoners (see prisoners.ts).
   public captives: Captive[] = [];
+  // Babies, carried by a parent until they can walk (see lifespans.ts).
+  public infants: Infant[] = [];
+  public nextInfantId = 0;
   public nextEnemyId = 0;
   public raid: RaidState | null = null;
   public animals: Animal[] = [];
@@ -744,6 +755,17 @@ export class Simulation {
     return best;
   }
 
+  // A name nobody in the colony (or among its babies) has yet.
+  public freshName(): string {
+    const taken = new Set([...this.colonists.map((c) => c.name), ...this.infants.map((i) => i.name)]);
+    const free = COLONIST_NAMES.filter((n) => !taken.has(n));
+    return free.length > 0 ? this.rng.pick(free) : `${this.rng.pick(COLONIST_NAMES)} ${this.colonists.length + 1}`;
+  }
+
+  public dieOf(c: Colonist, cause: string): void {
+    die(this, c, cause);
+  }
+
   // Someone joins the colony on a given tile (a prisoner won over, say).
   public adopt(name: string, tile: number): Colonist {
     const taken = new Set(this.colonists.map((o) => o.name));
@@ -779,11 +801,7 @@ export class Simulation {
     if (edge === undefined) {
       return null;
     }
-    const taken = new Set(this.colonists.map((c) => c.name));
-    const free = COLONIST_NAMES.filter((n) => !taken.has(n));
-    const name =
-      free.length > 0 ? this.rng.pick(free) : `${this.rng.pick(COLONIST_NAMES)} ${this.colonists.length + 1}`;
-    const c = createColonist(this.colonists.length, name, edge, this.rng);
+    const c = createColonist(this.colonists.length, this.freshName(), edge, this.rng);
     for (const other of this.colonists) {
       introduce(c, other, this.rng);
     }
@@ -896,6 +914,7 @@ export class Simulation {
       updateWeather(this);
       updateBeacon(this);
       updateCaptives(this);
+      updateLifespans(this);
       this.weatherFilth();
     }
 
@@ -1065,7 +1084,7 @@ export class Simulation {
         break;
       case 'draft': {
         const c = this.colonists[cmd.colonist];
-        if (!c || c.health.dead || (cmd.drafted && (c.health.downed || this.inMentalBreak(c)))) {
+        if (!c || c.health.dead || (cmd.drafted && (c.health.downed || this.inMentalBreak(c) || c.age < DRAFT_AGE))) {
           break;
         }
         this.endJob(c);
@@ -2132,7 +2151,8 @@ export class Simulation {
 
   private updateNeeds(c: Colonist): void {
     const n = c.needs;
-    n.food = Math.max(0, n.food - FOOD_DECAY * traitFactor(c, 'foodDecay') * (c.sleeping ? 0.5 : 1));
+    const caring = this.infants.some((i) => i.carer === c.id) ? CARER_HUNGER : 1;
+    n.food = Math.max(0, n.food - FOOD_DECAY * traitFactor(c, 'foodDecay') * (c.sleeping ? 0.5 : 1) * caring);
     if (!c.sleeping) {
       n.joy = Math.max(0, n.joy - JOY_DECAY * traitFactor(c, 'joyDecay'));
     }
@@ -2385,7 +2405,9 @@ export class Simulation {
     }
     const diagonal = w.xOf(next) !== w.xOf(c.tile) && w.yOf(next) !== w.yOf(c.tile);
     const hunger = starving(c) ? STARVING_MOVE : 1;
-    return (MOVE_SPEED * armorOf(c).speed * hunger) / (w.moveCost(next) * (diagonal ? Math.SQRT2 : 1));
+    return (
+      (MOVE_SPEED * armorOf(c).speed * hunger * agePace(c).move) / (w.moveCost(next) * (diagonal ? Math.SQRT2 : 1))
+    );
   }
 
   private move(c: Colonist): void {
@@ -2507,7 +2529,7 @@ export class Simulation {
     const order = this.workOrder();
     for (let p = 1; p <= 4; p++) {
       for (const work of order) {
-        if (c.priorities[work] === p && this.tryWorkType(c, work)) {
+        if (c.priorities[work] === p && canWork(c, work) && this.tryWorkType(c, work)) {
           return true;
         }
       }
@@ -3194,7 +3216,7 @@ export class Simulation {
     const traits = traitFactor(c, 'workSpeed') * (plants ? traitFactor(c, 'plantSpeed') : 1);
     const tools = c.tool && TOOL_WORK.has(type as JobType) ? 1 + TOOL_BONUS * qualityFactor(c.tool.quality) : 1;
     const inspired = c.thoughts.some((t) => t.key === 'inspired') ? INSPIRED_SPEED : 1;
-    return skillFactor(skill) * moodFactor * traits * healthFactor(c) * tools * inspired;
+    return skillFactor(skill) * moodFactor * traits * healthFactor(c) * tools * inspired * agePace(c).work;
   }
 
   private stepWork(c: Colonist, job: Job): void {
@@ -6794,6 +6816,12 @@ export const OBJECTIVES: ObjectiveDef[] = [
     phase: 5,
     check: (s) => s.living().length >= populationFor(s.world.width).maxColonists,
     progress: (s) => `${s.living().length}/${populationFor(s.world.width).maxColonists}`,
+  },
+  {
+    id: 'firstChild',
+    label: 'Welcome a child born in the valley',
+    phase: 5,
+    check: (s) => (s.stats.births ?? 0) > 0,
   },
   {
     id: 'bread',

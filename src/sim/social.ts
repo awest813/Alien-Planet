@@ -1,5 +1,6 @@
 import { TRAITS, TraitDef } from './defs';
 import { Rng, hash2 } from './rng';
+import { canRomance } from './lifespans';
 import type { Simulation } from './simulation';
 import { Colonist } from './types';
 
@@ -114,7 +115,14 @@ function interact(sim: Simulation, a: Colonist, b: Colonist, insults = 1): void 
     adjust(b, a, 6);
     sim.addThought(a, 'deepTalk');
     sim.addThought(b, 'deepTalk');
-    if (a.lover < 0 && b.lover < 0 && chemistry > 0.2 && mutualOpinion(a, b) >= LOVER_OPINION && sim.rng.next() < 0.3) {
+    if (
+      a.lover < 0 &&
+      b.lover < 0 &&
+      canRomance(a, b) &&
+      chemistry > 0.2 &&
+      mutualOpinion(a, b) >= LOVER_OPINION &&
+      sim.rng.next() < 0.3
+    ) {
       a.lover = b.id;
       b.lover = a.id;
       sim.addLog(`${a.name} and ${b.name} have fallen in love.`, 'good', true);

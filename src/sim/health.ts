@@ -235,7 +235,7 @@ export function checkHealth(sim: Simulation, c: Colonist): void {
   h.downed = downed;
 }
 
-function die(sim: Simulation, c: Colonist, cause: string): void {
+export function die(sim: Simulation, c: Colonist, cause: string): void {
   sim.endJob(c);
   sim.dropCarried(c);
   const weapon = weaponDef(c.weapon).item;
@@ -261,6 +261,13 @@ function die(sim: Simulation, c: Colonist, cause: string): void {
   // Waiting to be buried (a grave and a funeral), and remembered by name.
   sim.unburied.push({ id: c.id, name: c.name, day: sim.day, cause });
   sim.addLog(`${c.name} has died of ${cause}.`, 'danger', true);
+  // Parents grieve a child above all.
+  for (const parent of c.parents) {
+    const p = sim.colonists[parent];
+    if (p && !p.health.dead) {
+      sim.addThought(p, 'childDied');
+    }
+  }
   sim.events.push('death');
   for (const other of sim.living()) {
     if (other.spouse === c.id) {

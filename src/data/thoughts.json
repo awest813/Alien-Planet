@@ -353,5 +353,25 @@
   "unburied": {
     "label": "One of us lies unburied",
     "mood": -2
+  },
+  "newParent": {
+    "label": "Became a parent",
+    "mood": 10,
+    "hours": 96
+  },
+  "newbornInColony": {
+    "label": "A child was born",
+    "mood": 4,
+    "hours": 36
+  },
+  "childDied": {
+    "label": "Lost a child",
+    "mood": -25,
+    "hours": 240
+  },
+  "grewUp": {
+    "label": "All grown up",
+    "mood": 6,
+    "hours": 48
   }
 }
