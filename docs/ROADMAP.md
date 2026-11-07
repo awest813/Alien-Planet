@@ -375,3 +375,155 @@ Done since:
   - notifications;
   - the README.
 - It's checked in the browser at desktop and phone sizes.
+- The 100-player playtest (`scripts/playtest.ts`) runs clean: no crashes, no invariant problems, and every
+  sensible play style keeps its colony.
+
+## 10. Next: what the genre's best do that we don't
+
+An audit against four colony and settlement games the direction draws on: RimWorld (story-driven colony
+survival), Dwarf Fortress (deep simulation and emergent history), Clanfolk (a family clan through hard
+winters, everything made from raw materials) and First Feudal (a medieval village grown by assigning people
+to work). We take **mechanics** from the genre, never content: no names, creatures, items, art or
+storylines from any of them. Everything below is designed to fit Colony Alpha's alien valley and its
+existing systems.
+
+### Audit
+
+| Area                | The genre at its best                                                        | Colony Alpha today                                                        | Gap        |
+| ------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------- |
+| Storage & hauling   | Stockpiles with item filters and priorities; shelves; forbidding items       | One stockpile kind that takes everything; iceboxes and freezers           | Large      |
+| Heating & fuel      | Fires burn fuel; firewood is cut and stored for winter                       | Campfires and hearths heat for free; generators burn wood                 | Medium     |
+| Food & preservation | Many crops; milling, baking, smoking, drying, cellars; seasonal stocking up  | 3 crops; meals and fine meals; cold storage by power or ice               | Large      |
+| Materials           | Long chains: clay to pottery, ore to metal, flax to linen, hides to leather  | Wood, stone, blocks, cotton, wool, leather, silver; no metal, no smelting | Large      |
+| Life & family       | Ages, children growing up, elders, generations, family homes, inheritance    | Ageless adults; lovers marry; no children                                 | Large      |
+| Character           | Backstories; varied mental breaks; inspirations; obsessive artifact-making   | 12 traits, passions; one kind of break (a daze); one kind of inspiration  | Medium     |
+| Body & medicine     | Body parts, scars, lasting injuries, infection, surgery, hospitals           | Wounds by severity, bleeding, one disease, tending with medicine          | Medium     |
+| Society             | Leaders and offices, laws and policies, justice, a village that votes        | Opinions, friends, rivals, gatherings; no roles beyond work priorities    | Large      |
+| Factions & world    | Diplomacy, gifts, alliances, quests, a world map, expeditions, outposts      | Raiders, traders with goodwill, prisoners; one map                        | Large      |
+| Depth               | Digging down through layers, caverns, ores and dangers below                 | One surface layer; rock is mined flat                                     | Very large |
+| History & legend    | A chronicle; engravings and artifacts that record events; named great beasts | Story log, art titled after events, memorials, a legacy summary           | Small      |
+| Threats             | Sieges, great beasts, infestations from below, plagues, betrayal             | Raids that grow, maddened packs, one fever, fire, weather events          | Medium     |
+
+The core loop is solid: survival, a storyteller, combat, culture, rites and a long game. What's thin is
+**depth of production** (Clanfolk, Dwarf Fortress), **life across generations** (Clanfolk, First Feudal),
+**variety of minds and bodies** (RimWorld) and **a world beyond the valley** (all four).
+
+### The phases, in order
+
+Ordered so each builds on the last, with the cheapest high-value work first. Each lists a first slice that
+can ship on its own.
+
+**Phase E: Storage and fuel.** _(Small–medium. Foundation for everything after.)_
+
+- Stockpile settings: allowed categories (food, materials, weapons, apparel, medicine, art supplies) and a
+  priority (low to critical); haulers move items to better stockpiles. Shelves hold three stacks on a tile.
+- Forbid and allow, on items and doors (keep colonists out of a cell block or a storeroom).
+- Firewood: campfires, hearths and torches burn wood; haulers refuel them (the refuel job exists for
+  generators). Winter prep becomes a real chore: a woodpile to fill before the cold.
+- First slice: stockpile categories and priorities. Success: no regression in the harness, fewer haul trips
+  per item delivered.
+
+**Phase F: Food, materials and the seasons.** _(Medium–large.)_
+
+- New crops with their own seasons and uses: a grain (milled to flour, baked into bread that keeps), a
+  fibre crop for a second cloth, a hardy root that grows into autumn.
+- Preserving: a drying rack and a smokehouse turn meat, fish and berries into preserved food that keeps for
+  a season without power. A root cellar (a dug room) keeps food cold in summer.
+- Clay from riverbanks: a kiln fires pots (better storage) and bricks (a new wall and floor).
+- Ore in rock (iron-like and copper-like veins shown in the rock art): a smelter makes metal; metal tools,
+  weapons and armor take over from wood and stone in the mid game.
+- First slice: grain, mill, bread and the drying rack. Success: Standard colonies reach winter with more days
+  of food, and fewer starving hours without needing power.
+
+**Phase G: Lifespans and families.** _(Large: touches colonists everywhere.)_
+
+- Ages and a calendar of birthdays (a year is 24 days, so ages advance at roughly a year per in-game year
+  and lifespans span a long run).
+- Children: married couples may have a child (a pregnancy over most of a season). Children grow through
+  stages: babies need care, children learn skills by watching and play instead of working, teenagers do
+  light work. They take after their parents' traits and passions.
+- Elders: past a certain age, slower and frailer, but teach faster; death of old age eventually.
+- Family homes: assign a bedroom to a family; family members get opinions of each other built in.
+- Backstories: each colonist's past (a few lines and a skill tilt), generated from a pool of original
+  backstories, shown in the inspector.
+- First slice: ages, backstories and births to married couples (children as non-working colonists who grow
+  up). Success: in long harness runs (120 days) a second generation joins the work force.
+
+**Phase H: Minds.** _(Medium.)_
+
+- Mental breaks by kind and severity: a sulk in their room, a food binge, a tantrum that breaks something, a
+  hiding spree, walking off for a day; traits steer which (an abrasive colonist picks fights).
+- More inspirations: a creative burst (next sculpture or instrument piece is much better), a taming knack, a
+  fighting rage, a teaching mood.
+- Obsessions: rarely, a skilled colonist is seized by an idea, claims a workshop, demands particular
+  materials, and makes a one-of-a-kind named artifact of legendary quality, recorded in the story. If the
+  materials never come, they break down.
+- First slice: three kinds of break and two inspirations. Success: breaks feel different in the story log,
+  with no rise in deaths.
+
+**Phase I: Bodies and medicine.** _(Medium.)_
+
+- Wounds land on body parts (head, torso, arms, legs, hands, eyes). A lost or ruined part means a lasting
+  effect (a limp slows walking, a bad hand slows work, a lost eye worsens aim). Scars hurt in the cold.
+- Infection in untended or dirty wounds (ties into hygiene). Hospital beds and an infirmary room role give
+  better tending and recovery.
+- Simple surgery and aids: a crutch, a wooden limb, later metal ones (Phase F's metal).
+- First slice: body parts with lasting injuries, infection, hospital beds. Success: Harsh survival holds
+  steady while wounded veterans show visibly in the colony.
+
+**Phase J: The village and its people.** _(Large.)_
+
+- Offices, filled by vote at a gathering: a leader (a small mood lift when the colony is well run, and
+  speeches at festivals), a quartermaster, a warden (the prisoner work today), a healer.
+- Policies the leader can set: ration sizes, curfews, a work day, whether to keep prisoners, festival days.
+  Each pleases some colonists and annoys others (by trait).
+- Justice: a colonist who steals or hurts someone in a break faces the colony's choice: forgive, confine,
+  or exile.
+- First slice: a leader chosen by vote and three policies. Success: policies move mood and output in the
+  harness in the directions intended.
+
+**Phase K: Factions and the wider world.** _(Large.)_
+
+- Diplomacy: gifts, envoys, alliances and tributes; allied factions send help in raids, enemies can be bought
+  off.
+- Requests from factions: deliver goods, shelter a traveller, hunt a dangerous beast, for silver, goodwill or
+  a recruit.
+- Expeditions: send colonists off the map (a world view of nearby sites) to trade, scavenge a ruin or rescue
+  someone, and come back days later (or not).
+- First slice: requests and gifts. Success: goodwill swings matter and requests get done in the harness.
+
+**Phase L: Into the rock.** _(Very large; decide whether to do it at all.)_
+
+- A second layer beneath the valley, reached by a stairway dug into rock: caverns with their own plants and
+  creatures, richer ore, underground water, and things that come up if you dig too far.
+- The renderer shows one layer at a time; pathfinding and rooms work across stairs.
+- A cheaper version: mine shafts that yield ore over time, and cavern breaches as a storyteller event, with
+  no second map layer.
+- First slice: decide between the full layer and the shaft version (see the questions below).
+
+**Phase M: Legends and great threats.** _(Medium.)_
+
+- A chronicle screen: the colony's history by year, built from the story log, deaths, marriages, births,
+  artifacts and battles.
+- Wall engravings: a mason carves a scene from the chronicle into a stone wall (beauty, and a record).
+- Great threats with names and histories: a vast beast that wakes once a year, a siege that camps and builds,
+  an infestation from below (Phase L).
+- First slice: the chronicle and engravings. Success: a 120-day run reads like a history.
+
+### What to measure
+
+- Extend the balance harness for each phase (food days with preservation, generation size, break kinds,
+  lasting injuries) and the 100-player playtest with new personas (a family planner, a hoarder who never
+  sorts storage, a policy tinkerer).
+- Long runs become routine: 120-day runs on a few seeds, to see generations, legends and late-game threats.
+- Performance budget: under 60 ms per 1,000 ticks on a Large map, checked with each phase.
+
+### Questions to settle before starting
+
+1. **Generations:** should colonists age and die of old age, and should children be born, or keep everyone
+   adult (simpler, but no Clanfolk-style clan)?
+2. **Depth:** a full underground layer (a big job: rendering, pathfinding, rooms) or the cheaper mine-shaft
+   version?
+3. **Fuel:** should campfires and hearths burn wood (more winter prep, and harder for neglectful players)?
+4. **Order:** the plan starts with storage and food (foundations) before families. Start with families
+   instead, if they're the priority?
