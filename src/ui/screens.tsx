@@ -351,6 +351,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
           </li>
           <li>Floors make rooms nicer, roofs keep the rain off open shelters, tool kits make workers faster.</li>
           <li>
+            Blood, rubble and tracked-in dirt make rooms uglier: give someone <b>Clean</b> work to scrub it away.
+            Sculptures show their quality: cracked when poor, silver-trimmed when excellent, gold for a masterwork.
+          </li>
+          <li>
             The storyteller sends good and bad turns: heat waves, eclipses, meteorites, refugees, auroras, inspired
             colonists and bumper crops among them.
           </li>

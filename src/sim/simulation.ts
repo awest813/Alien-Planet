@@ -1310,6 +1310,9 @@ export class Simulation {
     if (job.type === 'craft' && job.stage === 1 && this.isAtWorkSpot(c, job.target, false)) {
       return { tile: job.target, ratio: Math.min(1, job.progress / RECIPES[job.line].work) };
     }
+    if (job.type === 'clean' && c.tile === job.target) {
+      return { tile: job.target, ratio: Math.min(1, job.progress / CLEAN_WORK) };
+    }
     if (
       !WORK_JOBS.has(job.type) ||
       !this.workTargetValid(job) ||
