@@ -187,6 +187,11 @@ describe('new events', () => {
     const speed = (c: (typeof sim.colonists)[number]) =>
       (sim as unknown as { workSpeed: (c: unknown, type: string) => number }).workSpeed(c, 'chop');
     const before = sim.colonists.map(speed);
+    // No artists, animal handlers or children: the only inspiration to be had is working faster.
+    for (const c of sim.colonists) {
+      c.skills.artistic = 0;
+      c.skills.animals = 0;
+    }
     expect(triggerEvent(sim, 'inspiration')).toBe(true);
     const inspired = sim.colonists.findIndex((c) => c.thoughts.some((t) => t.key === 'inspired'));
     expect(inspired).toBeGreaterThanOrEqual(0);

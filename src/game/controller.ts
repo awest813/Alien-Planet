@@ -34,6 +34,7 @@ import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
 import { DOWNED_TICKS, persuasion } from '../sim/prisoners';
 import { DRAFT_AGE, backstoryOf, stageOf } from '../sim/lifespans';
+import { LEGEND } from '../sim/minds';
 import { applyTrade, goodwillOf, prices, standingLabel, tradableItems, tradeOpen, artForSale } from '../sim/trade';
 import { weatherDef } from '../sim/weather';
 import {
@@ -871,6 +872,7 @@ export class GameController {
       { label: 'Concerts given', value: st.concerts ?? 0 },
       { label: 'Weddings', value: st.weddings ?? 0 },
       { label: 'Children born', value: st.births ?? 0 },
+      { label: 'Legendary works', value: st.legends ?? 0 },
       { label: 'Couples leaving together', value: Math.floor(married) },
       { label: 'Buildings built', value: st.built },
     ];
@@ -1719,6 +1721,24 @@ export class GameController {
         text: `Raid: ${raiders} raider${raiders > 1 ? 's' : ''} from ${FACTIONS[sim.enemies[0].faction].name}. Draft with Q.`,
         tone: 'danger',
         tile: sim.enemies.find((e) => !e.fleeing)?.tile,
+      });
+    }
+    // An obsessed artist's vision: what it still needs, and how long is left.
+    const ob = sim.obsession;
+    if (ob) {
+      const artist = sim.colonists[ob.colonist];
+      const cost = featureDef(LEGEND).build!.cost;
+      const missing = cost
+        .map((k, line) => ({ item: k.item, need: k.count - w.deliveredAt(ob.tile, line) }))
+        .filter((m) => m.need > 0 && sim.stockOf(m.item) < m.need)
+        .map((m) => `${m.need - sim.stockOf(m.item)} ${itemDef(m.item).name.toLowerCase()}`);
+      const days = Math.max(0, (ob.deadline - sim.tick) / (TICKS_PER_HOUR * 24));
+      alerts.push({
+        text:
+          `${artist.name} is obsessed with a vision (${days < 1 ? 'less than a day' : `${Math.floor(days)} days`} left)` +
+          (missing.length > 0 ? `: still short of ${missing.join(', ')}` : ': everything is there'),
+        tone: missing.length > 0 && days < 2 ? 'danger' : 'warn',
+        tile: ob.tile,
       });
     }
     // Wounded raiders worth taking in, while there's time.

@@ -373,5 +373,39 @@
     "label": "All grown up",
     "mood": 6,
     "hours": 48
+  },
+  "creativeInspiration": {
+    "label": "Inspired: a creative spark",
+    "mood": 6,
+    "hours": 72
+  },
+  "tamingInspiration": {
+    "label": "Inspired: a way with animals",
+    "mood": 5,
+    "hours": 48
+  },
+  "teachingInspiration": {
+    "label": "Inspired: in a teaching mood",
+    "mood": 5,
+    "hours": 24
+  },
+  "obsessed": {
+    "label": "Obsessed with a vision",
+    "mood": -4
+  },
+  "obsessionFailed": {
+    "label": "The vision came to nothing",
+    "mood": -12,
+    "hours": 96
+  },
+  "createdLegend": {
+    "label": "Made a legend",
+    "mood": 16,
+    "hours": 120
+  },
+  "colonyLegend": {
+    "label": "A legend was made here",
+    "mood": 4,
+    "hours": 72
   }
 }

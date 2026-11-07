@@ -1240,5 +1240,35 @@
       ],
       "work": 60
     }
+  },
+  {
+    "key": "legendarySculpture",
+    "name": "Legendary sculpture",
+    "beauty": 20,
+    "art": true,
+    "joy": {
+      "activity": "Admiring a legendary sculpture",
+      "kind": "art",
+      "hoursToFull": 1.5,
+      "seats": 4
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "stoneBlocks",
+          "count": 30
+        },
+        {
+          "item": "silver",
+          "count": 25
+        },
+        {
+          "item": "wood",
+          "count": 20
+        }
+      ],
+      "work": 1600
+    },
+    "value": 1500
   }
 ]

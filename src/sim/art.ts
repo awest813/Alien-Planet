@@ -1,3 +1,4 @@
+import { useInspiration } from './minds';
 import type { Simulation, StoryEntry } from './simulation';
 import { Colonist } from './types';
 
@@ -10,7 +11,9 @@ export const MASTERWORK = 17;
 // Artistic skill, give or take three, plus three for an inspired artist.
 export function rollQuality(sim: Simulation, c: Colonist): number {
   const inspired = c.thoughts.some((t) => t.key === 'inspired') ? 3 : 0;
-  return Math.max(0, Math.min(20, c.skills.artistic + sim.rng.int(-3, 3) + inspired));
+  // A creative spark is spent on one piece, and lifts it a long way.
+  const spark = useInspiration(sim, c, 'creativeInspiration') ? 6 : 0;
+  return Math.max(0, Math.min(20, c.skills.artistic + sim.rng.int(-3, 3) + inspired + spark));
 }
 
 // How much of a sculpture's base beauty its quality brings out: 0.4 for the shoddiest, about 1.2

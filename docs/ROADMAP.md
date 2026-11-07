@@ -534,6 +534,28 @@ can ship on its own.
   materials never come, they break down.
 - First slice: three kinds of break and two inspirations. Success: breaks feel different in the story log,
   with no rise in deaths.
+- **Done** (`src/sim/minds.ts`):
+  - Four kinds of mental break: a daze (as before), a sulk in bed for the whole break, a food binge (eating
+    whether hungry or not), and a rage that smashes one nearby piece of furniture (rubble, and it goes back
+    on the build list), then burns out into a daze. Gluttons binge, pessimists sulk, the abrasive rage and
+    the kind never do; children only sulk or wander off in a daze. The inspector and alerts say which.
+  - Inspirations, chosen to suit the colonist: working faster (as before), a creative spark (their next
+    sculpture is six levels better), a way with animals (their next taming attempt always works), and a
+    teaching mood (children nearby learn three times as fast what that adult knows best).
+  - Obsessions (rare: from day 14, at most once every 40 days, and only to a content artist, mood 55 or
+    more): the colony's most skilled artist or craftsman is seized by a vision and plans a legendary sculpture near home that only they may carve,
+    needing 30 granite blocks, 25 silver and 20 wood within eight days. An alert tracks what's still missing. Done in time, it's
+    a quality 20 piece of great beauty, and a story moment that lifts everyone; neglected, the artist snaps
+    into a long rage and is downcast for days.
+  - Balance, 48 days on 12 seeds: Standard kept everyone but one lost in a raid (82 of 83; 3 breaks, mood
+    50.5), with 6 obsessions and 2 legendary sculptures. Harsh lost 1 of 77 in a raid; its 21 breaks are
+    mostly one colony that starved for over a thousand colonist-hours. The 100-player playtest was clean.
+  - The balance harness now counts every kind of break (it only counted dazes), and its test colony
+    answers an obsession as a player would: a stonecutter's table, more mining, and more blocks on the
+    bills. Without that it never had blocks to give, and every obsession ended in a breakdown. Tuning from
+    those runs: obsessions were too frequent and too hard at first (11 in 12 colonies, mostly failed), so
+    they're rarer, need less, allow more time, and come only to a content artist.
+  - Not done from the plan: hiding sprees, walking off for a day, and a fighting rage.
 
 **Phase I: Bodies and medicine.** _(Medium.)_
 

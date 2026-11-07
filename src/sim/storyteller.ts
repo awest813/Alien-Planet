@@ -7,6 +7,7 @@ import { damage, infect } from './health';
 import { caravanArrives, goodwillOf } from './trade';
 import { ignite } from './weather';
 import { Season } from './seasons';
+import { inspire, obsessionPossible, startObsession } from './minds';
 import type { Simulation } from './simulation';
 
 export type Difficulty = 'peaceful' | 'standard' | 'harsh';
@@ -448,16 +449,15 @@ const EVENTS: EventDef[] = [
     minDay: 2,
     cooldownDays: 4,
     weight: () => 0.8,
-    run: (sim) => {
-      const ready = sim.living().filter((c) => !c.health.downed && !sim.inMentalBreak(c));
-      if (ready.length === 0) {
-        return false;
-      }
-      const c = sim.rng.pick(ready);
-      sim.addThought(c, 'inspired');
-      sim.addLog(`${c.name} is inspired and will work faster for a day.`, 'good', true);
-      return true;
-    },
+    run: (sim) => inspire(sim),
+  },
+  {
+    // Rarely, a skilled artist is seized by a vision of a legendary work, and needs materials for it.
+    key: 'obsession',
+    minDay: 14,
+    cooldownDays: 40,
+    weight: (sim) => (obsessionPossible(sim) ? 0.06 : 0),
+    run: (sim) => startObsession(sim),
   },
   {
     // Perfect growing weather: every field shoots up.

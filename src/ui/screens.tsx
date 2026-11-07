@@ -364,6 +364,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             Grow <b>healroot</b> for medicine, hunt and fish for meat and leather, forage berries for quick food.
           </li>
           <li>
+            Unhappy colonists break in their own ways: a daze, a sulk, a binge, or a rage that smashes furniture.
+            Sometimes a skilled artist is seized by a vision: deliver what they ask in time for a legendary sculpture.
+          </li>
+          <li>
             Married couples may have children. Babies stay with a parent; children play and learn by watching the adults
             work; teens help with light work; at 18 they're grown. The old slow down, and in time pass on.
           </li>

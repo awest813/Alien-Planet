@@ -144,6 +144,9 @@ interface Result {
   rooms: { role: string; impressiveness: number }[];
   mess: number;
   births: number;
+  smashed: number;
+  obsessions: number;
+  legends: number;
   grown: number;
   children: number;
   oldAge: number;
@@ -266,6 +269,7 @@ function play(seed: number): Result {
   let lutePlaced = false;
   let gravesPlaced = false;
   let rackPlaced = false;
+  let cutterPlanned = false;
   let millPlaced = false;
   let prisonPlaced = false;
   const fell = new Set<number>();
@@ -524,6 +528,29 @@ function play(seed: number): Result {
       hearthPlaced = true;
       sim.apply({ type: 'build', feature: featureId('hearth'), tiles: [at(hut.x + 7, hut.y + 4)] });
     }
+    // An obsessed artist's vision needs granite blocks: cut plenty while it lasts, as a player would.
+    const blocks = RECIPES.find((r) => r.key === 'cutBlocks')!;
+    const wanted = sim.obsession ? 70 : 30;
+    // ...and granite to cut them from.
+    if (sim.obsession && Math.floor(sim.hour) === 7 && sim.stockOf(itemId('stone')) < 30) {
+      const c = sim.living()[0];
+      if (c) {
+        const cx = w.xOf(c.tile);
+        const cy = w.yOf(c.tile);
+        sim.apply({ type: 'designate', rect: { x0: cx - 18, y0: cy - 18, x1: cx + 18, y1: cy + 18 }, kind: 'mine' });
+      }
+    }
+    if (sim.obsession && sim.countFeature((f) => f === featureId('stonecutterTable')) === 0 && !cutterPlanned) {
+      const spot = findSite(sim, 1, 1, avoid);
+      if (spot) {
+        cutterPlanned = true;
+        claim(avoid, sim, spot.x, spot.y, 1, 1);
+        sim.apply({ type: 'build', feature: featureId('stonecutterTable'), tiles: [at(spot.x, spot.y)] });
+      }
+    }
+    if (sim.bills[blocks.id].target !== wanted) {
+      sim.apply({ type: 'bill', recipe: blocks.id, target: wanted });
+    }
     // A parka for everyone before winter.
     const parka = RECIPES.find((r) => r.key === 'tailorParka')!;
     if (sim.bills[parka.id].target !== sim.living().length) {
@@ -688,6 +715,9 @@ function play(seed: number): Result {
     joyLowHours,
     rooms: roomsAtEnd(sim),
     births: sim.stats.births ?? 0,
+    smashed: sim.stats.smashed ?? 0,
+    obsessions: sim.stats.obsessions ?? 0,
+    legends: sim.stats.legends ?? 0,
     grown: sim.living().filter((c) => c.backstory === 'colonyBorn' && c.age >= 18).length,
     children: sim.living().filter((c) => c.age < 18).length + sim.infants.length,
     oldAge:
@@ -711,7 +741,7 @@ function countBreaks(sim: Simulation): number {
 }
 const originalAddLog = Simulation.prototype.addLog;
 Simulation.prototype.addLog = function (this: Simulation, text, tone, story) {
-  if (text.includes('in a daze')) {
+  if (text.includes('has had enough')) {
     breakCounts.set(this, (breakCounts.get(this) ?? 0) + 1);
   }
   if (text.startsWith('Research complete: Tailoring')) {
@@ -854,6 +884,10 @@ console.log(
         `${role} ${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(0)} (${values.length})`,
     )
     .join(', ')}`,
+);
+console.log(
+  `  minds: ${sum((r) => r.smashed)} things smashed in rages, ${sum((r) => r.obsessions)} obsessions, ` +
+    `${sum((r) => r.legends)} legendary works made`,
 );
 console.log(
   `  families: ${sum((r) => r.births)} born, ${sum((r) => r.children)} still children at the end, ` +

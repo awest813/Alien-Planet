@@ -777,6 +777,29 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillRect(7, 1, 1, 1);
       c.fillRect(6, 3, 1, 4);
       break;
+    case 'legendarySculpture':
+      // A soaring figure in pale stone, wreathed in gold, on a broad stepped plinth.
+      c.fillStyle = 'rgba(0,0,0,0.3)';
+      c.fillRect(1, 13, 14, 3);
+      c.fillStyle = '#6f6e74';
+      c.fillRect(1, 12, 14, 3);
+      c.fillStyle = '#8f8e95';
+      c.fillRect(3, 10, 10, 2);
+      c.fillStyle = '#e4e2dc';
+      c.fillRect(7, 0, 2, 2);
+      c.fillRect(6, 2, 4, 5);
+      c.fillRect(3, 1, 3, 1);
+      c.fillRect(10, 1, 3, 1);
+      c.fillRect(5, 7, 2, 3);
+      c.fillRect(9, 7, 2, 3);
+      c.fillStyle = '#e8b93a';
+      c.fillRect(6, 4, 4, 1);
+      c.fillRect(2, 0, 1, 2);
+      c.fillRect(13, 0, 1, 2);
+      c.fillRect(3, 10, 10, 1);
+      c.fillStyle = '#fff1a8';
+      c.fillRect(7, 4, 1, 1);
+      break;
     case 'sculptureGrand':
       // Granite with silver inlay on a stepped base.
       c.fillStyle = 'rgba(0,0,0,0.25)';

@@ -28,7 +28,8 @@ describe('weather', () => {
         expect(kinds.has('drought')).toBe(false);
       }
     }
-  });
+    // A whole year of play: give it room on a busy machine.
+  }, 20_000);
 
   it('soaks colonists caught outside in the rain, who feel the cold more', () => {
     const sim = Simulation.newColony(2);

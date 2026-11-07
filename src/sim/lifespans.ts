@@ -235,9 +235,15 @@ function watchAndLearn(sim: Simulation): void {
     if (child.age >= ADULT || child.sleeping || child.health.downed) {
       continue;
     }
-    const teacher = living.find(
-      (a) => isAdult(a) && a.job && sim.world.distance(a.tile, child.tile) <= WATCH_RANGE && skillOfJob(a) !== null,
-    );
+    const near = (a: Colonist) => isAdult(a) && sim.world.distance(a.tile, child.tile) <= WATCH_RANGE;
+    // An adult in a teaching mood teaches what they know best, three times as well.
+    const mentor = living.find((a) => near(a) && a.thoughts.some((t) => t.key === 'teachingInspiration'));
+    if (mentor) {
+      const best = SKILL_KEYS.reduce((b, k) => (mentor.skills[k] > mentor.skills[b] ? k : b));
+      learn(sim, child, best, WATCH_XP * 3);
+      continue;
+    }
+    const teacher = living.find((a) => near(a) && a.job && skillOfJob(a) !== null);
     const skill = teacher ? skillOfJob(teacher) : null;
     if (skill) {
       learn(sim, child, skill, WATCH_XP);

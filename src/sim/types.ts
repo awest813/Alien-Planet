@@ -158,6 +158,8 @@ export interface Colonist {
   parents: number[];
   // When their child is due, while the couple is expecting.
   expectingUntil?: number;
+  // The kind of mental break they're in (while breakUntil is ahead).
+  breakKind?: 'daze' | 'sulk' | 'binge' | 'tantrum';
   tile: number;
   // Remaining tiles to walk; path[0] is the tile being entered.
   path: number[];
@@ -440,6 +442,10 @@ export interface Stats {
   // Games of chess played with someone.
   chessGames?: number;
   births?: number;
+  // Furniture smashed in tantrums, and legendary works made.
+  smashed?: number;
+  obsessions?: number;
+  legends?: number;
   // Raiders taken prisoner, and prisoners won over.
   captured?: number;
   recruited?: number;

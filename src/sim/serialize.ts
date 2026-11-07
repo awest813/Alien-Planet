@@ -1,3 +1,4 @@
+import type { Obsession } from './minds';
 import type { BeaconState } from './beacon';
 import type { JoyKind } from './defs';
 import { RaidState } from './combat';
@@ -50,6 +51,7 @@ interface SavedColonist {
   backstory?: string;
   parents?: number[];
   expectingUntil?: number;
+  breakKind?: 'daze' | 'sulk' | 'binge' | 'tantrum';
   tile: number;
   skills: Skills;
   priorities: Priorities;
@@ -144,6 +146,7 @@ export interface SaveData {
   nextEnemyId: number;
   captives?: Captive[];
   infants?: Infant[];
+  obsession?: Obsession | null;
   nextInfantId?: number;
   animals: Animal[];
   nextAnimalId: number;
@@ -241,6 +244,7 @@ export function serialize(sim: Simulation): SaveData {
         backstory: c.backstory,
         parents: [...c.parents],
         expectingUntil: c.expectingUntil,
+        breakKind: c.breakKind,
       }),
     ),
     bills: structuredClone(sim.bills),
@@ -261,6 +265,7 @@ export function serialize(sim: Simulation): SaveData {
     nextEnemyId: sim.nextEnemyId,
     captives: structuredClone(sim.captives),
     infants: structuredClone(sim.infants),
+    obsession: sim.obsession && { ...sim.obsession },
     nextInfantId: sim.nextInfantId,
     animals: structuredClone(sim.animals),
     caravan: structuredClone(sim.caravan),
@@ -358,6 +363,7 @@ export function deserialize(data: SaveData): Simulation {
   sim.nextEnemyId = data.nextEnemyId;
   sim.captives = structuredClone(data.captives ?? []);
   sim.infants = structuredClone(data.infants ?? []);
+  sim.obsession = data.obsession ? { ...data.obsession } : null;
   sim.nextInfantId = data.nextInfantId ?? 0;
   sim.animals = structuredClone(data.animals);
   sim.caravan = structuredClone(data.caravan);

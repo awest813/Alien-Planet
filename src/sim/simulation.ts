@@ -159,6 +159,18 @@ import {
 import { BeaconState, TRANSMIT_HOURS, chooseToStay, depart, freshBeacon, updateBeacon } from './beacon';
 import { FEED_BELOW, PRISONER_BED, TALK_TICKS, release, talk, updateCaptives, visitDue } from './prisoners';
 import { CARER_HUNGER, DRAFT_AGE, agePace, canWork, rollPast, updateLifespans } from './lifespans';
+import {
+  BREAK_LABELS,
+  BreakKind,
+  LEGEND,
+  LEGEND_QUALITY,
+  Obsession,
+  breakLog,
+  chooseBreak,
+  smashable,
+  updateObsession,
+  useInspiration,
+} from './minds';
 import { spreadWildPlants, wildPlantCover } from './plants';
 import {
   Designation,
@@ -210,6 +222,9 @@ const CLEAN_WORK = 30;
 const CLEAN_RANGE = 12;
 // Hours on a drying rack (in the dry) to turn meat, fish or berries into food that keeps.
 const DRYING_HOURS = 12;
+// A rage targets furniture this close; its wander job is marked with this stage.
+const TANTRUM_RANGE = 10;
+const TANTRUM_STAGE = 9;
 // How far below (or above) their comfort colonists will still go out for fun or idle about.
 const JOY_CHILL = 6;
 // The best a storage tile can be for an item (critical priority, cold for perishables).
@@ -296,6 +311,7 @@ export interface SimTimers {
 
 // Moments the UI reacts to: raids, deaths and collapses pause the game.
 export type SimEvent =
+  | 'obsession'
   | 'dusk'
   | 'dawn'
   | 'raid'
@@ -553,6 +569,8 @@ export class Simulation {
   public enemies: Enemy[] = [];
   // Raiders lying wounded, and prisoners (see prisoners.ts).
   public captives: Captive[] = [];
+  // A colonist seized by a vision for a legendary work (see minds.ts).
+  public obsession: Obsession | null = null;
   // Babies, carried by a parent until they can walk (see lifespans.ts).
   public infants: Infant[] = [];
   public nextInfantId = 0;
@@ -915,6 +933,7 @@ export class Simulation {
       updateBeacon(this);
       updateCaptives(this);
       updateLifespans(this);
+      updateObsession(this);
       this.weatherFilth();
     }
 
@@ -1338,7 +1357,7 @@ export class Simulation {
       return 'Fighting back';
     }
     if (this.inMentalBreak(c)) {
-      return 'Mental break: wandering in a daze';
+      return BREAK_LABELS[c.breakKind ?? 'daze'];
     }
     const job = c.job;
     if (!job) {
@@ -2090,6 +2109,9 @@ export class Simulation {
         keys.push('unburied');
       }
     }
+    if (this.obsession?.colonist === c.id) {
+      keys.push('obsessed');
+    }
     // What's around them: sculptures, flowers, fine floors and furniture lift the spirits; a bare
     // room with nothing pleasant in it drags a little.
     if (!c.sleeping) {
@@ -2137,16 +2159,24 @@ export class Simulation {
     if (c.breakUntil > 0) {
       // A break just ended.
       c.breakUntil = 0;
+      c.breakKind = undefined;
       this.addThought(c, 'recoveredFromBreak');
       this.addLog(`${c.name} has calmed down.`, 'info');
     }
     c.lowMoodTicks = c.mood < BREAK_THRESHOLD ? c.lowMoodTicks + SLOW_TICKS : 0;
     if (c.lowMoodTicks > TICKS_PER_HOUR * 2 && this.rng.next() < 0.05) {
       c.lowMoodTicks = 0;
-      c.breakUntil = this.tick + this.rng.int(3, 5) * TICKS_PER_HOUR;
-      this.endJob(c);
-      this.addLog(`${c.name} has had enough and is wandering around in a daze.`, 'warn');
+      this.startBreak(c, chooseBreak(this, c), this.rng.int(3, 5));
     }
+  }
+
+  // A colonist breaks down, in their own way, for some hours.
+  public startBreak(c: Colonist, kind: BreakKind, hours: number): void {
+    c.breakUntil = this.tick + hours * TICKS_PER_HOUR;
+    c.breakKind = kind;
+    c.drafted = false;
+    this.endJob(c);
+    this.addLog(breakLog(c, kind), kind === 'tantrum' ? 'danger' : 'warn');
   }
 
   private updateNeeds(c: Colonist): void {
@@ -2291,7 +2321,8 @@ export class Simulation {
     if (this.tick % SLOW_TICKS === 0 && this.raidersNear(c) && this.tryShelter(c)) {
       // Running for cover.
     } else if (this.inMentalBreak(c)) {
-      if (c.job && c.job.type !== 'wander' && c.job.type !== 'warmUp' && c.job.type !== 'shelter') {
+      const allowed = c.job && ['wander', 'warmUp', 'shelter', ...(c.breakKind === 'binge' ? ['eat'] : [])];
+      if (c.job && !allowed!.includes(c.job.type)) {
         this.endJob(c);
       }
     } else {
@@ -2469,7 +2500,20 @@ export class Simulation {
       if ((c.health.hypothermia > 0.5 || c.health.heatstroke > 0.5) && this.tryWarmUp(c)) {
         return;
       }
+      if (c.breakKind === 'binge' && this.tryEat(c)) {
+        return;
+      }
+      if (c.breakKind === 'sulk' && this.startSulk(c)) {
+        return;
+      }
+      if (c.breakKind === 'tantrum' && this.startTantrum(c)) {
+        return;
+      }
       this.startWander(c);
+      return;
+    }
+    // An obsessed artist works on nothing but their vision, when there's anything to do for it.
+    if (this.obsession?.colonist === c.id && this.tryLegend(c)) {
       return;
     }
     if (c.carrying && this.tryStash(c)) {
@@ -2694,11 +2738,121 @@ export class Simulation {
         this.stepFish(c, job);
         break;
       case 'wander':
+        // A rage ends with something broken.
+        if (job.stage === TANTRUM_STAGE && this.inMentalBreak(c) && this.isAtWorkSpot(c, job.target, false)) {
+          this.smash(c, job.target);
+          this.endJob(c);
+          break;
+        }
         if (job.wait-- <= 0) {
           this.endJob(c);
         }
         break;
     }
+  }
+
+  // Sulking: off to bed (or somewhere indoors) to stew for the rest of the break.
+  private startSulk(c: Colonist): boolean {
+    const w = this.world;
+    const region = this.regionOf(c.tile);
+    const spot =
+      this.nearestIn(
+        'buildings',
+        c.tile,
+        (i) => featureDef(w.feature[i]).bed && this.regions.region[i] === region && !this.isReserved(`b${i}`, c),
+        1,
+      )[0] ??
+      this.nearest(c.tile, (i) => w.isPassable(i) && this.isIndoors(i) && this.regions.region[i] === region, 1)[0];
+    const path = spot !== undefined ? this.pathfinder.find(c.tile, [spot]) : null;
+    if (spot === undefined || !path) {
+      return false;
+    }
+    this.assign(c, this.makeJob('wander', spot, { wait: Math.max(60, c.breakUntil - this.tick) }), path);
+    return true;
+  }
+
+  // A rage: storm over to a nearby piece of furniture and break it.
+  private startTantrum(c: Colonist): boolean {
+    const region = this.regionOf(c.tile);
+    const [target] = this.nearestIn(
+      'buildings',
+      c.tile,
+      (i) =>
+        smashable(this, i) && this.world.distance(c.tile, i) <= TANTRUM_RANGE && this.hasWorkSpot(i, false, region),
+      1,
+    );
+    const path = target !== undefined ? this.pathfinder.find(c.tile, this.workSpots(target, false, region)) : null;
+    if (target === undefined || !path) {
+      return false;
+    }
+    this.assign(c, this.makeJob('wander', target, { wait: 20, stage: TANTRUM_STAGE }), path);
+    return true;
+  }
+
+  private smash(c: Colonist, i: number): void {
+    const w = this.world;
+    const f = w.feature[i];
+    if (!smashable(this, i)) {
+      return;
+    }
+    const name = featureDef(f).name.toLowerCase();
+    // One thing broken, and the rage burns out into a daze for the rest of the break.
+    c.breakKind = 'daze';
+    w.setFeature(i, NONE);
+    w.addFilth(i, Filth.RUBBLE, 2);
+    this.rebuild(i, f);
+    this.stats.smashed = (this.stats.smashed ?? 0) + 1;
+    this.addLog(
+      `${c.name} smashed ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name} in a rage. It's marked for rebuilding.`,
+      'warn',
+      true,
+    );
+  }
+
+  // ---- Obsessions ----
+
+  // A spot for a legendary piece: open ground near the middle of the colony.
+  public legendSite(): number | undefined {
+    const home = this.homeTile() ?? this.living()[0]?.tile;
+    if (home === undefined) {
+      return undefined;
+    }
+    const region = this.regionOf(home);
+    return this.nearest(
+      home,
+      (i) =>
+        this.world.feature[i] === NONE &&
+        this.world.blueprint[i] === NONE &&
+        this.world.itemType[i] === NONE &&
+        this.regions.region[i] === region &&
+        this.canPlaceBlueprint(i, LEGEND) &&
+        this.world.neighbors(i).every((n) => this.world.feature[n] === NONE),
+      1,
+    )[0];
+  }
+
+  public planLegend(tile: number): void {
+    this.placeBlueprint(tile, LEGEND);
+  }
+
+  public dropLegend(tile: number): void {
+    if (this.world.blueprint[tile] === LEGEND) {
+      this.cancelBlueprint(tile);
+    }
+  }
+
+  public itemName(item: number): string {
+    return itemDef(item).name.toLowerCase();
+  }
+
+  // The obsessed artist: carve the vision if everything's there, or fetch what's missing.
+  private tryLegend(c: Colonist): boolean {
+    const tile = this.obsession!.tile;
+    const region = this.regionOf(c.tile);
+    if (this.constructable(tile) && !this.isReserved(`w${tile}`, c) && this.hasWorkSpot(tile, false, region)) {
+      return this.startWorkJob(c, 'sculpt', [tile], region);
+    }
+    return this.tryDeliver(c, true);
   }
 
   // Up to `limit` tiles passing `test`, nearest first. `bias` adds to a tile's distance.
@@ -2944,6 +3098,7 @@ export class Simulation {
       c.tile,
       (i) =>
         featureDef(this.world.blueprint[i]).art &&
+        (this.world.blueprint[i] !== LEGEND || this.obsession?.colonist === c.id) &&
         this.constructable(i) &&
         !this.isReserved(`w${i}`, c) &&
         this.hasWorkSpot(i, false, region),
@@ -2953,7 +3108,8 @@ export class Simulation {
 
   // A finished sculpture: its quality from the artist's skill, a subject from the colony's story.
   private finishArtwork(c: Colonist, tile: number, name: string): void {
-    const quality = rollQuality(this, c);
+    const legend = this.world.feature[tile] === LEGEND;
+    const quality = legend ? LEGEND_QUALITY : rollQuality(this, c);
     const memorial = featureDef(this.world.feature[tile]).key === 'memorial';
     const fallen = this.colonists.filter((o) => o.health.dead);
     const title = memorial ? memorialTitle(fallen.map((o) => o.name)) : titleFor(this, c);
@@ -2977,7 +3133,17 @@ export class Simulation {
     this.stats.bestArt = Math.max(this.stats.bestArt ?? 0, quality);
     const label = qualityLabel(quality).toLowerCase();
     const what = `${/^[aeiou]/.test(label) ? 'an' : 'a'} ${label} ${name.toLowerCase()}`;
-    if (quality >= MASTERWORK) {
+    if (legend) {
+      this.obsession = null;
+      this.stats.legends = (this.stats.legends ?? 0) + 1;
+      this.addThought(c, 'createdLegend');
+      for (const o of this.living()) {
+        if (o !== c) {
+          this.addThought(o, 'colonyLegend');
+        }
+      }
+      this.addLog(`${c.name} has finished their vision: a legendary sculpture, “${title}”.`, 'good', true);
+    } else if (quality >= MASTERWORK) {
       this.addThought(c, 'madeMasterwork');
       this.addLog(`${c.name} has carved a masterwork: ${name.toLowerCase()}, “${title}”.`, 'good', true);
     } else {
@@ -5462,7 +5628,7 @@ export class Simulation {
     }
     const def = ANIMALS[animal.kind];
     const chance = Math.max(0.05, Math.min(0.85, 0.2 + c.skills.animals * 0.035 - def.wildness));
-    if (this.rng.chance(chance)) {
+    if (useInspiration(this, c, 'tamingInspiration') || this.rng.chance(chance)) {
       animal.tame = true;
       animal.taming = false;
       animal.revengeOn = -1;
