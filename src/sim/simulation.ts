@@ -19,6 +19,7 @@ import {
   researchDef,
   TRAITS,
   featureDef,
+  fuelOf,
   featureId,
   isFood,
   itemDef,
@@ -154,7 +155,19 @@ import {
 import { BeaconState, TRANSMIT_HOURS, chooseToStay, depart, freshBeacon, updateBeacon } from './beacon';
 import { FEED_BELOW, PRISONER_BED, TALK_TICKS, release, talk, updateCaptives, visitDue } from './prisoners';
 import { spreadWildPlants, wildPlantCover } from './plants';
-import { Designation, Filth, GROW_ZONE, TileKind, World, growZoneCrop } from './world';
+import {
+  Designation,
+  Filth,
+  GROW_ZONE,
+  STOCKPILE_ZONE,
+  TileKind,
+  World,
+  growZoneCrop,
+  isStockpileZone,
+  priorityRank,
+  stockpileZone,
+  zoneAccepts,
+} from './world';
 import { generateWorld } from './worldgen';
 
 export { MAP_SIZE, MAP_SIZES, NIGHT_END, NIGHT_START, START_HOUR, TICKS_PER_HOUR, populationFor } from './constants';
@@ -190,6 +203,8 @@ const TRACK_DIRT = 0.04;
 // colony's middle anyone bothers cleaning outdoors.
 const CLEAN_WORK = 30;
 const CLEAN_RANGE = 12;
+// The best a storage tile can be for an item (critical priority, cold for perishables).
+const MAX_STORE_VALUE = 9;
 // Levels of mess around someone indoors that make a room feel filthy, and the most a dirty kitchen
 // takes off a meal's quality.
 const FILTHY = 6;
@@ -531,6 +546,10 @@ export class Simulation {
   public power: PowerState = freshPower();
   // Buildings on the power grid and sun lamps, refreshed when features change.
   private powerTiles: number[] = [];
+  // Buildings that burn fuel for heat and light.
+  private fireTiles: number[] = [];
+  // Bumped whenever a fire goes out or is lit again, so rooms work out their heat afresh.
+  public fuelVersion = 0;
   private fishingSpots: number[] = [];
   // Year of the last "freezing over" message, so winter's freeze-thaw cycles don't repeat it.
   private iceNoticeYear = -1;
@@ -857,6 +876,7 @@ export class Simulation {
     if (slow) {
       this.refreshGrid();
       updatePower(this, this.powerTiles, SLOW_TICKS / TICKS_PER_HOUR);
+      this.burnFuel(SLOW_TICKS / TICKS_PER_HOUR);
       this.updateClimate();
       this.growCrops();
       this.updateSpoilage(SLOW_TICKS / TICKS_PER_HOUR);
@@ -950,7 +970,20 @@ export class Simulation {
           }
         });
         break;
-      case 'zone':
+      case 'zone': {
+        // A stockpile drawn onto or beside one with settings carries them on.
+        let zone = cmd.zone;
+        if (zone === STOCKPILE_ZONE) {
+          const { x0, y0, x1, y1 } = cmd.rect;
+          for (let y = Math.min(y0, y1) - 1; y <= Math.max(y0, y1) + 1 && zone === STOCKPILE_ZONE; y++) {
+            for (let x = Math.min(x0, x1) - 1; x <= Math.max(x0, x1) + 1; x++) {
+              if (w.inBounds(x, y) && isStockpileZone(w.zone[w.idx(x, y)])) {
+                zone = w.zone[w.idx(x, y)];
+                break;
+              }
+            }
+          }
+        }
         this.forRect(cmd.rect, (i) => {
           const terrain = terrainDef(w.terrain[i]);
           // A growing zone needs fertile soil open to the sky.
@@ -959,12 +992,36 @@ export class Simulation {
             this.cancelBlueprint(i);
           }
           if (cmd.zone === 0 || ok) {
-            w.zone[i] = cmd.zone;
+            w.zone[i] = zone;
             this.zoneVersion++;
             w.markDirty(i);
           }
         });
         break;
+      }
+      case 'stockpile': {
+        // The whole stockpile the tile belongs to (touching stockpile tiles) takes the settings.
+        if (!isStockpileZone(w.zone[cmd.tile])) {
+          break;
+        }
+        const value = stockpileZone(cmd.refused, cmd.priority);
+        const seen = new Set([cmd.tile]);
+        const queue = [cmd.tile];
+        while (queue.length > 0) {
+          const i = queue.pop()!;
+          w.zone[i] = value;
+          w.markDirty(i);
+          for (const n of w.neighbors(i)) {
+            const straight = w.xOf(n) === w.xOf(i) || w.yOf(n) === w.yOf(i);
+            if (straight && !seen.has(n) && isStockpileZone(w.zone[n])) {
+              seen.add(n);
+              queue.push(n);
+            }
+          }
+        }
+        this.zoneVersion++;
+        break;
+      }
       case 'festivals':
         this.story.festivals = cmd.on;
         break;
@@ -1038,6 +1095,14 @@ export class Simulation {
       }
       case 'release':
         release(this, cmd.captive);
+        break;
+      case 'forbid':
+        this.forRect(cmd.rect, (i) => {
+          if (w.itemType[i] !== NONE && w.forbidden[i] !== (cmd.on ? 1 : 0)) {
+            w.forbidden[i] = cmd.on ? 1 : 0;
+            w.markDirty(i);
+          }
+        });
         break;
       case 'hunt':
       case 'tame': {
@@ -1433,7 +1498,7 @@ export class Simulation {
     this.ensureRegions();
     // Flowers fade in winter, so the season is part of what the room's beauty depends on, and so is
     // the mess on the floor. (Worked out from what's there now, so a loaded game sees the same.)
-    const key = `${this.world.featureVersion}:${this.season === 'Winter'}:${this.world.filthVersion}`;
+    const key = `${this.world.featureVersion}:${this.season === 'Winter'}:${this.world.filthVersion}:${this.fuelVersion}`;
     if (this.contentsVersion !== key) {
       this.contentsVersion = key;
       this.roomContents = measureRooms(this.world, this.rooms, (i) => this.beautyAt(i));
@@ -1570,6 +1635,21 @@ export class Simulation {
     }
   }
 
+  // Fires burn through their wood; one that runs out goes cold and dark until it's refuelled.
+  private burnFuel(hours: number): void {
+    const w = this.world;
+    for (const i of this.fireTiles) {
+      const burns = featureDef(w.feature[i]).burns!;
+      if (w.fuel[i] <= 0) {
+        continue;
+      }
+      w.fuel[i] = Math.max(0, w.fuel[i] - (burns.perDay / 24) * hours);
+      if (w.fuel[i] <= 0) {
+        this.fuelVersion++;
+      }
+    }
+  }
+
   private refreshGrid(): void {
     const w = this.world;
     if (this.gridVersion === w.featureVersion) {
@@ -1579,8 +1659,12 @@ export class Simulation {
     this.powerTiles = [];
     this.lampTiles = [];
     this.fishingSpots = [];
+    this.fireTiles = [];
     for (let i = 0; i < w.size; i++) {
       const f = w.feature[i];
+      if (f !== NONE && featureDef(f).burns) {
+        this.fireTiles.push(i);
+      }
       if (f !== NONE && featureDef(f).fishing) {
         this.fishingSpots.push(i);
       }
@@ -2028,6 +2112,10 @@ export class Simulation {
   // ---- Reservations ----
 
   private isReserved(key: string, c: Colonist): boolean {
+    // Forbidden items count as taken: every search for an item checks its `i<tile>` key.
+    if (key.charCodeAt(0) === 105 && this.world.forbidden[Number(key.slice(1))] === 1) {
+      return true;
+    }
     const owner = this.reservations.get(key);
     return owner !== undefined && owner !== c.id;
   }
@@ -3461,20 +3549,45 @@ export class Simulation {
     return (zone !== 0 && zone < GROW_ZONE) || this.isIcebox(i);
   }
 
-  private stockpileSpot(item: number, near: number, region: number, c: Colonist, coldOnly = false): number | undefined {
+  // Whether storage on this tile takes this item (its stockpile's settings allow it).
+  public storesItem(i: number, item: number): boolean {
+    return this.isStockpile(i) && zoneAccepts(this.world.zone[i], item);
+  }
+
+  // How good a home this tile is for an item: its stockpile's priority, and a little more for food that
+  // rots when it's cold storage. Items only ever move to somewhere strictly better, so nothing shuttles.
+  public storeValue(i: number, item: number): number {
+    if (!this.storesItem(i, item)) {
+      return 0;
+    }
+    const zone = this.world.zone[i];
+    const rank = isStockpileZone(zone) ? priorityRank(zone) : 2;
+    return rank * 2 + (itemDef(item).shelfLife !== undefined && this.isColdStore(i) ? 1 : 0);
+  }
+
+  // The best place to put an item: the highest-value storage that takes it, nearest first. Only
+  // places better than `above` count (an item already stored moves only to somewhere better).
+  private stockpileSpot(
+    item: number,
+    near: number,
+    region: number,
+    c: Colonist,
+    coldOnly = false,
+    above = 0,
+  ): number | undefined {
     const w = this.world;
-    const perishable = itemDef(item).shelfLife !== undefined;
     return this.nearestIn(
       'storage',
       near,
       (i) =>
-        (coldOnly ? this.isColdStore(i) : this.isStockpile(i)) &&
+        (!coldOnly || this.isColdStore(i)) &&
+        this.storeValue(i, item) > above &&
         this.regions.region[i] === region &&
         w.canHoldItem(i, item) &&
         !this.isReserved(`s${i}`, c),
       1,
-      // Prefer topping up existing stacks of the same item, and cold storage for food that rots.
-      (i) => (w.itemType[i] === item ? 0 : 3) + (perishable && !this.isColdStore(i) ? 20 : 0),
+      // Better storage first, then topping up existing stacks of the same item.
+      (i) => (MAX_STORE_VALUE - this.storeValue(i, item)) * 1000 + (w.itemType[i] === item ? 0 : 3),
     )[0];
   }
 
@@ -3499,7 +3612,7 @@ export class Simulation {
     );
     for (const source of sources) {
       const item = w.itemType[source];
-      const dest = this.stockpileSpot(item, source, region, c, true);
+      const dest = this.stockpileSpot(item, source, region, c, true, this.storeValue(source, item));
       const path = dest !== undefined ? this.pathfinder.find(c.tile, [source]) : null;
       if (dest === undefined || !path) {
         continue;
@@ -3514,11 +3627,12 @@ export class Simulation {
     return false;
   }
 
-  // Keeps fuelled generators topped up.
+  // Keeps fuelled generators and fires topped up.
   private generatorRunningLow(): boolean {
     const w = this.world;
-    return this.powerTiles.some((i) => {
-      const fuel = w.feature[i] !== NONE ? featureDef(w.feature[i]).power?.fuel : undefined;
+    this.refreshGrid();
+    return [...this.powerTiles, ...this.fireTiles].some((i) => {
+      const fuel = w.feature[i] !== NONE ? fuelOf(featureDef(w.feature[i])) : undefined;
       return !!fuel && w.fuel[i] < fuel.capacity * 0.2;
     });
   }
@@ -3526,12 +3640,12 @@ export class Simulation {
   private tryRefuel(c: Colonist, urgentOnly = false): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
-    const fuelOf = (i: number) => (w.feature[i] !== NONE ? featureDef(w.feature[i]).power?.fuel : undefined);
+    const fuelAt = (i: number) => (w.feature[i] !== NONE ? fuelOf(featureDef(w.feature[i])) : undefined);
     const generator = this.nearestIn(
       'buildings',
       c.tile,
       (i) => {
-        const fuel = fuelOf(i);
+        const fuel = fuelAt(i);
         return (
           !!fuel &&
           w.fuel[i] < fuel.capacity * (urgentOnly ? 0.2 : 0.5) &&
@@ -3544,7 +3658,7 @@ export class Simulation {
     if (generator === undefined) {
       return false;
     }
-    const fuel = fuelOf(generator)!;
+    const fuel = fuelAt(generator)!;
     const source = this.nearestIn(
       'items',
       c.tile,
@@ -3563,7 +3677,7 @@ export class Simulation {
 
   private stepRefuel(c: Colonist, job: Job): void {
     const w = this.world;
-    const fuel = w.feature[job.target] !== NONE ? featureDef(w.feature[job.target]).power?.fuel : undefined;
+    const fuel = w.feature[job.target] !== NONE ? fuelOf(featureDef(w.feature[job.target])) : undefined;
     if (!fuel) {
       this.endJob(c);
       return;
@@ -3586,6 +3700,10 @@ export class Simulation {
       return;
     }
     if (c.carrying && c.carrying.item === job.item && this.isAtWorkSpot(c, job.target, false)) {
+      // A cold fire lit again warms its room.
+      if (w.fuel[job.target] <= 0) {
+        this.fuelVersion++;
+      }
       const added = Math.min(c.carrying.count, Math.ceil(fuel.capacity - w.fuel[job.target]));
       w.fuel[job.target] = Math.min(fuel.capacity, w.fuel[job.target] + added);
       c.carrying.count -= added;
@@ -3613,33 +3731,36 @@ export class Simulation {
     const region = this.regionOf(c.tile);
     // Item types lying loose that have somewhere to go, so a full stockpile for one item doesn't
     // block the rest. One pass finds the loose types; only those get a (full-map) space check.
-    const loose = new Set<number>();
-    const hasStockpile = this.storageTiles().length > 0;
-    for (const i of w.tilesWith('items')) {
-      if (!this.isStockpile(i) && this.regions.region[i] === region) {
-        loose.add(w.itemType[i]);
+    // Loose items, and stored ones that could be somewhere better (a stockpile that no longer takes
+    // them, or a higher priority one): the value of where each sits now.
+    const storage = this.storageTiles();
+    if (storage.length === 0) {
+      return false;
+    }
+    const best = new Map<number, number>();
+    const bestFor = (item: number) => {
+      let v = best.get(item);
+      if (v === undefined) {
+        v = 0;
+        for (const i of storage) {
+          if (this.regions.region[i] === region && w.canHoldItem(i, item)) {
+            v = Math.max(v, this.storeValue(i, item));
+          }
+        }
+        best.set(item, v);
       }
-    }
-    if (!hasStockpile || loose.size === 0) {
-      return false;
-    }
-    const storable = new Set([...loose].filter((item) => this.stockpileSpot(item, c.tile, region, c) !== undefined));
-    if (storable.size === 0) {
-      return false;
-    }
+      return v;
+    };
+    const misplaced = (i: number) => this.storeValue(i, w.itemType[i]) < bestFor(w.itemType[i]);
     const sources = this.nearestIn(
       'items',
       c.tile,
-      (i) =>
-        storable.has(w.itemType[i]) &&
-        !this.isStockpile(i) &&
-        this.regions.region[i] === region &&
-        !this.isReserved(`i${i}`, c),
+      (i) => this.regions.region[i] === region && !this.isReserved(`i${i}`, c) && misplaced(i),
       4,
     );
     for (const source of sources) {
       const item = w.itemType[source];
-      const dest = this.stockpileSpot(item, source, region, c);
+      const dest = this.stockpileSpot(item, source, region, c, false, this.storeValue(source, item));
       if (dest === undefined) {
         continue;
       }
@@ -4648,7 +4769,9 @@ export class Simulation {
     let fed = 0;
     for (const c of guests) {
       const tile = meals
-        .map((m) => [...w.tilesWith('items')].find((i) => w.itemType[i] === m && this.isStockpile(i)))
+        .map((m) =>
+          [...w.tilesWith('items')].find((i) => w.itemType[i] === m && this.isStockpile(i) && !w.forbidden[i]),
+        )
         .find((i) => i !== undefined);
       if (tile !== undefined) {
         const def = itemDef(w.itemType[tile]);

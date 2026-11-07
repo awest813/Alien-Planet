@@ -46,7 +46,16 @@ import {
   Skills,
   Stance,
 } from '../sim/types';
-import { Designation, GROW_ZONE, STOCKPILE_ZONE } from '../sim/world';
+import {
+  Designation,
+  GROW_ZONE,
+  STOCKPILE_ZONE,
+  STORAGE_GROUPS,
+  StockpilePriority,
+  isStockpileZone,
+  refusedGroups,
+  stockpilePriority,
+} from '../sim/world';
 import { Difficulty, coldSnapOn, eclipseOn, heatWaveOn } from '../sim/storyteller';
 import { SaveMeta, deleteSave, listSaves, readSave, writeSave } from './save-store';
 import { Settings, loadSettings, storeSettings } from './settings';
@@ -59,7 +68,8 @@ export type Tool =
   | { kind: 'build'; feature: number }
   | { kind: 'hunt' }
   | { kind: 'tame' }
-  | { kind: 'capture' };
+  | { kind: 'capture' }
+  | { kind: 'forbid'; on: boolean };
 
 export interface ToolDef {
   id: string;
@@ -269,6 +279,22 @@ export const TOOLS: ToolDef[] = [
     hint: 'Drag over raiders lying wounded: Warden colonists carry them to a prisoner bed, to win them over',
   },
   {
+    id: 'forbid',
+    label: 'Forbid',
+    hotkey: '',
+    tool: { kind: 'forbid', on: true },
+    group: 'orders',
+    hint: 'Drag over items to forbid them: colonists leave them where they are and never use them',
+  },
+  {
+    id: 'allow',
+    label: 'Allow',
+    hotkey: '',
+    tool: { kind: 'forbid', on: false },
+    group: 'orders',
+    hint: 'Drag over forbidden items to let colonists use them again',
+  },
+  {
     id: 'cancel',
     label: 'Cancel',
     hotkey: 'x',
@@ -374,7 +400,7 @@ export const TOOLS: ToolDef[] = [
     'Carved by an artist (Art work) in memory of the fallen. While it stands, the fallen are remembered',
   ),
   build('banner', 'Banner', '', 'decor', 'A splash of colour for a room'),
-  build('torch', 'Torch', '', 'decor', 'Lights up the dark around it'),
+  build('torch', 'Torch', '', 'decor', 'Lights up the dark around it; burns a little wood'),
   build('standingLamp', 'Standing lamp', '', 'decor', 'Steady light after dark, while the power grid is running'),
   build('stove', 'Stove', 'k', 'production', 'Cooks meals from raw food'),
   build('craftingBench', 'Crafting bench', 'j', 'production', 'Weaves cloth and crafts bows'),
@@ -399,8 +425,8 @@ export const TOOLS: ToolDef[] = [
     'power',
     'Draws 400 W. Transmit for five days and a ship may answer; raiders will hear it too',
   ),
-  build('campfire', 'Campfire', 'f', 'climate', 'Heats the room it is in'),
-  build('hearth', 'Stone hearth', '', 'climate', 'A strong heater for cold winters'),
+  build('campfire', 'Campfire', 'f', 'climate', 'Heats the room it is in; burns wood, which haulers bring'),
+  build('hearth', 'Stone hearth', '', 'climate', 'A strong heater for cold winters; burns wood'),
   build('electricHeater', 'Electric heater', '', 'climate', 'Strong heater, keeps rooms at 21°C (175 W)'),
   build('airConditioner', 'Air conditioner', '', 'climate', 'Cools a room to 20°C in hot weather (200 W)'),
   build('freezer', 'Freezer unit', '', 'climate', 'Chills a room to −6°C: a walk-in freezer for food (300 W)'),
@@ -523,6 +549,9 @@ export interface TileView {
   animal: string | null;
   // Extra lines about the building or items (fuel, power, freshness…).
   details: string[];
+  // On a stockpile: its settings (the groups it refuses, as a bit mask over STORAGE_GROUPS, and its
+  // priority), for the controls in the tile card.
+  stockpile: { tile: number; refused: number; priority: StockpilePriority } | null;
 }
 
 export interface CaptiveView {
@@ -1687,6 +1716,30 @@ export class GameController {
     if (hurt && sim.stockOf(itemId('herbalMedicine')) === 0) {
       alerts.push({ text: 'No medicine: grow healroot for better treatment', tone: 'warn' });
     }
+    // Fires gone out for want of wood.
+    const cold = [...w.tilesWith('features')].filter(
+      (i) => featureDef(w.feature[i]).burns && featureDef(w.feature[i]).heater > 0 && w.fuel[i] <= 0,
+    );
+    // Burning through the woodpile: warn while there's still time to chop more.
+    const burning = [...w.tilesWith('features')].filter((i) => featureDef(w.feature[i]).burns && w.fuel[i] > 0);
+    const perDay = burning.reduce((sum, i) => sum + featureDef(w.feature[i]).burns!.perDay, 0);
+    if (cold.length === 0 && perDay > 0 && sim.stockOf(itemId('wood')) < perDay * 3) {
+      alerts.push({
+        text: `Wood is running low: the fires burn about ${Math.round(perDay)} a day. Chop trees (C)`,
+        tone: sim.season === 'Winter' || daysUntilWinter(sim.totalHours) < 4 ? 'danger' : 'warn',
+      });
+    }
+    if (cold.length > 0) {
+      const wood = sim.stockOf(itemId('wood'));
+      alerts.push({
+        text:
+          wood === 0
+            ? `${cold.length} fire${cold.length > 1 ? 's have' : ' has'} gone out and there's no wood: chop trees (C)`
+            : `${cold.length} fire${cold.length > 1 ? 's have' : ' has'} gone out: colonists with Haul work bring wood`,
+        tone: sim.season === 'Winter' || sim.outdoorTemperature() < 5 ? 'danger' : 'warn',
+        tile: cold[0],
+      });
+    }
     const untilWinter = daysUntilWinter(sim.totalHours);
     // Winter kills a colony with nowhere warm to go: say so plainly, before and during.
     const warmRoom = sim.allRooms().some((r) => r.enclosed && r.heaters > 0);
@@ -1783,7 +1836,7 @@ export class GameController {
         });
       }
     }
-    if (!sim.world.zone.some((z) => z === STOCKPILE_ZONE) && totals.some((t) => t.total > 0)) {
+    if (!sim.world.zone.some(isStockpileZone) && totals.some((t) => t.total > 0)) {
       alerts.push({ text: 'No stockpile: items are left where they fall', tone: 'warn' });
     }
     // Blueprints waiting on materials the colony doesn't have.
@@ -1828,7 +1881,7 @@ export class GameController {
         }
       }
     }
-    if (!room && loose > 0 && w.zone.some((z) => z === STOCKPILE_ZONE)) {
+    if (!room && loose > 0 && w.zone.some(isStockpileZone)) {
       alerts.push({ text: `Stockpiles are full: ${loose} stacks lying outside. Zone more storage (Z).`, tone: 'warn' });
     }
     const ateRaw = sim.colonists.some((c) => c.thoughts.some((t) => t.key === 'ateRaw'));
@@ -1923,12 +1976,18 @@ export class GameController {
     if (zone >= GROW_ZONE) {
       orders.push(`Growing zone: ${featureDef(zone - GROW_ZONE).name.toLowerCase()}`);
     } else if (zone !== 0) {
-      orders.push('Stockpile');
+      const refused = STORAGE_GROUPS.filter((_, k) => refusedGroups(zone) & (1 << k));
+      orders.push(
+        `Stockpile · ${stockpilePriority(zone)} priority${refused.length > 0 ? ` · not for ${refused.join(', ')}` : ''}`,
+      );
     }
     const f = w.feature[i];
     const art = sim.artworkAt(i);
     const feature = f !== NONE ? (art ? `“${art.title}”` : featureDef(f).name) : null;
     const details: string[] = [];
+    if (w.forbidden[i] && w.itemType[i] !== NONE) {
+      details.push('Forbidden: colonists leave it alone (Allow to use it)');
+    }
     if (w.filth[i] !== 0) {
       const mess = ['', 'Dirt', 'Blood', 'Rubble'][w.filthKind(i)];
       const amount = ['', 'a little', 'some', 'a lot'][w.filthAmount(i)];
@@ -1955,6 +2014,13 @@ export class GameController {
     }
     if (def?.flowers && sim.season === 'Winter') {
       details.push('Out of bloom until spring');
+    }
+    if (def?.burns) {
+      details.push(
+        w.fuel[i] > 0
+          ? `Wood ${Math.ceil(w.fuel[i])}/${def.burns.capacity}, about ${Math.max(1, Math.round((w.fuel[i] / def.burns.perDay) * 24))}h left`
+          : 'Out of wood: cold and dark until haulers bring more',
+      );
     }
     if (def?.power) {
       const running = sim.power.powered;
@@ -2064,6 +2130,9 @@ export class GameController {
       temperature: Math.round(sim.temperatureAt(i)),
       animal,
       details,
+      stockpile: isStockpileZone(w.zone[i])
+        ? { tile: i, refused: refusedGroups(w.zone[i]), priority: stockpilePriority(w.zone[i]) }
+        : null,
       room:
         room && room.enclosed
           ? `${room.role} · ${impressivenessLabel(room.impressiveness)} (${room.impressiveness}) · ${room.size} tiles`

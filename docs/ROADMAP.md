@@ -422,6 +422,22 @@ can ship on its own.
   generators). Winter prep becomes a real chore: a woodpile to fill before the cold.
 - First slice: stockpile categories and priorities. Success: no regression in the harness, fewer haul trips
   per item delivered.
+- **Done (first part):**
+  - Fires burn wood: a campfire holds 30 and burns 10 a day, a hearth 60 and 15, a torch 10 and 2. A fire is
+    built with a first load, gives no heat or light once it's out, and haulers refuel it (urgently below a
+    fifth). Rooms work out their heat again the moment a fire goes out or is lit. Alerts warn when the
+    woodpile is under three days of burning, and when a fire has gone out.
+  - Stockpile settings, kept in the zone value (no new saved state): the groups it takes (food, materials,
+    gear, medicine) and a priority (low, normal, high, critical), set for a whole stockpile from its tile
+    card. A stockpile drawn beside one carries its settings on. Each storage tile has a value for each item
+    (priority, plus a little for perishables in cold storage); haulers move items only to somewhere better,
+    so nothing shuttles back and forth.
+  - Forbid and Allow orders: forbidden items are left alone by every job (they count as taken), marked
+    with a red cross, and allowed again once the tile empties.
+  - Balance, 48 days on 12 seeds: everyone survived on Standard and Harsh (75 of 75 each). In the
+    100-player playtest every sensible style kept its colony once its test player chopped more wood when the
+    woodpile ran low; colonies that never shelter or that tear their shelter down still freeze.
+  - Still to do: shelves (several stacks on a tile) and locked doors.
 
 **Phase F: Food, materials and the seasons.** _(Medium–large.)_
 
@@ -518,12 +534,10 @@ can ship on its own.
 - Long runs become routine: 120-day runs on a few seeds, to see generations, legends and late-game threats.
 - Performance budget: under 60 ms per 1,000 ticks on a Large map, checked with each phase.
 
-### Questions to settle before starting
+### Decided
 
-1. **Generations:** should colonists age and die of old age, and should children be born, or keep everyone
-   adult (simpler, but no Clanfolk-style clan)?
-2. **Depth:** a full underground layer (a big job: rendering, pathfinding, rooms) or the cheaper mine-shaft
-   version?
-3. **Fuel:** should campfires and hearths burn wood (more winter prep, and harder for neglectful players)?
-4. **Order:** the plan starts with storage and food (foundations) before families. Start with families
-   instead, if they're the priority?
+1. **Generations:** yes. Colonists age, have children, and die of old age.
+2. **Depth:** the cheaper version: mine shafts that yield ore over time, and breaches from below as events.
+   No second map layer.
+3. **Fuel:** campfires, hearths and torches burn wood.
+4. **Order:** as planned, starting with Phase E (storage and fuel).

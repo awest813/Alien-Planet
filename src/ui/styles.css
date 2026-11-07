@@ -1524,3 +1524,19 @@ button.big {
 .setting:has(input:disabled) {
   opacity: 0.5;
 }
+
+/* Stockpile settings in the tile card. */
+.stockpile-settings {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.stockpile-settings .row {
+  margin: 0;
+  gap: 3px;
+}
+.stockpile-settings button {
+  padding: 2px 6px;
+  text-transform: capitalize;
+}

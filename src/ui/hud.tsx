@@ -13,6 +13,7 @@ import {
 import { itemIconStyle } from '../render/icons';
 import { PHASE_NAMES } from '../sim/simulation';
 import type { Stance } from '../sim/types';
+import { STORAGE_GROUPS, StockpilePriority } from '../sim/world';
 import { Bar, moodColor } from './common';
 
 // The always-on game HUD: top bar, colonist bar, inspector, side panel, and architect menu.
@@ -538,7 +539,49 @@ function TileCard({ t, onClose }: { t: TileView; onClose?: () => void }) {
           {o}
         </div>
       ))}
+      {onClose && t.stockpile && <StockpileSettings s={t.stockpile} />}
     </section>
+  );
+}
+
+// What a stockpile takes and how keenly haulers fill it; changes apply to the whole stockpile.
+function StockpileSettings({ s }: { s: NonNullable<TileView['stockpile']> }) {
+  const set = (refused: number, priority: StockpilePriority) =>
+    controller.command({ type: 'stockpile', tile: s.tile, refused, priority });
+  return (
+    <div className="stockpile-settings">
+      <div className="muted small">Takes</div>
+      <div className="row">
+        {STORAGE_GROUPS.map((group, k) => {
+          const on = (s.refused & (1 << k)) === 0;
+          return (
+            <button
+              key={group}
+              className={on ? 'active' : ''}
+              aria-pressed={on}
+              title={on ? `Stop storing ${group} here` : `Store ${group} here`}
+              onClick={() => set(s.refused ^ (1 << k), s.priority)}
+            >
+              {group}
+            </button>
+          );
+        })}
+      </div>
+      <div className="muted small">Priority</div>
+      <div className="row">
+        {(['low', 'normal', 'high', 'critical'] as const).map((p) => (
+          <button
+            key={p}
+            className={s.priority === p ? 'active' : ''}
+            aria-pressed={s.priority === p}
+            title="Haulers fill higher priority stockpiles first, and move things up to them"
+            onClick={() => set(s.refused, p)}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

@@ -111,6 +111,9 @@ How the living simulation works:
   colonists with Warden work bring them in, feed them and talk them round until they join the colony, bringing
   their fighting skill. Left lying they die within a day; a starved prisoner dies too, and one can be released
   from the Prisoners screen.
+- **Storage and fuel:** click a stockpile to choose what it takes (food, materials, gear, medicine) and its priority;
+  haulers fill higher priority stockpiles first and move things up to them. Forbid items to keep everyone's hands
+  off them. Campfires, hearths and torches burn wood that haulers bring, so keep a woodpile for winter.
 - **Rooms and temperature:** enclosed rooms get a role (bedroom, barracks, kitchen, …) and an impressiveness
   score from furniture beauty and size. Outdoor temperature follows a day/night cycle; rooms drift towards it
   and campfires heat them.

@@ -233,6 +233,7 @@
     "key": "campfire",
     "name": "Campfire",
     "heater": 12,
+    "burns": { "item": "wood", "capacity": 30, "perDay": 10 },
     "build": {
       "cost": [
         {
@@ -293,6 +294,7 @@
     "name": "Stone hearth",
     "heater": 22,
     "research": "hearths",
+    "burns": { "item": "wood", "capacity": 60, "perDay": 15 },
     "build": {
       "cost": [
         {
@@ -993,6 +995,7 @@
       "color": "#ffa040",
       "flicker": true
     },
+    "burns": { "item": "wood", "capacity": 10, "perDay": 2 },
     "build": {
       "cost": [
         {

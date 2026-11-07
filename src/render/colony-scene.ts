@@ -105,6 +105,7 @@ const TOOL_COLORS: Record<string, number> = {
   build: 0x7fd0ff,
   hunt: 0xff5c5c,
   capture: 0xffa040,
+  forbid: 0xff6b6b,
   select: 0xffffff,
 };
 
@@ -145,6 +146,8 @@ export class ColonyScene extends Phaser.Scene {
     flicker: boolean;
     strength: number;
     powered: boolean;
+    // A fire that goes dark when it runs out of wood.
+    burns: boolean;
   }[] = [];
   private glowVersion = -1;
   private builtFor = -1;
@@ -894,6 +897,22 @@ export class ColonyScene extends Phaser.Scene {
       }
     }
 
+    // Forbidden items: a small red cross in the corner.
+    const view = this.visibleTiles();
+    for (const i of world.tilesWith('items')) {
+      if (!world.forbidden[i]) {
+        continue;
+      }
+      const tx = world.xOf(i);
+      const ty = world.yOf(i);
+      if (tx >= view.x0 && tx <= view.x1 && ty >= view.y0 && ty <= view.y1) {
+        const x = tx * TILE + TILE - 5;
+        const y = ty * TILE + 1;
+        g.lineStyle(1.5, 0xff4d4d, 0.95)
+          .lineBetween(x, y, x + 4, y + 4)
+          .lineBetween(x + 4, y, x, y + 4);
+      }
+    }
     // Downed raiders marked for capture.
     for (const p of sim.captives) {
       if (p.state === 'downed' && p.capture) {
@@ -1024,6 +1043,7 @@ export class ColonyScene extends Phaser.Scene {
             flicker: light.flicker,
             strength: light === STOVE_LIGHT ? 0.4 : 1,
             powered: !!def.power?.draw,
+            burns: !!def.burns,
           });
         }
       }
@@ -1041,6 +1061,7 @@ export class ColonyScene extends Phaser.Scene {
       const reach = Math.ceil(source.radius);
       if (
         (source.powered && !gridOn) ||
+        (source.burns && world.fuel[i] <= 0) ||
         world.xOf(i) < view.x0 - reach ||
         world.xOf(i) > view.x1 + reach ||
         world.yOf(i) < view.y0 - reach ||
@@ -1120,6 +1141,9 @@ export class ColonyScene extends Phaser.Scene {
         break;
       case 'capture':
         controller.command({ type: 'capture', rect, add: true });
+        break;
+      case 'forbid':
+        controller.command({ type: 'forbid', rect, on: tool.on });
         break;
       case 'zone':
         controller.command({ type: 'zone', rect, zone: tool.zone });

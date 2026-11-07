@@ -29,6 +29,38 @@ export const Designation = {
 
 // Zone values: 0 none, 1 stockpile, GROW_ZONE + crop feature id for growing zones.
 export const STOCKPILE_ZONE = 1;
+
+// A stockpile's settings live in its zone value (1 to 64): which kinds of item it refuses, and its
+// priority. Plain STOCKPILE_ZONE takes everything at normal priority.
+export const STORAGE_GROUPS = ['food', 'materials', 'gear', 'medicine'] as const;
+export type StorageGroup = (typeof STORAGE_GROUPS)[number];
+export const STOCKPILE_PRIORITIES = ['normal', 'low', 'high', 'critical'] as const;
+export type StockpilePriority = (typeof STOCKPILE_PRIORITIES)[number];
+// How strongly each priority pulls items: haulers move things to a higher rank.
+const PRIORITY_RANK: Record<StockpilePriority, number> = { low: 1, normal: 2, high: 3, critical: 4 };
+export const isStockpileZone = (zone: number): boolean => zone > 0 && zone < GROW_ZONE;
+export const stockpileZone = (refused: number, priority: StockpilePriority): number =>
+  STOCKPILE_ZONE + (refused & 15) + STOCKPILE_PRIORITIES.indexOf(priority) * 16;
+export const refusedGroups = (zone: number): number => (zone - STOCKPILE_ZONE) & 15;
+export const stockpilePriority = (zone: number): StockpilePriority =>
+  STOCKPILE_PRIORITIES[((zone - STOCKPILE_ZONE) >> 4) & 3];
+export const priorityRank = (zone: number): number => PRIORITY_RANK[stockpilePriority(zone)];
+// Which group an item is stored under.
+export function storageGroup(item: number): StorageGroup {
+  const def = itemDef(item);
+  if (def.key === 'herbalMedicine') {
+    return 'medicine';
+  }
+  if (def.nutrition > 0) {
+    return 'food';
+  }
+  if (def.weapon || def.armor || def.apparel || def.tool) {
+    return 'gear';
+  }
+  return 'materials';
+}
+export const zoneAccepts = (zone: number, item: number): boolean =>
+  !isStockpileZone(zone) || (refusedGroups(zone) & (1 << STORAGE_GROUPS.indexOf(storageGroup(item)))) === 0;
 export const GROW_ZONE = 100;
 export const growZoneCrop = (zone: number): number => (zone >= GROW_ZONE ? zone - GROW_ZONE : NONE);
 
@@ -78,6 +110,8 @@ export class World {
   public readonly progress: Float32Array;
   // Mess on the tile: kind × 4 + amount (0: clean). See Filth.
   public readonly filth: Uint8Array;
+  // 1: the items here are forbidden, and colonists leave them alone. Cleared when the tile empties.
+  public readonly forbidden: Uint8Array;
   // Bumped whenever the mess anywhere changes.
   public filthVersion = 0;
 
@@ -121,6 +155,7 @@ export class World {
     this.itemCount = new Uint16Array(this.size);
     this.progress = new Float32Array(this.size);
     this.filth = new Uint8Array(this.size);
+    this.forbidden = new Uint8Array(this.size);
   }
 
   public filthKind(i: number): number {
@@ -274,7 +309,8 @@ export class World {
     this.progress[i] = 0;
     this.damage[i] = 0;
     this.growth[i] = 0;
-    this.fuel[i] = 0;
+    // A fire is built with a first load of fuel; a generator starts empty.
+    this.fuel[i] = f !== NONE ? (featureDef(f).burns?.capacity ?? 0) : 0;
     this.featureVersion++;
     if (before !== this.isPassable(i) || roomBefore !== this.blocksRoom(i)) {
       this.structureVersion++;
@@ -417,6 +453,7 @@ export class World {
     this.itemCount[i] -= taken;
     if (this.itemCount[i] === 0) {
       this.itemType[i] = NONE;
+      this.forbidden[i] = 0;
     }
     this.markDirty(i);
     return taken;

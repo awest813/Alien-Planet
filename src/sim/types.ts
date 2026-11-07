@@ -1,4 +1,5 @@
 import type { JoyKind } from './defs';
+import type { StockpilePriority } from './world';
 export type JobType =
   | 'mine'
   | 'chop'
@@ -372,6 +373,9 @@ export type Command =
   | { type: 'cancel'; rect: Rect }
   // `zone` is 0 to clear, STOCKPILE_ZONE, or GROW_ZONE + crop feature id.
   | { type: 'zone'; rect: Rect; zone: number }
+  // Settings for the whole stockpile a tile belongs to: the item groups it refuses (a bit mask over
+  // STORAGE_GROUPS) and its priority.
+  | { type: 'stockpile'; tile: number; refused: number; priority: StockpilePriority }
   | { type: 'build'; feature: number; tiles: number[] }
   | { type: 'priority'; colonist: number; work: WorkTypeKey; value: number }
   | { type: 'schedule'; colonist: number; hour: number; slot: ScheduleSlot }
@@ -387,6 +391,8 @@ export type Command =
   | { type: 'capture'; rect: Rect; add: boolean }
   // Let a prisoner go.
   | { type: 'release'; captive: number }
+  // Forbid (or allow) the items in a rectangle: colonists leave forbidden items alone.
+  | { type: 'forbid'; rect: Rect; on: boolean }
   | { type: 'research'; project: string | null }
   // Whether the colony keeps the seasonal festivals.
   | { type: 'festivals'; on: boolean }

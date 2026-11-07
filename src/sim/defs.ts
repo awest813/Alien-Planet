@@ -104,6 +104,8 @@ export interface FeatureDef {
   workbench?: BenchType;
   // Heat added to the room per climate update.
   heater: number;
+  // Fires that burn fuel (wood) to give heat and light; out of fuel, they give neither.
+  burns?: { item: number; capacity: number; perDay: number };
   // Hit-chance multiplier for someone sheltering behind it (sandbags).
   cover: number;
   // Research project that must be finished before it can be built.
@@ -189,6 +191,7 @@ interface RawFeature {
   light?: { radius: number; color: string; flicker?: boolean };
   workbench?: string;
   heater?: number;
+  burns?: RawFuel;
   cover?: number;
   research?: string;
   researchStation?: boolean;
@@ -321,6 +324,7 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   light: f.light && { radius: f.light.radius, color: f.light.color, flicker: !!f.light.flicker },
   workbench: f.workbench as BenchType | undefined,
   heater: f.heater ?? 0,
+  burns: f.burns && { ...f.burns, item: resolveItem(f.burns.item) },
   cover: f.cover ?? 1,
   research: f.research,
   researchStation: !!f.researchStation,
@@ -556,3 +560,7 @@ export const ANIMALS: Record<string, AnimalDef> = Object.fromEntries(
 
 export const COLONIST_NAMES: string[] = colonistsJson.names;
 export const COLONIST_COLORS: string[] = colonistsJson.colors;
+
+// The fuel a building runs on, if any: a generator's, or a fire's.
+export const fuelOf = (def: FeatureDef): { item: number; capacity: number; perDay: number } | undefined =>
+  def.power?.fuel ?? def.burns;

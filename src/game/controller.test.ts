@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { featureId } from '../sim/defs';
+import { featureId, itemId } from '../sim/defs';
+import { STOCKPILE_ZONE } from '../sim/world';
 import { DAYS_PER_SEASON } from '../sim/seasons';
 import { HOUR, clearAround, outline } from '../sim/test-helpers';
 import { TICKS_PER_HOUR } from '../sim/simulation';
@@ -65,5 +66,28 @@ describe('alerts', () => {
     expect(about()).toMatch(/Warden/);
     sim.colonists[0].priorities.warden = 2;
     expect(about()).toMatch(/to be brought in/);
+  });
+
+  it('count a stockpile with settings as a stockpile', () => {
+    const { sim, w, x, y } = colony('4');
+    w.addItem(w.idx(x + 3, y + 3), itemId('wood'), 5);
+    expect(texts()).toContain('No stockpile: items are left where they fall');
+    sim.apply({ type: 'zone', rect: { x0: x - 4, y0: y - 4, x1: x - 2, y1: y - 2 }, zone: STOCKPILE_ZONE });
+    sim.apply({ type: 'stockpile', tile: w.idx(x - 4, y - 4), refused: 1, priority: 'high' });
+    expect(texts()).not.toContain('No stockpile: items are left where they fall');
+  });
+
+  it('warn before the woodpile runs out, and when a fire goes out', () => {
+    const { w, x, y } = colony('5');
+    for (const i of [...w.tilesWith('items')]) {
+      w.takeItem(i, w.itemCount[i]);
+    }
+    const fire = w.idx(x + 3, y);
+    w.setFeature(fire, featureId('campfire'));
+    expect(texts().some((t) => t.startsWith('Wood is running low'))).toBe(true);
+    w.addItem(w.idx(x - 3, y), itemId('wood'), 75);
+    expect(texts().some((t) => t.startsWith('Wood is running low'))).toBe(false);
+    w.fuel[fire] = 0;
+    expect(texts().some((t) => /gone out: colonists with Haul work bring wood/.test(t))).toBe(true);
   });
 });

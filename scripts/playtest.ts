@@ -3,7 +3,12 @@
 // (NaN needs, people or items inside walls, leaked reservations, prisoners off their beds), no jobs
 // stuck for a day, and a save that loads into exactly the same game.
 //
-//   npx tsx scripts/playtest.ts [days=16] [from=0] [to=100] [only=persona]
+//   npx tsx scripts/playtest.ts [days=16] [from=0] [to=100] [only=persona] [players=3,40]
+//
+// To look into one colony, set in the environment: TRACE=day (colonists hour by hour from that day),
+// BUILD=1 (buildings, wood and fires each noon), WHERE=day (where everyone sleeps, and the beds and door),
+// FIRE=day (each fire's fuel and who could reach it), BORDER=day (what walls off the fire's region),
+// SAVEAT=day SAVEDIR=dir (keep a save from that day, for loading into the browser).
 import { writeFileSync } from 'node:fs';
 import { MAP_SIZES } from '../src/sim/constants';
 import { FEATURES, NONE, RECIPES, featureDef, featureId, terrainDef } from '../src/sim/defs';
@@ -335,6 +340,7 @@ function play(player: number): Report {
     }
   }
 
+  let chopRadius = 14;
   const research = [
     'hearths',
     'cropRotation',
@@ -361,6 +367,18 @@ function play(player: number): Report {
       if (hour % 24 === 0 && persona !== 'neglectful') {
         const next = research.find((k) => !sim.isResearched(k));
         sim.apply({ type: 'research', project: next ?? null });
+      }
+      // A sensible player answers the wood warning: chop further afield.
+      if (hour % 12 === 0 && persona !== 'neglectful' && persona !== 'chaos' && sim.stockOf(itemId('wood')) < 60) {
+        chopRadius += 8;
+        const c = sim.living()[0] ?? sim.colonists[0];
+        const cx = w().xOf(c.tile);
+        const cy = w().yOf(c.tile);
+        sim.apply({
+          type: 'designate',
+          rect: { x0: cx - chopRadius, y0: cy - chopRadius, x1: cx + chopRadius, y1: cy + chopRadius },
+          kind: 'chop',
+        });
       }
       switch (persona) {
         case 'militarist':
@@ -476,6 +494,53 @@ function play(player: number): Report {
           `${process.env.SAVEDIR ?? '.'}/p${player}.json`,
           JSON.stringify(serialize(sim), (_k, v) => (ArrayBuffer.isView(v) ? Array.from(v as Uint8Array) : v)),
         );
+      }
+      if (process.env.BORDER && hour % 24 === 12 && sim.day >= Number(process.env.BORDER)) {
+        const ww = sim.world;
+        const fire = [...ww.tilesWith('features')].find((i) => featureDef(ww.feature[i]).burns);
+        if (fire !== undefined) {
+          const r = sim.regionOf(ww.neighbors(fire).find((n) => ww.isPassable(n))!);
+          const kinds = new Map<string, number>();
+          let size = 0;
+          for (let i = 0; i < ww.size; i++) {
+            if (sim.regionOf(i) !== r) continue;
+            size++;
+            for (const n of ww.neighbors(i)) {
+              if (sim.regionOf(n) !== r) {
+                const k = ww.feature[n] ? featureDef(ww.feature[n]).key : terrainDef(ww.terrain[n]).key;
+                kinds.set(k, (kinds.get(k) ?? 0) + 1);
+              }
+            }
+          }
+          console.log(`  d${sim.day} hut region ${r} size ${size} border`, JSON.stringify(Object.fromEntries(kinds)));
+        }
+      }
+      if (process.env.FIRE && hour % 24 === 12 && sim.day >= Number(process.env.FIRE)) {
+        const ww = sim.world;
+        const fires = [...ww.tilesWith('features')].filter((i) => featureDef(ww.feature[i]).burns);
+        for (const f of fires) {
+          const r = sim.regionOf(f);
+          const spots = ww
+            .neighbors(f)
+            .filter((n) => ww.isPassable(n))
+            .map((n) => sim.regionOf(n));
+          const wood = [...ww.tilesWith('items')].filter((i) => ww.itemType[i] === itemId('wood'));
+          console.log(
+            `  d${sim.day} fire ${featureDef(ww.feature[f]).key}@${ww.xOf(f)},${ww.yOf(f)} fuel ${ww.fuel[f].toFixed(1)} region ${r} spots ${spots.join(',')} ` +
+              `wood regions ${[...new Set(wood.map((i) => sim.regionOf(i)))].join(',')} forbidden ${wood.filter((i) => ww.forbidden[i]).length} ` +
+              `colonist regions ${sim
+                .living()
+                .map((c) => sim.regionOf(c.tile))
+                .join(',')} haul ${sim
+                .living()
+                .map((c) => c.priorities.hauling)
+                .join('')} ` +
+              `res f ${sim.reservations.get('f' + f) ?? '-'} jobs ${sim
+                .living()
+                .map((c) => c.job?.type ?? '-')
+                .join(',')}`,
+          );
+        }
       }
       if (process.env.BUILD && hour % 24 === 12) {
         const ww = sim.world;

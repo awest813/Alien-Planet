@@ -76,7 +76,7 @@ export function measureRooms(
     c.tables += def.table ? 1 : 0;
     if (def.power?.draw) {
       c.electricHeat += def.heater;
-    } else {
+    } else if (!def.burns || world.fuel[i] > 0) {
       c.heat += def.heater;
     }
     if (def.cooler) {
