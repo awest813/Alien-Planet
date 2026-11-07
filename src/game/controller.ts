@@ -2085,18 +2085,19 @@ export class GameController {
       }
     }
     // Full means no stockpile tile has room for any of the kinds of item lying outside.
-    const looseTypes = new Set<number>();
+    // (Forbidden things were left out on purpose.)
+    const looseTypes = new Map<number, number>();
     let loose = 0;
     for (let i = 0; i < w.size; i++) {
-      if (w.itemType[i] !== NONE && !sim.isStockpile(i)) {
-        looseTypes.add(w.itemType[i]);
+      if (w.itemType[i] !== NONE && !sim.isStockpile(i) && !w.forbidden[i]) {
+        looseTypes.set(w.itemType[i], (looseTypes.get(w.itemType[i]) ?? 0) + 1);
         loose++;
       }
     }
     let room = false;
     for (let i = 0; i < w.size && loose > 0 && !room; i++) {
       if (sim.isStockpile(i)) {
-        for (const type of looseTypes) {
+        for (const type of looseTypes.keys()) {
           if (w.canHoldItem(i, type) && sim.storesItem(i, type)) {
             room = true;
             break;
@@ -2105,7 +2106,11 @@ export class GameController {
       }
     }
     if (!room && loose > 0 && anyStorage) {
-      alerts.push({ text: `Stockpiles are full: ${loose} stacks lying outside. Zone more storage (Z).`, tone: 'warn' });
+      const [most] = [...looseTypes.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
+      alerts.push({
+        text: `Stockpiles are full: ${loose} stacks lying outside, mostly ${itemDef(most).name.toLowerCase()}. Zone more storage (Z).`,
+        tone: 'warn',
+      });
     }
     const ateRaw = sim.colonists.some((c) => c.thoughts.some((t) => t.key === 'ateRaw'));
     if (ateRaw && sim.countFeature((f) => featureDef(f).workbench === 'cooking') === 0) {

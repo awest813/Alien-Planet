@@ -29,6 +29,12 @@ describe('raids', () => {
     const w = sim.world;
     const { x, y } = clearAround(sim, 12);
     const ring = outline(w, x - 2, y - 2, x + 2, y + 2);
+    // Nothing lying about (the landing's timber and rations) to tempt the raiders instead.
+    for (const i of [...w.tilesWith('items')]) {
+      if (w.distance(i, w.idx(x, y)) < 8) {
+        w.takeItem(i, w.itemCount[i]);
+      }
+    }
     for (const t of ring) {
       w.setFeature(t, featureId('woodWall'));
     }
@@ -48,6 +54,12 @@ describe('raids', () => {
     const w = sim.world;
     const { x, y } = clearAround(sim, 12);
     const ring = outline(w, x - 2, y - 2, x + 2, y + 2);
+    // Nothing lying about (the landing's timber and rations) to tempt the raiders instead.
+    for (const i of [...w.tilesWith('items')]) {
+      if (w.distance(i, w.idx(x, y)) < 8) {
+        w.takeItem(i, w.itemCount[i]);
+      }
+    }
     // The north side is a solid rock face, three tiles thick.
     for (let dy = -4; dy <= -2; dy++) {
       for (let dx = -6; dx <= 6; dx++) {

@@ -653,7 +653,7 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
 - First slice: requests and gifts. Success: goodwill swings matter and requests get done in the harness.
 - **Done** (`src/sim/diplomacy.ts`, the Factions screen):
   - Requests: every five to eight days, if they're on good terms, the Meadow Kin ask a favour. Either some
-    goods from the stockpiles within four days (wood, meals, cloth, leather, stone blocks or medicine, more as
+    goods from the stockpiles within five days (wood, meals, cloth, leather, stone blocks or medicine, more as
     the colony grows, mostly things it has or nearly has), or, from day 6 and only if a hunter with a bow
     can reach the valley, a great boar (two and a half times as tough, and it never wanders off) hunted down
     within three. Doing it pays silver (now and then a new colonist instead) and +12 goodwill (+15 for the
@@ -727,7 +727,12 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
   lasting injuries) and the 100-player playtest with new personas (a family planner, a hoarder who never
   sorts storage, a policy tinkerer).
 - Long runs become routine: 120-day runs on a few seeds, to see generations, legends and late-game threats.
-- Performance budget: under 60 ms per 1,000 ticks on a Large map, checked with each phase.
+- Performance budget: under 60 ms per 1,000 ticks on a Large map, checked with each phase. Measure a bundled
+  build (`npx esbuild scripts/balance.ts --bundle --platform=node --format=esm --outfile=/tmp/balance.mjs`):
+  under tsx, every imported value goes through a getter, which inflates the numbers by about half. After
+  Phase L, a busy Large colony over 40 days ran at about 48 ms per 1,000 ticks (from 58), once `nearest`
+  searched outward from its starting point instead of scanning the whole map, hunters re-planned less often
+  on long chases, and skittish animals looked about every fourth tick instead of every tick.
 
 ### Decided
 

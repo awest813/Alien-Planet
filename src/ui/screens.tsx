@@ -306,7 +306,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
           <b>Watch the alerts</b> above the goals. Click one to jump to whoever or whatever it's about.
         </li>
       </ol>
-      <p className="muted">First night: walls, a door and a bed for everyone before 22:00.</p>
+      <p className="muted">
+        First night: walls, a door and a bed for everyone before 22:00. The timber salvaged from your landing is a
+        start; a small hut (5×5) is plenty.
+      </p>
       <details>
         <summary>Controls</summary>
         <ul className="help-steps">

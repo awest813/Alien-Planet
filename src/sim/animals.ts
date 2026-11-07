@@ -544,7 +544,14 @@ export function updateAnimals(sim: Simulation): void {
       continue;
     } else if (def.preys && !a.tame && !a.taming && stalk(sim, a)) {
       continue;
-    } else if (def.fleeRange > 0 && !a.tame && !a.taming && a.path.length === 0) {
+    } else if (
+      def.fleeRange > 0 &&
+      !a.tame &&
+      !a.taming &&
+      a.path.length === 0 &&
+      // Looking about every few ticks is plenty (and spares checking every animal against everyone).
+      (sim.tick + a.id) % 4 === 0
+    ) {
       // Skittish animals keep their distance from people, and from anything hunting them.
       const near =
         awake.find((c) => w.distance(c.tile, a.tile) < def.fleeRange)?.tile ??

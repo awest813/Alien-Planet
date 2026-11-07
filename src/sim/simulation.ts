@@ -252,6 +252,8 @@ const TRACK_DIRT_WET = 0.12;
 const CRAWL_HUNGRY = 0.15;
 // A downed patient this hungry is fed before wounds that aren't bleeding are tended.
 const STARVING_PATIENT = 0.1;
+// Wood the colonists land with.
+const SALVAGED_WOOD = 50;
 const CRAWL_RANGE = 25;
 // How long "nowhere to carry this patient" stands before a doctor looks again.
 const NO_RESCUE_RETRY = TICKS_PER_HOUR / 2;
@@ -749,13 +751,15 @@ export class Simulation {
     world.dropItemNear(spawn, itemId('meal'), 4 * landing);
     // A little silver for the first traders who come by.
     world.dropItemNear(spawn, itemId('silver'), 100);
+    // Timber salvaged from the landing: enough for a door and a bed or two, to make the first night easier.
+    world.dropItemNear(spawn, itemId('wood'), SALVAGED_WOOD);
     const sim = new Simulation(world, colonists, seed, rng);
     sim.story = freshStory(difficulty);
     // Eight animals on the standard map, more on bigger ones.
     populateWildlife(sim, Math.round((8 * world.size) / (MAP_SIZE * MAP_SIZE)), spawn);
     sim.wildCover = wildPlantCover(sim);
     sim.addLog(
-      `${NUMBER_WORDS[landing] ?? landing} colonists have landed with a few days of rations. Designate work and they will get to it.`,
+      `${NUMBER_WORDS[landing] ?? landing} colonists have landed with a few days of rations and some salvaged timber. Designate work and they will get to it.`,
       'info',
       true,
     );
@@ -2444,6 +2448,26 @@ export class Simulation {
           this.tryRescue(c);
         }
       }
+      // Someone lying helpless and starving gets fed: by a doctor, who drops what they're doing, or by
+      // anyone at all when no doctor is on their feet. (A failed search waits a while before the next.)
+      if (
+        this.tick % SLOW_TICKS === 0 &&
+        !c.job?.type.match(/^(tend|rescue|feed|eat)$/) &&
+        !c.drafted &&
+        canWork(c, 'doctor') &&
+        (c.priorities.doctor > 0 || !this.doctorStanding()) &&
+        c.health.hypothermia <= 0.5 &&
+        c.health.heatstroke <= 0.5 &&
+        (this.nextFeedSearch.get(c.id) ?? 0) <= this.tick &&
+        this.starvingPatient(c)
+      ) {
+        if (this.findFeed(c, STARVING_PATIENT)) {
+          this.endJob(c);
+          this.tryFeed(c, STARVING_PATIENT);
+        } else {
+          this.nextFeedSearch.set(c.id, this.tick + TICKS_PER_HOUR);
+        }
+      }
       const job = c.job?.type;
       // Starving colonists drop everything, sleep included, to eat. A failed food search is
       // retried a little later rather than every tick.
@@ -2980,15 +3004,42 @@ export class Simulation {
   // Up to `limit` tiles passing `test`, nearest first. `bias` adds to a tile's distance.
   public nearest(from: number, test: (i: number) => boolean, limit = 4, bias?: (i: number) => number): number[] {
     const w = this.world;
-    const best: { i: number; d: number }[] = [];
-    for (let i = 0; i < w.size; i++) {
-      const d = w.distance(from, i) + (bias ? bias(i) : 0);
-      // Distance is cheap and the test often isn't: only test tiles that could make the cut.
-      if (this.couldRank(best, i, d, limit) && test(i)) {
-        this.rank(best, i, d, limit);
+    if (bias) {
+      const best: { i: number; d: number }[] = [];
+      for (let i = 0; i < w.size; i++) {
+        const d = w.distance(from, i) + bias(i);
+        // Distance is cheap and the test often isn't: only test tiles that could make the cut.
+        if (this.couldRank(best, i, d, limit) && test(i)) {
+          this.rank(best, i, d, limit);
+        }
+      }
+      return best.map((b) => b.i);
+    }
+    // Without a bias, search ever bigger squares around `from`: once the square holds `limit` tiles all
+    // no farther than its edge, nothing outside it can do better (distance is never less than the
+    // larger of dx and dy), so the answer is the same as a scan of the whole map, for far less work.
+    const fx = w.xOf(from);
+    const fy = w.yOf(from);
+    for (let r = 8; ; r *= 2) {
+      const best: { i: number; d: number }[] = [];
+      const x0 = Math.max(0, fx - r);
+      const x1 = Math.min(w.width - 1, fx + r);
+      const y0 = Math.max(0, fy - r);
+      const y1 = Math.min(w.height - 1, fy + r);
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const i = w.idx(x, y);
+          const d = w.distance(from, i);
+          if (this.couldRank(best, i, d, limit) && test(i)) {
+            this.rank(best, i, d, limit);
+          }
+        }
+      }
+      const wholeMap = x0 === 0 && y0 === 0 && x1 === w.width - 1 && y1 === w.height - 1;
+      if (wholeMap || (best.length === limit && best[limit - 1].d <= r)) {
+        return best.map((b) => b.i);
       }
     }
-    return best.map((b) => b.i);
   }
 
   // The same search over just one kind of tile ('storage' is zones plus buildings, which covers
@@ -5620,7 +5671,8 @@ export class Simulation {
       this.endJob(c);
       return;
     }
-    c.path = path.slice(0, 6);
+    // A few steps at a time when close (the prey moves); a long way off, more before looking again.
+    c.path = path.slice(0, w.distance(c.tile, prey.tile) > 16 ? 16 : 6);
   }
 
   // Total nutrition the colony has on hand.
@@ -6124,6 +6176,28 @@ export class Simulation {
   }
 
   // ---- Doctoring ----
+
+  private nextFeedSearch = new Map<number, number>();
+
+  // Someone downed, starving and not yet being fed, within reach.
+  private starvingPatient(c: Colonist): boolean {
+    const region = this.regionOf(c.tile);
+    return this.living().some(
+      (p) =>
+        p !== c &&
+        p.health.downed &&
+        p.needs.food < STARVING_PATIENT &&
+        !this.isReserved(`fd${p.id}`, c) &&
+        this.regions.region[p.tile] === region,
+    );
+  }
+
+  // Whether any doctor is up and about.
+  private doctorStanding(): boolean {
+    return this.living().some(
+      (d) => d.priorities.doctor > 0 && !d.health.downed && !this.inMentalBreak(d) && canWork(d, 'doctor'),
+    );
+  }
 
   private urgentPatient(c: Colonist): boolean {
     const region = this.regionOf(c.tile);
@@ -6720,6 +6794,27 @@ export class Simulation {
   // Someone who can't get up to eat gets food brought to them.
   // Brings food to someone downed and hungry (below `below`).
   private tryFeed(c: Colonist, below = 0.35): boolean {
+    const found = this.findFeed(c, below);
+    if (!found) {
+      return false;
+    }
+    this.dropCarried(c);
+    this.reserve(c, `fd${found.patient.id}`);
+    this.reserve(c, `i${found.source}`);
+    this.assign(
+      c,
+      this.makeJob('feed', -1, {
+        source: found.source,
+        item: this.world.itemType[found.source],
+        patient: found.patient.id,
+      }),
+      found.path,
+    );
+    return true;
+  }
+
+  // Someone downed and hungry, and food to bring them, and the way to it.
+  private findFeed(c: Colonist, below: number): { patient: Colonist; source: number; path: number[] } | null {
     const w = this.world;
     const region = this.regionOf(c.tile);
     const patient = this.living().find(
@@ -6731,7 +6826,7 @@ export class Simulation {
         this.regions.region[p.tile] === region,
     );
     if (!patient) {
-      return false;
+      return null;
     }
     const source = this.nearestIn(
       'items',
@@ -6746,13 +6841,9 @@ export class Simulation {
     )[0];
     const path = source !== undefined ? this.pathfinder.find(c.tile, [source]) : null;
     if (source === undefined || !path) {
-      return false;
+      return null;
     }
-    this.dropCarried(c);
-    this.reserve(c, `fd${patient.id}`);
-    this.reserve(c, `i${source}`);
-    this.assign(c, this.makeJob('feed', -1, { source, item: w.itemType[source], patient: patient.id }), path);
-    return true;
+    return { patient, source, path };
   }
 
   private stepFeed(c: Colonist, job: Job): void {

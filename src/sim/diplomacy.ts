@@ -37,7 +37,7 @@ export const freshDiplomacy = (): Diplomacy => ({ request: null, nextRequestDay:
 
 const DAY = TICKS_PER_HOUR * 24;
 // Days to do what's asked.
-const DELIVER_DAYS = 4;
+const DELIVER_DAYS = 5;
 const HUNT_DAYS = 3;
 // Goodwill: earned by a request done, lost by one turned down or let lapse.
 const DONE_GOODWILL = 12;
@@ -55,12 +55,12 @@ export const PEACE_DAYS = 12;
 
 // What they might ask for (item, how many at the start), more as the colony grows.
 const DELIVERIES: [string, number][] = [
-  ['wood', 60],
-  ['meal', 10],
-  ['cloth', 20],
-  ['leather', 12],
-  ['stoneBlocks', 25],
-  ['herbalMedicine', 5],
+  ['wood', 40],
+  ['meal', 8],
+  ['cloth', 15],
+  ['leather', 10],
+  ['stoneBlocks', 20],
+  ['herbalMedicine', 4],
 ];
 
 const clampGoodwill = (g: number) => Math.max(-100, Math.min(100, Math.round(g)));
@@ -122,7 +122,7 @@ function canHunt(sim: Simulation): boolean {
 // A new favour asked (a delivery or a hunt, by chance unless `kind` is given).
 export function makeRequest(sim: Simulation, faction: number, kind?: RequestKind): void {
   const d = sim.diplomacy;
-  const growth = 1 + sim.day / 30;
+  const growth = 1 + sim.day / 40;
   const hunt = kind
     ? kind === 'hunt'
     : sim.day >= 6 && sim.story.difficulty !== 'peaceful' && canHunt(sim) && sim.rng.next() < 0.3;
