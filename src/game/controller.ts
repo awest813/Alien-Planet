@@ -34,7 +34,7 @@ import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
-import { DOWNED_TICKS, persuasion, roomToJoin } from '../sim/prisoners';
+import { DOWNED_TICKS, persuasion, ransomPrice, roomToJoin } from '../sim/prisoners';
 import { DRAFT_AGE, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans';
 import { LEGEND } from '../sim/minds';
 import { PART_LABELS, SCAR_LABELS, isInfected, scarsOf } from '../sim/body';
@@ -55,12 +55,28 @@ import {
   GIFT_SIZES,
   HIRE_DAYS,
   HIRE_GOODWILL,
+  SETTLER_GOODWILL,
+  TRUCE_GOODWILL,
   atPeace,
   describeRequest,
   giftGoodwill,
   hireCost,
+  settlerCost,
+  settlerDays,
+  truceDays,
   tributeCost,
 } from '../sim/diplomacy';
+import { ALLIANCE_DAYS, alliance } from '../sim/alliances';
+import {
+  MAX_PARTY,
+  RUINS,
+  TRIP_DAYS,
+  awayWith,
+  cannotGo,
+  destinationName,
+  expeditions,
+  supplyCost,
+} from '../sim/expeditions';
 import { weatherDef } from '../sim/weather';
 import {
   Colonist,
@@ -604,7 +620,7 @@ export interface ColonistView {
   stage: string;
   backstory: { title: string; description: string };
   family: string[];
-  status: 'Healthy' | 'Injured' | 'Sick' | 'Downed' | 'Dead';
+  status: 'Healthy' | 'Injured' | 'Sick' | 'Downed' | 'Dead' | 'Away';
   bleeding: boolean;
   sleeping: boolean;
   injuries: { label: string; severity: number; tended: boolean; infected: boolean }[];
@@ -676,6 +692,8 @@ export interface CaptiveView {
   talksLeft: number;
   // The colony is full: they can't join until there's room.
   noRoom: boolean;
+  // Silver their people would pay to have them back.
+  ransom: number;
 }
 
 export interface PowerView {
@@ -759,16 +777,20 @@ export interface FactionView {
   description: string;
   relation: string;
   hostile: boolean;
-  goodwill: number | null;
+  goodwill: number;
   // Friendly: the goodwill each gift size would earn. Hostile: days of bought peace left (0: none).
   giftGains: number[];
   peaceDays: number;
+  // Hostile: days of truce left (0: none).
+  truceDays: number;
+  // Friendly: allied with the colony.
+  allied: boolean;
 }
 
 export interface DiplomacyView {
   request: {
     faction: string;
-    kind: 'deliver' | 'hunt';
+    kind: 'deliver' | 'hunt' | 'commission';
     text: string;
     // Deliveries: how many the stockpiles hold of what's asked.
     have: number;
@@ -785,6 +807,27 @@ export interface DiplomacyView {
   hireGoodwill: number;
   hireDays: number;
   hiredDaysLeft: number;
+  truceGoodwill: number;
+  // The friendly factions quarrelling, and who each is.
+  dispute: {
+    a: { id: number; name: string };
+    b: { id: number; name: string };
+    about: string;
+    hoursLeft: number;
+  } | null;
+  envoy: { faction: string; hoursLeft: number; days: number } | null;
+  alliance: { faction: string; daysLeft: number } | null;
+  // An ally's call for help: the goods that would do, how many are stored, and who could go instead.
+  call: { faction: string; goods: string; have: number; count: number; hoursLeft: number } | null;
+  // A settler from the Meadow Kin: their price, the goodwill and wait, whether there's room.
+  settler: { faction: number; cost: number; goodwill: number; waitDays: number; room: boolean };
+  // Parties away, and what a new one could do.
+  expeditions: { where: string; who: string; daysLeft: number; leaving: boolean }[];
+  destinations: { to: number; purpose: 'trade' | 'salvage'; label: string; days: number; open: boolean }[];
+  // Colonists who could go (and why not, for the rest).
+  travellers: { id: number; name: string; why: string | null }[];
+  // Supplies for 1..MAX_PARTY members, by purpose.
+  supplies: { trade: number[]; salvage: number[] };
 }
 
 export interface Alert {
@@ -1145,7 +1188,7 @@ export class GameController {
         this.notify(event === 'death' ? 'Game paused: a colonist has died.' : 'Game paused: a colonist collapsed.');
       }
     }
-    if (this.sim.living().length === 0 && !this.fallen) {
+    if (this.sim.headcount() === 0 && !this.fallen) {
       this.fallen = true;
       this.setSpeed(0);
     }
@@ -1623,7 +1666,7 @@ export class GameController {
         id: c.id,
         name: c.name,
         color: c.color,
-        activity: sim.describe(c),
+        activity: this.activityOf(c),
         carrying: c.carrying && `${c.carrying.count} ${itemDef(c.carrying.item).name.toLowerCase()}`,
         skills: { ...c.skills },
         needs: { ...c.needs },
@@ -1647,13 +1690,15 @@ export class GameController {
         sleeping: c.sleeping,
         status: c.health.dead
           ? 'Dead'
-          : c.health.downed
-            ? 'Downed'
-            : c.health.disease
-              ? 'Sick'
-              : c.health.injuries.length > 0
-                ? 'Injured'
-                : 'Healthy',
+          : c.away
+            ? 'Away'
+            : c.health.downed
+              ? 'Downed'
+              : c.health.disease
+                ? 'Sick'
+                : c.health.injuries.length > 0
+                  ? 'Injured'
+                  : 'Healthy',
         injuries: c.health.injuries.map((injury) => ({
           label: injury.part ? `${injury.label} (${PART_LABELS[injury.part]})` : injury.label,
           severity: injury.severity,
@@ -1790,13 +1835,20 @@ export class GameController {
         id: f.id,
         name: f.name,
         description: f.description,
-        relation: f.hostile && atPeace(sim, f.id) ? 'Paid off' : standingLabel(goodwillOf(sim, f.id), f.hostile),
+        relation:
+          f.hostile && truceDays(sim, f.id) > 0
+            ? 'Truce'
+            : f.hostile && atPeace(sim, f.id)
+              ? 'Paid off'
+              : alliance(sim)?.faction === f.id
+                ? 'Allied'
+                : standingLabel(goodwillOf(sim, f.id), f.hostile),
         hostile: f.hostile,
-        goodwill: f.hostile ? null : goodwillOf(sim, f.id),
+        goodwill: goodwillOf(sim, f.id),
         giftGains: f.hostile ? [] : GIFT_SIZES.map((s) => giftGoodwill(sim, f.id, s)),
-        peaceDays: atPeace(sim, f.id)
-          ? Math.ceil((sim.diplomacy.peaceUntil[f.id] - sim.tick) / (TICKS_PER_HOUR * 24))
-          : 0,
+        peaceDays: Math.max(0, Math.ceil(((sim.diplomacy.peaceUntil[f.id] ?? 0) - sim.tick) / (TICKS_PER_HOUR * 24))),
+        truceDays: truceDays(sim, f.id),
+        allied: alliance(sim)?.faction === f.id,
       })),
       diplomacy: this.diplomacyView(),
       chronicle: this.chronicleView(),
@@ -2370,7 +2422,7 @@ export class GameController {
             faction: FACTIONS[r.faction].name,
             kind: r.kind,
             text: describeRequest(r),
-            have: r.kind === 'deliver' ? colonyStock(sim, r.item) : 0,
+            have: r.kind !== 'hunt' ? colonyStock(sim, r.item) : 0,
             count: r.count,
             hoursLeft: Math.max(0, Math.ceil((r.until - sim.tick) / TICKS_PER_HOUR)),
             quarryTile: quarry?.tile ?? null,
@@ -2383,7 +2435,86 @@ export class GameController {
       hireGoodwill: HIRE_GOODWILL,
       hireDays: HIRE_DAYS,
       hiredDaysLeft: Math.max(0, Math.ceil(((sim.diplomacy.fightersUntil ?? 0) - sim.tick) / (TICKS_PER_HOUR * 24))),
+      ...this.worldView(),
     };
+  }
+
+  // The wider world: quarrels, envoys, an alliance and its calls, settlers and expeditions.
+  private worldView() {
+    const sim = this.sim;
+    const d = sim.diplomacy;
+    const hoursTo = (tick: number) => Math.max(0, Math.ceil((tick - sim.tick) / TICKS_PER_HOUR));
+    const ally = alliance(sim);
+    const kin = FACTIONS.findIndex((f) => f.key === 'meadowKin');
+    const party = (n: number) =>
+      Array.from({ length: MAX_PARTY }, (_, k) => supplyCost(sim, n === 0 ? 'trade' : 'salvage', k + 1));
+    return {
+      truceGoodwill: TRUCE_GOODWILL,
+      dispute: d.dispute
+        ? {
+            a: { id: d.dispute.a, name: FACTIONS[d.dispute.a].name },
+            b: { id: d.dispute.b, name: FACTIONS[d.dispute.b].name },
+            about: d.dispute.about,
+            hoursLeft: hoursTo(d.dispute.until),
+          }
+        : null,
+      envoy: d.envoy
+        ? { faction: FACTIONS[d.envoy.faction].name, hoursLeft: hoursTo(d.envoy.until), days: ALLIANCE_DAYS }
+        : null,
+      alliance: ally ? { faction: FACTIONS[ally.faction].name, daysLeft: Math.ceil(hoursTo(ally.until) / 24) } : null,
+      call: d.call
+        ? {
+            faction: FACTIONS[d.call.faction].name,
+            goods: quantity(d.call.item, d.call.count),
+            have: colonyStock(sim, d.call.item),
+            count: d.call.count,
+            hoursLeft: hoursTo(d.call.until),
+          }
+        : null,
+      settler: {
+        faction: kin,
+        cost: settlerCost(sim),
+        goodwill: SETTLER_GOODWILL,
+        waitDays: settlerDays(sim),
+        room: roomToJoin(sim),
+      },
+      expeditions: expeditions(sim).map((e) => ({
+        where: destinationName(e.to),
+        who: e.members.map((id) => sim.colonists[id].name).join(', '),
+        daysLeft: Math.ceil(hoursTo(e.back) / 24),
+        leaving: e.members.some((id) => sim.colonists[id].away === 'leaving'),
+      })),
+      destinations: [
+        ...FACTIONS.filter((f) => !f.hostile).map((f) => ({
+          to: f.id,
+          purpose: 'trade' as const,
+          label: `Trade at ${destinationName(f.id)}`,
+          days: TRIP_DAYS.trade,
+          open: goodwillOf(sim, f.id) >= 0,
+        })),
+        {
+          to: RUINS,
+          purpose: 'salvage' as const,
+          label: `Salvage ${destinationName(RUINS)}`,
+          days: TRIP_DAYS.salvage,
+          open: true,
+        },
+      ],
+      travellers: sim
+        .living()
+        .filter((c) => c.age >= DRAFT_AGE)
+        .map((c) => ({ id: c.id, name: c.name, why: cannotGo(sim, c) })),
+      supplies: { trade: party(0), salvage: party(1) },
+    };
+  }
+
+  // What a colonist is doing, in a few words (or where they've gone).
+  private activityOf(c: Colonist): string {
+    const e = awayWith(this.sim, c);
+    if (e) {
+      return c.away === 'leaving' ? `Setting off for ${destinationName(e.to)}` : `Away at ${destinationName(e.to)}`;
+    }
+    return this.sim.describe(c);
   }
 
   private villageView(): UiState['village'] {
@@ -2465,6 +2596,7 @@ export class GameController {
       food: p.food,
       talksLeft: Math.ceil(p.resistance / Math.max(0.3, Math.max(...sim.living().map(persuasion), 0.3))),
       noRoom: !roomToJoin(sim),
+      ransom: ransomPrice(p),
     }));
   }
 

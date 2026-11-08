@@ -2,7 +2,7 @@ import { TOUCH } from './touch';
 import { useEffect, useRef, useState } from 'react';
 import { ChronicleYear, UiState, controller } from '../game/controller';
 import { ChronicleKind } from '../sim/chronicle';
-import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey } from '../sim/types';
+import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey, WorldAction } from '../sim/types';
 import { Bar, SLOT_LABELS, WORK_LABELS } from './common';
 import { ADULT, TEEN, TEEN_WORK } from '../sim/lifespans';
 import { Hours, POLICY_TEXT, Rations } from '../sim/village';
@@ -598,7 +598,7 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
             <b>{r.faction}</b> ask: {r.text}. <span className="muted">{left(r.hoursLeft)}.</span>
           </p>
           <div className="row">
-            {r.kind === 'deliver' ? (
+            {r.kind !== 'hunt' ? (
               <button
                 disabled={r.have < r.count}
                 onClick={() => controller.command({ type: 'fulfilRequest' })}
@@ -631,15 +631,17 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
         </>
       ) : (
         <p className="muted">
-          Nothing asked of the colony just now. The Meadow Kin ask a favour every week or so, if they're on good terms
-          with you: doing it earns silver (or a new colonist) and their goodwill; turning it down or letting it lapse
-          costs some.
+          Nothing asked of the colony just now. The neighbours take turns to ask a favour every week or so, if they're
+          on good terms with you: doing it earns silver, goods (or a new colonist) and their goodwill; turning it down
+          or letting it lapse costs some.
         </p>
       )}
+      <WorldNews state={state} />
       <h3>Neighbours</h3>
       <p className="muted small">
         Your silver: {d.silver}. Goodwill brings better prices, more caravans and more gifts of supplies; below 0 they
-        stop trading altogether.
+        stop trading altogether. Raiders soften when their people are let go or ransomed, and harden when they are
+        starved; the warier they are, the more often and harder they raid.
       </p>
       <table className="summary">
         <tbody>
@@ -651,18 +653,32 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
               </td>
               <td className="num">
                 {f.relation}
-                {f.goodwill !== null && <div className="muted small">goodwill {f.goodwill}</div>}
+                <div className="muted small">goodwill {f.goodwill}</div>
                 {f.peaceDays > 0 && <div className="muted small">{f.peaceDays} days of peace left</div>}
+                {f.truceDays > 0 && <div className="muted small">{f.truceDays} days of truce left</div>}
               </td>
               <td>
                 {f.hostile ? (
-                  <button
-                    disabled={d.silver < d.tributeCost}
-                    onClick={() => controller.command({ type: 'tribute', faction: f.id })}
-                    title="Pay them to leave the colony alone for 12 days: their share of the raids stops (the others still come)"
-                  >
-                    Pay {d.tributeCost} silver for peace
-                  </button>
+                  <div className="row">
+                    <button
+                      disabled={d.silver < d.tributeCost}
+                      onClick={() => controller.command({ type: 'tribute', faction: f.id })}
+                      title="Pay them to leave the colony alone for 12 days: their share of the raids stops (the others still come)"
+                    >
+                      Pay {d.tributeCost} silver for peace
+                    </button>
+                    <button
+                      disabled={f.goodwill < d.truceGoodwill || f.truceDays > 0}
+                      onClick={() => controller.command({ type: 'world', action: { kind: 'truce', faction: f.id } })}
+                      title={
+                        f.goodwill < d.truceGoodwill
+                          ? `They won't agree below goodwill ${d.truceGoodwill}: let their people go, or ransom them`
+                          : 'No raids from them for a while; it spends some of their goodwill'
+                      }
+                    >
+                      Offer a truce
+                    </button>
+                  </div>
                 ) : (
                   <>
                     <div className="row">
@@ -681,22 +697,50 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
                         </button>
                       ))}
                     </div>
-                    <div className="row">
-                      <button
-                        disabled={d.silver < d.hireCost || (f.goodwill ?? 0) < d.hireGoodwill}
-                        onClick={() => controller.command({ type: 'hireFighters', faction: f.id })}
-                        title={
-                          (f.goodwill ?? 0) < d.hireGoodwill
-                            ? `They won't fight for the colony below goodwill ${d.hireGoodwill}`
-                            : `Their fighters come to every raid and siege for ${d.hireDays} days, within the hour`
-                        }
-                      >
-                        Hire fighters: {d.hireCost} silver
-                      </button>
-                      {d.hiredDaysLeft > 0 && (
-                        <span className="muted small">Fighters hired for {d.hiredDaysLeft} more days</span>
-                      )}
-                    </div>
+                    {f.id === d.settler.faction && (
+                      <div className="row">
+                        <button
+                          disabled={d.silver < d.hireCost || (f.goodwill ?? 0) < d.hireGoodwill}
+                          onClick={() => controller.command({ type: 'hireFighters', faction: f.id })}
+                          title={
+                            (f.goodwill ?? 0) < d.hireGoodwill
+                              ? `They won't fight for the colony below goodwill ${d.hireGoodwill}`
+                              : `Their fighters come to every raid and siege for ${d.hireDays} days, within the hour`
+                          }
+                        >
+                          Hire fighters: {d.hireCost} silver
+                        </button>
+                        {d.hiredDaysLeft > 0 && (
+                          <span className="muted small">Fighters hired for {d.hiredDaysLeft} more days</span>
+                        )}
+                      </div>
+                    )}
+                    {f.id === d.settler.faction && (
+                      <div className="row">
+                        <button
+                          disabled={
+                            d.silver < d.settler.cost ||
+                            f.goodwill < d.settler.goodwill ||
+                            d.settler.waitDays > 0 ||
+                            !d.settler.room
+                          }
+                          onClick={() =>
+                            controller.command({ type: 'world', action: { kind: 'settler', faction: f.id } })
+                          }
+                          title={
+                            !d.settler.room
+                              ? 'The colony has no room for more'
+                              : f.goodwill < d.settler.goodwill
+                                ? `They won't send one of their own below goodwill ${d.settler.goodwill}`
+                                : d.settler.waitDays > 0
+                                  ? `Nobody else is ready to leave for ${d.settler.waitDays} days`
+                                  : 'A willing settler comes to join the colony'
+                          }
+                        >
+                          Ask for a settler: {d.settler.cost} silver
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </td>
@@ -704,7 +748,155 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
           ))}
         </tbody>
       </table>
+      <Expeditions state={state} />
     </Modal>
+  );
+}
+
+// Quarrels between the neighbours, an envoy's offer, an ally's call for help.
+function WorldNews({ state }: { state: UiState }) {
+  const d = state.diplomacy;
+  const world = (action: WorldAction) => controller.command({ type: 'world', action });
+  const [lend, setLend] = useState<number | null>(null);
+  const free = d.travellers.filter((t) => t.why === null);
+  const lender = free.find((t) => t.id === lend) ?? free[0];
+  if (!d.dispute && !d.envoy && !d.call && !d.alliance) {
+    return null;
+  }
+  const left = (hours: number) => (hours > 24 ? `${Math.ceil(hours / 24)} days left` : `${hours}h left`);
+  return (
+    <>
+      <h3>Neighbours' news</h3>
+      {d.alliance && (
+        <p>
+          Allied with <b>{d.alliance.faction}</b> for {d.alliance.daysLeft} more days: their fighters come to your raids
+          more readily, and they will ask for help when raided.
+        </p>
+      )}
+      {d.call && (
+        <>
+          <p>
+            <b>{d.call.faction}</b> are under attack and ask for help: lend a colonist for a few days, or send{' '}
+            {d.call.goods}. <span className="muted">{left(d.call.hoursLeft)}. Refusing ends the alliance.</span>
+          </p>
+          <div className="row">
+            <button disabled={d.call.have < d.call.count} onClick={() => world({ kind: 'call', answer: 'goods' })}>
+              Send the goods ({d.call.have} stored)
+            </button>
+            {lender && (
+              <>
+                <select value={lender.id} onChange={(e) => setLend(Number(e.target.value))} aria-label="Who to lend">
+                  {free.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+                <button onClick={() => world({ kind: 'call', answer: lender.id })}>Lend {lender.name}</button>
+              </>
+            )}
+            <ConfirmButton
+              label="Refuse"
+              confirm="They'll end the alliance. Sure?"
+              onConfirm={() => world({ kind: 'call', answer: 'refuse' })}
+            />
+          </div>
+        </>
+      )}
+      {d.dispute && (
+        <>
+          <p>
+            <b>{d.dispute.a.name}</b> and <b>{d.dispute.b.name}</b> are quarrelling over {d.dispute.about}. Whoever you
+            back will be pleased and the other offended. <span className="muted">{left(d.dispute.hoursLeft)}.</span>
+          </p>
+          <div className="row">
+            {[d.dispute.a, d.dispute.b].map((side) => (
+              <button key={side.id} onClick={() => world({ kind: 'dispute', side: side.id })}>
+                Back {side.name}
+              </button>
+            ))}
+            <button onClick={() => world({ kind: 'dispute', side: null })}>Stay out of it</button>
+          </div>
+        </>
+      )}
+      {d.envoy && (
+        <>
+          <p>
+            An envoy from <b>{d.envoy.faction}</b> offers an alliance for {d.envoy.days} days. Their rivals will take it
+            badly. <span className="muted">{left(d.envoy.hoursLeft)}.</span>
+          </p>
+          <div className="row">
+            <button onClick={() => world({ kind: 'envoy', accept: true })}>Accept</button>
+            <button onClick={() => world({ kind: 'envoy', accept: false })}>Send them home</button>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+// Parties away, and sending a new one.
+function Expeditions({ state }: { state: UiState }) {
+  const d = state.diplomacy;
+  const [dest, setDest] = useState(0);
+  const [chosen, setChosen] = useState<number[]>([]);
+  const target = d.destinations[Math.min(dest, d.destinations.length - 1)];
+  const party = chosen.filter((id) => d.travellers.some((t) => t.id === id && t.why === null));
+  const cost = party.length > 0 ? d.supplies[target.purpose][party.length - 1] : 0;
+  const toggle = (id: number) =>
+    setChosen((now) => (now.includes(id) ? now.filter((x) => x !== id) : now.length < 3 ? [...now, id] : now));
+  return (
+    <>
+      <h3>Expeditions</h3>
+      <p className="muted small">
+        Send one to three colonists off the map for a few days: to a neighbour's settlement to trade and make friends,
+        or to the ruins to salvage. Supplies cost silver, and a trading party carries silver to spend (it goes further
+        than with a caravan); there's a chance of trouble on the road.
+      </p>
+      {d.expeditions.map((e, k) => (
+        <p key={k}>
+          <b>{e.who}</b>: {e.leaving ? 'setting off for' : 'away at'} {e.where}, back in about {e.daysLeft} day
+          {e.daysLeft === 1 ? '' : 's'}.
+        </p>
+      ))}
+      <div className="row">
+        <select value={dest} onChange={(e) => setDest(Number(e.target.value))} aria-label="Where to">
+          {d.destinations.map((t, k) => (
+            <option key={k} value={k} disabled={!t.open}>
+              {t.label} ({t.days} days)
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="row">
+        {d.travellers.map((t) => (
+          <label key={t.id} className="small" title={t.why ?? undefined}>
+            <input
+              type="checkbox"
+              disabled={t.why !== null}
+              checked={party.includes(t.id)}
+              onChange={() => toggle(t.id)}
+            />{' '}
+            {t.name}
+            {t.why && <span className="muted"> ({t.why})</span>}
+          </label>
+        ))}
+      </div>
+      <div className="row">
+        <button
+          disabled={party.length === 0 || !target.open || d.silver < cost}
+          onClick={() => {
+            controller.command({
+              type: 'world',
+              action: { kind: 'expedition', to: target.to, purpose: target.purpose, colonists: party },
+            });
+            setChosen([]);
+          }}
+        >
+          Send {party.length || ''} ({cost} silver)
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -778,7 +970,7 @@ export function PrisonersScreen({ state, onClose }: { state: UiState; onClose: (
       <p className="muted">
         Colonists with <b>Warden</b> work bring captives to a prisoner bed, feed them, and talk with them twice a day or
         so. Once their resistance is worn down, each talk may win them over to join the colony; a happy, kind warden
-        does best.
+        does best. Their people notice: letting them go (or selling them back) softens them, starving them does not.
       </p>
       {held.length === 0 && lying.length === 0 && <p className="muted">Nobody is held.</p>}
       {held.length > 0 && (
@@ -806,11 +998,18 @@ export function PrisonersScreen({ state, onClose }: { state: UiState; onClose: (
                       : 'Ready to be won over'}
                 </td>
                 <td>
-                  <ConfirmButton
-                    label="Set free"
-                    confirm="Set them free?"
-                    onConfirm={() => controller.command({ type: 'release', captive: p.id })}
-                  />
+                  <div className="row">
+                    <ConfirmButton
+                      label="Set free"
+                      confirm="Set them free?"
+                      onConfirm={() => controller.command({ type: 'release', captive: p.id })}
+                    />
+                    <ConfirmButton
+                      label={`Ransom: ${p.ransom} silver`}
+                      confirm="Sell them back?"
+                      onConfirm={() => controller.command({ type: 'world', action: { kind: 'ransom', captive: p.id } })}
+                    />
+                  </div>
                 </td>
               </tr>
             ))}

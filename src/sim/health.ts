@@ -382,7 +382,7 @@ export function die(sim: Simulation, c: Colonist, cause: string): void {
     }
   }
   c.lover = -1;
-  if (sim.living().length === 0) {
+  if (sim.headcount() === 0) {
     sim.addLog('Every colonist has died. The colony is lost.', 'danger', true);
   }
 }

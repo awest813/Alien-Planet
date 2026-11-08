@@ -48,7 +48,9 @@ const formatPower = (watts: number) => (Math.abs(watts) >= 1000 ? `${(watts / 10
 export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Screen) => void }) {
   const p = state.power;
   const net = p.supply - p.demand;
-  const anyFree = state.colonists.some((c) => !c.dead && c.status !== 'Downed' && !c.drafted && c.age >= DRAFT_AGE);
+  const anyFree = state.colonists.some(
+    (c) => !c.dead && c.status !== 'Downed' && c.status !== 'Away' && !c.drafted && c.age >= DRAFT_AGE,
+  );
   return (
     <header className="panel topbar">
       <div className="tb-time">
@@ -230,6 +232,9 @@ function statusIcons(c: ColonistView): { icon: string; title: string }[] {
   if (c.dead) {
     return [{ icon: '☠', title: 'Dead' }];
   }
+  if (c.status === 'Away') {
+    return [{ icon: '🧭', title: c.activity }];
+  }
   const icons: { icon: string; title: string }[] = [];
   if (c.status === 'Downed') {
     icons.push({ icon: '✚', title: 'Downed: needs a doctor' });
@@ -316,12 +321,14 @@ function ColonistCard({ c }: { c: ColonistView }) {
         )}
         {c.leader && <span className="tag good">leader</span>}
         {c.status !== 'Healthy' && (
-          <span className={`tag ${c.status === 'Injured' || c.status === 'Sick' ? 'warn' : 'danger'}`}>
+          <span
+            className={`tag ${c.status === 'Injured' || c.status === 'Sick' ? 'warn' : c.status === 'Away' ? '' : 'danger'}`}
+          >
             {c.status.toLowerCase()}
           </span>
         )}
         <span className="spacer" />
-        {!c.dead && c.status !== 'Downed' && (
+        {!c.dead && c.status !== 'Downed' && c.status !== 'Away' && (
           <button
             className={c.drafted ? 'active danger' : ''}
             disabled={c.age < DRAFT_AGE}

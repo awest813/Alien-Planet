@@ -1,14 +1,25 @@
 import { addQuarry, maxHp } from './animals';
 import { maybeSendAllies } from './combat';
 import { TICKS_PER_HOUR, populationFor } from './constants';
-import { FACTIONS, itemDef, itemId, quantity, weaponDef } from './defs';
+import { FACTIONS, RECIPES, itemDef, itemId, quantity, weaponDef } from './defs';
+import type { Expedition } from './expeditions';
+import type { Alliance, AllyCall, Dispute, Envoy } from './alliances';
 import type { Simulation } from './simulation';
-import { STARTING_GOODWILL, colonyStock, goodwillOf, takeFromStockpiles } from './trade';
+import {
+  colonyStock,
+  goodwillOf,
+  shiftGoodwill,
+  startingGoodwill,
+  takeFromStockpiles,
+  tradeFloor,
+  waresOf,
+} from './trade';
 
 // The wider world: what the friendly faction asks of the colony, the gifts the colony sends to win them
 // over, and the tribute that buys a few days' peace from raiders.
 
-export type RequestKind = 'deliver' | 'hunt';
+// A commission is a delivery of crafted goods, paid for in the neighbours' own goods rather than silver.
+export type RequestKind = 'deliver' | 'hunt' | 'commission';
 
 export interface FactionRequest {
   faction: number;
@@ -24,6 +35,8 @@ export interface FactionRequest {
   silver: number;
   recruit: boolean;
   goodwill: number;
+  // Commissions: what they pay with instead of silver.
+  pay?: { item: number; count: number }[];
 }
 
 export interface Diplomacy {
@@ -34,6 +47,23 @@ export interface Diplomacy {
   peaceUntil: Record<number, number>;
   // Until this tick the friendly faction has been paid to send fighters to every raid.
   fightersUntil?: number;
+  // Hostile faction id → the tick a truce with them ends (no raids from them until then).
+  truceUntil?: Record<number, number>;
+  // The friendly faction that asked the last favour, so the neighbours take turns.
+  lastAsked?: number;
+  // No settler for sale before this day.
+  settlerDay?: number;
+  // The two friendly factions quarrelling, an envoy waiting on an answer, an alliance and its call for help
+  // (see alliances.ts).
+  dispute?: Dispute | null;
+  nextDisputeDay?: number;
+  envoy?: Envoy | null;
+  nextEnvoyDay?: number;
+  alliance?: Alliance | null;
+  call?: AllyCall | null;
+  // Colonists off the map (see expeditions.ts).
+  expeditions?: Expedition[];
+  nextExpeditionId?: number;
 }
 
 export const freshDiplomacy = (): Diplomacy => ({ request: null, nextRequestDay: 5, peaceUntil: {} });
@@ -52,6 +82,24 @@ const MENDING_DAYS = 2;
 // friendship takes favours, trade or gifts now and then.
 const KEPT_UP_ABOVE = 40;
 const COOLING_DAYS = 3;
+// Commissions: crafted goods, from the second week, given a little longer.
+const COMMISSION_FROM_DAY = 12;
+const COMMISSION_CHANCE = 0.3;
+const COMMISSION_DAYS = 7;
+// What they might commission (item, how many at the start).
+const COMMISSIONS: [string, number][] = [
+  ['tunic', 2],
+  ['parka', 1],
+  ['toolKit', 2],
+  ['fineMeal', 5],
+  ['bread', 10],
+  ['leatherArmor', 1],
+  ['recurveBow', 1],
+  ['longbow', 1],
+  ['bricks', 25],
+  ['ironSword', 1],
+];
+
 // Below this the friendly faction won't ask (or trade, or send anything).
 export const WARY = 0;
 // Silver for one goodwill, before the drop-off as they come to like you anyway.
@@ -70,19 +118,21 @@ const DELIVERIES: [string, number][] = [
   ['herbalMedicine', 4],
 ];
 
-const clampGoodwill = (g: number) => Math.max(-100, Math.min(100, Math.round(g)));
+// Close friends drift apart faster: above this, goodwill slips a point every other day as well.
+const CLOSE_ABOVE = 75;
 
-export function changeGoodwill(sim: Simulation, faction: number, delta: number): void {
-  sim.goodwill[faction] = clampGoodwill(goodwillOf(sim, faction) + delta);
-}
+export const changeGoodwill = shiftGoodwill;
 
 export const friendly = () => FACTIONS.filter((f) => !f.hostile);
+// Paid off, or at truce.
 export const atPeace = (sim: Simulation, faction: number): boolean =>
-  (sim.diplomacy.peaceUntil[faction] ?? 0) > sim.tick;
+  (sim.diplomacy.peaceUntil[faction] ?? 0) > sim.tick || truceDays(sim, faction) > 0;
 // Whether the friendly faction is on speaking terms with the colony.
-export const onGoodTerms = (sim: Simulation, faction: number): boolean => goodwillOf(sim, faction) >= WARY;
+export const onGoodTerms = (sim: Simulation, faction: number): boolean =>
+  goodwillOf(sim, faction) >= tradeFloor(faction);
 
-const roomToGrow = (sim: Simulation) => sim.living().length < populationFor(sim.world.width).maxColonists;
+// Away colonists still have their place.
+const roomToGrow = (sim: Simulation) => sim.headcount() < populationFor(sim.world.width).maxColonists;
 
 // Called every in-game hour: a new request now and then (mid-morning), and a lapsed one closed.
 export function updateDiplomacy(sim: Simulation): void {
@@ -90,12 +140,13 @@ export function updateDiplomacy(sim: Simulation): void {
   if (Math.floor(sim.hour) === 0) {
     for (const f of friendly()) {
       const g = goodwillOf(sim, f.id);
-      if (g < STARTING_GOODWILL && sim.day % MENDING_DAYS === 0) {
+      if (g < startingGoodwill(f.id) && sim.day % MENDING_DAYS === 0) {
         changeGoodwill(sim, f.id, 1);
-      } else if (g > KEPT_UP_ABOVE && sim.day % COOLING_DAYS === 0) {
+      } else if ((g > CLOSE_ABOVE && sim.day % 2 === 0) || (g > KEPT_UP_ABOVE && sim.day % COOLING_DAYS === 0)) {
         changeGoodwill(sim, f.id, -1);
       }
     }
+    updateHostility(sim);
   }
   const r = d.request;
   if (r) {
@@ -109,8 +160,11 @@ export function updateDiplomacy(sim: Simulation): void {
   if (Math.floor(sim.hour) !== 9 || sim.day < d.nextRequestDay) {
     return;
   }
-  const faction = friendly().find((f) => onGoodTerms(sim, f.id));
+  // The neighbours take turns to ask.
+  const asking = friendly().filter((f) => onGoodTerms(sim, f.id));
+  const faction = asking.find((f) => f.id !== d.lastAsked) ?? asking[0];
   if (faction) {
+    d.lastAsked = faction.id;
     makeRequest(sim, faction.id);
   }
 }
@@ -138,7 +192,25 @@ export function makeRequest(sim: Simulation, faction: number, kind?: RequestKind
     ? kind === 'hunt'
     : sim.day >= 6 && sim.story.difficulty !== 'peaceful' && canHunt(sim) && sim.rng.next() < 0.3;
   let r: FactionRequest;
-  if (hunt) {
+  const commission =
+    !hunt && (kind ? kind === 'commission' : sim.day >= COMMISSION_FROM_DAY && sim.rng.next() < COMMISSION_CHANCE);
+  const crafted = commission ? pickCommission(sim, growth) : undefined;
+  if (crafted) {
+    // Paid in their own goods, worth half as much again as what they ask for.
+    const worth = itemDef(crafted.item).value * crafted.count * 1.5;
+    r = {
+      faction,
+      kind: 'commission',
+      item: crafted.item,
+      count: crafted.count,
+      quarry: -1,
+      until: sim.tick + COMMISSION_DAYS * DAY,
+      silver: 0,
+      recruit: false,
+      goodwill: DONE_GOODWILL,
+      pay: payInKind(sim, faction, worth),
+    };
+  } else if (hunt) {
     const beast = addQuarry(sim);
     if (!beast) {
       d.nextRequestDay = sim.day + 1;
@@ -178,7 +250,7 @@ export function makeRequest(sim: Simulation, faction: number, kind?: RequestKind
     };
   }
   d.request = r;
-  const days = r.kind === 'hunt' ? HUNT_DAYS : DELIVER_DAYS;
+  const days = r.kind === 'hunt' ? HUNT_DAYS : r.kind === 'commission' ? COMMISSION_DAYS : DELIVER_DAYS;
   sim.addLog(
     `${FACTIONS[faction].name} ask a favour: ${describeRequest(r)}. They need it within ${days} days (Factions).`,
     'info',
@@ -190,7 +262,12 @@ export function makeRequest(sim: Simulation, faction: number, kind?: RequestKind
 export const QUARRY_NAME = 'great boar';
 
 export function describeRequest(r: FactionRequest): string {
-  const reward = `${r.recruit ? 'one of their own, who would like to join the colony' : `${r.silver} silver`}`;
+  const reward = r.pay
+    ? r.pay.map((p) => quantity(p.item, p.count)).join(' and ')
+    : `${r.recruit ? 'one of their own, who would like to join the colony' : `${r.silver} silver`}`;
+  if (r.kind === 'commission') {
+    return `${quantity(r.item, r.count)} made for them, paid in ${reward}`;
+  }
   return r.kind === 'hunt'
     ? `hunt down the ${QUARRY_NAME} troubling their herds, for ${reward}`
     : `${quantity(r.item, r.count)}, for ${reward}`;
@@ -212,6 +289,19 @@ function complete(sim: Simulation, what: string): void {
     }
   }
   const home = sim.homeTile() ?? sim.living()[0]?.tile;
+  if (r.pay) {
+    for (const p of r.pay) {
+      if (home !== undefined) {
+        sim.world.dropItemNear(home, p.item, p.count);
+      }
+    }
+    sim.addLog(
+      `${what} ${name} are pleased, and paid in ${r.pay.map((p) => quantity(p.item, p.count)).join(' and ')}.`,
+      'good',
+      true,
+    );
+    return;
+  }
   if (home !== undefined && r.silver > 0) {
     sim.world.dropItemNear(home, itemId('silver'), r.silver);
   }
@@ -242,7 +332,7 @@ function lapse(sim: Simulation): void {
 // Sends what was asked for (from the stockpiles). Returns why not, if it can't.
 export function fulfil(sim: Simulation): string | null {
   const r = sim.diplomacy.request;
-  if (!r || r.kind !== 'deliver') {
+  if (!r || r.kind === 'hunt') {
     return 'Nothing to deliver.';
   }
   const have = colonyStock(sim, r.item);
@@ -311,7 +401,8 @@ export const fightersHired = (sim: Simulation): boolean => (sim.diplomacy.fighte
 
 export function hireFighters(sim: Simulation, faction: number): string | null {
   const f = FACTIONS[faction];
-  if (!f || f.hostile) {
+  // (Only the Meadow Kin hire out their fighters; an ally's come anyway, see alliances.ts.)
+  if (!f || f.hostile || f.key !== 'meadowKin') {
     return "They won't fight for the colony.";
   }
   if (goodwillOf(sim, faction) < HIRE_GOODWILL) {
@@ -363,5 +454,174 @@ export function payTribute(sim: Simulation, faction: number): string | null {
     }
     sim.addLog('The raiders take the silver and leave.', 'good');
   }
+  return null;
+}
+
+// Something the colony knows how to make (by research) and already makes: it has at least a third of what's
+// asked in store. Otherwise they ask for something else.
+function pickCommission(sim: Simulation, growth: number): { item: number; count: number } | undefined {
+  const options = COMMISSIONS.map(([key, base]) => ({
+    item: itemId(key),
+    count: Math.max(1, Math.round(base * growth)),
+  }))
+    .filter(({ item }) => RECIPES.some((r) => r.product.item === item && !r.mend && sim.isResearched(r.research)))
+    .filter((o) => colonyStock(sim, o.item) * 3 >= o.count)
+    .map((o) => ({ ...o, weight: Math.min(1, colonyStock(sim, o.item) / o.count) + 0.3 }));
+  if (options.length === 0) {
+    return undefined;
+  }
+  let roll = sim.rng.next() * options.reduce((sum, o) => sum + o.weight, 0);
+  return options.find((o) => (roll -= o.weight) <= 0) ?? options[0];
+}
+
+// Goods from a faction's own stores worth about `worth` silver: one or two kinds of what their traders carry.
+function payInKind(sim: Simulation, faction: number, worth: number): { item: number; count: number }[] {
+  const wares = waresOf(sim, faction)
+    .map(([key]) => itemId(key))
+    .filter((item) => itemDef(item).value > 0 && itemDef(item).value <= worth);
+  if (wares.length === 0) {
+    return [{ item: itemId('silver'), count: Math.round(worth) }];
+  }
+  const first = sim.rng.pick(wares);
+  const rest = wares.filter((i) => i !== first);
+  const second = rest.length > 0 && worth >= 60 ? sim.rng.pick(rest) : undefined;
+  const lines =
+    second === undefined
+      ? [{ item: first, share: 1 }]
+      : [
+          { item: first, share: 0.6 },
+          { item: second, share: 0.4 },
+        ];
+  return lines
+    .map(({ item, share }) => ({ item, count: Math.max(1, Math.round((worth * share) / itemDef(item).value)) }))
+    .filter((p) => p.count > 0);
+}
+
+// ---- Raiders' goodwill ----
+// The raider factions start out hostile, and how the colony treats their people moves that: letting captives
+// go (or selling them back) softens them, starving them hardens them. Feelings drift back over time. The
+// warier they are the more often and the harder they raid; softened enough, they'll agree to a truce.
+
+export const hostile = () => FACTIONS.filter((f) => f.hostile);
+// How each dealing with a raider faction's people changes their goodwill.
+export const HOSTILE_DEALINGS = {
+  released: 8,
+  releasedWounded: 4,
+  ransomed: 5,
+  recruited: -4,
+  starved: -15,
+  leftToDie: -1,
+} as const;
+// Hostile feelings drift back to where they started, a point every few days.
+const HOSTILE_DRIFT_DAYS = 4;
+// A truce: on offer at this goodwill, it holds this long, and it spends this much of their goodwill.
+export const TRUCE_GOODWILL = -25;
+export const TRUCE_DAYS = 18;
+const TRUCE_SPENDS = 20;
+
+export function hostileDealing(sim: Simulation, faction: number, how: keyof typeof HOSTILE_DEALINGS): void {
+  if (!FACTIONS[faction]?.hostile) {
+    return;
+  }
+  const before = goodwillOf(sim, faction);
+  changeGoodwill(sim, faction, HOSTILE_DEALINGS[how]);
+  if (before < TRUCE_GOODWILL && goodwillOf(sim, faction) >= TRUCE_GOODWILL && truceDays(sim, faction) === 0) {
+    sim.addLog(`${FACTIONS[faction].name} might now agree to a truce (Factions).`, 'good', true);
+  }
+}
+
+export const truceDays = (sim: Simulation, faction: number): number =>
+  Math.max(0, Math.ceil(((sim.diplomacy.truceUntil?.[faction] ?? 0) - sim.tick) / DAY));
+
+// Once a day: hostile feelings drift back, and an ended truce is noted.
+function updateHostility(sim: Simulation): void {
+  for (const f of hostile()) {
+    const g = goodwillOf(sim, f.id);
+    const start = startingGoodwill(f.id);
+    if (g !== start && sim.day % HOSTILE_DRIFT_DAYS === 0) {
+      changeGoodwill(sim, f.id, g > start ? -1 : 1);
+    }
+    const until = sim.diplomacy.truceUntil?.[f.id];
+    if (until !== undefined && until <= sim.tick) {
+      delete sim.diplomacy.truceUntil![f.id];
+      sim.addLog(`The truce with ${FACTIONS[f.id].name} has ended.`, 'warn', true);
+    }
+  }
+}
+
+export function proposeTruce(sim: Simulation, faction: number): string | null {
+  const f = FACTIONS[faction];
+  if (!f || !f.hostile) {
+    return 'There is no quarrel with them to settle.';
+  }
+  if (truceDays(sim, faction) > 0) {
+    return `There is already a truce with ${f.name}.`;
+  }
+  if (goodwillOf(sim, faction) < TRUCE_GOODWILL) {
+    return `${f.name} won't hear of a truce yet (goodwill ${TRUCE_GOODWILL} needed). Letting their people go helps.`;
+  }
+  const d = sim.diplomacy;
+  d.truceUntil = { ...d.truceUntil, [faction]: sim.tick + TRUCE_DAYS * DAY };
+  changeGoodwill(sim, faction, -TRUCE_SPENDS);
+  sim.stats.truces = (sim.stats.truces ?? 0) + 1;
+  sim.addLog(`${f.name} have agreed to a truce: no raids from them for ${TRUCE_DAYS} days.`, 'good', true);
+  // Any of theirs attacking now go home.
+  const attacking = sim.enemies.filter((e) => e.faction === faction && e.hp > 0 && !e.fleeing);
+  for (const e of attacking) {
+    e.fleeing = true;
+    e.path = [];
+  }
+  if (attacking.length > 0 && sim.raid && !sim.enemies.some((e) => e.hp > 0 && !e.fleeing)) {
+    sim.raid.outcome ??= 'withdrew';
+  }
+  return null;
+}
+
+// How hard a raider faction presses the colony: 1 where their goodwill started, up to 1.2 at its worst and
+// down to 0.8 once they've softened. It scales their share of the raids and how many come.
+export const raidPressure = (sim: Simulation, faction: number): number =>
+  Math.max(0.8, Math.min(1.2, 1 + (startingGoodwill(faction) - goodwillOf(sim, faction)) / 250));
+
+// Which raider faction comes: the warier, the likelier.
+export function pickRaider(sim: Simulation, factions: { id: number }[]): number {
+  let roll = sim.rng.next() * factions.reduce((sum, f) => sum + raidPressure(sim, f.id), 0);
+  return (factions.find((f) => (roll -= raidPressure(sim, f.id)) <= 0) ?? factions[0]).id;
+}
+
+// ---- Settlers ----
+// The Meadow Kin will send a willing settler to a colony they like, for silver to set them up: one every
+// so often, while the valley has room.
+
+export const SETTLER_GOODWILL = 30;
+const SETTLER_GAP_DAYS = 8;
+export const settlerCost = (sim: Simulation): number => Math.round((250 + Math.min(sim.day, 120) * 3) / 10) * 10;
+export const settlerDays = (sim: Simulation): number => Math.max(0, (sim.diplomacy.settlerDay ?? 0) - sim.day);
+
+export function buySettler(sim: Simulation, faction: number): string | null {
+  const f = FACTIONS[faction];
+  if (!f || f.hostile || f.key !== 'meadowKin') {
+    return 'They have nobody to spare.';
+  }
+  if (!roomToGrow(sim)) {
+    return 'The colony has no room for more.';
+  }
+  if (goodwillOf(sim, faction) < SETTLER_GOODWILL) {
+    return `${f.name} won't send one of their own to a colony they hardly know (goodwill ${SETTLER_GOODWILL} needed).`;
+  }
+  if (settlerDays(sim) > 0) {
+    return `Nobody else is ready to leave for a while (${settlerDays(sim)} days).`;
+  }
+  const cost = settlerCost(sim);
+  if (colonyStock(sim, itemId('silver')) < cost) {
+    return `They want ${cost} silver to set a settler up.`;
+  }
+  const c = sim.addWanderer();
+  if (!c) {
+    return 'No way into the valley for them.';
+  }
+  takeFromStockpiles(sim, itemId('silver'), cost);
+  sim.diplomacy.settlerDay = sim.day + SETTLER_GAP_DAYS;
+  sim.stats.settlers = (sim.stats.settlers ?? 0) + 1;
+  sim.addLog(`${c.name} has come from ${f.name} to settle, for ${cost} silver.`, 'good', true);
   return null;
 }

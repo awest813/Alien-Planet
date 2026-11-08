@@ -4,8 +4,8 @@ import { maybeSendAllies, spawnRaid, weaponScore } from './combat';
 import { TICKS_PER_HOUR, populationFor } from './constants';
 import { ANIMALS, FACTIONS, NONE, featureDef, itemDef, itemId, terrainDef } from './defs';
 import { damage, infect } from './health';
-import { caravanArrives, goodwillOf } from './trade';
-import { atPeace, onGoodTerms } from './diplomacy';
+import { caravanArrives, caravanWeight, goodwillOf } from './trade';
+import { atPeace, onGoodTerms, pickRaider, raidPressure } from './diplomacy';
 import { breach, breachWeight } from './depths';
 import { BeastState, beastWakes, beastWeight } from './beast';
 import { ignite } from './weather';
@@ -120,11 +120,15 @@ const threatScale = (sim: Simulation) => {
 };
 
 // Newcomers stop asking to join once the colony fills its valley.
-const roomToGrow = (sim: Simulation) => sim.living().length < populationFor(sim.world.width).maxColonists;
+// (Colonists away on an expedition keep their place.)
+const roomToGrow = (sim: Simulation) => sim.headcount() < populationFor(sim.world.width).maxColonists;
 
 const hostileFactions = () => FACTIONS.filter((f) => f.hostile);
 // Raiders who haven't been paid to stay away.
 const raiders = (sim: Simulation) => hostileFactions().filter((f) => !atPeace(sim, f.id));
+// Each raider faction's share of the raids, more from the warier (see raidPressure); one per faction at the start.
+const raidShare = (sim: Simulation) =>
+  raiders(sim).reduce((sum, f) => sum + raidPressure(sim, f.id), 0) / hostileFactions().length;
 const animalLabel = (kind: string) => ANIMALS[kind].plural;
 const friendlyFaction = () => FACTIONS.find((f) => !f.hostile)!;
 
@@ -148,7 +152,12 @@ function raidSize(sim: Simulation): number {
 // come to help.
 function attack(sim: Simulation, siege: boolean): boolean {
   const factions = raiders(sim);
-  if (factions.length === 0 || !spawnRaid(sim, sim.rng.pick(factions).id, raidSize(sim), siege)) {
+  if (factions.length === 0) {
+    return false;
+  }
+  // The warier the faction the likelier it comes, and with a few more.
+  const faction = pickRaider(sim, factions);
+  if (!spawnRaid(sim, faction, Math.max(2, Math.round(raidSize(sim) * raidPressure(sim, faction))), siege)) {
     return false;
   }
   maybeSendAllies(sim);
@@ -166,7 +175,7 @@ const EVENTS: EventDef[] = [
       sim.story.difficulty === 'peaceful' || raiders(sim).length === 0
         ? 0
         : // Each faction bought off is a share of the raids that don't come.
-          3 * (raiders(sim).length / hostileFactions().length) * (transmitting(sim) ? SIGNAL_RAID_WEIGHT : 1),
+          3 * raidShare(sim) * (transmitting(sim) ? SIGNAL_RAID_WEIGHT : 1),
     run: (sim) => attack(sim, false),
   },
   {
@@ -176,10 +185,7 @@ const EVENTS: EventDef[] = [
     minDay: 40,
     cooldownDays: 12,
     threat: true,
-    weight: (sim) =>
-      sim.story.difficulty === 'peaceful' || raiders(sim).length === 0
-        ? 0
-        : 0.5 * (raiders(sim).length / hostileFactions().length),
+    weight: (sim) => (sim.story.difficulty === 'peaceful' || raiders(sim).length === 0 ? 0 : 0.5 * raidShare(sim)),
     run: (sim) => attack(sim, true),
   },
   {
@@ -302,8 +308,7 @@ const EVENTS: EventDef[] = [
     key: 'caravan',
     minDay: 3,
     cooldownDays: 5,
-    weight: (sim) =>
-      sim.caravan || !onGoodTerms(sim, friendlyFaction().id) ? 0 : 0.6 + goodwillOf(sim, friendlyFaction().id) / 100,
+    weight: (sim) => caravanWeight(sim),
     run: (sim) => caravanArrives(sim),
   },
   {

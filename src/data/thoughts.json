@@ -135,6 +135,11 @@
     "mood": 5,
     "hours": 48
   },
+  "backFromJourney": {
+    "label": "Back from a journey",
+    "mood": 4,
+    "hours": 36
+  },
   "welcomedNewcomer": {
     "label": "A newcomer joined us",
     "mood": 2,

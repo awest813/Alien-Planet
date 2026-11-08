@@ -96,6 +96,8 @@ interface SavedColonist {
   path: number[];
   practicedAt?: Partial<Record<SkillKey, number>>;
   recentJoy: Partial<Record<JoyKind, number>>;
+  // On an expedition (older saves: never).
+  away?: 'leaving' | 'gone';
 }
 
 // Plain structured-cloneable data, stored as-is in IndexedDB. Jobs and reservations
@@ -259,6 +261,7 @@ export function serialize(sim: Simulation): SaveData {
         expectingUntil: c.expectingUntil,
         expectingWith: c.expectingWith,
         breakKind: c.breakKind,
+        away: c.away,
       }),
     ),
     bills: structuredClone(sim.bills),
