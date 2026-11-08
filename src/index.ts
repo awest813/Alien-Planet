@@ -10,7 +10,7 @@ import { App } from './ui/App';
 import './ui/styles.css';
 
 // Phaser draws the world; React draws the management UI on top of it.
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
   backgroundColor: '#10141c',
@@ -29,9 +29,9 @@ new Phaser.Game({
 createRoot(document.getElementById('ui')!).render(createElement(App));
 
 // Handy for poking at the simulation from the browser console during development,
-// e.g. `colonyEvent(colony.sim, 'raid')`.
+// e.g. `colonyEvent(colony.sim, 'raid')`; `colonyGame` is the Phaser game, for timing frames.
 if (import.meta.env.DEV) {
-  Object.assign(window, { colony: controller, colonyEvent: triggerEvent, colonySound: sound });
+  Object.assign(window, { colony: controller, colonyEvent: triggerEvent, colonySound: sound, colonyGame: game });
 }
 
 // Minimise instead of quitting when the Android back button is pressed.

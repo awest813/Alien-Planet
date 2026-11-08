@@ -9,6 +9,7 @@ import { NIGHT_END, NIGHT_START } from '../sim/simulation';
 import { Animal, Colonist, Enemy } from '../sim/types';
 import { Designation, GROW_ZONE, World } from '../sim/world';
 import { Frames, TILE, TILESET_KEY, createTextures } from './textures';
+import { LightBuffer, LitTile, litTiles } from './lighting';
 import { auroraOn, eclipseOn } from '../sim/storyteller';
 
 interface PawnView {
@@ -136,7 +137,13 @@ export class ColonyScene extends Phaser.Scene {
   private ship: Phaser.GameObjects.Image | undefined;
   // The season the ground is drawn for (0 spring … 3 winter); a change repaints it.
   private terrainSeason = 1;
-  private glow: Phaser.GameObjects.Graphics;
+  // Light after dark, one pixel a tile, stretched smoothly over the map (see lighting.ts).
+  private light: Phaser.GameObjects.Image | undefined;
+  private lightTexture: Phaser.Textures.CanvasTexture | undefined;
+  private lightPixels: ImageData | undefined;
+  private lightBuffer: LightBuffer | undefined;
+  // The tiles each light reaches, worked out again when features change.
+  private lightReach = new Map<string, LitTile[]>();
   private heatmap: Phaser.GameObjects.Graphics;
   private fireFx!: Phaser.GameObjects.Graphics;
   private weatherFx!: Phaser.GameObjects.Graphics;
@@ -174,10 +181,6 @@ export class ColonyScene extends Phaser.Scene {
     this.overlay = this.add.graphics().setDepth(Depth.NIGHT + 0.5);
     this.preview = this.add.graphics().setDepth(Depth.PREVIEW);
     this.night = this.add.rectangle(0, 0, 1, 1, 0x0a1230, 0).setOrigin(0).setDepth(Depth.NIGHT);
-    this.glow = this.add
-      .graphics()
-      .setDepth(Depth.NIGHT + 1)
-      .setBlendMode(Phaser.BlendModes.ADD);
     // Flames show through the night shading; weather sits over everything on the map.
     this.fireFx = this.add.graphics().setDepth(Depth.NIGHT + 1);
     this.beaconFx = this.add.graphics().setDepth(Depth.NIGHT + 1);
@@ -461,6 +464,7 @@ export class ColonyScene extends Phaser.Scene {
     this.roomsVersion = world.structureVersion;
     world.dirty.clear();
 
+    this.buildLight(world);
     const size = world.width * TILE;
     this.night.setSize(size + 4000, size + 4000).setPosition(-2000, -2000);
     this.cameras.main.setBounds(-TILE * 8, -TILE * 8, size + TILE * 16, size + TILE * 16);
@@ -1155,7 +1159,7 @@ export class ColonyScene extends Phaser.Scene {
     const sim = controller.sim;
     if (!controller.settings.dayNightLighting) {
       this.night.setFillStyle(0x0a1230, 0);
-      this.glow.clear();
+      this.drawGlow(0);
       return;
     }
     const { color, alpha, dark } = skyAt(sim.hour);
@@ -1220,6 +1224,7 @@ export class ColonyScene extends Phaser.Scene {
     if (world.featureVersion !== this.glowVersion) {
       this.glowVersion = world.featureVersion;
       this.glowSources = [];
+      this.lightReach.clear();
       for (let i = 0; i < world.size; i++) {
         const f = world.feature[i];
         if (f === NONE) {
@@ -1248,58 +1253,84 @@ export class ColonyScene extends Phaser.Scene {
         }
       }
     }
-    const g = this.glow;
-    g.clear();
-    if (dark <= 0) {
+    const buffer = this.lightBuffer;
+    if (!buffer || !this.lightPixels || !this.lightTexture) {
       return;
     }
-    const time = this.time.now;
-    const view = this.visibleTiles();
-    const gridOn = controller.sim.power.powered;
-    for (const source of this.glowSources) {
-      const i = source.tile;
-      const reach = Math.ceil(source.radius);
-      if (
-        (source.powered && !gridOn) ||
-        (source.burns && world.fuel[i] <= 0) ||
-        world.xOf(i) < view.x0 - reach ||
-        world.xOf(i) > view.x1 + reach ||
-        world.yOf(i) < view.y0 - reach ||
-        world.yOf(i) > view.y1 + reach
-      ) {
-        continue;
+    if (dark > 0) {
+      const time = this.time.now;
+      const view = this.visibleTiles();
+      const gridOn = controller.sim.power.powered;
+      const near = (i: number, reach: number) =>
+        world.xOf(i) >= view.x0 - reach &&
+        world.xOf(i) <= view.x1 + reach &&
+        world.yOf(i) >= view.y0 - reach &&
+        world.yOf(i) <= view.y1 + reach;
+      for (const source of this.glowSources) {
+        const i = source.tile;
+        if ((source.powered && !gridOn) || (source.burns && world.fuel[i] <= 0) || !near(i, Math.ceil(source.radius))) {
+          continue;
+        }
+        const flicker = source.flicker ? 0.85 + 0.15 * Math.sin(time / 110 + i) : 1;
+        const amount = 0.4 * dark * source.strength * flicker;
+        for (const lit of this.reachOf(i, source.radius)) {
+          buffer.add(lit.tile, source.color, amount * lit.share);
+        }
       }
-      const flicker = source.flicker ? 0.85 + 0.15 * Math.sin(time / 110 + i) : 1;
-      const x = (world.xOf(i) + 0.5) * TILE;
-      const y = (world.yOf(i) + 0.5) * TILE;
-      // Many faint rings, so the pool fades smoothly rather than in bands.
-      for (let ring = 12; ring >= 1; ring--) {
-        const share = ring / 12;
-        g.fillStyle(source.color, 0.032 * dark * source.strength * flicker).fillCircle(
-          x,
-          y,
-          share * source.radius * TILE,
-        );
-      }
-    }
-    // A fire burning (a tree, a wall) lights the night round it too (the nearest few dozen in view).
-    let lit = 0;
-    for (const i of controller.sim.burning) {
-      const tx = world.xOf(i);
-      const ty = world.yOf(i);
-      if (lit >= 60 || tx < view.x0 - 3 || tx > view.x1 + 3 || ty < view.y0 - 3 || ty > view.y1 + 3) {
-        continue;
-      }
-      lit++;
-      const flicker = 0.8 + 0.2 * Math.sin(time / 90 + i);
-      for (let ring = 6; ring >= 1; ring--) {
-        g.fillStyle(0xff8c2a, 0.05 * dark * flicker).fillCircle(
-          (tx + 0.5) * TILE,
-          (ty + 0.5) * TILE,
-          (ring / 6) * 3 * TILE,
-        );
+      // A fire burning (a tree, a wall) lights the night round it too (the nearest few dozen in view).
+      let burning = 0;
+      for (const i of controller.sim.burning) {
+        if (burning >= 60 || !near(i, 3)) {
+          continue;
+        }
+        burning++;
+        const amount = 0.3 * dark * (0.8 + 0.2 * Math.sin(time / 90 + i));
+        for (const lit of this.reachOf(i, 3)) {
+          buffer.add(lit.tile, 0xff8c2a, amount * lit.share);
+        }
       }
     }
+    if (buffer.flush(this.lightPixels.data)) {
+      this.lightTexture.context.putImageData(this.lightPixels, 0, 0);
+      // A canvas upload takes the game's pixel-art filtering; the light wants smooth.
+      this.lightTexture.refresh().setFilter(Phaser.Textures.FilterMode.LINEAR);
+    }
+  }
+
+  // The tiles a light reaches, kept until features change (a wall built or knocked down).
+  private reachOf(tile: number, radius: number): LitTile[] {
+    const key = `${tile}:${radius}`;
+    let reach = this.lightReach.get(key);
+    if (!reach) {
+      reach = litTiles(controller.sim.world, tile, radius);
+      this.lightReach.set(key, reach);
+    }
+    return reach;
+  }
+
+  // The light texture for a new map: one black pixel a tile, smoothly stretched over it.
+  private buildLight(world: World): void {
+    this.light?.destroy();
+    if (this.textures.exists('light-map')) {
+      this.textures.remove('light-map');
+    }
+    const texture = this.textures.createCanvas('light-map', world.width, world.height)!;
+    const pixels = texture.context.createImageData(world.width, world.height);
+    for (let p = 3; p < pixels.data.length; p += 4) {
+      pixels.data[p] = 255;
+    }
+    texture.context.putImageData(pixels, 0, 0);
+    texture.refresh().setFilter(Phaser.Textures.FilterMode.LINEAR);
+    this.lightTexture = texture;
+    this.lightPixels = pixels;
+    this.lightBuffer = new LightBuffer(world.size);
+    this.lightReach.clear();
+    this.light = this.add
+      .image(0, 0, 'light-map')
+      .setOrigin(0)
+      .setScale(TILE)
+      .setDepth(Depth.NIGHT + 1)
+      .setBlendMode(Phaser.BlendModes.ADD);
   }
 
   // ---- Input ----

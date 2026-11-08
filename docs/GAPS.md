@@ -109,15 +109,11 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 
 ## 8. Graphics
 
-- **Light passes through walls.** Fire and lamp glow are drawn as soft circles over the night shade, so a lit
-  room spills light onto the tiles outside it.
-  - Close it by clipping each light to its room (the room map already exists) or to tiles in line of sight.
 - **Name labels can cover the tile north of a colonist.** Labels are staggered up to three lines when they
   crowd, and hidden when zoomed out, but a busy stockpile can still sit under a name.
-- **Zoomed right out, the map is costly to draw.** There are eleven tile layers, and each draws every tile in
-  view every frame, so the cost grows with the area on screen. It hasn't been measured on slow machines.
-  - Close it by baking the layers that rarely change (ground, floors, zones) into one render texture and
-    redrawing only changed tiles.
+- **Drawing is cheap for now.** On a Large map a frame takes about 2.5 ms of script time at the usual zoom and
+  5 ms zoomed right out (eleven tile layers, each drawing the tiles in view), measured in a headless browser.
+  It hasn't been measured on a slow phone.
 
 ## 9. Testing
 
@@ -159,6 +155,7 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 - **Reporting:** the long-run report undercounting deaths and raids.
 - **Graphics:**
   - night shading drawn under the bright overlays, and fires lighting the dark;
+  - light stopped by walls: a fire lights its own room and the inside of the walls, not the grass outside;
   - fires with flickering flames, embers and smoke;
   - seasonal trees and bushes, gold ripe crops;
   - blueprints for walls and floors told apart;
