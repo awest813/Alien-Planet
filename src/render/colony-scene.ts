@@ -772,12 +772,26 @@ export class ColonyScene extends Phaser.Scene {
       }
       const fits = level < LEVELS;
       const offset = NAME_Y - (fits ? level : 0) * LINE;
-      pawn.label.setPosition(pawn.root.x, pawn.root.y + offset).setAlpha(fits ? 1 : 0);
+      pawn.label.setPosition(pawn.root.x, pawn.root.y + offset).setAlpha(fits ? this.nameAlpha(pawn.label) : 0);
       pawn.alert.setY(pawn.label.visible && fits ? offset - LINE : NAME_Y - LINE);
       if (fits) {
         placed.push({ left, right, y: pawn.root.y, level });
       }
     }
+  }
+
+  // A name covers part of the tile above its owner: it fades while the mouse is over it, so what lies
+  // there can be seen (and clicked). (Not for a finger: its last tap would leave the name faded.)
+  private nameAlpha(label: Phaser.GameObjects.Text): number {
+    const pointer = this.input.activePointer;
+    if (!pointer || pointer.wasTouch) {
+      return 1;
+    }
+    const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    const half = label.width / 2 + 1;
+    // (Its anchor is its bottom edge.)
+    const over = Math.abs(point.x - label.x) <= half && point.y >= label.y - 9 && point.y <= label.y + 1;
+    return over ? 0.2 : 1;
   }
 
   // A stack's count under a colonist's name makes both hard to read: the count fades while a name is
@@ -983,7 +997,8 @@ export class ColonyScene extends Phaser.Scene {
       const free = (y: number) =>
         !placed.some((o) => Math.abs(o.y - y) < 7 && o.right + 1 > left && o.left < right + 1);
       const offset = [-11, -18, -25, -4].find((dy) => free(raider.y + dy));
-      label.setPosition(raider.x, raider.y + (offset ?? -11)).setAlpha(offset === undefined ? 0 : raider.alpha);
+      label.setPosition(raider.x, raider.y + (offset ?? -11));
+      label.setAlpha(offset === undefined ? 0 : raider.alpha * this.nameAlpha(label));
       if (offset !== undefined) {
         placed.push({ left, right, y: raider.y + offset });
       }

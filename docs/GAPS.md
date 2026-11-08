@@ -110,8 +110,6 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 
 ## 8. Graphics
 
-- **Name labels can cover the tile north of a colonist.** Labels are staggered up to three lines when they
-  crowd, and hidden when zoomed out, but a busy stockpile can still sit under a name.
 - **Drawing is cheap for now.** On a Large map a frame takes about 2.5 ms of script time at the usual zoom and
   5 ms zoomed right out (eleven tile layers, each drawing the tiles in view), measured in a headless browser.
   It hasn't been measured on a slow phone.
@@ -162,5 +160,5 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   - seasonal trees and bushes, gold ripe crops;
   - blueprints for walls and floors told apart;
   - its own art for milk, the freezer and the air conditioner;
-  - a stronger heat map, and labels hidden when zoomed out.
+  - a stronger heat map, labels hidden when zoomed out, and a name fading while the mouse is over it.
 - **Sound:** fights, births, fires and collapses heard; winter quiet with stronger wind.
