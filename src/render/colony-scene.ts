@@ -22,7 +22,7 @@ interface PawnView {
 }
 
 interface Layers {
-  terrain: Phaser.Tilemaps.TilemapLayer;
+  terrain: Phaser.Tilemaps.TilemapGPULayer;
   floor: Phaser.Tilemaps.TilemapLayer;
   floorPlan: Phaser.Tilemaps.TilemapLayer;
   filth: Phaser.Tilemaps.TilemapLayer;
@@ -137,6 +137,8 @@ export class ColonyScene extends Phaser.Scene {
   private ship: Phaser.GameObjects.Image | undefined;
   // The season the ground is drawn for (0 spring … 3 winter); a change repaints it.
   private terrainSeason = 1;
+  // A ground tile changed this frame: the ground's texture of tile indexes is remade once, after them all.
+  private groundChanged = false;
   // Light after dark, one pixel a tile, stretched smoothly over the map (see lighting.ts).
   private light: Phaser.GameObjects.Image | undefined;
   private lightTexture: Phaser.Textures.CanvasTexture | undefined;
@@ -209,6 +211,10 @@ export class ColonyScene extends Phaser.Scene {
     const world = controller.sim.world;
     this.syncDirty(world);
     this.syncSeason(world);
+    if (this.groundChanged) {
+      this.groundChanged = false;
+      this.layers.terrain.generateLayerDataTexture();
+    }
     if (world.structureVersion !== this.roomsVersion) {
       this.roomsVersion = world.structureVersion;
       this.glowVersion = -1;
@@ -441,8 +447,14 @@ export class ColonyScene extends Phaser.Scene {
     const map = this.make.tilemap({ width: world.width, height: world.height, tileWidth: TILE, tileHeight: TILE });
     const tileset = map.addTilesetImage(TILESET_KEY, TILESET_KEY, TILE, TILE, 0, 0)!;
     const layer = (name: string, depth: number) => map.createBlankLayer(name, tileset)!.setDepth(depth);
+    // The ground covers every tile and seldom changes (a season, ice on the water), so the GPU draws it from a
+    // texture of tile indexes in one go. Drawn tile by tile like the other layers, it was the biggest part of a
+    // zoomed-out frame on a slow phone.
+    map.createBlankLayer('terrain', tileset)!.destroy(false);
+    const ground = new Phaser.Tilemaps.TilemapGPULayer(this, map, map.getLayerIndex('terrain')!, tileset);
+    this.add.existing(ground.setDepth(0));
     this.layers = {
-      terrain: layer('terrain', 0),
+      terrain: ground,
       floor: layer('floor', 0.6),
       // Planned floors show under furniture rather than over it.
       floorPlan: layer('floorPlan', 0.7).setAlpha(0.55),
@@ -456,6 +468,12 @@ export class ColonyScene extends Phaser.Scene {
       designation: layer('designation', 6),
     };
     this.map = map;
+    this.filled.clear();
+    for (const l of Object.values(this.layers)) {
+      if (l instanceof Phaser.Tilemaps.TilemapLayer) {
+        this.cullFilled(l);
+      }
+    }
 
     for (let i = 0; i < world.size; i++) {
       this.drawTile(world, i);
@@ -473,12 +491,65 @@ export class ColonyScene extends Phaser.Scene {
     }
   }
 
+  // Every tile has ground, and most redraws of a tile leave it as it was.
+  private putGround(x: number, y: number, frame: number): void {
+    const tile = this.layers.terrain.getTileAt(x, y, true);
+    if (tile?.index !== frame) {
+      this.layers.terrain.putTileAt(frame, x, y, false);
+      this.groundChanged = true;
+    }
+  }
+
   private put(layer: Phaser.Tilemaps.TilemapLayer, x: number, y: number, frame: number): Phaser.Tilemaps.Tile | null {
+    const filled = this.filled.get(layer);
     if (frame < 0) {
+      filled?.delete(y * layer.layer.width + x);
       layer.removeTileAt(x, y, false, false);
       return null;
     }
+    filled?.add(y * layer.layer.width + x);
     return layer.putTileAt(frame, x, y, false);
+  }
+
+  // Most layers are mostly empty, but Phaser finds the tiles to draw by looking at every tile in view, which
+  // zoomed out on a big map is thousands a layer, every frame. So each layer keeps a list of its filled tiles,
+  // and when that's the shorter list, those are the ones looked at.
+  private filled = new Map<Phaser.Tilemaps.TilemapLayer, Set<number>>();
+  private cullFilled(layer: Phaser.Tilemaps.TilemapLayer): void {
+    const filled = new Set<number>();
+    this.filled.set(layer, filled);
+    const scan = layer.cullCallback;
+    const width = layer.layer.width;
+    const height = layer.layer.height;
+    layer.cullCallback = (
+      data: Phaser.Tilemaps.LayerData,
+      camera: Phaser.Cameras.Scene2D.Camera,
+      out: Phaser.Tilemaps.Tile[],
+      order: number,
+    ) => {
+      const view = camera.worldView;
+      const x0 = Math.max(0, Math.floor(view.x / TILE) - 1);
+      const y0 = Math.max(0, Math.floor(view.y / TILE) - 1);
+      const x1 = Math.min(width - 1, Math.ceil(view.right / TILE));
+      const y1 = Math.min(height - 1, Math.ceil(view.bottom / TILE));
+      if (filled.size >= (x1 - x0 + 1) * (y1 - y0 + 1)) {
+        return scan(data, camera, out, order);
+      }
+      // (Tiles on a layer never overlap, so the order they're drawn in doesn't matter.)
+      out.length = 0;
+      for (const i of filled) {
+        const x = i % width;
+        const y = (i - x) / width;
+        if (x < x0 || x > x1 || y < y0 || y > y1) {
+          continue;
+        }
+        const tile = data.data[y][x];
+        if (tile && tile.index !== -1 && tile.visible && tile.alpha !== 0) {
+          out.push(tile);
+        }
+      }
+      return out;
+    };
   }
 
   // Trees and bushes turn with the seasons (warm in autumn, frosted in winter), and a crop that's ready to
@@ -574,7 +645,7 @@ export class ColonyScene extends Phaser.Scene {
     for (let i = 0; i < world.size; i++) {
       const x = world.xOf(i);
       const y = world.yOf(i);
-      this.put(this.layers.terrain, x, y, Frames.terrain(world.terrain[i], terrainVariant(x, y), season));
+      this.putGround(x, y, Frames.terrain(world.terrain[i], terrainVariant(x, y), season));
     }
     for (const i of world.tilesWith('features')) {
       const tile = this.layers.feature.getTileAt(world.xOf(i), world.yOf(i));
@@ -588,7 +659,7 @@ export class ColonyScene extends Phaser.Scene {
     const x = world.xOf(i);
     const y = world.yOf(i);
     const L = this.layers;
-    this.put(L.terrain, x, y, Frames.terrain(world.terrain[i], terrainVariant(x, y), this.terrainSeason));
+    this.putGround(x, y, Frames.terrain(world.terrain[i], terrainVariant(x, y), this.terrainSeason));
     this.put(L.floor, x, y, world.floor[i] !== NONE ? Frames.feature(world.floor[i]) : -1);
     this.put(L.roof, x, y, world.roof[i] !== NONE ? Frames.feature(world.roof[i]) : -1);
     this.put(L.filth, x, y, world.filth[i] !== 0 ? Frames.filth(world.filthKind(i), world.filthAmount(i)) : -1);
@@ -735,10 +806,12 @@ export class ColonyScene extends Phaser.Scene {
       pawn.figure.setScale(c.age < TEEN ? 0.7 : c.age < ADULT ? 0.85 : 1);
       pawn.zzz.setVisible(c.sleeping).setY(-6 - ((time / 400) % 3));
       pawn.label.setVisible(controller.settings.showNames && this.labelsReadable && pawn.root.visible);
-      pawn.alert
-        .setText(downed ? '+' : '!')
-        .setColor(downed ? '#ff5c5c' : '#ff7a5c')
-        .setVisible(downed || controller.sim.inMentalBreak(c));
+      // Only when it changes: setting a text's colour redraws and re-uploads it, every frame, for every pawn.
+      const mark = downed ? '+' : '!';
+      if (pawn.alert.text !== mark) {
+        pawn.alert.setText(mark).setColor(downed ? '#ff5c5c' : '#ff7a5c');
+      }
+      pawn.alert.setVisible(downed || controller.sim.inMentalBreak(c));
       if (c.carrying) {
         pawn.carry.setFrame(Frames.item(c.carrying.item)).setVisible(true);
       } else {
