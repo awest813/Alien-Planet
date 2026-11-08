@@ -26,19 +26,23 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 - **Wealth grows from about 8k to 40–54k and changes little.** Raids now gain up to 4 raiders above 15k, but
   nothing else responds to a rich colony.
 
-## 2. Raids are lost, but cheaply
+## 2. Raids on Harsh are still lost in the open
 
-- **From about day 25, raids knock out the whole colony almost every time** (also true before this branch). With
-  6 colonists against the cap of 9 raiders (11 on Harsh), the test colony is overrun in 88–100% of raids;
-  fighting from a sandbag ring with longbows and bought arms (`defend`) still loses 45–75%. Raiders leave the
-  downed alone, so few die: a raid costs stolen goods and a few days of healing, never the colony. That is why
-  deaths are rare late (below), and losing every fight isn't tense either.
-  - Most of the harm is close combat: raiders with clubs, knives and spears charge the line, and a colonist
-    goes down after two or three blows while a raider takes four or five arrows. Arrows at colonists in cover
-    land only about 14% of the time.
-  - Close it by deciding what a raid should be: smaller raids scaled to the colony's fighters (not a flat cap),
-    raiders who break sooner, wounds that knock raiders down as they do colonists, traps and embrasures the
-    defence can build early, or allies who come to help.
+- **Partly closed.** Pain now puts raiders down, raids break once 45% are out of the fight, sandbags, embrasures
+  and traps come early (no prerequisites), blows across a barricade land less often, and the Meadow Kin sometimes
+  send fighters. Share of raids that overran the whole colony, 72 days, 12 seeds:
+
+  | Days  | Standard, in the open (before) | Standard, in the open | Standard, from sandbags | Harsh, in the open |
+  | ----- | ------------------------------ | --------------------- | ----------------------- | ------------------ |
+  | 13–24 | 61%                            | 22%                   | 6%                      | 79%                |
+  | 25–36 | 88%                            | 35%                   | 6%                      | 97%                |
+  | 37–72 | ~100%                          | 63–72%                | 15–60%                  | ~96%               |
+
+- **Harsh raids (11 raiders against about 6 colonists) still win nearly every fight in the open**, and a
+  Standard colony that never builds cover loses most from day 37. Raiders leave the downed alone, so few die.
+  - Close it by sizing raids to the colony's fighters rather than a flat cap, or with more allies on Harsh.
+- **Most downed raiders are left to die** (125 fell wounded in twelve 48-day colonies, 10 were taken prisoner).
+  Capture is manual and prisoner beds are few; a "capture all downed" order or an automatic warden would help.
 
 ## 3. The late game is too safe
 
