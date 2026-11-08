@@ -122,6 +122,8 @@ export interface FeatureDef {
   shelf: number;
   // A drying rack: storage for meat, fish and berries, which dry on it into food that keeps.
   dries: boolean;
+  // A feeding trough: haulers fill it with this, and tame animals in its pen eat from it.
+  feeds?: { item: number; capacity: number };
   // A hospital bed: patients heal faster, are tended better and catch fewer infections.
   hospital: boolean;
   // Radius of a sun lamp's light (crops grow beneath it day and night).
@@ -217,6 +219,7 @@ interface RawFeature {
   icebox?: boolean;
   shelf?: number;
   dries?: boolean;
+  feeds?: { item: string; capacity: number };
   hospital?: boolean;
   growLight?: number;
   bridge?: boolean;
@@ -360,6 +363,7 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   icebox: !!f.icebox,
   shelf: f.shelf ?? 0,
   dries: !!f.dries,
+  feeds: f.feeds && { item: resolveItem(f.feeds.item), capacity: f.feeds.capacity },
   hospital: !!f.hospital,
   growLight: f.growLight ?? 0,
   bridge: !!f.bridge,
@@ -607,9 +611,10 @@ export const ANIMALS: Record<string, AnimalDef> = Object.fromEntries(
 export const COLONIST_NAMES: string[] = colonistsJson.names;
 export const COLONIST_COLORS: string[] = colonistsJson.colors;
 
-// The fuel a building runs on, if any: a generator's, or a fire's.
-export const fuelOf = (def: FeatureDef): { item: number; capacity: number; perDay: number } | undefined =>
-  def.power?.fuel ?? def.burns;
+// What haulers keep a building topped up with, if anything: a generator's fuel, a fire's wood, a
+// trough's feed.
+export const fuelOf = (def: FeatureDef): { item: number; capacity: number } | undefined =>
+  def.power?.fuel ?? def.burns ?? def.feeds;
 
 // Which skill (and work type) a bench uses: the stove and millstone are cooking, the rest crafting.
 export const benchSkill = (bench: BenchType): 'cooking' | 'crafting' =>

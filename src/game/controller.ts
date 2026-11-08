@@ -422,6 +422,20 @@ export const TOOLS: ToolDef[] = [
   build('brickFloor', 'Brick floor', '', 'floors', 'A warm-coloured floor of fired bricks (Pottery)'),
   build('carpet', 'Carpet', '', 'floors', 'The prettiest floor; woven from cloth'),
   build('bridge', 'Bridge', '', 'structure', 'Walkway over shallow or deep water'),
+  build(
+    'fence',
+    'Fence',
+    '',
+    'structure',
+    'Drag a rectangle outline to fence in a pen. Animals stay out (or in); people walk round or through a gate',
+  ),
+  build(
+    'gate',
+    'Gate',
+    '',
+    'structure',
+    'Put one in a fence: colonists walk through, animals do not. Tame animals go into the nearest pen and stay',
+  ),
   build('bed', 'Bed', 'e', 'furniture', 'Colonists sleep better in beds'),
   build('fineBed', 'Fine bed', '', 'furniture', 'Prettier, and colonists rest 25% faster'),
   build(
@@ -507,6 +521,13 @@ export const TOOLS: ToolDef[] = [
     '',
     'production',
     'Build on the shore; hunters fish here when food runs short and all winter',
+  ),
+  build(
+    'trough',
+    'Feeding trough',
+    '',
+    'production',
+    'Build on the edge of a pen; haulers fill it with potatoes, and fed animals in the pen breed in any season',
   ),
   build('icebox', 'Icebox', '', 'production', 'Food storage that keeps food fresh while powered (50 W)'),
   build('shelf', 'Shelf', '', 'production', 'Storage for three stacks of one kind of item on a single tile'),
@@ -2574,6 +2595,9 @@ export class GameController {
     }
     if (def?.flowers && sim.season === 'Winter') {
       details.push('Out of bloom until spring');
+    }
+    if (def?.feeds) {
+      details.push(`Feed ${Math.floor(w.fuel[i])}/${def.feeds.capacity} ${itemDef(def.feeds.item).name.toLowerCase()}`);
     }
     if (def?.burns) {
       const hours = Math.max(1, Math.round((w.fuel[i] / def.burns.perDay) * 24));

@@ -1240,7 +1240,8 @@ export class ColonyScene extends Phaser.Scene {
   private dragTiles(tool: Tool, a: number, b: number): number[] {
     const world = controller.sim.world;
     const r = this.dragRect(a, b);
-    const outline = tool.kind === 'build' && featureDef(tool.feature).blocksRoom && !featureDef(tool.feature).door;
+    const def = tool.kind === 'build' ? featureDef(tool.feature) : undefined;
+    const outline = !!def && ((def.blocksRoom && !def.door) || def.key === 'fence');
     const tiles: number[] = [];
     for (let y = r.y0; y <= r.y1; y++) {
       for (let x = r.x0; x <= r.x1; x++) {

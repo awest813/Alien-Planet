@@ -9,6 +9,7 @@ import { Filth } from './world';
 import { beastLeaves, beastSlain } from './beast';
 import { animalWeight } from './biomes';
 import { changeGoodwill, friendly, onGoodTerms } from './diplomacy';
+import { animalMayEnter, feedPenned, gateFilter, penAt, penFor, penTarget } from './pens';
 
 // Wild animals on the standard 64×64 map; bigger maps hold proportionally more.
 export const MAX_ANIMALS = 14;
@@ -155,7 +156,8 @@ function stalk(sim: Simulation, a: Animal): boolean {
           !p.tame &&
           def.preys!.includes(p.kind) &&
           w.distance(p.tile, a.tile) <= HUNT_RANGE &&
-          sim.regionOf(p.tile) === region,
+          sim.regionOf(p.tile) === region &&
+          penAt(sim, p.tile) < 0,
       )
       .sort((x, y) => w.distance(x.tile, a.tile) - w.distance(y.tile, a.tile))[0];
     if (!prey) {
@@ -290,14 +292,15 @@ export function manhuntersArrive(sim: Simulation, kind: string, count: number): 
 }
 
 function pathTo(sim: Simulation, a: Animal, goals: number[]): void {
-  a.path = sim.pathfinder.find(a.tile, goals) ?? [];
+  // Animals don't pass gates (but a tame one may, on its way into a pen).
+  a.path = sim.pathfinder.find(a.tile, goals, gateFilter(sim, a)) ?? [];
   a.moveProgress = 0;
 }
 
 function move(sim: Simulation, a: Animal): void {
   const w = sim.world;
   const next = a.path[0];
-  if (!w.isPassable(next)) {
+  if (!w.isPassable(next) || !animalMayEnter(sim, a, next)) {
     a.path = [];
     a.moveProgress = 0;
     return;
@@ -324,7 +327,7 @@ function wanderTarget(sim: Simulation, a: Animal, distance: number, from?: numbe
       tx = x + Math.sign(x - w.xOf(from) || 1) * sim.rng.int(2, distance);
       ty = y + Math.sign(y - w.yOf(from) || 1) * sim.rng.int(0, distance);
     }
-    if (w.inBounds(tx, ty) && sim.regionOf(w.idx(tx, ty)) === region) {
+    if (w.inBounds(tx, ty) && sim.regionOf(w.idx(tx, ty)) === region && penAt(sim, w.idx(tx, ty)) < 0) {
       return w.idx(tx, ty);
     }
   }
@@ -337,22 +340,34 @@ const MAX_TAME = 14;
 
 export const wildCount = (sim: Simulation) => sim.animals.filter((a) => !a.tame).length;
 
-// Each morning tame pairs may have young, and tame animals give their produce (milk, wool, eggs).
+// Tame animals left to graze for themselves breed only in spring and summer, this much as often as fed
+// ones in a pen.
+const GRAZING_BREED = 0.5;
+
+// Each morning penned animals eat from their troughs, tame pairs may have young, and tame animals give
+// their produce (milk, wool, eggs).
 export function animalsAtDawn(sim: Simulation): void {
   const tame = sim.animals.filter((a) => a.tame && a.hp > 0);
+  const fed = feedPenned(sim, tame);
+  const grazing = sim.season === 'Spring' || sim.season === 'Summer' ? GRAZING_BREED : 0;
   const born: string[] = [];
   for (const kind of Object.keys(ANIMALS)) {
-    const herd = tame.filter((a) => a.kind === kind);
-    for (let pair = 0; pair < Math.floor(herd.length / 2); pair++) {
-      if (
-        sim.animals.filter((a) => a.tame).length >= MAX_TAME ||
-        !sim.rng.chance(ANIMALS[kind].breedChance * (sim.isResearched('husbandry') ? 2 : 1))
-      ) {
-        continue;
+    // Fed animals pair up with others fed in the same pen; the rest with each other.
+    const herds = new Map<number, Animal[]>();
+    for (const a of tame.filter((t) => t.kind === kind)) {
+      const key = fed.has(a) ? penAt(sim, a.tile) : -1;
+      herds.set(key, [...(herds.get(key) ?? []), a]);
+    }
+    for (const [pen, herd] of herds) {
+      const chance = ANIMALS[kind].breedChance * (sim.isResearched('husbandry') ? 2 : 1) * (pen >= 0 ? 1 : grazing);
+      for (let pair = 0; pair < Math.floor(herd.length / 2); pair++) {
+        if (sim.animals.filter((a) => a.tame).length >= MAX_TAME || !sim.rng.chance(chance)) {
+          continue;
+        }
+        const young = addAnimal(sim, herd[pair * 2].tile, kind);
+        young.tame = true;
+        born.push(ANIMALS[kind].name.toLowerCase());
       }
-      const young = addAnimal(sim, herd[pair * 2].tile, kind);
-      young.tame = true;
-      born.push(ANIMALS[kind].name.toLowerCase());
     }
   }
   if (born.length > 0) {
@@ -707,9 +722,11 @@ export function updateAnimals(sim: Simulation): void {
       }
     }
     if (a.path.length === 0 && a.revengeOn < 0 && sim.tick >= a.restUntil) {
-      // Tame animals that stray too far head back towards the colony.
+      // Tame animals keep to their pen if there is one; otherwise those that stray too far head back
+      // towards the colony.
+      const pen = penFor(sim, a);
       const strayed = a.tame && home !== undefined && w.distance(a.tile, home) > HOME_RANGE;
-      const to = strayed ? homeward(sim, a, home) : wanderTarget(sim, a, WANDER_RADIUS);
+      const to = pen ? penTarget(sim, a, pen) : strayed ? homeward(sim, a, home) : wanderTarget(sim, a, WANDER_RADIUS);
       if (to !== undefined) {
         pathTo(sim, a, [to]);
       }

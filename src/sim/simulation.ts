@@ -118,6 +118,7 @@ import {
   StoryState,
   coldSnapOn,
   eclipseOn,
+  foodDays,
   freshStory,
   heatWaveOn,
   updateStoryteller,
@@ -292,6 +293,8 @@ const PRESERVING_RATE = 2 / 3;
 const LOW_EXPECTATION_DAYS = 12;
 const COLD_FOR_FIRES = 8;
 const FIREWOOD_RESERVE_DAYS = 3;
+// Haulers fill the animals' troughs only while the colony has this many days of food in store.
+const TROUGH_FOOD_DAYS = 3;
 // Wood the colonists land with.
 const SALVAGED_WOOD = 50;
 const CRAWL_RANGE = 25;
@@ -1669,7 +1672,9 @@ export class Simulation {
         return job.stage === 1 ? `Carrying ${patient?.name} to safety` : `Rescuing ${patient?.name}`;
       }
       case 'refuel':
-        return 'Refuelling the generator';
+        return w.feature[job.target] !== NONE && featureDef(w.feature[job.target]).feeds
+          ? 'Filling the trough'
+          : 'Refuelling the generator';
       case 'fish':
         return 'Fishing';
       case 'extinguish':
@@ -4349,6 +4354,8 @@ export class Simulation {
           !!fuel &&
           // In the cold, the fires come first: a generator only gets wood they can spare.
           !(featureDef(w.feature[i]).power && fuel.item === WOOD && keepWood) &&
+          // And people eat before the animals do.
+          !(featureDef(w.feature[i]).feeds && foodDays(this) < TROUGH_FOOD_DAYS) &&
           w.fuel[i] < fuel.capacity * (urgentOnly ? 0.2 : 0.5) &&
           !this.isReserved(`f${i}`, c) &&
           this.hasWorkSpot(i, false, region)

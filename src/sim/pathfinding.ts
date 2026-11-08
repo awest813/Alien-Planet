@@ -29,7 +29,8 @@ export class Pathfinder {
   }
 
   // Returns the tiles to walk (excluding `start`, ending on one of `goals`), or null if unreachable.
-  public find(start: number, goals: number[]): number[] | null {
+  // `blocked` rules out tiles others can walk (animals don't pass gates).
+  public find(start: number, goals: number[], blocked?: (i: number) => boolean): number[] | null {
     if (goals.length === 0) {
       return null;
     }
@@ -85,7 +86,7 @@ export class Pathfinder {
           continue;
         }
         const n = world.idx(nx, ny);
-        if (this.closed[n] === gen || !world.isPassable(n)) {
+        if (this.closed[n] === gen || !world.isPassable(n) || blocked?.(n)) {
           continue;
         }
         const diagonal = d >= 4;

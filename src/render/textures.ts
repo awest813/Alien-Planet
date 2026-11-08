@@ -965,6 +965,52 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillStyle = 'rgba(25, 18, 12, 0.25)';
       c.fillRect(0, 15, 16, 1);
       break;
+    case 'fence':
+      // Rails out to each side from a post, so a run of fence joins up whichever way it goes.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(7, 9, 4, 7);
+      c.fillStyle = '#8d6238';
+      c.fillRect(0, 6, 16, 2);
+      c.fillRect(0, 10, 16, 2);
+      c.fillRect(6, 0, 2, 16);
+      c.fillRect(9, 0, 2, 16);
+      c.fillStyle = '#5a3a1f';
+      c.fillRect(6, 5, 5, 8);
+      c.fillStyle = '#7a5230';
+      c.fillRect(7, 6, 3, 6);
+      break;
+    case 'gate':
+      // A plank gate on two posts, braced corner to corner.
+      c.fillStyle = '#5a3a1f';
+      c.fillRect(0, 3, 2, 12);
+      c.fillRect(14, 3, 2, 12);
+      c.fillStyle = '#a77a48';
+      c.fillRect(2, 5, 12, 2);
+      c.fillRect(2, 11, 12, 2);
+      c.fillStyle = '#8d6238';
+      for (let k = 0; k < 6; k++) {
+        c.fillRect(3 + k * 2, 11 - k, 2, 2);
+      }
+      c.fillStyle = '#c9a25a';
+      c.fillRect(12, 8, 1, 2);
+      break;
+    case 'trough':
+      // A long wooden box with feed heaped in it.
+      c.fillStyle = 'rgba(0,0,0,0.22)';
+      c.fillRect(1, 12, 15, 3);
+      c.fillStyle = '#6b4423';
+      c.fillRect(1, 5, 14, 8);
+      c.fillStyle = '#8d6238';
+      c.fillRect(1, 5, 14, 2);
+      c.fillStyle = '#3e2a16';
+      c.fillRect(3, 7, 10, 4);
+      c.fillStyle = '#b89a5a';
+      c.fillRect(4, 7, 3, 2);
+      c.fillRect(8, 8, 4, 2);
+      c.fillStyle = '#5a3a1f';
+      c.fillRect(2, 13, 2, 2);
+      c.fillRect(12, 13, 2, 2);
+      break;
     case 'bridge':
       c.fillStyle = 'rgba(0,0,0,0.25)';
       c.fillRect(0, 14, 16, 2);

@@ -1,7 +1,7 @@
 // Headless balance harness: an "autoplayer" runs a sensible colony on many seeds and prints
 // survival, combat, health, mood and social statistics.
 //
-//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive|defend] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K] [nohunt] [surplus] [flow]
+//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive|defend] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K] [nohunt] [surplus] [pen] [flow]
 //     [biome=tundra|desert|forest] [map=river|island]
 //
 // "passive" never drafts during raids, to measure the worst case; "defend" holds a sandbag line; "peaceful" and "harsh" pick the
@@ -46,6 +46,8 @@ const noHunt = process.argv.includes('nohunt');
 const surplus = process.argv.includes('surplus');
 // "flow" prints a day-by-day table of food, materials and wildlife, averaged over the seeds.
 const flow = process.argv.includes('flow');
+// "pen" fences a pen with a gate and a trough once the colony is settled, and tames a pair to keep in it.
+const keepPen = process.argv.includes('pen');
 // Nutrition a colonist eats in a day (as the top bar's "days of food" counts it).
 const DAILY_NUTRITION = 1.4;
 // "policy=frugal,long,rest" sets the colony's policies from the start.
@@ -361,6 +363,7 @@ function play(seed: number): Result {
   let labTile = -1;
   let telescopePlaced = false;
   let fishingPlaced = false;
+  let penBuilt = false;
   let chopRadius = 15;
   let friendDay = -1;
   let starvingHours = 0;
@@ -759,6 +762,52 @@ function play(seed: number): Result {
     // Hunt whatever wildlife is around once the colony is settled (leather becomes recurve bows).
     if (sim.day >= 3 && !noHunt) {
       sim.apply({ type: 'hunt', rect: { x0: 0, y0: 0, x1: w.width - 1, y1: w.height - 1 }, add: true });
+    }
+    // A 7×7 pen with a gate and a trough, then a pair of grazers tamed to keep in it (and spared the hunt).
+    if (keepPen && !penBuilt && sim.day >= 6) {
+      const site = findSite(sim, 7, 7, avoid);
+      if (site) {
+        penBuilt = true;
+        claim(avoid, sim, site.x, site.y, 7, 7);
+        const ring: number[] = [];
+        for (let y = site.y; y < site.y + 7; y++) {
+          for (let x = site.x; x < site.x + 7; x++) {
+            if (x === site.x || y === site.y || x === site.x + 6 || y === site.y + 6) {
+              ring.push(at(x, y));
+            }
+          }
+        }
+        const gate = at(site.x + 3, site.y);
+        const trough = at(site.x + 3, site.y + 6);
+        sim.apply({
+          type: 'build',
+          feature: featureId('fence'),
+          tiles: ring.filter((i) => i !== gate && i !== trough),
+        });
+        sim.apply({ type: 'build', feature: featureId('gate'), tiles: [gate] });
+        sim.apply({ type: 'build', feature: featureId('trough'), tiles: [trough] });
+      }
+    }
+    if (keepPen && penBuilt && Math.floor(sim.hour) === 8 && sim.tick % TICKS_PER_HOUR === 0) {
+      const grazers = ['grouse', 'deer', 'muskox', 'hare'];
+      const kept = sim.animals.filter((a) => a.tame || a.taming);
+      if (kept.length < 2) {
+        const wild = sim.animals.filter((a) => !a.tame && !a.taming && grazers.includes(a.kind));
+        const kind = grazers.find((k) => wild.filter((a) => a.kind === k).length >= 2);
+        for (const a of wild.filter((b) => b.kind === kind).slice(0, 2 - kept.length)) {
+          const r = { x0: w.xOf(a.tile), y0: w.yOf(a.tile), x1: w.xOf(a.tile), y1: w.yOf(a.tile) };
+          sim.apply({ type: 'tame', rect: r, add: true });
+        }
+      }
+    }
+    if (keepPen) {
+      for (const a of sim.animals.filter((b) => b.taming && b.hunted)) {
+        sim.apply({
+          type: 'hunt',
+          rect: { x0: w.xOf(a.tile), y0: w.yOf(a.tile), x1: w.xOf(a.tile), y1: w.yOf(a.tile) },
+          add: false,
+        });
+      }
     }
     // A couple of fishing spots on the nearest shore, for food through the winter.
     if (!fishingPlaced && sim.day >= 4) {

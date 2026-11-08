@@ -1333,5 +1333,50 @@
       ],
       "work": 220
     }
+  },
+  {
+    "key": "fence",
+    "name": "Fence",
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 3
+        }
+      ],
+      "work": 35
+    }
+  },
+  {
+    "key": "gate",
+    "name": "Gate",
+    "passable": true,
+    "moveCost": 1.2,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 6
+        }
+      ],
+      "work": 50
+    }
+  },
+  {
+    "key": "trough",
+    "name": "Feeding trough",
+    "feeds": {
+      "item": "potatoes",
+      "capacity": 40
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 15
+        }
+      ],
+      "work": 60
+    }
   }
 ]
