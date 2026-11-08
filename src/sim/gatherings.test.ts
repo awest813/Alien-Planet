@@ -104,7 +104,14 @@ describe('weddings', () => {
     }
     expect(planned).toBe(true);
     expect(sim.gatheringNotice()).toContain('17:00');
-    run(sim, HOUR * 15);
+    // Fed through the day too, so nobody's off looking for food when it starts.
+    for (let h = 0; h < 15; h++) {
+      for (const c of sim.colonists) {
+        c.needs.food = 1;
+        c.needs.rest = 1;
+      }
+      run(sim, HOUR);
+    }
     expect(a.spouse).toBe(b.id);
     expect(b.spouse).toBe(a.id);
     expect(has(sim, 0, 'gotMarried')).toBe(true);
