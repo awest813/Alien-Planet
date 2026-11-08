@@ -1256,6 +1256,15 @@ export class GameController {
     this.selectColonist(living[(at + 1) % living.length].id, true);
   }
 
+  // Back to the colony: the camera to the middle of what's been built (or to the colonists, before
+  // anything has been).
+  public focusHome(): void {
+    const home = this.sim.homeTile();
+    if (home !== undefined) {
+      this.focusRequest = home;
+    }
+  }
+
   // Takes the camera to whoever or wherever an alert is about (and selects them).
   public focusAlert(alert: Alert): void {
     if (alert.colonist !== undefined) {

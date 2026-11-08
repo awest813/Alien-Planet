@@ -909,6 +909,22 @@ export function Architect({ state }: { state: UiState }) {
   }, [current]);
   // A tab switch moves the buttons out from under the mouse, which never sends a mouseleave.
   useEffect(() => setHovered(null), [group]);
+  // Back to Select (Esc, right-click): the button last pressed keeps no focus ring, so it doesn't look
+  // like it's still picked.
+  const tools0 = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (state.toolId === 'select' && tools0.current?.contains(document.activeElement)) {
+      (document.activeElement as HTMLElement).blur();
+    }
+  }, [state.toolId]);
+  // Switching tabs puts down a tool from another tab, so the hint line never describes a tool that
+  // isn't on show.
+  const switchTab = (key: ToolGroup) => {
+    if (current && current.id !== 'select' && current.group !== key) {
+      controller.selectToolById('select');
+    }
+    setGroup(key);
+  };
   const tools = TOOLS.filter((t) => t.group === group);
   return (
     <section className="panel architect" aria-label="Architect">
@@ -919,12 +935,15 @@ export function Architect({ state }: { state: UiState }) {
             role="tab"
             aria-selected={group === g.key}
             className={group === g.key ? 'active' : ''}
-            onClick={() => setGroup(g.key)}
+            onClick={() => switchTab(g.key)}
           >
             {g.label}
           </button>
         ))}
         <span className="spacer" />
+        <button onClick={() => controller.focusHome()} title="Back to the colony (H)">
+          ⌂ Colony
+        </button>
         <button
           className={state.overlay === 'temperature' ? 'active' : ''}
           onClick={() => controller.setOverlay(state.overlay === 'temperature' ? 'none' : 'temperature')}
@@ -933,7 +952,7 @@ export function Architect({ state }: { state: UiState }) {
           🌡 Temperature
         </button>
       </div>
-      <div className="arch-tools">
+      <div className="arch-tools" ref={tools0}>
         {tools.map((t) => {
           const locked = state.lockedTools[t.id];
           return (
@@ -978,8 +997,12 @@ export function Notices({ state, paused = false }: { state: UiState; paused?: bo
       {paused && (
         <button className="pause-banner" onClick={() => controller.togglePause()} title="Resume (Space)">
           {state.notStarted
-            ? '❚❚ Paused · give your first orders, then click here or press Space to start the clock'
-            : '❚❚ Paused · click or Space to resume'}
+            ? TOUCH
+              ? '❚❚ Paused · give your first orders, then tap here to start the clock'
+              : '❚❚ Paused · give your first orders, then click here or press Space to start the clock'
+            : TOUCH
+              ? '❚❚ Paused · tap to resume'
+              : '❚❚ Paused · click or Space to resume'}
         </button>
       )}
       {state.toast && <div className="toast">{state.toast}</div>}

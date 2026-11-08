@@ -331,7 +331,7 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             <kbd>A</kbd>
             <kbd>S</kbd>
             <kbd>D</kbd> or right-drag pans, the wheel zooms, the minimap moves the view, <kbd>Tab</kbd> jumps from
-            colonist to colonist.
+            colonist to colonist, <kbd>H</kbd> brings the view back to the colony.
           </li>
           <li>Tool hotkeys are shown on their buttons; hover a button to see what it does and costs.</li>
         </ul>

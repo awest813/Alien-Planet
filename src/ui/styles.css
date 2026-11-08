@@ -1064,6 +1064,65 @@ button.link:focus-visible {
     display: none;
   }
 
+  /* The top bar in two short rows: the clock, speed and counts, then the screens in one row that scrolls
+     sideways, instead of wrapping into five and covering a quarter of the map. */
+  .topbar {
+    gap: 4px 8px;
+    padding: 4px 6px;
+  }
+
+  .tb-time {
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .speeds button {
+    min-width: 26px;
+    padding: 2px 4px;
+  }
+
+  /* The banner over the map says so already. */
+  .topbar .paused {
+    display: none;
+  }
+
+  /* Notices take the whole width (the middle column is narrow here), keeping clear of the
+     alerts-and-goals toggle at the top right. */
+  .notices {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    width: auto;
+    padding: 0 64px 0 4px;
+    box-sizing: border-box;
+  }
+
+  .pause-banner {
+    border-radius: 12px;
+    font-size: 12px;
+  }
+
+  .tb-resources {
+    margin-left: 0;
+    gap: 2px 8px;
+  }
+
+  .tb-resources .res:not(.power):not(.food) {
+    display: inline;
+  }
+
+  .screens {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    width: 100%;
+    scrollbar-width: none;
+  }
+
+  .screens button {
+    flex: none;
+    padding: 3px 7px;
+    font-size: 12px;
+  }
+
   /* One row each for the Architect tabs and tools, scrolling sideways, so the panel doesn't take a
      third of the screen. */
   .arch-tabs,
@@ -1445,7 +1504,8 @@ button.primary:hover:not(:disabled) {
 /* Paused: hard to miss, and one click away from running again. */
 .pause-banner {
   align-self: center;
-  white-space: nowrap;
+  max-width: 100%;
+  text-align: center;
   pointer-events: auto;
   padding: 4px 14px;
   font-weight: 600;

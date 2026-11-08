@@ -390,7 +390,10 @@ export class ColonyScene extends Phaser.Scene {
     this.map?.destroy();
     this.itemLabels.forEach((label) => label.destroy());
     this.itemLabels.clear();
-    this.pawns.forEach((pawn) => pawn.root.destroy());
+    this.pawns.forEach((pawn) => {
+      pawn.root.destroy();
+      pawn.label.destroy();
+    });
     this.pawns.clear();
     this.raiders.forEach((raider) => raider.destroy());
     this.raiders.clear();
@@ -615,7 +618,9 @@ export class ColonyScene extends Phaser.Scene {
         strokeThickness: 2,
       })
       .setOrigin(0.5, 1)
-      .setResolution(4);
+      .setResolution(4)
+      // Names go on their own layer, above every figure, so a neighbour never hides one.
+      .setDepth(Depth.PAWNS + 0.5);
     const zzz = this.add
       .text(6, -6, 'z', { fontFamily: 'monospace', fontSize: '6px', color: '#cfe3ff' })
       .setResolution(4)
@@ -631,7 +636,7 @@ export class ColonyScene extends Phaser.Scene {
       .setOrigin(0.5, 1)
       .setResolution(4)
       .setVisible(false);
-    const root = this.add.container(0, 0, [figure, carry, label, zzz, alert]).setDepth(Depth.PAWNS);
+    const root = this.add.container(0, 0, [figure, carry, zzz, alert]).setDepth(Depth.PAWNS);
     return { root, figure, carry, zzz, alert, label };
   }
 
@@ -668,7 +673,7 @@ export class ColonyScene extends Phaser.Scene {
       // Children are small, teens nearly grown.
       pawn.figure.setScale(c.age < TEEN ? 0.7 : c.age < ADULT ? 0.85 : 1);
       pawn.zzz.setVisible(c.sleeping).setY(-6 - ((time / 400) % 3));
-      pawn.label.setVisible(controller.settings.showNames);
+      pawn.label.setVisible(controller.settings.showNames && pawn.root.visible);
       pawn.alert
         .setText(downed ? '+' : '!')
         .setColor(downed ? '#ff5c5c' : '#ff7a5c')
@@ -679,6 +684,67 @@ export class ColonyScene extends Phaser.Scene {
         pawn.carry.setVisible(false);
       }
     }
+    this.staggerNames();
+    this.fadeCountsUnderNames();
+  }
+
+  // Colonists side by side would run their names together: one that would overlap its neighbour's
+  // goes up a line.
+  private staggerNames(): void {
+    const NAME_Y = -11;
+    const pawns = [...this.pawns.values()].sort((a, b) => a.root.x - b.root.x);
+    const placed: { left: number; right: number; y: number; raised: boolean }[] = [];
+    for (const pawn of pawns) {
+      const half = pawn.label.width / 2;
+      const left = pawn.root.x - half;
+      const right = pawn.root.x + half;
+      const clash = (raised: boolean) =>
+        placed.some(
+          (o) => o.raised === raised && Math.abs(o.y - pawn.root.y) < 8 && o.right + 1 > left && o.left < right + 1,
+        );
+      const raised = clash(false) && !clash(true);
+      pawn.label.setPosition(pawn.root.x, pawn.root.y + (raised ? NAME_Y - 7 : NAME_Y));
+      placed.push({ left, right, y: pawn.root.y, raised });
+    }
+  }
+
+  // A stack's count under a colonist's name makes both hard to read: the count fades while a name is
+  // over it.
+  private fadedCounts = new Set<number>();
+  private fadeCountsUnderNames(): void {
+    const world = controller.sim.world;
+    const covered = new Set<number>();
+    if (controller.settings.showNames && this.itemLabels.size > 0) {
+      for (const pawn of this.pawns.values()) {
+        if (!pawn.root.visible) {
+          continue;
+        }
+        // The name sits above the figure's head, centred, about 8px tall (a line higher if staggered).
+        const half = pawn.label.width / 2 + 2;
+        // (Its anchor is its bottom edge.)
+        const top = pawn.label.y - 9;
+        const bottom = pawn.label.y + 1;
+        for (let ty = Math.floor(top / TILE); ty <= Math.floor(bottom / TILE); ty++) {
+          for (let tx = Math.floor((pawn.root.x - half) / TILE); tx <= Math.floor((pawn.root.x + half) / TILE); tx++) {
+            if (tx >= 0 && ty >= 0 && tx < world.width && ty < world.height) {
+              const i = world.idx(tx, ty);
+              if (this.itemLabels.has(i)) {
+                covered.add(i);
+              }
+            }
+          }
+        }
+      }
+    }
+    for (const i of this.fadedCounts) {
+      if (!covered.has(i)) {
+        this.itemLabels.get(i)?.setAlpha(1);
+      }
+    }
+    for (const i of covered) {
+      this.itemLabels.get(i)?.setAlpha(0.15);
+    }
+    this.fadedCounts = covered;
   }
 
   // Visiting traders: green-clad figures with green name labels.
@@ -1354,6 +1420,8 @@ export class ColonyScene extends Phaser.Scene {
       } else if (key === 'Tab') {
         event.preventDefault();
         controller.cycleColonist();
+      } else if (key === 'h') {
+        controller.focusHome();
       } else if (key === 'q') {
         if (controller.selectedColonist !== null) {
           controller.toggleDraft(controller.selectedColonist);
