@@ -1706,3 +1706,42 @@ button.big {
 .chronicle-work .chronicle-icon {
   color: var(--accent);
 }
+
+/* ---------- Touch screens ---------- */
+/* Fingers need bigger targets than a mouse: buttons at least 32px tall (36px wide for the speeds). */
+@media (pointer: coarse) {
+  .speeds button,
+  .arch-tabs button,
+  .arch-tools button,
+  .screens button,
+  .tb-resources button,
+  .modal button,
+  .inspector button,
+  .side button,
+  .side-toggle,
+  .colonist-bar .chip {
+    min-height: 32px;
+  }
+
+  .speeds button {
+    min-width: 36px;
+  }
+}
+
+/* A phone on its side: the build bar keeps to two short rows (tabs that scroll sideways, then the tools) and
+   drops the hint line, leaving the map more than a strip. */
+@media (max-height: 480px) {
+  .architect .hint {
+    display: none;
+  }
+
+  .arch-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .arch-tabs button {
+    flex-shrink: 0;
+  }
+}
