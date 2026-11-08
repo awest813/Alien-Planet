@@ -117,6 +117,8 @@ export class ColonyScene extends Phaser.Scene {
   private layers: Layers;
   private pawns = new Map<number, PawnView>();
   private raiders = new Map<number, Phaser.GameObjects.Container>();
+  // Raiders' and allies' names, on the names' own layer above every figure (as colonists' are).
+  private raiderLabels = new Map<number, Phaser.GameObjects.Text>();
   // Raiders lying wounded and prisoners, by id.
   private captives = new Map<number, Phaser.GameObjects.Container>();
   private traders = new Map<number, Phaser.GameObjects.Container>();
@@ -397,6 +399,8 @@ export class ColonyScene extends Phaser.Scene {
     this.pawns.clear();
     this.raiders.forEach((raider) => raider.destroy());
     this.raiders.clear();
+    this.raiderLabels.forEach((label) => label.destroy());
+    this.raiderLabels.clear();
     this.captives.forEach((captive) => captive.destroy());
     this.captives.clear();
     this.traders.forEach((trader) => trader.destroy());
@@ -806,16 +810,6 @@ export class ColonyScene extends Phaser.Scene {
     const body = this.add.image(0, 0, 'pawn-body').setTint(tint);
     // Allies go bareheaded, like the traders from the same valley; raiders wear hoods.
     const head = this.add.image(0, 0, ally ? 'pawn-head' : 'raider-head');
-    const label = this.add
-      .text(0, -11, e.name, {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '6px',
-        color: ally ? '#9fe38a' : '#ff8a8a',
-        stroke: '#000000',
-        strokeThickness: 2,
-      })
-      .setOrigin(0.5, 1)
-      .setResolution(4);
     // Allies carry a small round shield on the arm, so they read as fighters rather than traders.
     const parts: Phaser.GameObjects.GameObject[] = [legs, body, head];
     if (ally) {
@@ -824,7 +818,7 @@ export class ColonyScene extends Phaser.Scene {
       shield.fillStyle(0xe8d27a, 1).fillCircle(-4, 2, 1.1);
       parts.push(shield);
     }
-    return this.add.container(0, 0, [...parts, label]).setDepth(Depth.PAWNS);
+    return this.add.container(0, 0, parts).setDepth(Depth.PAWNS);
   }
 
   private syncAnimals(): void {
@@ -888,6 +882,8 @@ export class ColonyScene extends Phaser.Scene {
       if (!alive.has(id)) {
         raider.destroy();
         this.raiders.delete(id);
+        this.raiderLabels.get(id)?.destroy();
+        this.raiderLabels.delete(id);
       }
     }
     for (const e of fighters) {
@@ -895,6 +891,20 @@ export class ColonyScene extends Phaser.Scene {
       if (!raider) {
         raider = this.createRaider(e, allies.has(e.id));
         this.raiders.set(e.id, raider);
+        this.raiderLabels.set(
+          e.id,
+          this.add
+            .text(0, 0, e.name, {
+              fontFamily: 'system-ui, sans-serif',
+              fontSize: '6px',
+              color: allies.has(e.id) ? '#9fe38a' : '#ff8a8a',
+              stroke: '#000000',
+              strokeThickness: 2,
+            })
+            .setOrigin(0.5, 1)
+            .setResolution(4)
+            .setDepth(Depth.PAWNS + 0.5),
+        );
       }
       const to = e.path.length > 0 ? e.path[0] : e.tile;
       const t = e.moveProgress;
@@ -902,8 +912,23 @@ export class ColonyScene extends Phaser.Scene {
       const y = world.yOf(e.tile) + (world.yOf(to) - world.yOf(e.tile)) * t;
       raider.setPosition((x + 0.5) * TILE, (y + 0.5) * TILE).setAlpha(e.fleeing ? 0.6 : 1);
       (raider.getAt(0) as Phaser.GameObjects.Image).setTexture(stride(e.path.length > 0, this.time.now));
-      // The name label is the container's last child.
-      (raider.getAt(raider.length - 1) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames);
+      this.raiderLabels.get(e.id)!.setVisible(controller.settings.showNames && raider.visible);
+    }
+    // A camp or a melee packs them close: a name that would overlap another goes up a line (or two), or fades
+    // out if there's still no room. Compared where the labels actually sit, rows above and below included.
+    const placed: { left: number; right: number; y: number }[] = [];
+    for (const [id, raider] of [...this.raiders].sort(([, a], [, b]) => a.y - b.y || a.x - b.x)) {
+      const label = this.raiderLabels.get(id)!;
+      const half = label.width / 2;
+      const left = raider.x - half;
+      const right = raider.x + half;
+      const free = (y: number) =>
+        !placed.some((o) => Math.abs(o.y - y) < 7 && o.right + 1 > left && o.left < right + 1);
+      const offset = [-11, -18, -25, -4].find((dy) => free(raider.y + dy));
+      label.setPosition(raider.x, raider.y + (offset ?? -11)).setAlpha(offset === undefined ? 0 : raider.alpha);
+      if (offset !== undefined) {
+        placed.push({ left, right, y: raider.y + offset });
+      }
     }
   }
 

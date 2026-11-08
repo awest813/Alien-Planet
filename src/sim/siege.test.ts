@@ -79,4 +79,34 @@ describe('sieges', () => {
     }
     expect(fired).toBeGreaterThan(0);
   });
+
+  it('keep undrafted colonists from working within reach of the camp', () => {
+    const { sim, keepWell } = colony(13);
+    triggerEvent(sim, 'siege');
+    const siege = besieging(sim)!;
+    const w = sim.world;
+    // The only work there is: trees right by the camp, marked for chopping.
+    const trees = sim.nearest(
+      siege.camp,
+      (i) => w.isPassable(i) && w.feature[i] === 0 && w.distance(i, siege.camp) >= 4 && w.distance(i, siege.camp) <= 8,
+      4,
+    );
+    for (const i of trees) {
+      w.setFeature(i, featureId('tree'));
+    }
+    expect(trees.length).toBeGreaterThan(0);
+    const x = trees.map((i) => w.xOf(i));
+    const y = trees.map((i) => w.yOf(i));
+    sim.apply({
+      type: 'designate',
+      kind: 'chop',
+      rect: { x0: Math.min(...x), y0: Math.min(...y), x1: Math.max(...x), y1: Math.max(...y) },
+    });
+    expect(sim.nearSiegeCamp(trees[0])).toBe(true);
+    for (let t = 0; t < 4 * TICKS_PER_HOUR; t++) {
+      keepWell();
+      sim.step();
+    }
+    expect(trees.every((i) => w.feature[i] === featureId('tree') && w.progress[i] === 0)).toBe(true);
+  });
 });

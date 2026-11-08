@@ -52,6 +52,7 @@ import {
   RaidState,
   armorOf,
   attackAnimal,
+  besieging,
   canAttack,
   colonistCombat,
   colonistTarget,
@@ -261,6 +262,10 @@ const STARVING_PATIENT = 0.1;
 // Walls and doors count as this many tiles nearer than other blueprints.
 const ENCLOSURE_FIRST = 15;
 const OBJECTIVE_TICKS = 40;
+// Reservation keys that name a tile (`w<tile>` for work, `i<tile>` for items, and so on); `t` and `h` take ids.
+const TILE_KEYS = new Set([...'iwbdxsljfc'].map((ch) => ch.charCodeAt(0)));
+// Undrafted colonists keep this far from a siege camp.
+const SIEGE_DANGER = 14;
 // What the later research does.
 const MASONRY_SPEED = 1.2;
 const IRRIGATION_YIELD = 1.25;
@@ -2419,8 +2424,18 @@ export class Simulation {
     if (key.charCodeAt(0) === 105 && this.world.forbidden[Number(key.slice(1))] === 1) {
       return true;
     }
+    // So does anything within reach of a siege camp, for anyone not drafted to fight.
+    if (!c.drafted && TILE_KEYS.has(key.charCodeAt(0)) && this.nearSiegeCamp(Number(key.slice(1)))) {
+      return true;
+    }
     const owner = this.reservations.get(key);
     return owner !== undefined && owner !== c.id;
+  }
+
+  // Within bowshot (and a little more) of a siege party waiting in its camp.
+  public nearSiegeCamp(tile: number): boolean {
+    const siege = besieging(this);
+    return !!siege && tile >= 0 && this.world.distance(tile, siege.camp) <= SIEGE_DANGER;
   }
 
   private reserve(c: Colonist, key: string): void {
@@ -2531,6 +2546,14 @@ export class Simulation {
 
     if (this.tick % SLOW_TICKS === 0 && this.raidersNear(c) && this.tryShelter(c)) {
       // Running for cover.
+    } else if (
+      this.tick % SLOW_TICKS === 0 &&
+      c.job &&
+      c.job.type !== 'shelter' &&
+      (this.nearSiegeCamp(c.job.target) || this.nearSiegeCamp(c.path[c.path.length - 1] ?? -1))
+    ) {
+      // Work that would take them within reach of a siege camp waits.
+      this.endJob(c);
     } else if (this.inMentalBreak(c)) {
       const allowed = c.job && ['wander', 'warmUp', 'shelter', ...(c.breakKind === 'binge' ? ['eat'] : [])];
       if (c.job && !allowed!.includes(c.job.type)) {
