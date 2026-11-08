@@ -15,6 +15,7 @@ import {
   NONE,
   NORMAL_QUALITY,
   RECIPES,
+  RESEARCH,
   THOUGHTS,
   researchDef,
   TRAITS,
@@ -294,6 +295,9 @@ const SIEGE_EXEMPT = new Set<string>(['shelter', 'rescue', 'tend', 'feed', 'eat'
 // What the later research does.
 const MASONRY_SPEED = 1.2;
 const IRRIGATION_YIELD = 1.25;
+// Steel tools (steelmaking) for miners and woodcutters; seed from the best plants (plant breeding).
+const STEEL_SPEED = 1.25;
+const BREEDING_YIELD = 1.2;
 const PRESERVING_RATE = 2 / 3;
 // The first days, when colonists expect little.
 const LOW_EXPECTATION_DAYS = 12;
@@ -1837,7 +1841,7 @@ export class Simulation {
   }
 
   private updateClimate(): void {
-    const leak = this.isResearched('insulation') ? 0.5 : 1;
+    const leak = (this.isResearched('insulation') ? 0.5 : 1) * (this.isResearched('doubleGlazing') ? 0.5 : 1);
     updateRoomTemperatures(
       this.roomTemps,
       this.rooms,
@@ -1892,6 +1896,7 @@ export class Simulation {
     const hour = this.hour;
     const winter = this.season === 'Winter';
     const growing = !winter && hour >= NIGHT_END && hour < 20;
+    const glassDay = this.isResearched('glassmaking') && hour >= NIGHT_END && hour < 20;
     const speed = this.isResearched('cropRotation') ? 1.25 : 1;
     const lit = this.litTiles();
     let frosted = 0;
@@ -1909,8 +1914,9 @@ export class Simulation {
         frosted++;
         continue;
       }
-      // Sun lamps let crops grow at night and through winter; under a roof they're the only light.
-      const sunlit = growing && w.roof[i] === NONE;
+      // Sun lamps let crops grow at night and through winter; under a roof they're the only light, unless the
+      // roof is glass (then a warm greenhouse grows by day, winter or not).
+      const sunlit = (growing && w.roof[i] === NONE) || (glassDay && w.roof[i] !== NONE);
       if ((!sunlit && !lit[i]) || w.growth[i] >= 1 || temp < CROP_MIN_TEMP) {
         continue;
       }
@@ -2845,7 +2851,7 @@ export class Simulation {
     const diagonal = w.xOf(next) !== w.xOf(c.tile) && w.yOf(next) !== w.yOf(c.tile);
     const hunger = starving(c) ? STARVING_MOVE : 1;
     return (
-      (MOVE_SPEED * armorOf(c).speed * hunger * agePace(c).move * scarMove(c)) /
+      (MOVE_SPEED * armorOf(c).speed * hunger * agePace(c).move * scarMove(c, this.isResearched('prosthetics'))) /
       (w.moveCost(next) * (diagonal ? Math.SQRT2 : 1))
     );
   }
@@ -3870,9 +3876,10 @@ export class Simulation {
       tools *
       inspired *
       agePace(c).work *
-      scarWork(c) *
+      scarWork(c, this.isResearched('prosthetics')) *
       hoursSpeed(this.village) *
-      (type === 'construct' && this.isResearched('masonry') ? MASONRY_SPEED : 1)
+      (type === 'construct' && this.isResearched('masonry') ? MASONRY_SPEED : 1) *
+      ((type === 'mine' || type === 'chop') && this.isResearched('steelmaking') ? STEEL_SPEED : 1)
     );
   }
 
@@ -3975,10 +3982,15 @@ export class Simulation {
           1,
         )[0];
         // (Irrigation's quarter more, as an extra unit a quarter of the time on small harvests.)
-        const more = this.isResearched('irrigation') ? crop.count * IRRIGATION_YIELD : crop.count;
+        const more =
+          (this.isResearched('irrigation') ? crop.count * IRRIGATION_YIELD : crop.count) *
+          (this.isResearched('plantBreeding') ? BREEDING_YIELD : 1);
         const yieldCount = Math.floor(more) + (more % 1 > 0 && this.rng.next() < more % 1 ? 1 : 0);
         w.dropItemNear(offField ?? t, crop.item, yieldCount);
         this.produce(crop.item, yieldCount);
+        if (this.season === 'Winter') {
+          this.stats.winterHarvests = (this.stats.winterHarvests ?? 0) + 1;
+        }
         c.workStreak++;
         break;
       }
@@ -4879,9 +4891,16 @@ export class Simulation {
       const rolled = !!made.apparel || !!made.weapon || !!made.armor || product === TOOL_KIT;
       // A meal cooked amid mess comes out worse, and so less safe to eat.
       const taint = bench === 'cooking' ? Math.min(MAX_KITCHEN_TAINT, this.messAround(job.target)) : 0;
-      const quality = rolled ? Math.max(0, Math.min(20, skill + this.rng.int(-2, 2))) : Math.max(0, skill - taint);
+      // (Precision tools: a grade better, about two points of quality.)
+      const tools = this.isResearched('precisionTools') ? 2 : 0;
+      const quality = rolled
+        ? Math.max(0, Math.min(20, skill + tools + this.rng.int(-2, 2)))
+        : Math.max(0, skill - taint);
       w.dropItemNear(c.tile, product, recipe.product.count, fresh, quality);
       this.produce(product, recipe.product.count);
+      if (rolled) {
+        this.stats.bestCraft = Math.max(this.stats.bestCraft ?? 0, quality);
+      }
       if (rolled) {
         this.addLog(`${c.name} made a ${qualityLabel(quality).toLowerCase()} ${itemDef(product).name.toLowerCase()}.`);
       }
@@ -5890,10 +5909,66 @@ export class Simulation {
 
   // ---- Research ----
 
+  // What holds a project back: the building it has to be studied at, and materials short in storage to
+  // finish it (nothing when it can go ahead).
+  public researchHold(key: string): { building?: string; short: { item: number; count: number }[] } {
+    const project = researchDef(key);
+    const hold: { building?: string; short: { item: number; count: number }[] } = { short: [] };
+    if (!project) {
+      return hold;
+    }
+    if (project.building && this.countFeature((f) => featureDef(f).key === project.building) === 0) {
+      hold.building = project.building;
+    }
+    for (const need of project.materials ?? []) {
+      const item = itemId(need.item);
+      const have = this.storedCount(item);
+      if (have < need.count) {
+        hold.short.push({ item, count: need.count - have });
+      }
+    }
+    return hold;
+  }
+
+  // Items of a kind in storage (not forbidden), for research materials.
+  private storedCount(item: number): number {
+    const w = this.world;
+    let n = 0;
+    for (const i of w.tilesWith('items')) {
+      if (w.itemType[i] === item && !w.forbidden[i] && this.isStockpile(i)) {
+        n += w.itemCount[i];
+      }
+    }
+    return n;
+  }
+
+  // Takes a finished project's materials out of storage.
+  private useMaterials(key: string): void {
+    const w = this.world;
+    for (const need of researchDef(key)?.materials ?? []) {
+      const item = itemId(need.item);
+      let left = need.count;
+      for (const i of [...w.tilesWith('items')]) {
+        if (left > 0 && w.itemType[i] === item && !w.forbidden[i] && this.isStockpile(i)) {
+          left -= w.takeItem(i, left);
+        }
+      }
+    }
+  }
+
   private tryResearch(c: Colonist): boolean {
     const w = this.world;
     const current = this.research.current;
     if (!current || this.isResearched(current)) {
+      return false;
+    }
+    // Nothing to do at the bench while the project waits on a building, or on materials to finish it.
+    const project = researchDef(current);
+    const hold = this.researchHold(current);
+    if (
+      hold.building ||
+      (project && hold.short.length > 0 && (this.research.progress[current] ?? 0) >= project.cost - 1)
+    ) {
       return false;
     }
     const region = this.regionOf(c.tile);
@@ -5931,7 +6006,14 @@ export class Simulation {
     }
     this.research.progress[project.key] = (this.research.progress[project.key] ?? 0) + this.workSpeed(c, 'research');
     learn(this, c, 'research');
+    // Materials short: the work goes as far as it can, and waits there.
+    if (this.research.progress[project.key] >= project.cost && this.researchHold(project.key).short.length > 0) {
+      this.research.progress[project.key] = project.cost - 1;
+      this.endJob(c);
+      return;
+    }
     if (this.research.progress[project.key] >= project.cost) {
+      this.useMaterials(project.key);
       this.research.done.push(project.key);
       this.research.current = null;
       this.addLog(`Research complete: ${project.name}. ${project.description}`, 'good', true);
@@ -7272,14 +7354,14 @@ const NUMBER_WORDS: Record<number, string> = { 3: 'Three', 4: 'Four', 5: 'Five',
 export interface ObjectiveDef {
   id: string;
   label: string;
-  phase: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  phase: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   check: (sim: Simulation) => boolean;
   progress?: (sim: Simulation) => string;
   // Left out entirely in some games (no raids on peaceful).
   hidden?: (sim: Simulation) => boolean;
 }
 
-export const PHASE_NAMES = ['Shelter', 'Living', 'Story', 'Seasons', 'Prosperity', 'Legacy', 'Generations'];
+export const PHASE_NAMES = ['Shelter', 'Living', 'Story', 'Seasons', 'Prosperity', 'Legacy', 'Generations', 'Mastery'];
 
 const produced = (s: Simulation, key: string) => s.stats.produced[key] ?? 0;
 // Kinds of recreation the colony's buildings offer (walks don't count).
@@ -7689,10 +7771,57 @@ export const OBJECTIVES: ObjectiveDef[] = [
     check: (s) => (s.stats.breaches ?? 0) > 0,
     hidden: (s) => s.story.difficulty === 'peaceful',
   },
+  // Mastery: what a long-settled colony can do that a young one can't.
+  {
+    id: 'winterHarvest',
+    label: 'Bring in a harvest in winter',
+    phase: 8,
+    check: (s) => (s.stats.winterHarvests ?? 0) > 0,
+  },
+  {
+    id: 'steel',
+    label: 'Learn steelmaking',
+    phase: 8,
+    check: (s) => s.isResearched('steelmaking'),
+  },
+  {
+    id: 'masterCraft',
+    label: 'Craft something of masterwork quality',
+    phase: 8,
+    check: (s) => (s.stats.bestCraft ?? 0) >= MASTERWORK,
+  },
+  {
+    id: 'thiefCaught',
+    label: 'Bring down a thief before they get away',
+    phase: 8,
+    check: (s) => (s.stats.thievesCaught ?? 0) > 0,
+    hidden: (s) => s.story.difficulty === 'peaceful',
+  },
+  {
+    id: 'cleanDefence',
+    label: 'See off a raid with nobody left down',
+    phase: 8,
+    check: (s) => (s.stats.cleanDefences ?? 0) > 0,
+    hidden: (s) => s.story.difficulty === 'peaceful',
+  },
+  {
+    id: 'wealthy',
+    label: 'Grow the colony to 60,000 silver in wealth',
+    phase: 8,
+    check: (s) => colonyWealth(s) >= 60000,
+    progress: (s) => `${Math.round(colonyWealth(s) / 1000)}k`,
+  },
+  {
+    id: 'allResearch',
+    label: 'Learn every research project',
+    phase: 8,
+    check: (s) => RESEARCH.every((r) => s.isResearched(r.key)),
+    progress: (s) => `${s.research.done.length}/${RESEARCH.length}`,
+  },
   {
     id: 'decade',
     label: 'Keep the colony going for ten years',
-    phase: 7,
+    phase: 8,
     check: (s) => s.totalHours / 24 >= 10 * DAYS_PER_YEAR,
     progress: (s) => `${Math.min(10, Math.floor(s.totalHours / 24 / DAYS_PER_YEAR))}/10 years`,
   },

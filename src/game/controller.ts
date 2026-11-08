@@ -21,6 +21,7 @@ import {
   weaponDef,
   JOY_KIND_LABELS,
   type JoyKind,
+  type ResearchDef,
 } from '../sim/defs';
 import { availableProjects, isAvailable } from '../sim/research';
 import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, seasonOf, yearOf } from '../sim/seasons';
@@ -237,6 +238,25 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     screen: 'factions',
   },
   cavern: { how: 'Dig a mine shaft (Deep mining research) deep enough, and be ready for what comes up.' },
+  winterHarvest: {
+    how: 'Research Glassmaking (it needs a kiln), roof a field inside a heated room, and harvest it in winter.',
+    screen: 'research',
+  },
+  steel: {
+    how: 'Research Steelmaking: it needs a smelter standing and 40 iron in storage to finish.',
+    screen: 'research',
+  },
+  masterCraft: {
+    how: 'Give your best crafter crafting work; Precision tools research lifts every piece a grade.',
+    screen: 'production',
+  },
+  thiefCaught: { how: 'When thieves come, draft colonists and bring one down before they reach the edge of the map.' },
+  cleanDefence: { how: 'Fight from cover (sandbags, embrasures, traps) so a raid breaks before anyone falls.' },
+  wealthy: { how: 'Build, craft and store goods: everything the colony owns counts.' },
+  allResearch: {
+    how: 'Keep researchers busy. Later projects need buildings and materials too (see Research).',
+    screen: 'research',
+  },
   decade: { how: 'Keep going: ten years of the valley.' },
   instrument: {
     how: 'Build a drum, flute or lute (Furniture). Colonists play it for fun, and everyone nearby enjoys the music.',
@@ -807,6 +827,32 @@ export interface Alert {
   tile?: number;
 }
 
+// A late project's building and materials, and (while it can be picked) what it's waiting on.
+function researchNeeds(sim: Simulation, p: ResearchDef): { needs?: string; held?: string } {
+  if (!p.building && !p.materials) {
+    return {};
+  }
+  const building = p.building ? featureDef(featureId(p.building)).name : undefined;
+  const parts = [
+    ...(building ? [`studied where there's a ${building.toLowerCase()}`] : []),
+    ...(p.materials ?? []).map(
+      (m) => `${m.count} ${itemDef(itemId(m.item)).name.toLowerCase()} from storage to finish`,
+    ),
+  ];
+  const view: { needs?: string; held?: string } = { needs: `Needs: ${parts.join('; ')}.` };
+  if (sim.research.done.includes(p.key) || !isAvailable(sim.research, p)) {
+    return view;
+  }
+  const hold = sim.researchHold(p.key);
+  const nearlyDone = (sim.research.progress[p.key] ?? 0) >= p.cost - 1;
+  if (hold.building) {
+    view.held = `Build a ${building!.toLowerCase()} to study this.`;
+  } else if (nearlyDone && hold.short.length > 0) {
+    view.held = `Waiting on ${hold.short.map((s) => `${s.count} more ${itemDef(s.item).name.toLowerCase()}`).join(' and ')} in storage to finish.`;
+  }
+  return view;
+}
+
 export interface ResearchView {
   key: string;
   name: string;
@@ -817,6 +863,10 @@ export interface ResearchView {
   available: boolean;
   current: boolean;
   requires: string[];
+  // What a late project needs besides points ("A smelter standing; 40 iron to finish"), and what's
+  // holding it back right now, if anything.
+  needs?: string;
+  held?: string;
 }
 
 export interface UiState {
@@ -1638,6 +1688,7 @@ export class GameController {
         available: isAvailable(sim.research, p),
         current: sim.research.current === p.key,
         requires: p.requires.map((r) => researchDef(r)?.name ?? r),
+        ...researchNeeds(sim, p),
       })),
       researchBench: sim.countFeature((f) => featureDef(f).researchStation) > 0,
       lockedTools: Object.fromEntries(
@@ -2106,6 +2157,14 @@ export class GameController {
       availableProjects(sim.research).length > 0
     ) {
       alerts.push({ text: 'No research project selected', tone: 'warn' });
+    }
+    // The current project waiting on a building, or on materials to finish.
+    const studying = sim.research.current ? researchDef(sim.research.current) : undefined;
+    if (studying && !sim.isResearched(studying.key)) {
+      const { held } = researchNeeds(sim, studying);
+      if (held) {
+        alerts.push({ text: `${studying.name}: ${held}`, tone: 'warn' });
+      }
     }
     if (coldSnapOn(sim)) {
       alerts.push({ text: 'Cold snap: keep colonists warm indoors', tone: 'warn' });

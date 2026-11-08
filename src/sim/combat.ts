@@ -372,7 +372,7 @@ function breach(sim: Simulation, e: Enemy): boolean {
       // Clubs and spears are better for battering than bows.
       w.damage[wall] += weaponDef(e.weapon).range > 1 ? 8 : 14;
       const def = featureDef(w.feature[wall]);
-      if (w.damage[wall] >= toughness(w, wall)) {
+      if (w.damage[wall] >= toughness(sim, wall)) {
         const feature = w.feature[wall];
         w.setFeature(wall, NONE);
         w.addFilth(wall, Filth.RUBBLE, 2);
@@ -411,9 +411,10 @@ const breakable = (w: World, i: number) => {
   const def = featureDef(w.feature[i]);
   return !!def.build || (!!def.natural && def.harvest?.work === 'mine');
 };
-const toughness = (w: World, i: number) => {
-  const def = featureDef(w.feature[i]);
-  return def.build?.work ?? def.harvest?.amount ?? 100;
+const toughness = (sim: Simulation, i: number) => {
+  const def = featureDef(sim.world.feature[i]);
+  // Reinforced (research): built walls and doors take twice the blows.
+  return def.build ? def.build.work * (sim.isResearched('reinforcedWalls') ? 2 : 1) : (def.harvest?.amount ?? 100);
 };
 // Digging is the last resort: a wall a little further off is still the better way in.
 const ROCK_DETOUR = 12;
@@ -508,6 +509,9 @@ export function woundEnemy(sim: Simulation, e: Enemy, amount: number, by: string
     'good',
   );
   const w = sim.world;
+  if (e.thief) {
+    sim.stats.thievesCaught = (sim.stats.thievesCaught ?? 0) + 1;
+  }
   // A thief brought down drops what they took.
   if (e.loot) {
     w.dropItemNear(e.tile, e.loot.item, e.loot.count);
@@ -556,7 +560,8 @@ function springTrap(sim: Simulation, e: Enemy): void {
   sim.addLog(`${e.name} stepped on a spike trap!`, 'good');
   recordShot(sim, e.tile, e.tile, true, false);
   // Spikes find the gaps in armor.
-  woundEnemy(sim, e, (0.3 + sim.rng.next() * 0.15) * (1 - e.armor * 0.5), 'A spike trap');
+  const barbs = sim.isResearched('barbedTraps') ? 1.5 : 1;
+  woundEnemy(sim, e, (0.3 + sim.rng.next() * 0.15) * (1 - e.armor * 0.5) * barbs, 'A spike trap');
   e.suppression = 1;
 }
 
@@ -618,7 +623,7 @@ function wreckBeacon(sim: Simulation, e: Enemy): boolean {
       e.cooldown = weaponDef(e.weapon).cooldown;
       // Delicate work, quickly undone.
       w.damage[beacon] += (weaponDef(e.weapon).range > 1 ? 8 : 14) * BEACON_FRAGILE;
-      if (w.damage[beacon] >= toughness(w, beacon)) {
+      if (w.damage[beacon] >= toughness(sim, beacon)) {
         const feature = w.feature[beacon];
         w.setFeature(beacon, NONE);
         w.addFilth(beacon, Filth.RUBBLE, 2);
@@ -929,6 +934,9 @@ export function updateEnemies(sim: Simulation): void {
       for (const c of standing) {
         sim.addThought(c, 'repelledRaid');
       }
+      if (standing.length === sim.living().length) {
+        sim.stats.cleanDefences = (sim.stats.cleanDefences ?? 0) + 1;
+      }
     } else if (sim.living().length > 0) {
       sim.addLog(`The raiders left the colony for dead${plunder(sim)}.`, 'danger', true);
     }
@@ -959,7 +967,11 @@ function colonistAttack(sim: Simulation, c: Colonist, target: number, weapon: We
       c.skills.combat,
       c.tile,
       target,
-      ranged ? (traitValue(c, 'accuracy') ?? 0) + scarAim(c) + (sim.isResearched('tactics') ? TACTICS_AIM : 0) : 0,
+      ranged
+        ? (traitValue(c, 'accuracy') ?? 0) +
+            scarAim(c, sim.isResearched('prosthetics')) +
+            (sim.isResearched('tactics') ? TACTICS_AIM : 0)
+        : 0,
     );
   recordShot(sim, c.tile, target, hit, ranged);
   c.cooldown = weapon.cooldown;

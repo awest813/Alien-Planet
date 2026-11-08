@@ -965,6 +965,11 @@ button.brush.active {
   border-color: var(--accent);
 }
 
+.research .warn-text {
+  color: var(--warn);
+  margin-top: 2px;
+}
+
 .research li.done,
 .research li.locked {
   opacity: 0.55;

@@ -4,19 +4,37 @@ import { OBJECTIVES, PHASE_NAMES, Simulation } from './simulation';
 const goal = (id: string) => OBJECTIVES.find((o) => o.id === id)!;
 
 describe('the Generations goals', () => {
-  it('come last, from the colony’s own story', () => {
-    expect(PHASE_NAMES.at(-1)).toBe('Generations');
+  it('come after Legacy, from the colony’s own story', () => {
+    expect(PHASE_NAMES[6]).toBe('Generations');
     const ids = OBJECTIVES.filter((o) => o.phase === 7).map((o) => o.id);
-    expect(ids).toEqual([
-      'grownUp',
-      'thirdGeneration',
-      'elder',
-      'siegeSeenOff',
-      'beastSlain',
-      'allies',
-      'cavern',
-      'decade',
-    ]);
+    expect(ids).toEqual(['grownUp', 'thirdGeneration', 'elder', 'siegeSeenOff', 'beastSlain', 'allies', 'cavern']);
+  });
+
+  it('are followed by Mastery, which ends with ten years', () => {
+    expect(PHASE_NAMES.at(-1)).toBe('Mastery');
+    const ids = OBJECTIVES.filter((o) => o.phase === 8).map((o) => o.id);
+    expect(ids.at(-1)).toBe('decade');
+    expect(ids).toHaveLength(8);
+    const sim = Simulation.newColony(9);
+    for (const id of [
+      'winterHarvest',
+      'masterCraft',
+      'thiefCaught',
+      'cleanDefence',
+      'steel',
+      'wealthy',
+      'allResearch',
+    ]) {
+      expect(goal(id).check(sim)).toBe(false);
+    }
+    sim.stats.winterHarvests = 1;
+    sim.stats.bestCraft = 17;
+    sim.stats.thievesCaught = 1;
+    sim.stats.cleanDefences = 1;
+    sim.research.done.push('steelmaking');
+    for (const id of ['winterHarvest', 'masterCraft', 'thiefCaught', 'cleanDefence', 'steel']) {
+      expect(goal(id).check(sim)).toBe(true);
+    }
   });
 
   it('see children grow up, and their children born', () => {

@@ -12,5 +12,21 @@
     "immunityPerHour": 0.026,
     "contagious": 0.02,
     "seasons": ["Autumn", "Winter"]
+  },
+  "greyFlu": {
+    "label": "Grey flu",
+    "description": "A winter flu, catching and stronger than a cough: untended, it can kill, the old above all. Bed rest and a doctor see most through it.",
+    "severityPerHour": 0.042,
+    "immunityPerHour": 0.03,
+    "contagious": 0.03,
+    "seasons": ["Winter"]
+  },
+  "shakingSickness": {
+    "label": "Shaking sickness",
+    "description": "Comes with travellers and passes by touch: only those who tend or share a bed with the sick catch it. Deadly without a doctor.",
+    "severityPerHour": 0.05,
+    "immunityPerHour": 0.033,
+    "contagious": 0.08,
+    "range": 1
   }
 }

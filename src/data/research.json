@@ -133,8 +133,8 @@
     "key": "signalBeacon",
     "name": "Signal beacon",
     "cost": 3000,
-    "requires": ["electricity"],
-    "description": "Unlocks the signal beacon: transmit for five days and a ship may answer."
+    "requires": ["engineering"],
+    "description": "Unlocks the signal beacon: transmit for five days and a ship may answer. Needs engineering first."
   },
   {
     "key": "milling",
@@ -230,5 +230,131 @@
     "cost": 16000,
     "description": "Iron instruments and a steady hand: bad wounds are half as likely to leave a lasting mark.",
     "requires": ["herbalism", "smelting"]
+  },
+  {
+    "key": "steelmaking",
+    "name": "Steelmaking",
+    "cost": 18000,
+    "requires": ["smelting", "engineering"],
+    "building": "smelter",
+    "materials": [
+      {
+        "item": "iron",
+        "count": 40
+      }
+    ],
+    "description": "Steel edges on picks and axes: mining and chopping go a quarter faster."
+  },
+  {
+    "key": "glassmaking",
+    "name": "Glassmaking",
+    "cost": 16000,
+    "requires": ["pottery", "smelting"],
+    "building": "kiln",
+    "materials": [
+      {
+        "item": "stone",
+        "count": 60
+      }
+    ],
+    "description": "Glass panes in the roof: crops under a roof get daylight, so a warm greenhouse grows through winter."
+  },
+  {
+    "key": "doubleGlazing",
+    "name": "Double glazing",
+    "cost": 20000,
+    "requires": ["glassmaking", "insulation"],
+    "materials": [
+      {
+        "item": "bricks",
+        "count": 40
+      }
+    ],
+    "description": "Rooms hold their heat better still: they lose warmth half as fast again."
+  },
+  {
+    "key": "reinforcedWalls",
+    "name": "Reinforced walls",
+    "cost": 22000,
+    "requires": ["masonry", "tactics"],
+    "materials": [
+      {
+        "item": "stoneBlocks",
+        "count": 60
+      }
+    ],
+    "description": "Walls and doors take twice as many blows to break."
+  },
+  {
+    "key": "barbedTraps",
+    "name": "Barbed traps",
+    "cost": 12000,
+    "requires": ["traps", "smelting"],
+    "materials": [
+      {
+        "item": "iron",
+        "count": 20
+      }
+    ],
+    "description": "Spike traps wound half as badly again."
+  },
+  {
+    "key": "antiseptics",
+    "name": "Antiseptics",
+    "cost": 18000,
+    "requires": ["herbalism"],
+    "building": "hospitalBed",
+    "materials": [
+      {
+        "item": "herbalMedicine",
+        "count": 20
+      }
+    ],
+    "description": "Clean dressings: wounds are half as likely to go bad again."
+  },
+  {
+    "key": "plantBreeding",
+    "name": "Plant breeding",
+    "cost": 20000,
+    "requires": ["irrigation"],
+    "materials": [
+      {
+        "item": "potatoes",
+        "count": 120
+      }
+    ],
+    "description": "Seed kept from the best plants: harvests are a fifth bigger."
+  },
+  {
+    "key": "prosthetics",
+    "name": "Prosthetics",
+    "cost": 24000,
+    "requires": ["surgery", "steelmaking"],
+    "building": "craftingBench",
+    "materials": [
+      {
+        "item": "iron",
+        "count": 20
+      },
+      {
+        "item": "leather",
+        "count": 20
+      }
+    ],
+    "description": "Fitted limbs and lenses: lasting injuries cost half as much."
+  },
+  {
+    "key": "precisionTools",
+    "name": "Precision tools",
+    "cost": 26000,
+    "requires": ["steelmaking", "engineering"],
+    "building": "craftingBench",
+    "materials": [
+      {
+        "item": "iron",
+        "count": 30
+      }
+    ],
+    "description": "Fine files and gauges: everything crafted comes out a grade better."
   }
 ]

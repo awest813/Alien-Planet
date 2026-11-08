@@ -73,10 +73,11 @@ export function rollPart(sim: Simulation): BodyPart {
 export const scarsOf = (c: Colonist): Scar[] => c.health.scars ?? [];
 const count = (c: Colonist, kind: ScarKind) => scarsOf(c).filter((s) => s.kind === kind).length;
 
-// What lasting injuries do: walking and working pace, aim, and a little standing pain.
-export const scarMove = (c: Colonist): number => 0.85 ** count(c, 'limp');
-export const scarWork = (c: Colonist): number => 0.9 ** count(c, 'stiffHand');
-export const scarAim = (c: Colonist): number => -0.12 * count(c, 'lostEye');
+// What lasting injuries do: walking and working pace, aim, and a little standing pain. Fitted (prosthetics
+// research), a limp, a stiff hand or a lost eye costs half as much.
+export const scarMove = (c: Colonist, fitted = false): number => (fitted ? 0.925 : 0.85) ** count(c, 'limp');
+export const scarWork = (c: Colonist, fitted = false): number => (fitted ? 0.95 : 0.9) ** count(c, 'stiffHand');
+export const scarAim = (c: Colonist, fitted = false): number => (fitted ? -0.06 : -0.12) * count(c, 'lostEye');
 export const scarPain = (c: Colonist): number => 0.03 * count(c, 'scar');
 
 export const isInfected = (injury: Injury): boolean => (injury.infection ?? 0) > 0 && !injury.treated;
@@ -94,7 +95,8 @@ export function infectionStep(sim: Simulation, c: Colonist, injury: Injury, hour
   const open = injury.label === 'Cut' || injury.label === 'Arrow wound';
   if (open && (injury.infection ?? 0) === 0 && injury.severity >= INFECTION_MIN_SEVERITY) {
     const risk = injury.tended === 0 ? INFECTION_UNTENDED : injury.dirty ? INFECTION_DIRTY : INFECTION_CLEAN;
-    if (sim.rng.next() < risk * hours * (hospital ? 0.5 : 1) * (sim.isResearched('herbalism') ? 0.45 : 1)) {
+    const care = (sim.isResearched('herbalism') ? 0.45 : 1) * (sim.isResearched('antiseptics') ? 0.5 : 1);
+    if (sim.rng.next() < risk * hours * (hospital ? 0.5 : 1) * care) {
       injury.infection = 0.01;
       injury.treated = false;
       sim.stats.infections = (sim.stats.infections ?? 0) + 1;

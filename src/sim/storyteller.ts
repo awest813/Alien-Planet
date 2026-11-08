@@ -287,6 +287,51 @@ const EVENTS: EventDef[] = [
     },
   },
   {
+    // From the second winter, a stronger flu: one falls ill, and it spreads like the cough.
+    key: 'greyFlu',
+    minDay: 40,
+    cooldownDays: 16,
+    threat: true,
+    weight: (sim) => (sim.season === 'Winter' ? 0.6 : 0),
+    run: (sim) => {
+      const healthy = sim.living().filter((c) => !c.health.disease);
+      if (healthy.length < 2) {
+        return false;
+      }
+      const first = sim.rng.pick(healthy);
+      infect(sim, first, 'greyFlu');
+      sim.addLog(
+        `${first.name} has the grey flu. It's catching and can kill: keep the sick in bed, apart, and tended.`,
+        'danger',
+        true,
+      );
+      return true;
+    },
+  },
+  {
+    // Rarely, someone brings the shaking sickness back from the edge of the valley. It passes only by touch, so
+    // whoever nurses the sick is most at risk.
+    key: 'shakingSickness',
+    minDay: 50,
+    cooldownDays: 30,
+    threat: true,
+    weight: (sim) => (sim.living().length >= 4 ? 0.2 : 0),
+    run: (sim) => {
+      const healthy = sim.living().filter((c) => !c.health.disease);
+      if (healthy.length < 2) {
+        return false;
+      }
+      const first = sim.rng.pick(healthy);
+      infect(sim, first, 'shakingSickness');
+      sim.addLog(
+        `${first.name} has the shaking sickness, caught from travellers. It passes by touch and kills without a doctor: tend them, and keep everyone else away.`,
+        'danger',
+        true,
+      );
+      return true;
+    },
+  },
+  {
     key: 'disease',
     minDay: 3,
     cooldownDays: 5,

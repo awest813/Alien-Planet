@@ -499,6 +499,12 @@ export interface Stats {
   // Silver's worth of goods thieves got away with, and food lost to vermin.
   stolen?: number;
   verminLost?: number;
+  // For the Mastery goals: thieves brought down, raids seen off with nobody down, winter harvests, and the
+  // best quality anything has been crafted at.
+  thievesCaught?: number;
+  cleanDefences?: number;
+  winterHarvests?: number;
+  bestCraft?: number;
   alliesCame?: number;
   // Every death, by cause (the log only keeps the latest).
   deaths?: Record<string, number>;

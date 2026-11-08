@@ -556,6 +556,10 @@ export interface ResearchDef {
   cost: number;
   description: string;
   requires: string[];
+  // Late projects need a building standing to study at all (a smelter for steel), and use up materials from
+  // storage to finish.
+  building?: string;
+  materials?: { item: string; count: number }[];
 }
 
 export const RESEARCH: ResearchDef[] = researchJson.map((r) => ({ requires: [], ...r }));

@@ -575,7 +575,9 @@ export function ResearchScreen({ state, onClose }: { state: UiState; onClose: ()
               <div className="muted small">
                 {p.description}
                 {!p.available && !p.done && p.requires.length > 0 && ` Requires ${p.requires.join(', ')}.`}
+                {!p.done && p.needs && ` ${p.needs}`}
               </div>
+              {p.held && <div className="small warn-text">{p.held}</div>}
               {!p.done && <Bar value={p.progress} color="#8fc3ff" label={`${p.name} progress`} />}
             </li>
           ))}

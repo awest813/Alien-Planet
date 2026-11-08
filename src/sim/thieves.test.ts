@@ -54,6 +54,7 @@ describe('thieves', () => {
     thief.loot = { item: itemId('silver'), count: 100 };
     woundEnemy(sim, thief, 2, 'Juno');
     expect(thief.loot).toBeUndefined();
+    expect(sim.stats.thievesCaught).toBe(1);
     expect(total()).toBe(before + 100);
   });
 });

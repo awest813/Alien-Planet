@@ -29,6 +29,8 @@ interface DiseaseDef {
   contagious?: number;
   // The seasons it spreads in (none: all year).
   seasons?: string[];
+  // How close someone has to be to catch it (tiles; 1 is touch).
+  range?: number;
 }
 
 // After getting over an illness, how long someone can't catch it again.
@@ -52,7 +54,8 @@ export function spreadDisease(sim: Simulation): void {
         other !== sick &&
         !other.health.disease &&
         !immune(sim, other, sick.health.disease!.key) &&
-        sim.world.distance(sick.tile, other.tile) <= CONTAGION_RANGE &&
+        // (By touch: next to them, diagonals included.)
+        sim.world.distance(sick.tile, other.tile) <= (def!.range !== undefined ? def!.range + 0.5 : CONTAGION_RANGE) &&
         sim.rng.chance(chance)
       ) {
         infect(sim, other, sick.health.disease!.key);
@@ -263,10 +266,12 @@ export function updateHealth(sim: Simulation, c: Colonist, hours: number): void 
   if (h.disease) {
     const def = DISEASES[h.disease.key];
     const tended = h.disease.tendedUntil > sim.tick;
-    // A catching illness is hardest on the old and the very young.
-    const frail = def.contagious && (c.age >= ELDER || c.age < TODDLER * 2) ? 1.4 : 1;
+    // Any illness weighs on the old (more the older they are, and they throw it off more slowly); a catching
+    // one is hard on the very young too.
+    const old = c.age >= ELDER ? 1.3 + (c.age - ELDER) * 0.02 : 1;
+    const frail = Math.max(old, def.contagious && c.age < TODDLER * 2 ? 1.4 : 1);
     h.disease.severity += def.severityPerHour * (tended ? 0.45 : 1) * frail * hours;
-    h.disease.immunity += def.immunityPerHour * restBonus * hours;
+    h.disease.immunity += def.immunityPerHour * restBonus * (c.age >= ELDER ? 0.85 : 1) * hours;
     if (h.disease.immunity >= 1 && h.disease.severity < 1) {
       sim.addLog(`${c.name} has recovered from ${h.disease.label.toLowerCase()}.`, 'good');
       h.recovered = { key: h.disease.key, until: sim.tick + IMMUNE_DAYS * 24 * TICKS_PER_HOUR };
