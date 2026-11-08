@@ -1,3 +1,4 @@
+import { Biome, MapKind, biomeDef } from './biomes';
 import { NONE, featureId, terrainId } from './defs';
 import { computePassRegions } from './regions';
 import { fbm, hash2 } from './rng';
@@ -16,7 +17,14 @@ export interface GeneratedMap {
   spawn: number;
 }
 
-export function generateWorld(width: number, height: number, seed: number): GeneratedMap {
+export function generateWorld(
+  width: number,
+  height: number,
+  seed: number,
+  biome: Biome = 'temperate',
+  map: MapKind = 'valley',
+): GeneratedMap {
+  const land = biomeDef(biome).land;
   const world = new World(width, height);
   const elevation = new Float32Array(world.size);
   const moisture = new Float32Array(world.size);
@@ -50,27 +58,33 @@ export function generateWorld(width: number, height: number, seed: number): Gene
     const y = world.yOf(i);
     const e = elev[i];
     let t: number;
-    if (e < 0.06) {
+    if (e < land.deep) {
       t = DEEP;
-    } else if (e < 0.11) {
+    } else if (e < land.shallow) {
       t = SHALLOW;
-    } else if (e < 0.16) {
+    } else if (e < land.beach) {
       t = SAND;
-    } else if (rock[i] > 0.8) {
+    } else if (rock[i] > land.rock) {
       t = STONE;
       world.feature[i] = ROCK;
-    } else if (rock[i] > 0.76) {
+    } else if (rock[i] > land.stone) {
       t = STONE;
     } else {
-      t = moist[i] > 0.7 ? SOIL : GRASS;
+      t = moist[i] > land.soil ? SOIL : moist[i] < land.sand ? SAND : GRASS;
       const roll = hash2(x, y, seed + 31);
-      if (roll < Math.max(0, moist[i] - 0.35) * 0.55) {
+      if (roll < Math.max(0, moist[i] - land.treeFrom) * land.treeRate) {
         world.feature[i] = TREE;
-      } else if (roll > 0.982) {
+      } else if (roll > land.bushAbove) {
         world.feature[i] = BUSH;
       }
     }
     world.terrain[i] = t;
+  }
+
+  if (map === 'river') {
+    carveRiver(world, seed);
+  } else if (map === 'island') {
+    carveLake(world, seed);
   }
 
   // Spawn in the largest walkable region, as close to the map centre as possible.
@@ -179,6 +193,12 @@ export function generateWorld(width: number, height: number, seed: number): Gene
     }
   }
 
+  // Every start has timber and something to eat close by (in a desert, an oasis of sorts).
+  if (biome !== 'temperate' || map !== 'valley') {
+    ensureNear(world, spawn, TREE, MIN_TREES, 14, seed + 811);
+    ensureNear(world, spawn, BUSH, MIN_BUSHES, 16, seed + 823);
+  }
+
   // Clear a small landing area around the spawn point.
   for (let y = sy - 2; y <= sy + 2; y++) {
     for (let x = sx - 2; x <= sx + 2; x++) {
@@ -194,4 +214,118 @@ export function generateWorld(width: number, height: number, seed: number): Gene
 
   world.structureVersion++;
   return { world, spawn };
+}
+
+// A start has at least this many trees and berry bushes within reach of the landing.
+const MIN_TREES = 36;
+const MIN_BUSHES = 8;
+
+const growsHere = (world: World, i: number) =>
+  world.feature[i] === NONE &&
+  world.floor[i] === NONE &&
+  [terrainId('grass'), terrainId('soil'), terrainId('sand')].includes(world.terrain[i]);
+
+// Plants trees (or bushes) in clumps around `spawn` until there are `count` within `radius`, so
+// no biome or map starts a colony with nothing to build or eat. Away from the landing itself.
+function ensureNear(world: World, spawn: number, feature: number, count: number, radius: number, seed: number): void {
+  const sx = world.xOf(spawn);
+  const sy = world.yOf(spawn);
+  const near = (i: number) => Math.hypot(world.xOf(i) - sx, world.yOf(i) - sy);
+  let have = 0;
+  for (let i = 0; i < world.size; i++) {
+    if (world.feature[i] === feature && near(i) <= radius) {
+      have++;
+    }
+  }
+  // Clumps: a few centres around the landing, then the open ground nearest each.
+  for (let k = 0; k < 24 && have < count; k++) {
+    const angle = hash2(k, 1, seed) * Math.PI * 2;
+    const dist = 5 + hash2(k, 2, seed) * (radius - 7);
+    const cx = Math.round(sx + Math.cos(angle) * dist);
+    const cy = Math.round(sy + Math.sin(angle) * dist);
+    for (let r = 0; r <= 2 && have < count; r++) {
+      for (let y = cy - r; y <= cy + r && have < count; y++) {
+        for (let x = cx - r; x <= cx + r && have < count; x++) {
+          if (!world.inBounds(x, y)) {
+            continue;
+          }
+          const i = world.idx(x, y);
+          if (growsHere(world, i) && near(i) > 3 && near(i) <= radius && hash2(x, y, seed + k) < 0.7) {
+            world.feature[i] = feature;
+            have++;
+          }
+        }
+      }
+    }
+  }
+}
+
+// A deep river across the map, a little to one side of the middle, with sandy banks and a few shallow
+// fords where people (and raiders, and animals) can wade across. A bridge is quicker.
+function carveRiver(world: World, seed: number): void {
+  const DEEP = terrainId('deepWater');
+  const SHALLOW = terrainId('shallowWater');
+  const SAND = terrainId('sand');
+  // Running north to south, or west to east.
+  const across = hash2(seed, 3, seed + 17) < 0.5;
+  const length = across ? world.width : world.height;
+  const span = across ? world.height : world.width;
+  const side = hash2(seed, 5, seed + 17) < 0.5 ? -1 : 1;
+  const base = span / 2 + side * span * (0.14 + hash2(seed, 6, seed + 17) * 0.05);
+  const phase = hash2(seed, 7, seed + 17) * Math.PI * 2;
+  const bend = span * 0.05;
+  const fords = [0.2, 0.5, 0.8].map((f) => Math.round(length * (f + (hash2(seed, f * 10, seed + 19) - 0.5) * 0.1)));
+  for (let along = 0; along < length; along++) {
+    const centre = base + Math.sin((along / length) * Math.PI * 2 + phase) * bend + Math.sin(along * 0.37 + phase);
+    const ford = fords.some((f) => Math.abs(f - along) <= 1);
+    for (let off = 0; off < span; off++) {
+      const d = Math.abs(off + 0.5 - centre);
+      const i = across ? world.idx(along, off) : world.idx(off, along);
+      if (d <= 1.6 && !ford) {
+        world.terrain[i] = DEEP;
+      } else if (d <= 2.8) {
+        world.terrain[i] = SHALLOW;
+      } else if (d <= 3.8 && world.terrain[i] !== DEEP && world.terrain[i] !== SHALLOW) {
+        world.terrain[i] = SAND;
+      } else {
+        continue;
+      }
+      world.feature[i] = NONE;
+    }
+  }
+}
+
+// The colony lands on an island in a lake: a ring of deep water round the middle of the map, crossed
+// by two shallow fords. Little room to farm, lots of fish, and only two ways in.
+function carveLake(world: World, seed: number): void {
+  const DEEP = terrainId('deepWater');
+  const SHALLOW = terrainId('shallowWater');
+  const SAND = terrainId('sand');
+  const cx = world.width / 2;
+  const cy = world.height / 2;
+  const half = Math.min(world.width, world.height) / 2;
+  const fordAngle = hash2(seed, 9, seed + 29) * Math.PI * 2;
+  const fordAt = [fordAngle, fordAngle + Math.PI * (0.8 + hash2(seed, 10, seed + 29) * 0.4)];
+  for (let i = 0; i < world.size; i++) {
+    const dx = world.xOf(i) + 0.5 - cx;
+    const dy = world.yOf(i) + 0.5 - cy;
+    const angle = Math.atan2(dy, dx);
+    // The shores wander a little.
+    const r = Math.hypot(dx, dy) / half + (fbm(world.xOf(i), world.yOf(i), seed + 31337, 2, 0.12) - 0.5) * 0.12;
+    const ford = fordAt.some((a) => {
+      const gap = Math.abs(Math.atan2(Math.sin(angle - a), Math.cos(angle - a)));
+      return gap * Math.hypot(dx, dy) <= 1.5;
+    });
+    if (r < 0.4 || r > 0.7) {
+      continue;
+    }
+    if (r < 0.44 || r > 0.66) {
+      world.terrain[i] = world.terrain[i] === DEEP || world.terrain[i] === SHALLOW ? world.terrain[i] : SAND;
+    } else if (ford || r < 0.47 || r > 0.63) {
+      world.terrain[i] = SHALLOW;
+    } else {
+      world.terrain[i] = DEEP;
+    }
+    world.feature[i] = NONE;
+  }
 }

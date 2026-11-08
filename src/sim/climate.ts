@@ -1,3 +1,4 @@
+import { Biome, biomeDef } from './biomes';
 import { NONE, featureDef } from './defs';
 import { Rooms } from './regions';
 import { hash2 } from './rng';
@@ -14,13 +15,15 @@ export const COMFORT_MIN = 8;
 export const COMFORT_MAX = 32;
 export const CROP_MIN_TEMP = 5;
 
-// Daily cycle peaking mid-afternoon, plus a smooth day-to-day drift.
-export function outdoorTemperature(totalHours: number, seed: number): number {
+// Daily cycle peaking mid-afternoon, plus a smooth day-to-day drift. The biome sets how warm the
+// year runs, how hard the seasons swing and how cold the nights get.
+export function outdoorTemperature(totalHours: number, seed: number, biome?: Biome): number {
+  const climate = biomeDef(biome);
   const day = Math.floor(totalHours / 24);
   const t = (totalHours % 24) / 24;
   const drift = hash2(day, 0, seed) * (1 - t) + hash2(day + 1, 0, seed) * t;
   const daily = Math.sin((((totalHours % 24) - 9) / 24) * Math.PI * 2);
-  return 12 + daily * 8 + (drift - 0.5) * 6 + seasonalOffset(totalHours);
+  return 12 + daily * climate.daily + (drift - 0.5) * 6 + seasonalOffset(totalHours, climate.mean, climate.swing);
 }
 
 // Furniture-derived stats for one room.

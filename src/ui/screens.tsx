@@ -5,7 +5,7 @@ import { ChronicleKind } from '../sim/chronicle';
 import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey, WorldAction } from '../sim/types';
 import { Bar, SLOT_LABELS, WORK_LABELS, moodColor } from './common';
 import { ADULT, TEEN, TEEN_WORK } from '../sim/lifespans';
-import { Hours, POLICY_TEXT, Rations } from '../sim/village';
+import { Hours, Hunting, POLICY_TEXT, Rations } from '../sim/village';
 
 // Full-screen dialogs opened from the top bar.
 
@@ -966,7 +966,7 @@ function Expeditions({ state }: { state: UiState }) {
 // The colony's leader (chosen by vote each season) and the policies it lives by.
 export function VillageScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
   const v = state.village;
-  const set = (policy: { rations?: Rations; hours?: Hours; restDays?: boolean }) =>
+  const set = (policy: { rations?: Rations; hours?: Hours; restDays?: boolean; hunting?: Hunting }) =>
     controller.command({ type: 'policy', ...policy });
   const choice = <T extends string>(value: T, current: T, label: string, apply: () => void) => (
     <button key={value} className={value === current ? 'active' : ''} aria-pressed={value === current} onClick={apply}>
@@ -1020,6 +1020,12 @@ export function VillageScreen({ state, onClose }: { state: UiState; onClose: () 
         </span>
         <input type="checkbox" checked={v.restDays} onChange={(e) => set({ restDays: e.target.checked })} />
       </label>
+      <div className="muted small">Hunting</div>
+      <div className="row">
+        {choice('all', v.hunting, 'Hunt all', () => set({ hunting: 'all' }))}
+        {choice('surplus', v.hunting, 'Surplus only', () => set({ hunting: 'surplus' }))}
+      </div>
+      <p className="muted small">{POLICY_TEXT.hunting[v.hunting]}</p>
     </Modal>
   );
 }

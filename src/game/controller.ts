@@ -24,6 +24,7 @@ import {
   type ResearchDef,
 } from '../sim/defs';
 import { availableProjects, isAvailable } from '../sim/research';
+import type { Biome, MapKind } from '../sim/biomes';
 import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, seasonOf, yearOf } from '../sim/seasons';
 import { ChronicleKind } from '../sim/chronicle';
 import { animalName } from '../sim/animals';
@@ -40,7 +41,7 @@ import { DRAFT_AGE, ELDER, TEEN, backstoryOf, canWork, stageOf } from '../sim/li
 import { LEGEND } from '../sim/minds';
 import { PART_LABELS, SCAR_LABELS, isInfected, scarsOf } from '../sim/body';
 import { AILMENTS, ailmentsOf } from '../sim/ageing';
-import { Hours, Rations, tally } from '../sim/village';
+import { Hours, Hunting, Rations, tally } from '../sim/village';
 import {
   applyTrade,
   colonyStock,
@@ -348,7 +349,7 @@ export const TOOLS: ToolDef[] = [
     hotkey: 'v',
     tool: { kind: 'hunt' },
     group: 'orders',
-    hint: 'Drag over animals to hunt them for meat and leather (boars fight back)',
+    hint: 'Drag over animals to hunt them for meat and leather (boars fight back). The Village screen can keep a breeding pair of each kind',
   },
   {
     id: 'tame',
@@ -469,6 +470,20 @@ export const TOOLS: ToolDef[] = [
   build('brickFloor', 'Brick floor', '', 'floors', 'A warm-coloured floor of fired bricks (Pottery)'),
   build('carpet', 'Carpet', '', 'floors', 'The prettiest floor; woven from cloth'),
   build('bridge', 'Bridge', '', 'structure', 'Walkway over shallow or deep water'),
+  build(
+    'fence',
+    'Fence',
+    '',
+    'structure',
+    'Drag a rectangle outline to fence in a pen. Animals stay out (or in); people walk round or through a gate',
+  ),
+  build(
+    'gate',
+    'Gate',
+    '',
+    'structure',
+    'Put one in a fence: colonists walk through, animals do not. Tame animals go into the nearest pen and stay',
+  ),
   build('bed', 'Bed', 'e', 'furniture', 'Colonists sleep better in beds'),
   build('fineBed', 'Fine bed', '', 'furniture', 'Prettier, and colonists rest 25% faster'),
   build(
@@ -561,6 +576,13 @@ export const TOOLS: ToolDef[] = [
     '',
     'production',
     'Build on the shore; hunters fish here when food runs short and all winter',
+  ),
+  build(
+    'trough',
+    'Feeding trough',
+    '',
+    'production',
+    'Build on the edge of a pen; haulers fill it with potatoes, and fed animals in the pen breed in any season',
   ),
   build('icebox', 'Icebox', '', 'production', 'Food storage that keeps food fresh while powered (50 W)'),
   build('shelf', 'Shelf', '', 'production', 'Storage for three stacks of one kind of item on a single tile'),
@@ -959,6 +981,7 @@ export interface UiState {
     rations: Rations;
     hours: Hours;
     restDays: boolean;
+    hunting: Hunting;
   };
   raid: RaidView | null;
   hover: TileView | null;
@@ -1009,6 +1032,8 @@ export interface UiState {
   difficulty: Difficulty;
   // Tiles per side.
   mapSize: number;
+  // The land the colony started in.
+  biome: Biome;
 }
 
 const toolId = (tool: Tool): string =>
@@ -1502,13 +1527,19 @@ export class GameController {
   // Set by the UI while a full-screen menu is open, so game hotkeys don't act behind it.
   public modalOpen = false;
 
-  public newColony(seedText: string, difficulty: Difficulty = 'standard', size = MAP_SIZE): void {
+  public newColony(
+    seedText: string,
+    difficulty: Difficulty = 'standard',
+    size = MAP_SIZE,
+    biome: Biome = 'temperate',
+    map: MapKind = 'valley',
+  ): void {
     // Offer the same choices next time.
-    this.setSettings({ newDifficulty: difficulty, newMapSize: size });
+    this.setSettings({ newDifficulty: difficulty, newMapSize: size, newBiome: biome, newMap: map });
     const trimmed = seedText.trim();
     const seed =
       trimmed === '' ? Math.floor(Math.random() * 1e9) : /^\d+$/.test(trimmed) ? Number(trimmed) : hashSeed(trimmed);
-    this.replaceSim(Simulation.newColony(seed, difficulty, size));
+    this.replaceSim(Simulation.newColony(seed, difficulty, size, { biome, map }));
     this.inPlay = true;
     // The clock waits for the player: there's a deadline (the first nightfall), and reading the goals and
     // getting the first orders down shouldn't eat into it.
@@ -1636,6 +1667,7 @@ export class GameController {
           colonists: sim.living().length,
           difficulty: sim.story.difficulty,
           mapSize: sim.world.width,
+          biome: sim.biome,
         },
         serialize(sim),
       );
@@ -1968,6 +2000,7 @@ export class GameController {
       seed: sim.seed,
       difficulty: sim.story.difficulty,
       mapSize: sim.world.width,
+      biome: sim.biome,
     };
   }
 
@@ -2695,6 +2728,7 @@ export class GameController {
       rations: v.rations,
       hours: v.hours,
       restDays: v.restDays,
+      hunting: v.hunting ?? 'all',
     };
   }
 
@@ -2861,6 +2895,9 @@ export class GameController {
     }
     if (def?.flowers && sim.season === 'Winter') {
       details.push('Out of bloom until spring');
+    }
+    if (def?.feeds) {
+      details.push(`Feed ${Math.floor(w.fuel[i])}/${def.feeds.capacity} ${itemDef(def.feeds.item).name.toLowerCase()}`);
     }
     if (def?.burns) {
       const hours = Math.max(1, Math.round((w.fuel[i] / def.burns.perDay) * 24));

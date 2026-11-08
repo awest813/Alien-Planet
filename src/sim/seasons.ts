@@ -35,8 +35,9 @@ export function daysUntilWinter(totalHours: number): number {
   return day >= winterStart ? 0 : winterStart - day;
 }
 
-// Added to the daily temperature cycle: about +10°C in mid-summer, -10°C in mid-winter.
-export function seasonalOffset(totalHours: number): number {
+// Added to the daily temperature cycle: about +10°C in mid-summer, -10°C in mid-winter (a colder or
+// hotter biome moves the mean and widens or narrows the swing).
+export function seasonalOffset(totalHours: number, mean = 0, swing = SEASONAL_SWING): number {
   const angle = ((yearDayFraction(totalHours) - PEAK_YEAR_DAY) / DAYS_PER_YEAR) * Math.PI * 2;
-  return SEASONAL_MEAN + SEASONAL_SWING * Math.cos(angle);
+  return SEASONAL_MEAN + mean + swing * Math.cos(angle);
 }

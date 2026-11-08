@@ -933,6 +933,10 @@ button.brush.active {
   margin: 6px 0;
 }
 
+.difficulties.four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .difficulties button {
   display: flex;
   flex-direction: column;
@@ -1065,7 +1069,8 @@ button.brush.active {
     z-index: 5;
   }
 
-  .difficulties {
+  .difficulties,
+  .difficulties.four {
     grid-template-columns: 1fr;
   }
 }

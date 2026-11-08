@@ -38,7 +38,14 @@ import {
   type JoyKind,
   type JoySpec,
 } from './defs';
-import { animalName, animalsAtDawn, populateWildlife, updateAnimals } from './animals';
+import {
+  animalName,
+  animalsAtDawn,
+  keepBreedingPairs,
+  populateWildlife,
+  spareForBreeding,
+  updateAnimals,
+} from './animals';
 import {
   apparelScore,
   comfortRange,
@@ -119,6 +126,7 @@ import {
   coldSnapOn,
   colonyWealth,
   eclipseOn,
+  foodDays,
   freshStory,
   heatWaveOn,
   updateStoryteller,
@@ -223,6 +231,7 @@ import {
   zoneAccepts,
 } from './world';
 import { generateWorld } from './worldgen';
+import type { Biome, MapKind } from './biomes';
 
 export { MAP_SIZE, MAP_SIZES, NIGHT_END, NIGHT_START, START_HOUR, TICKS_PER_HOUR, populationFor } from './constants';
 const LOG_LIMIT = 60;
@@ -305,11 +314,16 @@ const IRRIGATION_YIELD = 1.25;
 // Steel tools (steelmaking) for miners and woodcutters; seed from the best plants (plant breeding).
 const STEEL_SPEED = 1.25;
 const BREEDING_YIELD = 1.2;
+// With no raids to cost it time and stores, a peaceful colony's food would only pile up: its fields give a
+// little less, so food stays something to plan for.
+const PEACEFUL_YIELD = 0.8;
 const PRESERVING_RATE = 2 / 3;
 // The first days, when colonists expect little.
 const LOW_EXPECTATION_DAYS = 12;
 const COLD_FOR_FIRES = 8;
 const FIREWOOD_RESERVE_DAYS = 3;
+// Haulers fill the animals' troughs only while the colony has this many days of food in store.
+const TROUGH_FOOD_DAYS = 3;
 // Wood the colonists land with.
 const SALVAGED_WOOD = 50;
 const CRAWL_RANGE = 25;
@@ -648,6 +662,8 @@ export class Simulation {
   // Finished sculptures by tile.
   public artworks = new Map<number, Artwork>();
   public story: StoryState = freshStory();
+  // The land the colony started in: its climate, weather and wildlife (see biomes.ts).
+  public biome: Biome = 'temperate';
   public enemies: Enemy[] = [];
   // Fighters a friendly faction sent to help against a raid (see combat.ts).
   public allies: Enemy[] = [];
@@ -796,8 +812,14 @@ export class Simulation {
     this.wasNight = this.isNight();
   }
 
-  public static newColony(seed: number, difficulty: Difficulty = 'standard', size = MAP_SIZE): Simulation {
-    const { world, spawn } = generateWorld(size, size, seed);
+  public static newColony(
+    seed: number,
+    difficulty: Difficulty = 'standard',
+    size = MAP_SIZE,
+    land: { biome?: Biome; map?: MapKind } = {},
+  ): Simulation {
+    const biome = land.biome ?? 'temperate';
+    const { world, spawn } = generateWorld(size, size, seed, biome, land.map);
     const rng = new Rng(seed ^ 0x9e3779b9);
     const names = [...COLONIST_NAMES];
     const colonists: Colonist[] = [];
@@ -822,6 +844,7 @@ export class Simulation {
     world.dropItemNear(spawn, itemId('wood'), SALVAGED_WOOD);
     const sim = new Simulation(world, colonists, seed, rng);
     sim.story = freshStory(difficulty);
+    sim.biome = biome;
     // Eight animals on the standard map, more on bigger ones.
     populateWildlife(sim, Math.round((8 * world.size) / (MAP_SIZE * MAP_SIZE)), spawn);
     sim.wildCover = wildPlantCover(sim);
@@ -956,7 +979,9 @@ export class Simulation {
     const coldSnap = coldSnapOn(this) ? 12 : 0;
     const heatWave = heatWaveOn(this) ? 10 : 0;
     const eclipse = eclipseOn(this) ? 3 : 0;
-    return outdoorTemperature(this.totalHours, this.seed) - coldSnap + heatWave - eclipse + weatherDef(this).temp;
+    return (
+      outdoorTemperature(this.totalHours, this.seed, this.biome) - coldSnap + heatWave - eclipse + weatherDef(this).temp
+    );
   }
 
   // Whether clouds or rain hide the sky (no aurora to see).
@@ -1250,6 +1275,12 @@ export class Simulation {
           this.village.restDays = cmd.restDays;
           updateRest(this);
         }
+        if (cmd.hunting) {
+          this.village.hunting = cmd.hunting;
+          if (cmd.hunting === 'surplus') {
+            keepBreedingPairs(this);
+          }
+        }
         break;
       case 'sellArt': {
         const why = sellArt(this, cmd.tile);
@@ -1369,6 +1400,9 @@ export class Simulation {
             // won't be tamed.
             a.taming = cmd.add && !a.tame && !a.quarry && a.kind !== 'greatBeast';
           }
+        }
+        if (cmd.type === 'hunt' && cmd.add) {
+          keepBreedingPairs(this);
         }
         break;
       }
@@ -1733,7 +1767,9 @@ export class Simulation {
         return job.stage === 1 ? `Carrying ${patient?.name} to safety` : `Rescuing ${patient?.name}`;
       }
       case 'refuel':
-        return 'Refuelling the generator';
+        return w.feature[job.target] !== NONE && featureDef(w.feature[job.target]).feeds
+          ? 'Filling the trough'
+          : 'Refuelling the generator';
       case 'fish':
         return 'Fishing';
       case 'extinguish':
@@ -4058,7 +4094,8 @@ export class Simulation {
         // (Irrigation's quarter more, as an extra unit a quarter of the time on small harvests.)
         const more =
           (this.isResearched('irrigation') ? crop.count * IRRIGATION_YIELD : crop.count) *
-          (this.isResearched('plantBreeding') ? BREEDING_YIELD : 1);
+          (this.isResearched('plantBreeding') ? BREEDING_YIELD : 1) *
+          (this.story.difficulty === 'peaceful' ? PEACEFUL_YIELD : 1);
         const yieldCount = Math.floor(more) + (more % 1 > 0 && this.rng.next() < more % 1 ? 1 : 0);
         w.dropItemNear(offField ?? t, crop.item, yieldCount);
         this.produce(crop.item, yieldCount);
@@ -4507,6 +4544,8 @@ export class Simulation {
           !!fuel &&
           // In the cold, the fires come first: a generator only gets wood they can spare.
           !(featureDef(w.feature[i]).power && fuel.item === WOOD && keepWood) &&
+          // And people eat before the animals do.
+          !(featureDef(w.feature[i]).feeds && foodDays(this) < TROUGH_FOOD_DAYS) &&
           w.fuel[i] < fuel.capacity * (urgentOnly ? 0.2 : 0.5) &&
           !this.isReserved(`f${i}`, c) &&
           this.hasWorkSpot(i, false, region)
@@ -6110,7 +6149,14 @@ export class Simulation {
     }
     const region = this.regionOf(c.tile);
     const prey = this.animals
-      .filter((a) => a.hunted && a.hp > 0 && this.regions.region[a.tile] === region && !this.isReserved(`h${a.id}`, c))
+      .filter(
+        (a) =>
+          a.hunted &&
+          a.hp > 0 &&
+          this.regions.region[a.tile] === region &&
+          !this.isReserved(`h${a.id}`, c) &&
+          !spareForBreeding(this, a),
+      )
       .sort((a, b) => w.distance(c.tile, a.tile) - w.distance(c.tile, b.tile))[0];
     if (!prey) {
       return false;
@@ -6123,7 +6169,8 @@ export class Simulation {
   private stepHunt(c: Colonist, job: Job): void {
     const w = this.world;
     const prey = this.animals.find((a) => a.id === job.patient);
-    if (!prey || prey.hp <= 0 || !prey.hunted) {
+    // (Another hunter's kill may have left it one of the last pair.)
+    if (!prey || prey.hp <= 0 || !prey.hunted || spareForBreeding(this, prey)) {
       this.endJob(c);
       return;
     }
