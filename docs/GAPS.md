@@ -42,7 +42,8 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   Standard colony that never builds cover loses most from day 37. Raiders leave the downed alone, so few die.
   - Close it by sizing raids to the colony's fighters rather than a flat cap, or with more allies on Harsh.
 - **Most downed raiders are left to die** (125 fell wounded in twelve 48-day colonies, 10 were taken prisoner).
-  Capture is manual and prisoner beds are few; a "capture all downed" order or an automatic warden would help.
+  The test colony marks them all for capture but builds a single prisoner bed, so this mostly says the harness
+  should build more; in play, an alert already walks the player through Capture, a bed and a warden.
 
 ## 3. The late game is too safe
 
