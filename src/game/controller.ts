@@ -1039,14 +1039,29 @@ export class GameController {
       });
     }
     const weather = sim.weather.kind;
+    // Fights within view since the last frame (each shot heard once).
+    const inView = (i: number) =>
+      w.xOf(i) >= view.x0 && w.xOf(i) <= view.x1 && w.yOf(i) >= view.y0 && w.yOf(i) <= view.y1;
+    // (A save loaded from earlier in time starts the count again.)
+    if (this.heardShotsTo > sim.tick) {
+      this.heardShotsTo = sim.tick - 1;
+    }
+    const shots = sim.shots
+      .filter((s) => s.tick > this.heardShotsTo && (inView(s.from) || inView(s.to)))
+      .map((s) => ({ ranged: s.ranged, hit: s.hit }));
+    this.heardShotsTo = sim.tick;
     return {
       musicians,
       paused: this.speedIndex === 0 || !this.inPlay,
       night: sim.isNight(),
       rain: weather === 'rain' || weather === 'storm',
       storm: weather === 'storm',
+      cold: sim.outdoorTemperature() < 2,
+      shots,
     };
   }
+  // The last tick whose shots have been heard.
+  private heardShotsTo = 0;
 
   private autosave(): void {
     if (this.inPlay && this.settings.autosave && this.sim.living().length > 0) {
@@ -1121,7 +1136,13 @@ export class GameController {
         sound.alert('raid');
       } else if (event === 'death') {
         sound.alert('death');
-      } else if (event === 'goal' || event === 'concert') {
+      } else if (
+        event === 'goal' ||
+        event === 'concert' ||
+        event === 'fire' ||
+        event === 'collapse' ||
+        event === 'birth'
+      ) {
         sound.alert(event);
       } else if (event === 'shipAnswered') {
         sound.alert('goal');

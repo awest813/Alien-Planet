@@ -1,7 +1,12 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 
 export default defineConfig({
   base: '',
+  test: {
+    // Not the copies of the project that agents work in (.claude/worktrees).
+    exclude: ['**/node_modules/**', '**/dist/**', '.claude/**'],
+  },
   server: {
     host: '0.0.0.0',
     port: 3000,

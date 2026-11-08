@@ -19,9 +19,15 @@ export interface SoundScene {
   night: boolean;
   rain: boolean;
   storm: boolean;
+  // Hard cold: the birds and crickets fall quiet and the wind picks up.
+  cold: boolean;
+  // Bowshots and blows landing within view since the last frame (a few at most are heard).
+  shots: { ranged: boolean; hit: boolean }[];
 }
 
-export type Alert = 'raid' | 'death' | 'goal' | 'concert';
+export type Alert = 'raid' | 'death' | 'goal' | 'concert' | 'fire' | 'collapse' | 'birth';
+// At most this many fight sounds a second, however big the battle.
+const FIGHT_SOUNDS_PER_SECOND = 8;
 
 // Whether sound is on: callers can skip gathering what it needs when it isn't.
 export const soundEnabled = (): boolean => sound.isEnabled();
@@ -122,6 +128,8 @@ class Sound {
     }, 250);
   }
 
+  // When the last fight sounds were played (to keep a battle from becoming a roar).
+  private fightSounds: number[] = [];
   private wakeArmed = false;
   private hidden = false;
   private sleepTimer: ReturnType<typeof setTimeout> | undefined;
@@ -186,7 +194,7 @@ class Sound {
       return;
     }
     const now = ctx.currentTime;
-    const wind = scene.storm ? 0.22 : scene.rain ? 0.1 : 0.05;
+    const wind = scene.storm ? 0.22 : scene.rain ? 0.1 : scene.cold ? 0.09 : 0.05;
     const rain = scene.storm ? 0.12 : scene.rain ? 0.07 : 0;
     if (wind !== this.windLevel || rain !== this.rainLevel) {
       this.windLevel = wind;
@@ -196,8 +204,18 @@ class Sound {
     }
     if (!scene.paused && now >= this.nextCall) {
       this.nextCall = now + 2 + Math.random() * 6;
-      if (!scene.rain) {
+      if (!scene.rain && !scene.cold) {
         this.call(scene.night);
+      }
+    }
+    if (!scene.paused) {
+      for (const shot of scene.shots) {
+        if (this.fightSounds.filter((t) => t > now - 1).length >= FIGHT_SOUNDS_PER_SECOND) {
+          break;
+        }
+        this.fightSounds = this.fightSounds.filter((t) => t > now - 1);
+        this.fightSounds.push(now);
+        this.fight(shot.ranged, shot.hit, now + Math.random() * 0.04);
       }
     }
     const here = new Set<number>();
@@ -309,6 +327,37 @@ class Sound {
     osc.stop(end);
   }
 
+  // A bowshot (a short twang, and a thump if it lands) or a blow (a dull thud).
+  private fight(ranged: boolean, hit: boolean, when: number): void {
+    const ctx = this.ctx!;
+    if (ranged) {
+      const string = ctx.createOscillator();
+      string.type = 'triangle';
+      string.frequency.setValueAtTime(330, when);
+      string.frequency.exponentialRampToValueAtTime(180, when + 0.12);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.05, when);
+      gain.gain.exponentialRampToValueAtTime(0.001, when + 0.14);
+      string.connect(gain).connect(this.effectsBus!);
+      string.start(when);
+      string.stop(when + 0.16);
+    }
+    if (hit || !ranged) {
+      const at = ranged ? when + 0.12 : when;
+      const thud = ctx.createBufferSource();
+      thud.buffer = this.noise;
+      const tone = ctx.createBiquadFilter();
+      tone.type = 'lowpass';
+      tone.frequency.value = hit ? 500 : 300;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(hit ? 0.09 : 0.04, at);
+      gain.gain.exponentialRampToValueAtTime(0.001, at + 0.09);
+      thud.connect(tone).connect(gain).connect(this.effectsBus!);
+      thud.start(at, Math.random());
+      thud.stop(at + 0.1);
+    }
+  }
+
   // A bird by day, a cricket by night, somewhere off in the distance.
   private call(night: boolean): void {
     const ctx = this.ctx!;
@@ -354,6 +403,12 @@ class Sound {
       // A rising chime.
       goal: { pitches: [72, 76, 79], step: 0.09, type: 'triangle', length: 0.5 },
       concert: { pitches: [67, 72], step: 0.15, type: 'sine', length: 0.6 },
+      // A bell rung quickly.
+      fire: { pitches: [84, 84, 84], step: 0.18, type: 'square', length: 0.16 },
+      // A single falling note.
+      collapse: { pitches: [60, 55], step: 0.12, type: 'triangle', length: 0.45 },
+      // Two soft notes rising.
+      birth: { pitches: [67, 74], step: 0.22, type: 'sine', length: 0.8 },
     };
     const cue = tones[kind];
     cue.pitches.forEach((pitch, k) => {
@@ -363,7 +418,7 @@ class Sound {
       osc.frequency.value = frequency(pitch);
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.frequency.value = kind === 'raid' ? 900 : 4000;
+      filter.frequency.value = kind === 'raid' ? 900 : kind === 'fire' ? 2600 : 4000;
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0, start);
       gain.gain.linearRampToValueAtTime(0.16, start + 0.02);

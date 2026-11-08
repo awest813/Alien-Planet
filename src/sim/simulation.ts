@@ -274,6 +274,20 @@ const ENCLOSURE_FIRST = 15;
 const OBJECTIVE_TICKS = 40;
 // Reservation keys that name a tile (`w<tile>` for work, `i<tile>` for items, and so on); `t` and `h` take ids.
 const TILE_KEYS = new Set([...'iwbdxsljfc'].map((ch) => ch.charCodeAt(0)));
+// The tile in a key like `i1234`, read in place (this runs for every candidate in every search, and slicing
+// out a new string each time adds up). NaN when the rest isn't all digits (an id key such as `fd12`).
+function keyTile(key: string): number {
+  let n = 0;
+  for (let k = 1; k < key.length; k++) {
+    const d = key.charCodeAt(k) - 48;
+    if (d < 0 || d > 9) {
+      return NaN;
+    }
+    n = n * 10 + d;
+  }
+  return key.length > 1 ? n : NaN;
+}
+
 // Undrafted colonists keep this far from a siege camp, except to bring in, tend or feed the hurt (and eat).
 const SIEGE_DANGER = 14;
 const SIEGE_EXEMPT = new Set<string>(['shelter', 'rescue', 'tend', 'feed', 'eat', 'wander']);
@@ -374,7 +388,8 @@ export type SimEvent =
   | 'concert'
   | 'gathering'
   | 'shipAnswered'
-  | 'shipLanded';
+  | 'shipLanded'
+  | 'birth';
 
 // A notable moment in the colony's history, for the story screen.
 export interface StoryEntry {
@@ -960,6 +975,15 @@ export class Simulation {
   // ---- Main loop ----
 
   public step(): void {
+    this.stepping = true;
+    try {
+      this.stepOnce();
+    } finally {
+      this.stepping = false;
+    }
+  }
+
+  private stepOnce(): void {
     this.tick++;
     // The interface drains these each frame; with nobody listening (tests, balance runs) keep
     // only the latest few.
@@ -1494,7 +1518,23 @@ export class Simulation {
     return n;
   }
 
+  // Counted once a tick while the colony steps (stock checks come many times a tick: is there wood for the
+  // fires, is a bill's target met); between ticks, for the interface, always counted afresh.
+  private totalsCache: { tick: number; totals: { item: number; stored: number; total: number }[] } | null = null;
+  private stepping = false;
+
   public resourceTotals(): { item: number; stored: number; total: number }[] {
+    if (this.stepping && this.totalsCache?.tick === this.tick) {
+      return this.totalsCache.totals;
+    }
+    const totals = this.countTotals();
+    if (this.stepping) {
+      this.totalsCache = { tick: this.tick, totals };
+    }
+    return totals;
+  }
+
+  private countTotals(): { item: number; stored: number; total: number }[] {
     const w = this.world;
     const totals = ITEMS.map((item) => ({ item: item.id, stored: 0, total: 0 }));
     for (const i of w.tilesWith('items')) {
@@ -2459,11 +2499,18 @@ export class Simulation {
 
   private isReserved(key: string, c: Colonist): boolean {
     // Forbidden items count as taken: every search for an item checks its `i<tile>` key.
-    if (key.charCodeAt(0) === 105 && this.world.forbidden[Number(key.slice(1))] === 1) {
+    if (key.charCodeAt(0) === 105 && this.world.forbidden[keyTile(key)] === 1) {
       return true;
     }
     // So does anything within reach of a siege camp, for anyone not drafted to fight.
-    if (!c.drafted && TILE_KEYS.has(key.charCodeAt(0)) && this.nearSiegeCamp(Number(key.slice(1)))) {
+    // (Checked first that a siege is on at all: this runs for every candidate in every search.)
+    if (
+      this.raid?.siege &&
+      !this.raid.siege.attacking &&
+      !c.drafted &&
+      TILE_KEYS.has(key.charCodeAt(0)) &&
+      this.nearSiegeCamp(keyTile(key))
+    ) {
       return true;
     }
     const owner = this.reservations.get(key);

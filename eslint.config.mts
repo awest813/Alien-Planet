@@ -7,7 +7,7 @@ import { defineConfig } from 'eslint/config';
 
 export default defineConfig([
   {
-    ignores: ['.output/', 'android/', 'build/', 'dist/', 'ios/'],
+    ignores: ['.output/', '.claude/', 'android/', 'build/', 'dist/', 'ios/'],
   },
   {
     files: ['**/*.{js,mjs,cjs,ts,mts,cts}'],

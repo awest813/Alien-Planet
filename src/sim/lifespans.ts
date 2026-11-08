@@ -210,6 +210,7 @@ function birth(sim: Simulation, carrier: Colonist): void {
   sim.stats.births = (sim.stats.births ?? 0) + 1;
   const names = parents.map((p) => sim.colonists[p].name).join(' and ');
   sim.addLog(`${infant.name} is born to ${names}.`, 'good', true);
+  sim.events.push('birth');
   for (const c of sim.living()) {
     sim.addThought(c, parents.includes(c.id) ? 'newParent' : 'newbornInColony');
   }
