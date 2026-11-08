@@ -486,5 +486,129 @@
     "label": "We slew the great beast",
     "mood": 8,
     "hours": 120
+  },
+  "argued": {
+    "label": "Had an argument",
+    "mood": -4,
+    "hours": 12
+  },
+  "fistfight": {
+    "label": "Got into a fight",
+    "mood": -6,
+    "hours": 24
+  },
+  "separated": {
+    "label": "Our marriage is over",
+    "mood": -12,
+    "hours": 168
+  },
+  "parentsSeparated": {
+    "label": "My parents split up",
+    "mood": -8,
+    "hours": 120
+  },
+  "parentsSeparatedGrown": {
+    "label": "My parents split up",
+    "mood": -3,
+    "hours": 48
+  },
+  "parentDied": {
+    "label": "Lost a parent",
+    "mood": -14,
+    "hours": 144
+  },
+  "siblingDied": {
+    "label": "Lost a brother or sister",
+    "mood": -10,
+    "hours": 120
+  },
+  "kinDied": {
+    "label": "Lost one of the family",
+    "mood": -6,
+    "hours": 96
+  },
+  "stiffJoints": {
+    "label": "Stiff joints",
+    "mood": -2
+  },
+  "soreBack": {
+    "label": "Sore back",
+    "mood": -3
+  },
+  "dimEyes": {
+    "label": "Failing eyes",
+    "mood": -2
+  },
+  "frailty": {
+    "label": "Frail with age",
+    "mood": -4
+  },
+  "retired": {
+    "label": "Enjoying retirement",
+    "mood": 4
+  },
+  "caredFor": {
+    "label": "Looked after in old age",
+    "mood": 3,
+    "hours": 12
+  },
+  "leftToFend": {
+    "label": "Left to fend for myself",
+    "mood": -5,
+    "hours": 12
+  },
+  "lookedAfterElder": {
+    "label": "Looked after an elder",
+    "mood": 2,
+    "hours": 8
+  },
+  "leaderNoRoom": {
+    "label": "A leader without a room of their own",
+    "mood": -6,
+    "hours": 12
+  },
+  "leaderPlainRoom": {
+    "label": "A plain room for a leader",
+    "mood": -3,
+    "hours": 12
+  },
+  "elderNoRoom": {
+    "label": "No room of my own at my age",
+    "mood": -4,
+    "hours": 12
+  },
+  "weightOfOffice": {
+    "label": "The weight of leading",
+    "mood": -3
+  },
+  "taughtLesson": {
+    "label": "Taught the children",
+    "mood": 3,
+    "hours": 12
+  },
+  "hadLesson": {
+    "label": "Learned something at lessons",
+    "mood": 2,
+    "hours": 8
+  },
+  "playedTogether": {
+    "label": "Played with the other children",
+    "mood": 3,
+    "hours": 8
+  },
+  "hardChildhood": {
+    "label": "Remembers a hard childhood",
+    "mood": -3,
+    "hours": 1440
+  },
+  "happyChildhood": {
+    "label": "Remembers a happy childhood",
+    "mood": 3,
+    "hours": 1440
+  },
+  "jealous": {
+    "label": "Jealous",
+    "mood": -5,
+    "hours": 24
   }
 }

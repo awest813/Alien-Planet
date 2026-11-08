@@ -351,6 +351,7 @@ function play(seed: number): Result {
   let shipsLanded = 0;
   let bannerPlaced = false;
   let labTile = -1;
+  let lessonBoardPlaced = false;
   let telescopePlaced = false;
   let fishingPlaced = false;
   let chopRadius = 15;
@@ -637,6 +638,15 @@ function play(seed: number): Result {
       if (spot) {
         claim(avoid, sim, spot.x, spot.y, 1, 1);
         sim.apply({ type: 'build', feature: featureId('telescope'), tiles: [at(spot.x, spot.y)] });
+      }
+    }
+    // A lesson board once there are children about.
+    if (!lessonBoardPlaced && sim.living().some((c) => c.age < 13)) {
+      lessonBoardPlaced = true;
+      const spot = findSite(sim, 1, 1, avoid);
+      if (spot) {
+        claim(avoid, sim, spot.x, spot.y, 1, 1);
+        sim.apply({ type: 'build', feature: featureId('lessonBoard'), tiles: [at(spot.x, spot.y)] });
       }
     }
     // A drying rack on day 3, so meat and fish keep without power.

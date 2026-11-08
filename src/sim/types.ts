@@ -31,6 +31,7 @@ export type JobType =
   | 'clean'
   | 'capture'
   | 'warden'
+  | 'lesson'
   | 'wander';
 
 export interface Job {
@@ -221,6 +222,24 @@ export interface Colonist {
   practicedAt: Partial<Record<SkillKey, number>>;
   // Recreation had lately, by kind (in needs filled; it fades day by day).
   recentJoy: Partial<Record<JoyKind, number>>;
+  // Family life over the years (all missing in older saves). The day a married couple's troubles began
+  // (they may part if it lasts), and who someone was married to before they separated.
+  strainedSince?: number;
+  separatedFrom?: number;
+  // Stepped back from heavy work in old age (see ageing.ts).
+  retired?: boolean;
+  // Hard and happy hours of a childhood, counted until they come of age (see school.ts).
+  childhood?: { hard: number; happy: number };
+  // Losses still grieved, and remembered on their anniversaries (see grief.ts).
+  grief?: Grief[];
+}
+
+export interface Grief {
+  // Who died, as they were known, the day they died, and how close they were (1: a friend, 3: a spouse or child).
+  id: number;
+  name: string;
+  day: number;
+  weight: number;
 }
 
 export type Stance = 'cover' | 'hold' | 'charge';
@@ -302,6 +321,8 @@ export interface Disease {
   tendedUntil: number;
 }
 
+export type AilmentKey = 'stiffJoints' | 'soreBack' | 'dimEyes' | 'frailty';
+
 export interface Health {
   injuries: Injury[];
   bloodLoss: number;
@@ -316,6 +337,8 @@ export interface Health {
   heatstroke: number;
   // Hours of food poisoning left.
   poisoned: number;
+  // The aches of old age (see ageing.ts); missing in older saves.
+  ailments?: AilmentKey[];
   // Lasting marks of old wounds (see body.ts).
   scars?: {
     part: 'torso' | 'arm' | 'leg' | 'hand' | 'head' | 'eye';
@@ -429,6 +452,8 @@ export type Command =
   | { type: 'draft'; colonist: number; drafted: boolean }
   | { type: 'move'; colonist: number; tile: number }
   | { type: 'stance'; colonist: number; stance: Stance }
+  // Let an elder retire from heavy work (or send them back to it).
+  | { type: 'retire'; colonist: number; retired: boolean }
   // Concentrate fire on a raider (-1 to stop); colonist -1 means every drafted colonist.
   | { type: 'focus'; colonist: number; enemy: number }
   | { type: 'hunt'; rect: Rect; add: boolean }
@@ -512,6 +537,12 @@ export interface Stats {
   weddings?: number;
   funerals?: number;
   memorials?: number;
+  // Family troubles: arguments, fistfights and marriages that ended.
+  arguments?: number;
+  fights?: number;
+  separations?: number;
+  // Lessons held for the children.
+  lessons?: number;
   // Sculptures finished, and the best quality reached (0–20).
   sculptures?: number;
   bestArt?: number;

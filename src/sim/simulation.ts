@@ -105,7 +105,11 @@ import {
   traitValue,
   updateSocial,
   fadeOpinions,
+  checkMarriages,
 } from './social';
+import { griefThoughts, updateGrief } from './grief';
+import { ageThoughts, needsCare, setRetired } from './ageing';
+import { stepLesson, tryLesson, trySeekPlaymate, updateChildhood, updatePlay, updateSchool } from './school';
 import {
   Difficulty,
   StoryState,
@@ -173,6 +177,7 @@ import {
   updateRest,
   updateVillage,
   villageThoughts,
+  bedroomExpectation,
 } from './village';
 import { updateGreatBeast } from './beast';
 import { ChronicleEntry, addToChronicle, chronicleKind, chronicleText } from './chronicle';
@@ -578,6 +583,7 @@ const FIRE_INTERRUPTS = new Set<JobType>([
   'tame',
   'clean',
   'warden',
+  'lesson',
   'wander',
 ]);
 
@@ -997,6 +1003,9 @@ export class Simulation {
       updateBeacon(this);
       updateCaptives(this);
       updateLifespans(this);
+      updateSchool(this);
+      updatePlay(this);
+      updateChildhood(this);
       updateObsession(this);
       updateVillage(this);
       spreadDisease(this);
@@ -1305,6 +1314,13 @@ export class Simulation {
         }
         break;
       }
+      case 'retire': {
+        const c = this.colonists[cmd.colonist];
+        if (c && !c.health.dead) {
+          setRetired(this, c, cmd.retired);
+        }
+        break;
+      }
       case 'stance': {
         const c = this.colonists[cmd.colonist];
         if (c) {
@@ -1522,7 +1538,7 @@ export class Simulation {
       label: THOUGHTS[key].label,
       mood: THOUGHTS[key].mood,
     }));
-    return [...traits, ...thoughts];
+    return [...traits, ...thoughts, ...griefThoughts(this, c)];
   }
 
   public inMentalBreak(c: Colonist): boolean {
@@ -1613,6 +1629,8 @@ export class Simulation {
         return this.isIndoors(c.tile) ? 'Sleeping' : 'Sleeping outside';
       case 'wander':
         return 'Wandering';
+      case 'lesson':
+        return job.line === 1 ? 'Teaching the children' : 'At lessons';
       case 'tend': {
         const patient = this.colonists[job.patient];
         if (job.stage === 0) {
@@ -2176,6 +2194,8 @@ export class Simulation {
       fadeRecentJoy(c);
     }
     fadeOpinions(this);
+    checkMarriages(this);
+    updateGrief(this);
     for (const c of this.colonists) {
       // Only colonists who were around for a good part of the night count (not late arrivals).
       if (c.nightTicks > TICKS_PER_HOUR * 2 && c.exposedTicks > c.nightTicks * 0.5) {
@@ -2391,6 +2411,7 @@ export class Simulation {
       keys.push('inPain');
     }
     keys.push(...socialThoughts(this, c));
+    keys.push(...ageThoughts(c));
     return keys;
   }
 
@@ -2830,7 +2851,12 @@ export class Simulation {
     if ((h.hypothermia > 0.5 || h.heatstroke > 0.5) && this.tryWarmUp(c)) {
       return;
     }
-    if (((food < rationsEatBelow(this.village) && slot !== 'W') || food < 0.15) && this.tryEat(c)) {
+    // The frail wait for their meals to be brought, and only fetch their own when nobody has.
+    const cared = needsCare(c);
+    if (((food < rationsEatBelow(this.village) && slot !== 'W' && !cared) || food < 0.15) && this.tryEat(c)) {
+      if (cared) {
+        this.addThought(c, 'leftToFend');
+      }
       return;
     }
     if ((h.hypothermia > 0.3 || h.heatstroke > 0.3) && this.tryWarmUp(c)) {
@@ -2858,6 +2884,10 @@ export class Simulation {
     if (slot === 'J' && restDay(this) && this.tryEssentialWork(c)) {
       return;
     }
+    // School in the morning: children to their lessons, and the teacher to teach them.
+    if (slot !== 'J' && tryLesson(this, c)) {
+      return;
+    }
     if ((slot === 'J' || (slot === 'A' && c.needs.joy < 0.3)) && c.needs.joy < 0.95 && this.tryJoy(c)) {
       return;
     }
@@ -2869,7 +2899,21 @@ export class Simulation {
     if (slot !== 'J' && this.tryWorkByPriority(c)) {
       return;
     }
+    // A child at a loose end goes to find the others to play with.
+    if (trySeekPlaymate(this, c)) {
+      return;
+    }
     this.startWander(c);
+  }
+
+  // For modules: sends a colonist to the nearest reachable tile of `goals` to do a job there.
+  public sendTo(c: Colonist, type: JobType, goals: number[], extra: Partial<Job> = {}): boolean {
+    const path = goals.length > 0 ? this.pathfinder.find(c.tile, goals) : null;
+    if (!path) {
+      return false;
+    }
+    this.assign(c, this.makeJob(type, path.length > 0 ? path[path.length - 1] : c.tile, extra), path);
+    return true;
   }
 
   private tryEssentialWork(c: Colonist): boolean {
@@ -3061,6 +3105,9 @@ export class Simulation {
         break;
       case 'fish':
         this.stepFish(c, job);
+        break;
+      case 'lesson':
+        stepLesson(this, c);
         break;
       case 'wander':
         // A rage ends with something broken.
@@ -6404,7 +6451,7 @@ export class Simulation {
     return this.living().some(
       (p) =>
         p !== c &&
-        p.health.downed &&
+        needsCare(p) &&
         p.needs.food < STARVING_PATIENT &&
         !this.isReserved(`fd${p.id}`, c) &&
         this.regions.region[p.tile] === region,
@@ -7039,7 +7086,7 @@ export class Simulation {
     const patient = this.living().find(
       (p) =>
         p !== c &&
-        p.health.downed &&
+        needsCare(p) &&
         p.needs.food < below &&
         !this.isReserved(`fd${p.id}`, c) &&
         this.regions.region[p.tile] === region,
@@ -7068,7 +7115,7 @@ export class Simulation {
   private stepFeed(c: Colonist, job: Job): void {
     const w = this.world;
     const patient = this.colonists[job.patient];
-    if (!patient || patient.health.dead || !patient.health.downed) {
+    if (!patient || patient.health.dead || !needsCare(patient)) {
       this.endJob(c);
       return;
     }
@@ -7103,6 +7150,11 @@ export class Simulation {
       patient.needs.food = Math.min(1, patient.needs.food + itemDef(meal.item).nutrition * meal.count);
       c.carrying = null;
       this.addLog(`${c.name} fed ${patient.name}.`);
+      // Bringing an elder their meal is a kindness, and felt as one.
+      if (!patient.health.downed) {
+        this.addThought(patient, 'caredFor');
+        this.addThought(c, 'lookedAfterElder');
+      }
     }
     this.endJob(c);
   }
@@ -7134,15 +7186,24 @@ export class Simulation {
     if (c.restCold > c.restTicks / 2) {
       this.addThought(c, 'sleptInCold');
     }
-    if (w.feature[c.tile] === NONE || !featureDef(w.feature[c.tile]).bed) {
+    const inBed = w.feature[c.tile] !== NONE && !!featureDef(w.feature[c.tile]).bed;
+    const room = inBed ? this.roomAt(c.tile) : undefined;
+    if (!inBed) {
       this.addThought(c, 'sleptOnGround');
-    } else {
-      const room = this.roomAt(c.tile);
-      if (room?.enclosed && room.beds > 1) {
-        this.addThought(c, 'sharedBedroom');
-      } else if (room?.enclosed && room.impressiveness >= NICE_ROOM) {
-        this.addThought(c, 'niceBedroom');
-      }
+    } else if (room?.enclosed && room.beds > 1) {
+      this.addThought(c, 'sharedBedroom');
+    } else if (room?.enclosed && room.impressiveness >= NICE_ROOM) {
+      this.addThought(c, 'niceBedroom');
+    }
+    // The leader and the old expect a room of their own (the leader, a nice one).
+    const expected = bedroomExpectation(
+      this,
+      c,
+      !!room?.enclosed && room.beds <= 1,
+      !!room?.enclosed && room.impressiveness >= NICE_ROOM,
+    );
+    if (expected) {
+      this.addThought(c, expected);
     }
   }
 
