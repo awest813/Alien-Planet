@@ -4,6 +4,9 @@
 // stuck for a day, and a save that loads into exactly the same game.
 //
 //   npx tsx scripts/playtest.ts [days=16] [from=0] [to=100] [only=persona] [players=3,40]
+//   npm run playtest:long [-- from=0 to=100]   (120 days, players 40–49: each persona once, Standard, Medium)
+//
+// A later argument wins over an earlier one, so the npm script's defaults can be overridden.
 //
 // To look into one colony, set in the environment: TRACE=day (colonists hour by hour from that day),
 // BUILD=1 (buildings, wood and fires each noon), WHERE=day (where everyone sleeps, and the beds and door),
@@ -24,14 +27,14 @@ import { driedFrom, fuelOf, itemDef, itemId } from '../src/sim/defs';
 const itemDefName = (i: number) => itemDef(i).key;
 
 const arg = (name: string, fallback: number) =>
-  Number(process.argv.find((a) => a.startsWith(`${name}=`))?.slice(name.length + 1) ?? fallback);
+  Number(process.argv.findLast((a) => a.startsWith(`${name}=`))?.slice(name.length + 1) ?? fallback);
 const DAYS = arg('days', 16);
 const FROM = arg('from', 0);
 const TO = arg('to', 100);
-const ONLY = process.argv.find((a) => a.startsWith('only='))?.slice(5);
+const ONLY = process.argv.findLast((a) => a.startsWith('only='))?.slice(5);
 // "players=3,20,40" plays just those.
 const PLAYERS = process.argv
-  .find((a) => a.startsWith('players='))
+  .findLast((a) => a.startsWith('players='))
   ?.slice(8)
   .split(',')
   .map(Number);
@@ -926,4 +929,8 @@ console.log(
 );
 for (const [k, n] of [...all].sort((a, b) => b[1] - a[1])) {
   console.log(`  ${n} player(s): ${k}`);
+}
+// A crash or a broken rule fails the run (so a scheduled job can flag it); colonies lost don't.
+if (crashed.length > 0 || all.size > 0) {
+  process.exitCode = 1;
 }

@@ -7,6 +7,7 @@
     "build": "vite build",
     "test": "vitest run --testTimeout=30000",
     "test:e2e": "playwright test",
+    "playtest:long": "rolldown scripts/playtest.ts --platform node --format esm --log-level warn --file node_modules/.cache/scripts/playtest.mjs && node node_modules/.cache/scripts/playtest.mjs days=120 from=40 to=50",
     "generate-logo:android": "npx @capacitor/assets generate --android",
     "generate-logo:ios": "npx @capacitor/assets generate --ios",
     "deploy:android": "npm run generate-logo:android && npm run build && cap run android",
