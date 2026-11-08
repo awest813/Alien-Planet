@@ -19,8 +19,9 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   feasts, parkas, recruiting. After that there's no direction.
   - Close it with later goal phases (generations, legends, a great work), or goals that come from the story,
     such as "survive the siege" or "raise a child to adulthood".
-- **Silver has one real use** (partly closed: hiring the Meadow Kin's fighters, 12 days at tribute prices). With
-  the test colony hiring whenever it can spare the silver, year-10 silver is 1,300–3,400, from 7,000–9,000.
+- **Silver still piles up, more slowly** (partly closed: hiring the Meadow Kin's fighters, 12 days at tribute
+  prices, about 920 silver a year kept up). With the test colony hiring whenever it can spare the silver, year-10
+  silver is 1,300–7,700 across four runs (from 7,000–9,000): income is still a little ahead of it.
   - More sinks would help: commissions from neighbours, buying a colonist, ransoming prisoners back, paid
     caravans or expeditions, buildings that cost silver.
 - **Wealth grows from about 8k to 40–54k and changes little.** Raids now gain up to 4 raiders above 15k, but

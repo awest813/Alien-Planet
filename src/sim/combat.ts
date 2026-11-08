@@ -44,6 +44,8 @@ export interface SiegeState {
   attackAt: number;
   dugIn?: boolean;
   attacking?: boolean;
+  // What they put up (taken down when the siege is over, so it never counts as the colony's).
+  built?: number[];
 }
 
 // Raiders this close to a colonist have arrived; the raid's time limit runs from then.
@@ -726,6 +728,7 @@ export function updateEnemies(sim: Simulation): void {
   sim.enemies = sim.enemies.filter((e) => e.hp > 0);
   if (raid && sim.enemies.length === 0) {
     sim.raid = null;
+    takeDownCamp(sim, raid);
     sim.rebuildAfterRaid();
     const standing = sim.living().filter((c) => !c.health.downed);
     // Every raider fell without the raid breaking first: that's a win too.
@@ -972,17 +975,19 @@ export function maybeSendAllies(sim: Simulation): void {
   if (!raid || friend < 0) {
     return;
   }
+  // Against a siege they come for the attack, not to storm the camp alone.
+  const from = raid.siege && !raid.siege.attacking ? Math.max(sim.tick, raid.siege.attackAt) : sim.tick;
   // Hired, they come for sure, within the hour, and in strength.
   if (fightersHired(sim)) {
     raid.allies = Math.max(3, Math.min(5, Math.round(raid.initial / 2)));
-    raid.alliesAt = sim.tick + TICKS_PER_HOUR;
+    raid.alliesAt = from + TICKS_PER_HOUR;
     return;
   }
   if (sim.rng.next() >= allyChance(goodwillOf(sim, friend))) {
     return;
   }
   raid.allies = Math.max(2, Math.min(4, Math.round(raid.initial / 3)));
-  raid.alliesAt = sim.tick + sim.rng.int(1, 3) * TICKS_PER_HOUR;
+  raid.alliesAt = from + sim.rng.int(1, 3) * TICKS_PER_HOUR;
 }
 
 function alliesArrive(sim: Simulation, count: number): void {
@@ -1191,11 +1196,31 @@ function setupSiege(sim: Simulation, from: number): boolean {
   if (home === undefined) {
     return false;
   }
+  // Clear of anything the colony has built (six tiles round each building), its zones, floors and rooms.
+  const near = new Uint8Array(w.size);
+  for (const f of w.tilesWith('features')) {
+    if (featureDef(w.feature[f]).natural || featureDef(w.feature[f]).crop) {
+      continue;
+    }
+    for (let dy = -6; dy <= 6; dy++) {
+      for (let dx = -6; dx <= 6; dx++) {
+        const x = w.xOf(f) + dx;
+        const y = w.yOf(f) + dy;
+        if (w.inBounds(x, y)) {
+          near[w.idx(x, y)] = 1;
+        }
+      }
+    }
+  }
   const open = (i: number) =>
     w.isPassable(i) &&
     w.feature[i] === NONE &&
     w.blueprint[i] === NONE &&
+    w.zone[i] === 0 &&
+    w.floor[i] === NONE &&
+    near[i] === 0 &&
     !w.tilesWith('items').has(i) &&
+    !sim.isIndoors(i) &&
     sim.regionOf(i) === region;
   const pick = ([lo, hi]: [number, number]) =>
     sim.nearest(from, (i) => open(i) && w.distance(i, home) >= lo && w.distance(i, home) <= hi, 1)[0];
@@ -1205,9 +1230,12 @@ function setupSiege(sim: Simulation, from: number): boolean {
   }
   // Round the fire (the camp's centre is the fire itself).
   const posts = sim.nearest(camp, (i) => i !== camp && open(i) && chebyshev(w, i, camp) <= 1, raid.initial);
+  if (posts.length === 0) {
+    return false;
+  }
   raid.siege = {
     camp,
-    posts: posts.length > 0 ? posts : [camp],
+    posts,
     attackAt: sim.tick + sim.rng.int(SIEGE_HOURS[0], SIEGE_HOURS[1]) * TICKS_PER_HOUR,
   };
   return true;
@@ -1232,8 +1260,10 @@ function digIn(sim: Simulation, siege: SiegeState): void {
     )
     .sort((a, b) => w.distance(a, home) - w.distance(b, home))
     .slice(0, CAMP_SANDBAGS);
+  siege.built = [];
   for (const i of ring) {
     w.setFeature(i, featureId('sandbags'));
+    siege.built.push(i);
   }
   // (Not on anything dropped there since, or anyone standing in it.)
   const occupied =
@@ -1244,6 +1274,7 @@ function digIn(sim: Simulation, siege: SiegeState): void {
     w.setFeature(siege.camp, featureId('campfire'));
     w.fuel[siege.camp] = 10;
     sim.fuelVersion++;
+    siege.built.push(siege.camp);
   }
   sim.addLog('The siege party has made camp and dug in behind sandbags.', 'warn');
 }
@@ -1257,16 +1288,17 @@ function siegeTurn(sim: Simulation, e: Enemy, siege: SiegeState): boolean {
   if (weapon.range <= 1 && colonists.some((c) => chebyshev(w, c.tile, e.tile) <= CAMP_CHARGE)) {
     return false;
   }
+  // At camp once within two tiles of the fire (or as close as they can get).
   const post = siege.posts[e.id % siege.posts.length];
-  if (e.tile !== post && chebyshev(w, e.tile, siege.camp) > 1) {
+  if (chebyshev(w, e.tile, siege.camp) > 2) {
     if (e.path.length === 0 || e.repathAt <= sim.tick) {
       e.repathAt = sim.tick + 60;
       e.path = sim.pathfinder.find(e.tile, [post, ...w.neighbors(post).filter((n) => w.isPassable(n))]) ?? [];
     }
     if (e.path.length > 0) {
       moveEnemy(sim, e);
+      return true;
     }
-    return true;
   }
   e.path = [];
   e.moveProgress = 0;
@@ -1295,6 +1327,21 @@ function updateSiege(sim: Simulation, raid: RaidState): void {
     raid.arrivedTick = sim.tick;
     sim.addLog('The siege party is breaking camp and attacking! Draft your colonists.', 'danger', true);
     sim.events.push('raidNear');
+  }
+}
+
+// When the siege is over, its camp goes with it (it was never the colony's).
+function takeDownCamp(sim: Simulation, raid: RaidState): void {
+  const w = sim.world;
+  for (const i of raid.siege?.built ?? []) {
+    const f = w.feature[i];
+    if (f === featureId('sandbags') || f === featureId('campfire')) {
+      w.setFeature(i, NONE);
+      w.fuel[i] = 0;
+    }
+  }
+  if (raid.siege?.built?.length) {
+    sim.fuelVersion++;
   }
 }
 

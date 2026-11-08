@@ -273,8 +273,9 @@ const ENCLOSURE_FIRST = 15;
 const OBJECTIVE_TICKS = 40;
 // Reservation keys that name a tile (`w<tile>` for work, `i<tile>` for items, and so on); `t` and `h` take ids.
 const TILE_KEYS = new Set([...'iwbdxsljfc'].map((ch) => ch.charCodeAt(0)));
-// Undrafted colonists keep this far from a siege camp.
+// Undrafted colonists keep this far from a siege camp, except to bring in, tend or feed the hurt (and eat).
 const SIEGE_DANGER = 14;
+const SIEGE_EXEMPT = new Set<string>(['shelter', 'rescue', 'tend', 'feed', 'eat', 'wander']);
 // What the later research does.
 const MASONRY_SPEED = 1.2;
 const IRRIGATION_YIELD = 1.25;
@@ -936,8 +937,10 @@ export class Simulation {
       let sx = 0;
       let sy = 0;
       let n = 0;
+      // (Not a siege party's camp.)
+      const camp = new Set(this.raid?.siege?.built ?? []);
       for (const i of w.tilesWith('features')) {
-        if (!featureDef(w.feature[i]).natural && !featureDef(w.feature[i]).crop) {
+        if (!featureDef(w.feature[i]).natural && !featureDef(w.feature[i]).crop && !camp.has(i)) {
           sx += w.xOf(i);
           sy += w.yOf(i);
           n++;
@@ -2448,6 +2451,22 @@ export class Simulation {
     return owner !== undefined && owner !== c.id;
   }
 
+  // Out of reach of the siege camp: to the nearest tile clear of it.
+  private leaveSiegeZone(c: Colonist): boolean {
+    const region = this.regionOf(c.tile);
+    const spot = this.nearest(
+      c.tile,
+      (i) => this.world.isPassable(i) && this.regionOf(i) === region && !this.nearSiegeCamp(i),
+      1,
+    )[0];
+    const path = spot === undefined ? null : this.pathfinder.find(c.tile, [spot]);
+    if (!path || spot === undefined) {
+      return false;
+    }
+    this.assign(c, this.makeJob('wander', spot), path);
+    return true;
+  }
+
   // Within bowshot (and a little more) of a siege party waiting in its camp.
   public nearSiegeCamp(tile: number): boolean {
     const siege = besieging(this);
@@ -2565,11 +2584,13 @@ export class Simulation {
     } else if (
       this.tick % SLOW_TICKS === 0 &&
       c.job &&
-      c.job.type !== 'shelter' &&
+      !SIEGE_EXEMPT.has(c.job.type) &&
       (this.nearSiegeCamp(c.job.target) || this.nearSiegeCamp(c.path[c.path.length - 1] ?? -1))
     ) {
-      // Work that would take them within reach of a siege camp waits.
+      // Work that would take them within reach of a siege camp waits (not bringing in or tending the hurt).
       this.endJob(c);
+    } else if (this.tick % SLOW_TICKS === 0 && !c.job && this.nearSiegeCamp(c.tile) && this.leaveSiegeZone(c)) {
+      // Caught within reach of the camp with nothing to do: get clear.
     } else if (this.inMentalBreak(c)) {
       const allowed = c.job && ['wander', 'warmUp', 'shelter', ...(c.breakKind === 'binge' ? ['eat'] : [])];
       if (c.job && !allowed!.includes(c.job.type)) {
@@ -7327,7 +7348,11 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'sandbags',
     label: 'Research fortifications and build sandbags',
     phase: 4,
-    check: (s) => s.countFeature((f) => FEATURES[f - 1].key === 'sandbags') > 0,
+    // (The colony's own: not a siege party's.)
+    check: (s) =>
+      [...s.world.tilesWith('features')].some(
+        (i) => FEATURES[s.world.feature[i] - 1].key === 'sandbags' && !s.raid?.siege?.built?.includes(i),
+      ),
   },
   {
     id: 'winter',

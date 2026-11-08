@@ -833,7 +833,7 @@ function play(seed: number): Result {
   const story = fullStories.get(sim) ?? [];
   const count = (re: RegExp) => story.filter((s) => re.test(s)).length;
   const events: Record<string, number> = {
-    raid: count(/^Raid!/),
+    raid: count(/^(Raid|Siege)!/),
     disease: count(/came down with/),
     wanderer: count(/asked to join/),
     coldSnap: count(/cold snap/),

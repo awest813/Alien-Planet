@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { besieging } from './combat';
-import { featureId } from './defs';
+import { damage } from './health';
+import { FACTIONS, featureId, itemId } from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation, TICKS_PER_HOUR } from './simulation';
 import { triggerEvent } from './storyteller';
@@ -108,5 +109,98 @@ describe('sieges', () => {
       sim.step();
     }
     expect(trees.every((i) => w.feature[i] === featureId('tree') && w.progress[i] === 0)).toBe(true);
+  });
+
+  it('reach their camp and dig in, whichever way they come', () => {
+    for (const seed of [11, 12, 13, 14, 15, 16]) {
+      const { sim, keepWell } = colony(seed);
+      triggerEvent(sim, 'siege');
+      const siege = besieging(sim)!;
+      for (let t = 0; t < 8 * TICKS_PER_HOUR && besieging(sim); t++) {
+        keepWell();
+        sim.step();
+      }
+      expect(siege.dugIn).toBe(true);
+      for (const e of sim.enemies.filter((r) => r.hp > 0 && !r.fleeing)) {
+        expect(
+          Math.max(
+            Math.abs(sim.world.xOf(e.tile) - sim.world.xOf(siege.camp)),
+            Math.abs(sim.world.yOf(e.tile) - sim.world.yOf(siege.camp)),
+          ),
+        ).toBeLessThanOrEqual(2);
+      }
+    }
+  });
+
+  it("leave nothing behind that counts as the colony's", () => {
+    const { sim, keepWell } = colony(14);
+    triggerEvent(sim, 'siege');
+    const siege = besieging(sim)!;
+    for (let t = 0; t < 8 * TICKS_PER_HOUR && !siege.dugIn; t++) {
+      keepWell();
+      sim.step();
+    }
+    expect(siege.built!.length).toBeGreaterThan(0);
+    // Not even the sandbag goal.
+    expect(sim.objectivesDone.sandbags ?? false).toBe(false);
+    for (const e of sim.enemies) {
+      e.fleeing = true;
+      e.hp = 0;
+    }
+    sim.step();
+    expect(sim.raid).toBeNull();
+    expect(siege.built!.every((i) => sim.world.feature[i] === 0)).toBe(true);
+  });
+
+  it('bring allies for the attack, not to storm the camp', () => {
+    const { sim } = colony(15);
+    sim.diplomacy.fightersUntil = sim.tick + 1000 * TICKS_PER_HOUR;
+    triggerEvent(sim, 'siege');
+    const siege = besieging(sim)!;
+    expect(sim.raid!.alliesAt).toBeGreaterThan(siege.attackAt);
+  });
+
+  it('let colonists bring in and tend the hurt near the camp', () => {
+    const { sim, keepWell } = colony(16);
+    triggerEvent(sim, 'siege');
+    const siege = besieging(sim)!;
+    const w = sim.world;
+    const hurt = sim.colonists[1];
+    hurt.tile = sim.nearest(siege.camp, (i) => w.isPassable(i) && w.distance(i, siege.camp) >= 10, 1)[0];
+    hurt.path = [];
+    hurt.job = null;
+    damage(sim, hurt, 0.9, 'cut');
+    expect(hurt.health.downed).toBe(true);
+    // The others start well clear of the camp, so whoever helps has to walk into its reach.
+    const clear = sim.nearest(siege.camp, (i) => w.isPassable(i) && w.distance(i, siege.camp) >= 18, 1)[0];
+    for (const c of sim.colonists) {
+      if (c !== hurt) {
+        c.tile = clear;
+        c.path = [];
+        c.job = null;
+      }
+    }
+    // Fed where they lie, so they don't crawl off for food and stay within reach of the camp.
+    hurt.needs.food = 1;
+    const tended = () => hurt.health.injuries.every((x) => x.tended > 0);
+    for (let t = 0; t < 8 * TICKS_PER_HOUR && !tended(); t++) {
+      keepWell();
+      sim.step();
+    }
+    expect(tended()).toBe(true);
+  });
+});
+
+describe('hiring in the thick of it', () => {
+  it('brings the fighters to the raid already on', () => {
+    const { sim } = colony(17);
+    triggerEvent(sim, 'raid');
+    expect(sim.raid!.allies).toBeUndefined();
+    const kin = FACTIONS.findIndex((f) => !f.hostile);
+    sim.goodwill[kin] = 80;
+    sim.world.dropItemNear(sim.colonists[0].tile, itemId('silver'), 2000);
+    sim.apply({ type: 'zone', rect: { x0: 0, y0: 0, x1: sim.world.width - 1, y1: sim.world.height - 1 }, zone: 1 });
+    sim.apply({ type: 'hireFighters', faction: kin });
+    expect(sim.raid!.allies).toBeGreaterThanOrEqual(3);
   });
 });

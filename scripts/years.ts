@@ -66,7 +66,7 @@ function snapshot(sim: Simulation): string {
 const original = Simulation.prototype.addLog;
 Simulation.prototype.addLog = function (this: Simulation, text: string, ...rest: unknown[]) {
   const t = tally(this);
-  if (/^Raid!/.test(text)) {
+  if (/^(Raid|Siege)!/.test(text)) {
     t.raids++;
   }
   if (text.includes('has had enough')) {

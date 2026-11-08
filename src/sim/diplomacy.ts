@@ -1,4 +1,5 @@
 import { addQuarry, maxHp } from './animals';
+import { maybeSendAllies } from './combat';
 import { TICKS_PER_HOUR, populationFor } from './constants';
 import { FACTIONS, itemDef, itemId, quantity, weaponDef } from './defs';
 import type { Simulation } from './simulation';
@@ -324,6 +325,10 @@ export function hireFighters(sim: Simulation, faction: number): string | null {
   const d = sim.diplomacy;
   d.fightersUntil = Math.max(d.fightersUntil ?? 0, sim.tick) + HIRE_DAYS * DAY;
   sim.stats.hired = (sim.stats.hired ?? 0) + 1;
+  // Hired in the thick of it: they come to this raid too.
+  if (sim.raid && !sim.raid.outcome && sim.raid.allies === undefined && sim.allies.length === 0) {
+    maybeSendAllies(sim);
+  }
   sim.addLog(
     `The colony paid ${f.name} ${cost} silver: their fighters will come to every raid for the next ${HIRE_DAYS} days.`,
     'good',
