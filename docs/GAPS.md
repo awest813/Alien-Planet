@@ -20,9 +20,9 @@ with esbuild for speed (see ROADMAP).
   (masterwork crafts, winter greenhouses, all research).
 - **A walled, armed colony still rarely loses anyone to raids.** Deaths in ten-year Standard runs now come from
   disease (the shaking sickness and grey flu, 1–2 a decade) rather than raids.
-- **Mood is lower but breaks come in bursts.** The late yearly average is about 47–52 (from 52–56), but most breaks
-  come around a death: a grieving colonist can break several times in a few days because the break cooldown is
-  short. Separations are rare (one in six ten-year runs).
+- **Separations are rare** (one in six ten-year runs). Mood is lower late (yearly average about 47–52, from
+  52–56); breaks no longer come in bursts after a death (no new break within a day of the last: seed 7919 went
+  from 9 breaks in ten years to 2, mean mood 48.8).
 - **Elders barely appear in ten years** (founders are 18–53), so ailments, care and retirement show little in the
   usual runs; care is meals only.
 - **Some dealings are thin:** there's no execute action (so that can't harden raiders); envoys and returning
@@ -31,7 +31,9 @@ with esbuild for speed (see ROADMAP).
   ends at 100 in some runs.
 - **The desert is the hardest land:** heat waves at the height of summer can kill several colonists before they
   get shelter. It may want gentler tuning.
-- **Pens:** troughs take only potatoes, and there's no warning for a fence with no gate or a pen too big.
+- **Pens:** troughs take only potatoes. (Fences that make no pen, and pens with no trough, now get an alert.)
+- **Tundra is hard on a slow start:** trees are scarce, and a farming-first colony that hasn't finished its hut
+  by the first cold can be lost (one of four sensible tundra colonies in a 36-day sample, on day 18).
 - **Drawing zoomed right out on a slow machine:** with 4× CPU throttling a desktop window showing the whole Large
   map takes about 28–31 ms a frame (phones about 14–16 ms). The feature layer (about 9 ms) can't use the GPU
   layer, and rebuilding the interface's state costs about 8 ms each time it's published (5 times a second), of

@@ -59,6 +59,21 @@ describe('alerts', () => {
     expect(reachBlueprint()).toBe(false);
   });
 
+  it('say when fences make no pen yet, and when a pen has no trough', () => {
+    const { w, x, y } = colony('3');
+    const fenceAlert = () => texts().some((t) => t.startsWith("The fences don't make a pen yet"));
+    const troughAlert = () => texts().some((t) => t.startsWith('A pen has no feeding trough'));
+    for (const i of outline(w, x + 2, y + 2, x + 7, y + 6)) {
+      w.setFeature(i, featureId('fence'));
+    }
+    expect(fenceAlert()).toBe(true);
+    w.setFeature(w.idx(x + 4, y + 6), featureId('gate'));
+    expect(fenceAlert()).toBe(false);
+    expect(troughAlert()).toBe(true);
+    w.setFeature(w.idx(x + 5, y + 4), featureId('trough'));
+    expect(troughAlert()).toBe(false);
+  });
+
   it('warn plainly when winter is coming and there is nowhere warm', () => {
     const { sim, w, x, y } = colony('2');
     // A few days before winter.

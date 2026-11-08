@@ -2544,7 +2544,10 @@ export class Simulation {
       this.addThought(c, 'recoveredFromBreak');
       this.addLog(`${c.name} has calmed down.`, 'info');
     }
-    c.lowMoodTicks = c.mood < BREAK_THRESHOLD ? c.lowMoodTicks + SLOW_TICKS : 0;
+    // (Not again within a day of the last: having let it all out, they hold together a while, however bad things
+    // are. Grief stacked on grief had them breaking again and again within days.)
+    const spent = c.thoughts.some((t) => t.key === 'recoveredFromBreak');
+    c.lowMoodTicks = c.mood < BREAK_THRESHOLD && !spent ? c.lowMoodTicks + SLOW_TICKS : 0;
     if (c.lowMoodTicks > TICKS_PER_HOUR * 2 && this.rng.next() < 0.05) {
       c.lowMoodTicks = 0;
       this.startBreak(c, chooseBreak(this, c), this.rng.int(3, 5));

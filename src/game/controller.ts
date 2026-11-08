@@ -41,6 +41,7 @@ import { DRAFT_AGE, ELDER, TEEN, backstoryOf, canWork, stageOf } from '../sim/li
 import { LEGEND } from '../sim/minds';
 import { PART_LABELS, SCAR_LABELS, isInfected, scarsOf } from '../sim/body';
 import { AILMENTS, ailmentsOf } from '../sim/ageing';
+import { MAX_PEN, penMap } from '../sim/pens';
 import { Hours, Hunting, Rations, tally } from '../sim/village';
 import {
   applyTrade,
@@ -2409,6 +2410,23 @@ export class GameController {
             colonist: c.id,
           });
         }
+      }
+    }
+    // Fences that don't make a pen yet, and pens with nothing to eat from.
+    const fences = sim.countFeature((f) => featureDef(f).key === 'fence');
+    if (fences >= 8) {
+      const { pens } = penMap(sim);
+      if (pens.length === 0) {
+        alerts.push({
+          text: `The fences don't make a pen yet: it needs a gate, and must be closed all round (no more than ${MAX_PEN} tiles, not touching the map edge).`,
+          tone: 'warn',
+        });
+      } else if (pens.some((pen) => pen.troughs.length === 0)) {
+        alerts.push({
+          text: 'A pen has no feeding trough: penned animals breed only in spring and summer without one.',
+          tone: 'warn',
+          tile: pens.find((pen) => pen.troughs.length === 0)!.tiles[0],
+        });
       }
     }
     // Shelves, iceboxes and drying racks are storage too.
