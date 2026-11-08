@@ -104,8 +104,9 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 - **There is a colonist overview** (closed: the ☰ at the end of the colonist bar).
 - **Phone polish is basic in places** (partly closed: full-width cards, the goals drawer below the top bar, Work
   and Schedule tables that scroll on their own with names kept in view, painting the schedule by finger, moving
-  drafted colonists by tap). There's no long-press to stand in for right-click on the Work grid, tap targets
-  are small (speed buttons 34×22), and a phone on its side leaves little map between the bars.
+  drafted colonists by tap, larger buttons on touch screens). The Work grid's right-click (priority down) has
+  no touch stand-in on iPhones, where a long press doesn't send one; tapping cycles through all the priorities
+  instead.
 
 ## 8. Graphics
 
@@ -125,8 +126,9 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 - **Performance is checked by hand** with `scripts/perf.ts` (Large map, 46–52 ms per 1,000 ticks against a 60 ms
   budget; it exits non-zero over budget). It's too noisy for CI. Goal checks, run every 40 ticks for quick
   feedback, had pushed it to 66 ms; now only the open phase's goals are checked that often. A busy Large
-  colony (13 colonists, 800 items) runs 36–85 ms per 1,000 ticks over 70 days; pathfinding, the reservation
-  check and room measuring are most of it.
+  colony (13 colonists, 800 items) runs 40–72 ms per 1,000 ticks over 70 days; days 50–70 are down from 64–85
+  (item searches no longer build a key per item, and ice coming and going no longer redoes the rooms); pathfinding is most of the
+  rest.
 - **Playtest personas never reach late content in 16 days.** No deep mining, breaches, elders or generations.
   Run some players for 120+ days regularly (`days=120 players=...`).
 - **The balance harness plays one way.** It hunts everything, gifts silver daily, never sets policies or pays

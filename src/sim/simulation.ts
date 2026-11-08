@@ -2557,14 +2557,46 @@ export class Simulation {
 
   private reserve(c: Colonist, key: string): void {
     this.reservations.set(key, c.id);
+    this.mirrorItem(key, c.id);
     c.reserved.push(key);
   }
 
   private release(c: Colonist, key: string): void {
     if (this.reservations.get(key) === c.id) {
       this.reservations.delete(key);
+      this.mirrorItem(key, -1);
     }
     c.reserved = c.reserved.filter((k) => k !== key);
+  }
+
+  // Item reservations (`i<tile>`) are kept by tile as well, so a search over every item needn't build a
+  // key for each one.
+  private readonly itemOwners = new Map<number, number>();
+  private mirrorItem(key: string, owner: number): void {
+    if (key.charCodeAt(0) !== 105) {
+      return;
+    }
+    const tile = keyTile(key);
+    if (Number.isNaN(tile)) {
+      return;
+    }
+    if (owner < 0) {
+      this.itemOwners.delete(tile);
+    } else {
+      this.itemOwners.set(tile, owner);
+    }
+  }
+
+  // isReserved(`i${tile}`, c), without the key: forbidden, by a siege camp, or someone else's.
+  private itemTaken(tile: number, c: Colonist): boolean {
+    if (this.world.forbidden[tile] === 1) {
+      return true;
+    }
+    if (this.raid?.siege && !this.raid.siege.attacking && !c.drafted && this.nearSiegeCamp(tile)) {
+      return true;
+    }
+    const owner = this.itemOwners.get(tile);
+    return owner !== undefined && owner !== c.id;
   }
 
   public endJob(c: Colonist): void {
@@ -2579,6 +2611,7 @@ export class Simulation {
     for (const key of c.reserved) {
       if (this.reservations.get(key) === c.id) {
         this.reservations.delete(key);
+        this.mirrorItem(key, -1);
       }
     }
     c.reserved = [];
@@ -3892,7 +3925,7 @@ export class Simulation {
     const kit = this.nearestIn(
       'items',
       c.tile,
-      (i) => w.itemType[i] === TOOL_KIT && this.regions.region[i] === region && !this.isReserved(`i${i}`, c),
+      (i) => w.itemType[i] === TOOL_KIT && this.regions.region[i] === region && !this.itemTaken(i, c),
       1,
     )[0];
     const path = kit !== undefined ? this.pathfinder.find(c.tile, [kit]) : null;
@@ -4127,7 +4160,7 @@ export class Simulation {
             this.nearestIn(
               'items',
               c.tile,
-              (i) => w.itemType[i] === need.item && !this.isReserved(`i${i}`, c) && this.regions.region[i] === region,
+              (i) => w.itemType[i] === need.item && !this.itemTaken(i, c) && this.regions.region[i] === region,
               1,
             )[0],
           );
@@ -4326,7 +4359,7 @@ export class Simulation {
         this.isStockpile(i) &&
         !this.isColdStore(i) &&
         this.regions.region[i] === region &&
-        !this.isReserved(`i${i}`, c),
+        !this.itemTaken(i, c),
       3,
     );
     for (const source of sources) {
@@ -4402,7 +4435,7 @@ export class Simulation {
     const source = this.nearestIn(
       'items',
       c.tile,
-      (i) => w.itemType[i] === fuel.item && this.regions.region[i] === region && !this.isReserved(`i${i}`, c),
+      (i) => w.itemType[i] === fuel.item && this.regions.region[i] === region && !this.itemTaken(i, c),
       1,
     )[0];
     const path = source !== undefined ? this.pathfinder.find(c.tile, [source]) : null;
@@ -4459,7 +4492,7 @@ export class Simulation {
     const w = this.world;
     const items = new Set<number>();
     for (const i of w.tilesWith('items')) {
-      if (w.itemType[i] !== NONE && this.regions.region[i] === region && !this.isReserved(`i${i}`, c)) {
+      if (w.itemType[i] !== NONE && this.regions.region[i] === region && !this.itemTaken(i, c)) {
         items.add(w.itemType[i]);
       }
     }
@@ -4495,7 +4528,7 @@ export class Simulation {
     const sources = this.nearestIn(
       'items',
       c.tile,
-      (i) => this.regions.region[i] === region && !this.isReserved(`i${i}`, c) && misplaced(i),
+      (i) => this.regions.region[i] === region && !this.itemTaken(i, c) && misplaced(i),
       4,
     );
     for (const source of sources) {
@@ -4711,7 +4744,7 @@ export class Simulation {
       matchesIngredient(w.itemType[i], ing) &&
       (!ing.worn || w.fresh[i] < MENDABLE) &&
       this.regions.region[i] === region &&
-      !this.isReserved(`i${i}`, c)
+      !this.itemTaken(i, c)
     );
   }
 
@@ -4865,10 +4898,7 @@ export class Simulation {
       'items',
       c.tile,
       (i) =>
-        w.itemType[i] !== NONE &&
-        isFood(w.itemType[i]) &&
-        this.regions.region[i] === region &&
-        !this.isReserved(`i${i}`, c),
+        w.itemType[i] !== NONE && isFood(w.itemType[i]) && this.regions.region[i] === region && !this.itemTaken(i, c),
       1,
       // Walk a bit further for a cooked meal.
       (i) => (itemDef(w.itemType[i]).category === 'meal' ? 0 : 10),
@@ -6180,7 +6210,7 @@ export class Simulation {
       c.tile,
       (i) => {
         const type = w.itemType[i];
-        if (type === NONE || this.regions.region[i] !== region || this.isReserved(`i${i}`, c)) {
+        if (type === NONE || this.regions.region[i] !== region || this.itemTaken(i, c)) {
           return false;
         }
         const def = itemDef(type);
@@ -6271,7 +6301,7 @@ export class Simulation {
     let bestScore = current + 0.5;
     for (const i of w.tilesWith('items')) {
       const t = w.itemType[i];
-      if (t === NONE || !itemDef(t).apparel || this.regions.region[i] !== region || this.isReserved(`i${i}`, c)) {
+      if (t === NONE || !itemDef(t).apparel || this.regions.region[i] !== region || this.itemTaken(i, c)) {
         continue;
       }
       const score = apparelScore(t, w.quality[i], w.fresh[i], outdoor) - w.distance(c.tile, i) * 0.01;
@@ -6644,7 +6674,7 @@ export class Simulation {
             w.itemType[i] !== NONE &&
             isFood(w.itemType[i]) &&
             this.regions.region[i] === region &&
-            !this.isReserved(`i${i}`, c) &&
+            !this.itemTaken(i, c) &&
             w.distance(i, c.tile) <= CRAWL_RANGE,
           1,
         )[0];
@@ -6677,7 +6707,7 @@ export class Simulation {
   private eatWhereLying(c: Colonist): boolean {
     const w = this.world;
     const tile = [c.tile, ...w.neighbors(c.tile)].find(
-      (i) => w.itemType[i] !== NONE && isFood(w.itemType[i]) && !this.isReserved(`i${i}`, c),
+      (i) => w.itemType[i] !== NONE && isFood(w.itemType[i]) && !this.itemTaken(i, c),
     );
     if (tile === undefined) {
       return false;
@@ -6881,10 +6911,7 @@ export class Simulation {
         'items',
         c.tile,
         (i) =>
-          w.itemType[i] !== NONE &&
-          isFood(w.itemType[i]) &&
-          this.regions.region[i] === region &&
-          !this.isReserved(`i${i}`, c),
+          w.itemType[i] !== NONE && isFood(w.itemType[i]) && this.regions.region[i] === region && !this.itemTaken(i, c),
         1,
         (i) => (itemDef(w.itemType[i]).category === 'meal' ? 0 : 10),
       )[0];
@@ -7004,7 +7031,7 @@ export class Simulation {
       ? this.nearestIn(
           'items',
           c.tile,
-          (i) => w.itemType[i] === MEDICINE && this.regions.region[i] === region && !this.isReserved(`i${i}`, c),
+          (i) => w.itemType[i] === MEDICINE && this.regions.region[i] === region && !this.itemTaken(i, c),
           1,
         )[0]
       : undefined;
@@ -7118,10 +7145,7 @@ export class Simulation {
       'items',
       c.tile,
       (i) =>
-        w.itemType[i] !== NONE &&
-        isFood(w.itemType[i]) &&
-        this.regions.region[i] === region &&
-        !this.isReserved(`i${i}`, c),
+        w.itemType[i] !== NONE && isFood(w.itemType[i]) && this.regions.region[i] === region && !this.itemTaken(i, c),
       1,
       (i) => (itemDef(w.itemType[i]).category === 'meal' ? 0 : 10),
     )[0];

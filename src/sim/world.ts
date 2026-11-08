@@ -368,8 +368,12 @@ export class World {
   }
 
   public setTerrain(i: number, t: number): void {
+    const before = this.isPassable(i);
     this.terrain[i] = t;
-    this.structureVersion++;
+    // Regions and rooms are worked out again only when walking changes (ice coming and going doesn't).
+    if (before !== this.isPassable(i)) {
+      this.structureVersion++;
+    }
     // Ice thawing takes anything left on it.
     if (this.filth[i] !== 0 && (!this.isPassable(i) || this.isOpenWater(i))) {
       this.filth[i] = 0;
