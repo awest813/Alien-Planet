@@ -288,6 +288,9 @@ const SIEGE_EXEMPT = new Set<string>(['shelter', 'rescue', 'tend', 'feed', 'eat'
 // What the later research does.
 const MASONRY_SPEED = 1.2;
 const IRRIGATION_YIELD = 1.25;
+// With no raids to cost it time and stores, a peaceful colony's food would only pile up: its fields give a
+// little less, so food stays something to plan for.
+const PEACEFUL_YIELD = 0.8;
 const PRESERVING_RATE = 2 / 3;
 // The first days, when colonists expect little.
 const LOW_EXPECTATION_DAYS = 12;
@@ -3908,7 +3911,9 @@ export class Simulation {
           1,
         )[0];
         // (Irrigation's quarter more, as an extra unit a quarter of the time on small harvests.)
-        const more = this.isResearched('irrigation') ? crop.count * IRRIGATION_YIELD : crop.count;
+        const more =
+          (this.isResearched('irrigation') ? crop.count * IRRIGATION_YIELD : crop.count) *
+          (this.story.difficulty === 'peaceful' ? PEACEFUL_YIELD : 1);
         const yieldCount = Math.floor(more) + (more % 1 > 0 && this.rng.next() < more % 1 ? 1 : 0);
         w.dropItemNear(offField ?? t, crop.item, yieldCount);
         this.produce(crop.item, yieldCount);
