@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { populationFor } from './constants';
-import { FACTIONS, featureId } from './defs';
+import { FACTIONS, featureId, itemId } from './defs';
 import { MAX_DEPTH, digDeeper, shaftAt } from './depths';
 import { gift, giftGoodwill, makeRequest, updateDiplomacy } from './diplomacy';
 import { related } from './lifespans';
 import { fadeOpinions } from './social';
-import { eventWeight } from './storyteller';
+import { eventWeight, triggerEvent } from './storyteller';
 import { goodwillOf } from './trade';
 import { roomToJoin, talk } from './prisoners';
 import { Simulation } from './simulation';
@@ -156,5 +156,31 @@ describe('relationships over the years', () => {
     expect(related(sim, aunt, kid)).toBe(true);
     expect(related(sim, grandma, kid)).toBe(true);
     expect(related(sim, kid, stranger)).toBe(false);
+  });
+});
+
+describe('a growing colony', () => {
+  it('draws bigger raids when it grows rich, and bigger caravans as it grows older', () => {
+    const raid = (rich: boolean) => {
+      const sim = Simulation.newColony(10);
+      sim.tick = 24 * 200 * 40;
+      if (rich) {
+        sim.world.dropItemNear(sim.colonists[0].tile, itemId('silver'), 40000);
+      }
+      sim.enemies = [];
+      triggerEvent(sim, 'raid');
+      return sim.enemies.length;
+    };
+    expect(raid(true)).toBeGreaterThan(raid(false));
+    const caravan = (day: number) => {
+      const sim = Simulation.newColony(11);
+      sim.tick = 24 * 200 * (day - 1);
+      triggerEvent(sim, 'caravan');
+      return sim.caravan!;
+    };
+    const early = caravan(5);
+    const late = caravan(120);
+    expect(late.silver).toBeGreaterThan(early.silver);
+    expect(late.stock.some((s) => s.item === itemId('fineMeal') || s.item === itemId('iron'))).toBe(true);
   });
 });

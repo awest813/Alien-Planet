@@ -775,6 +775,8 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
     work at normal. Goods now sell by condition, the worst first, and a pick that outlasts its stock is
     flagged before the deal.
   - 120-day playtests (20 players) found no invariant problems.
+  - Later years: raids gain up to four raiders with colony wealth above 15k, and caravans grow with the colony
+    (up to three times the goods and purse, finer wares from day 30). See docs/GAPS.md for what's still thin.
 
 ### What to measure
 

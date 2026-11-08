@@ -57,6 +57,17 @@ const WARES: [string, number, number][] = [
   ['parka', 0, 2],
   ['recurveBow', 0, 1],
 ];
+// Finer goods they bring once the colony has been around a while and has silver to spend.
+const LATER_WARES: [string, number, number][] = [
+  ['fineMeal', 0, 8],
+  ['toolKit', 0, 2],
+  ['iron', 0, 15],
+  ['crossbow', 0, 1],
+  ['scaleArmor', 0, 1],
+];
+const LATER_FROM_DAY = 30;
+// Caravans grow with the colony: more goods and a fuller purse, up to three times the first ones.
+const caravanScale = (sim: Simulation) => 1 + Math.min(sim.day, 120) / 60;
 
 export const goodwillOf = (sim: Simulation, faction: number): number => sim.goodwill[faction] ?? STARTING_GOODWILL;
 
@@ -106,14 +117,16 @@ export function caravanArrives(sim: Simulation): boolean {
     const name = names.splice(sim.rng.int(0, names.length - 1), 1)[0] ?? 'Trader';
     visitors.push({ id: sim.nextVisitorId++, name, tile: edge, path: [], moveProgress: 0, restUntil: 0 });
   }
-  const stock = WARES.map(([key, lo, hi]) => ({ item: itemId(key), count: sim.rng.int(lo, hi) })).filter(
-    (s) => s.count > 0,
-  );
+  const scale = caravanScale(sim);
+  const wares = sim.day >= LATER_FROM_DAY ? [...WARES, ...LATER_WARES] : WARES;
+  const stock = wares
+    .map(([key, lo, hi]) => ({ item: itemId(key), count: Math.round(sim.rng.int(lo, hi) * scale) }))
+    .filter((s) => s.count > 0);
   sim.caravan = {
     faction: faction.id,
     visitors,
     stock,
-    silver: sim.rng.int(200, 400),
+    silver: Math.round(sim.rng.int(200, 400) * scale),
     leaveAt: sim.tick + VISIT_HOURS * TICKS_PER_HOUR,
     leaving: false,
   };

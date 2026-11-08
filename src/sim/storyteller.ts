@@ -140,8 +140,11 @@ const EVENTS: EventDef[] = [
       const armed = sim
         .living()
         .filter((c) => weaponScore(c.weapon, c.weaponQuality) >= weaponScore('recurveBow', 4)).length;
-      const cap = Math.min(9 + harsh, 7 + harsh + Math.max(0, Math.floor((sim.day - 19) / 8)));
-      const size = 2 + harsh + Math.floor((sim.day - 4) / 3) + Math.floor(armed / 3);
+      // A rich colony draws bigger raids: one more raider for every 7,500 silver of goods beyond the
+      // first 15,000, up to four more (and the cap rises with it).
+      const rich = Math.max(0, Math.min(4, Math.floor((colonyWealth(sim) - 15000) / 7500)));
+      const cap = Math.min(9 + harsh, 7 + harsh + Math.max(0, Math.floor((sim.day - 19) / 8))) + rich;
+      const size = 2 + harsh + Math.floor((sim.day - 4) / 3) + Math.floor(armed / 3) + rich;
       const count = Math.max(2, Math.round(Math.min(cap, size) * threatScale(sim)));
       const factions = raiders(sim);
       return factions.length > 0 && spawnRaid(sim, sim.rng.pick(factions).id, count);
@@ -594,6 +597,11 @@ export function triggerEvent(sim: Simulation, key: string): boolean {
 }
 
 export const EVENT_KEYS = EVENTS.map((e) => e.key);
+
+// What everything the colony holds is worth, in silver.
+export function colonyWealth(sim: Simulation): number {
+  return sim.resourceTotals().reduce((sum, r) => sum + r.total * itemDef(r.item).value, 0);
+}
 
 // How likely an event is to be picked right now, relative to the others (for tests and tools).
 export const eventWeight = (sim: Simulation, key: string): number => {

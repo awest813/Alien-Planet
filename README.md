@@ -404,7 +404,10 @@ died:
 npx tsx scripts/playtest.ts days=20              # all 100 players (from=0 to=25 runs a share of them)
 npx tsx scripts/playtest.ts days=20 only=warden  # one play style
 npx tsx scripts/playtest.ts days=20 players=3,40 # particular players (TRACE=17 or BUILD=1 for detail)
+npx tsx scripts/years.ts 240 1 seed=150461       # a ten-year game, one line a year
 ```
+
+[docs/GAPS.md](docs/GAPS.md) lists where the game is thin, unbalanced or untested, with the evidence.
 
 ## Roadmap
 
