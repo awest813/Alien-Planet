@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LANDING_TICKS, TRANSMIT_HOURS, WAIT_TICKS, transmitting, updateBeacon } from './beacon';
+import { spawnRaid } from './combat';
 import { featureId, itemId } from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
@@ -108,5 +109,38 @@ describe('the signal beacon: edge cases', () => {
     other.sim.apply({ type: 'shipChoice', board: true });
     other.hours(WAIT_TICKS / HOUR + 2);
     expect(other.sim.beacon.choice).toBe('depart');
+  });
+
+  it('draws raiders who go straight for it while it transmits, and batter it down', () => {
+    const { sim, w, beacon, hours } = signal(2);
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    hours(1);
+    sim.power.powered = true;
+    expect(transmitting(sim)).toBe(true);
+    expect(spawnRaid(sim, 0, 3)).toBe(true);
+    expect(sim.enemies.filter((e) => e.wrecker)).toHaveLength(1);
+    expect(sim.log.at(-1)!.text).toMatch(/One is making for the beacon/);
+    const wrecker = sim.enemies.find((e) => e.wrecker)!;
+    wrecker.tile = w.idx(w.xOf(beacon) + 1, w.yOf(beacon) + 1);
+    wrecker.weapon = 'club';
+    // (Steady: this is about the beacon, not whether they lose their nerve.)
+    wrecker.nerveCheckAt = Number.MAX_SAFE_INTEGER;
+    // The others stay out of it.
+    sim.enemies = [wrecker];
+    sim.raid!.initial = 1;
+    for (let t = 0; t < 12 * HOUR && w.feature[beacon] === featureId('signalBeacon'); t++) {
+      wrecker.hp = 1;
+      for (const c of sim.colonists) {
+        c.needs.food = c.needs.rest = c.needs.joy = 1;
+      }
+      sim.step();
+    }
+    expect(w.feature[beacon]).not.toBe(featureId('signalBeacon'));
+    // Back on the build list once the raid's over.
+    sim.enemies = [];
+    sim.step();
+    expect(sim.raid).toBeNull();
+    expect(w.blueprint[beacon]).toBe(featureId('signalBeacon'));
+    expect(sim.log.some((l) => l.text.startsWith('Raiders wrecked the signal beacon!'))).toBe(true);
   });
 });

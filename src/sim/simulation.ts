@@ -7331,7 +7331,8 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'shelter',
     label: 'Build an enclosed shelter (walls + door)',
     phase: 1,
-    check: (s) => s.hasShelter(),
+    // (A door too: someone walled into a ring of rock hasn't built a shelter.)
+    check: (s) => s.hasShelter() && s.countFeature((f) => !!featureDef(f).door) > 0,
   },
   {
     id: 'bed',

@@ -352,6 +352,12 @@ export interface Enemy {
   post?: number;
   // Next tick a badly hurt raider weighs whether to run for it.
   nerveCheckAt?: number;
+  // A thief: after the stores, not a fight. The stack they're making for, and what they've grabbed.
+  thief?: boolean;
+  stealFrom?: number;
+  loot?: { item: number; count: number };
+  // Sent to wreck the signal beacon while it's on the air.
+  wrecker?: boolean;
 }
 
 // A raider who went down rather than dying: lying where they fell until captured (or until they die
@@ -490,6 +496,9 @@ export interface Stats {
   greatBeastSlain?: number;
   // Sieges the colony saw off (beaten or waited out without being overrun), and raids allies came to.
   siegesSeenOff?: number;
+  // Silver's worth of goods thieves got away with, and food lost to vermin.
+  stolen?: number;
+  verminLost?: number;
   alliesCame?: number;
   // Every death, by cause (the log only keeps the latest).
   deaths?: Record<string, number>;

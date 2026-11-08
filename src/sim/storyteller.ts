@@ -2,7 +2,7 @@ import { SIGNAL_RAID_WEIGHT, transmitting } from './beacon';
 import { herdArrives, herdsWary, manhuntersArrive, wildCap, wildCount } from './animals';
 import { maybeSendAllies, spawnRaid, weaponScore } from './combat';
 import { TICKS_PER_HOUR, populationFor } from './constants';
-import { ANIMALS, FACTIONS, NONE, featureDef, itemDef, itemId, terrainDef } from './defs';
+import { ANIMALS, FACTIONS, NONE, featureDef, isFood, itemDef, itemId, terrainDef } from './defs';
 import { damage, infect } from './health';
 import { caravanArrives, goodwillOf } from './trade';
 import { atPeace, onGoodTerms } from './diplomacy';
@@ -128,6 +128,26 @@ const raiders = (sim: Simulation) => hostileFactions().filter((f) => !atPeace(si
 const animalLabel = (kind: string) => ANIMALS[kind].plural;
 const friendlyFaction = () => FACTIONS.find((f) => !f.hostile)!;
 
+// Food vermin can get at: in stockpiles on the floor (not on a shelf or in an icebox), and not frozen.
+function verminCanReach(sim: Simulation): { tiles: number[]; total: number } {
+  const w = sim.world;
+  const tiles: number[] = [];
+  let total = 0;
+  for (const i of w.tilesWith('items')) {
+    const item = w.itemType[i];
+    if (!isFood(item) || !sim.isStockpile(i)) {
+      continue;
+    }
+    const f = w.feature[i];
+    if ((f !== NONE && (featureDef(f).shelf || featureDef(f).icebox)) || sim.temperatureAt(i) < 0) {
+      continue;
+    }
+    tiles.push(i);
+    total += w.itemCount[i];
+  }
+  return { tiles, total };
+}
+
 // How many raiders come: two on day 4 and one more every three days, plus extra for a well-armed colony. The
 // cap is seven at first (nine on harsh), rising by one every eight days after day 19; then all of it scaled
 // to the colony's size.
@@ -141,8 +161,16 @@ function raidSize(sim: Simulation): number {
   const rich = Math.max(0, Math.min(4, Math.floor((colonyWealth(sim) - 15000) / 7500)));
   const cap = Math.min(9 + harsh, 7 + harsh + Math.max(0, Math.floor((sim.day - 19) / 8))) + rich;
   const size = 2 + harsh + Math.floor((sim.day - 4) / 3) + Math.floor(armed / 3) + rich;
-  return Math.max(2, Math.round(Math.min(cap, size) * threatScale(sim)));
+  const scaled = Math.max(2, Math.round(Math.min(cap, size) * threatScale(sim)));
+  // Never more than a fair fight against those who can fight back today: about a third more (eight against
+  // six). (Eleven against six won nearly every harsh raid, cover or not.)
+  const fighters = sim.living().filter((c) => c.age >= DRAFT_AGE && !c.health.downed).length;
+  // (Riches are worth a little more risk: half the extra raiders a rich colony draws come on top.)
+  const fair = Math.round(Math.max(2, fighters) * (harsh ? RAID_ODDS_HARSH : RAID_ODDS)) + Math.floor(rich / 2);
+  return Math.max(2, Math.min(scaled, fair));
 }
+const RAID_ODDS = 1.3;
+const RAID_ODDS_HARSH = 1.35;
 
 // A raid, or a siege: raiders from one of the hostile factions (not those paid off), and now and then friends
 // come to help.
@@ -181,6 +209,51 @@ const EVENTS: EventDef[] = [
         ? 0
         : 0.5 * (raiders(sim).length / hostileFactions().length),
     run: (sim) => attack(sim, true),
+  },
+  {
+    // A rich colony draws thieves: a few quick hands after the stores, not a fight. More likely the more
+    // there is to take.
+    key: 'thieves',
+    minDay: 15,
+    cooldownDays: 8,
+    threat: true,
+    weight: (sim) =>
+      sim.story.difficulty === 'peaceful' || raiders(sim).length === 0
+        ? 0
+        : 0.8 * Math.min(1.5, colonyWealth(sim) / 20000) * (raiders(sim).length / hostileFactions().length),
+    run: (sim) => {
+      const factions = raiders(sim);
+      const count = 2 + (colonyWealth(sim) > 30000 ? 1 : 0) + (sim.story.difficulty === 'harsh' ? 1 : 0);
+      return factions.length > 0 && spawnRaid(sim, sim.rng.pick(factions).id, count, false, true);
+    },
+  },
+  {
+    // Vermin get into food left on the floor: worst in winter, when they come in from the cold. Food on shelves
+    // or in iceboxes, or kept below freezing, is safe.
+    key: 'vermin',
+    minDay: 20,
+    cooldownDays: 12,
+    threat: true,
+    weight: (sim) => (verminCanReach(sim).total < 30 ? 0 : sim.season === 'Winter' ? 0.7 : 0.15),
+    run: (sim) => {
+      const { tiles } = verminCanReach(sim);
+      const w = sim.world;
+      const share = 0.25 + sim.rng.next() * 0.15;
+      let lost = 0;
+      for (const i of tiles) {
+        lost += w.takeItem(i, Math.floor(w.itemCount[i] * share));
+      }
+      if (lost === 0) {
+        return false;
+      }
+      sim.stats.verminLost = (sim.stats.verminLost ?? 0) + lost;
+      sim.addLog(
+        `Vermin got into the stores: ${lost} food spoiled. Food on shelves or in iceboxes, or kept below freezing, is safe.`,
+        'warn',
+        true,
+      );
+      return true;
+    },
   },
   {
     // Once a year from the second, the great beast of the hills comes down.
@@ -302,8 +375,11 @@ const EVENTS: EventDef[] = [
     key: 'caravan',
     minDay: 3,
     cooldownDays: 5,
+    // Word of a rich colony gets about: traders come more often to one with more to buy and sell.
     weight: (sim) =>
-      sim.caravan || !onGoodTerms(sim, friendlyFaction().id) ? 0 : 0.6 + goodwillOf(sim, friendlyFaction().id) / 100,
+      sim.caravan || !onGoodTerms(sim, friendlyFaction().id)
+        ? 0
+        : 0.6 + goodwillOf(sim, friendlyFaction().id) / 100 + Math.min(0.6, colonyWealth(sim) / 50000),
     run: (sim) => caravanArrives(sim),
   },
   {

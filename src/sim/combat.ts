@@ -1,5 +1,6 @@
 import { hurtAnimal } from './animals';
 import { scarAim } from './body';
+import { beaconTile, transmitting } from './beacon';
 import { qualityFactor } from './apparel';
 import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
 import { FACTIONS, NONE, NORMAL_QUALITY, WeaponDef, featureDef, featureId, itemDef, itemId, weaponDef } from './defs';
@@ -34,6 +35,11 @@ export interface RaidState {
   allies?: number;
   // A siege: the raiders make camp out of reach, dig in, and attack when they're ready.
   siege?: SiegeState;
+  // They've had to tunnel through rock to get in (said once).
+  sapped?: boolean;
+  // Thieves after the stores rather than a fight; what they got away with.
+  thieves?: boolean;
+  stolen?: number;
 }
 
 export interface SiegeState {
@@ -221,7 +227,7 @@ function raiderArmor(sim: Simulation): number | undefined {
   return r < scale + leather ? itemId('leatherArmor') : undefined;
 }
 
-export function spawnRaid(sim: Simulation, faction: number, count: number, siege = false): boolean {
+export function spawnRaid(sim: Simulation, faction: number, count: number, siege = false, thieves = false): boolean {
   const w = sim.world;
   const region = sim.outsideRegion();
   if (region === undefined) {
@@ -250,7 +256,8 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
     const skill = def.skill + (sim.story.difficulty === 'harsh' ? 1 : 0) + Math.floor(sim.day / 20);
     for (let n = 0; n < count; n++) {
       const name = names.length > 0 ? names.splice(sim.rng.int(0, names.length - 1), 1)[0] : 'Raider';
-      const armorItem = raiderArmor(sim);
+      // Thieves travel light: a knife, no armour, quick on their feet.
+      const armorItem = thieves ? undefined : raiderArmor(sim);
       sim.enemies.push({
         id: sim.nextEnemyId++,
         name,
@@ -259,18 +266,33 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
         path: [],
         moveProgress: 0,
         hp: 1,
-        weapon: raiderWeapon(sim, faction),
+        weapon: thieves ? 'knife' : raiderWeapon(sim, faction),
         armor: armorItem !== undefined ? itemDef(armorItem).armor!.protection : 0,
         armorItem,
         skill,
-        speed: def.speed * (armorItem !== undefined ? itemDef(armorItem).armor!.speed : 1),
+        speed: def.speed * (thieves ? 1.2 : armorItem !== undefined ? itemDef(armorItem).armor!.speed : 1),
         suppression: 0,
         cooldown: 0,
         fleeing: false,
         repathAt: 0,
+        ...(thieves ? { thief: true } : {}),
       });
     }
-    sim.raid = { faction, initial: count, killed: 0, startedTick: sim.tick };
+    sim.raid = { faction, initial: count, killed: 0, startedTick: sim.tick, ...(thieves ? { thieves: true } : {}) };
+    // The signal draws them; while it's on the air a third of them go straight for the beacon.
+    const wreckers = !siege && !thieves && transmitting(sim) ? Math.ceil(count / 3) : 0;
+    for (const e of sim.enemies.slice(-count).slice(0, wreckers)) {
+      e.wrecker = true;
+    }
+    if (thieves) {
+      sim.addLog(
+        `Thieves! ${count} from ${def.name} are slipping in from the ${side} to rob the stores. Draft colonists to catch them.`,
+        'danger',
+        true,
+      );
+      sim.events.push('raid');
+      return true;
+    }
     if (siege && setupSiege(sim, centre)) {
       const hours = Math.round((sim.raid.siege!.attackAt - sim.tick) / TICKS_PER_HOUR);
       sim.addLog(
@@ -282,7 +304,7 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
       return true;
     }
     sim.addLog(
-      `Raid! ${count} raiders from ${def.name} are coming from the ${side}. Draft your colonists.`,
+      `Raid! ${count} raiders from ${def.name} are coming from the ${side}. ${wreckers > 0 ? `${wreckers === 1 ? 'One is' : `${wreckers} are`} making for the beacon. ` : ''}Draft your colonists.`,
       'danger',
       true,
     );
@@ -334,7 +356,7 @@ function breach(sim: Simulation, e: Enemy): boolean {
     !w.neighbors(e.breachTarget, false).some((n) => w.isPassable(n) && sim.regionOf(n) === goalRegion) &&
     e.repathAt <= sim.tick;
   if (e.breachTarget === undefined || !breakable(w, e.breachTarget) || stale) {
-    e.breachTarget = breachWall(sim, region, goalRegion, goal.tile);
+    e.breachTarget = breachWall(sim, region, goalRegion, goal.tile, e.breachTarget);
     e.repathAt = sim.tick + 200;
     e.path = [];
   }
@@ -350,12 +372,20 @@ function breach(sim: Simulation, e: Enemy): boolean {
       // Clubs and spears are better for battering than bows.
       w.damage[wall] += weaponDef(e.weapon).range > 1 ? 8 : 14;
       const def = featureDef(w.feature[wall]);
-      if (w.damage[wall] >= def.build!.work) {
+      if (w.damage[wall] >= toughness(w, wall)) {
         const feature = w.feature[wall];
         w.setFeature(wall, NONE);
         w.addFilth(wall, Filth.RUBBLE, 2);
-        sim.rebuild(wall, feature);
-        sim.addLog(`Raiders broke through a ${def.name.toLowerCase()}!`, 'danger');
+        if (def.natural) {
+          // Sappers: once a raid, word that they're tunnelling in.
+          if (sim.raid && !sim.raid.sapped) {
+            sim.raid.sapped = true;
+            sim.addLog('Raiders are digging through the rock to get at the colony!', 'danger');
+          }
+        } else {
+          sim.rebuild(wall, feature);
+          sim.addLog(`Raiders broke through a ${def.name.toLowerCase()}!`, 'danger');
+        }
       }
     }
     return true;
@@ -372,16 +402,38 @@ function breach(sim: Simulation, e: Enemy): boolean {
   return true;
 }
 
-const breakable = (w: World, i: number) => w.feature[i] !== NONE && !!featureDef(w.feature[i]).build && w.blocksRoom(i);
+// Walls and doors; and, for raiders with no other way in, the rock itself (sappers dig, slowly: rock takes as
+// many blows as it takes a miner's work).
+const breakable = (w: World, i: number) => {
+  if (w.feature[i] === NONE || !w.blocksRoom(i)) {
+    return false;
+  }
+  const def = featureDef(w.feature[i]);
+  return !!def.build || (!!def.natural && def.harvest?.work === 'mine');
+};
+const toughness = (w: World, i: number) => {
+  const def = featureDef(w.feature[i]);
+  return def.build?.work ?? def.harvest?.amount ?? 100;
+};
+// Digging is the last resort: a wall a little further off is still the better way in.
+const ROCK_DETOUR = 12;
+const SAP_REACH = 24;
 
 // The wall to break: one the raider can stand next to that opens straight into the colonists'
 // side, nearest them; failing that (thick or doubled walls), the wall on this side nearest them.
-function breachWall(sim: Simulation, region: number, goalRegion: number, goalTile: number): number | undefined {
+function breachWall(
+  sim: Simulation,
+  region: number,
+  goalRegion: number,
+  goalTile: number,
+  current?: number,
+): number | undefined {
   const w = sim.world;
   let best: number | undefined;
   let bestScore = Infinity;
   for (let i = 0; i < w.size; i++) {
-    if (!breakable(w, i)) {
+    // (Rock only near the colonists: far off, tunnelling leads nowhere useful.)
+    if (!breakable(w, i) || (featureDef(w.feature[i]).natural && w.distance(i, goalTile) > SAP_REACH)) {
       continue;
     }
     const sides = w.neighbors(i, false);
@@ -389,7 +441,13 @@ function breachWall(sim: Simulation, region: number, goalRegion: number, goalTil
       continue;
     }
     const opens = sides.some((n) => w.isPassable(n) && sim.regionOf(n) === goalRegion);
-    const score = w.distance(i, goalTile) + (opens ? 0 : 1000);
+    // Half-broken already: keep at it unless another is clearly better (thick rock or doubled walls have
+    // many equally good faces, and wandering between them breaks none).
+    const score =
+      w.distance(i, goalTile) +
+      (opens ? 0 : 1000) +
+      (featureDef(w.feature[i]).natural ? ROCK_DETOUR : 0) -
+      (i === current ? 3 : 0);
     if (score < bestScore) {
       best = i;
       bestScore = score;
@@ -450,6 +508,11 @@ export function woundEnemy(sim: Simulation, e: Enemy, amount: number, by: string
     'good',
   );
   const w = sim.world;
+  // A thief brought down drops what they took.
+  if (e.loot) {
+    w.dropItemNear(e.tile, e.loot.item, e.loot.count);
+    e.loot = undefined;
+  }
   const weapon = weaponDef(e.weapon);
   // Some of a fallen raider's gear survives the fight.
   if (weapon.item !== undefined && sim.rng.next() < 0.6) {
@@ -504,6 +567,15 @@ function flee(sim: Simulation, e: Enemy, ally = false): void {
   if (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) {
     e.hp = 0;
     e.fleeing = true;
+    if (e.loot) {
+      const value = itemDef(e.loot.item).value * e.loot.count;
+      if (sim.raid) {
+        sim.raid.stolen = (sim.raid.stolen ?? 0) + value;
+      }
+      sim.stats.stolen = (sim.stats.stolen ?? 0) + value;
+      sim.addLog(`${e.name} got away with ${e.loot.count} ${itemDef(e.loot.item).name.toLowerCase()}.`, 'danger');
+      e.loot = undefined;
+    }
     return;
   }
   if (e.path.length === 0) {
@@ -525,6 +597,101 @@ function flee(sim: Simulation, e: Enemy, ally = false): void {
     }
   }
   moveEnemy(sim, e, ally);
+}
+
+const BEACON_FRAGILE = 4;
+
+// A wrecker makes for the signal beacon and batters it down (it goes back on the build list). Returns false
+// once there's no beacon to get at; then they fight like any raider.
+function wreckBeacon(sim: Simulation, e: Enemy): boolean {
+  const w = sim.world;
+  const beacon = beaconTile(sim);
+  if (beacon === undefined) {
+    e.wrecker = false;
+    return false;
+  }
+  const region = sim.regionOf(e.tile);
+  if (chebyshev(w, e.tile, beacon) <= 1) {
+    e.path = [];
+    e.moveProgress = 0;
+    if (e.cooldown <= 0) {
+      e.cooldown = weaponDef(e.weapon).cooldown;
+      // Delicate work, quickly undone.
+      w.damage[beacon] += (weaponDef(e.weapon).range > 1 ? 8 : 14) * BEACON_FRAGILE;
+      if (w.damage[beacon] >= toughness(w, beacon)) {
+        const feature = w.feature[beacon];
+        w.setFeature(beacon, NONE);
+        w.addFilth(beacon, Filth.RUBBLE, 2);
+        sim.rebuild(beacon, feature);
+        sim.addLog(
+          'Raiders wrecked the signal beacon! It has to be built again before it can transmit.',
+          'danger',
+          true,
+        );
+      }
+    }
+    return true;
+  }
+  if (e.path.length === 0 || e.repathAt <= sim.tick) {
+    e.repathAt = sim.tick + 200;
+    const spots = w.neighbors(beacon).filter((n) => w.isPassable(n) && sim.regionOf(n) === region);
+    e.path = spots.length > 0 ? (sim.pathfinder.find(e.tile, spots) ?? []) : [];
+    if (e.path.length === 0) {
+      // Walled off from it: get at the colony instead.
+      e.wrecker = false;
+      return false;
+    }
+  }
+  moveEnemy(sim, e);
+  return true;
+}
+
+// A thief makes for the richest stack in the stores they can reach, grabs what they can carry and runs. Returns
+// false when there's nothing to steal (they then fight their way out like any raider).
+const THIEF_CARRIES = 150;
+function thiefTurn(sim: Simulation, e: Enemy): boolean {
+  const w = sim.world;
+  if (e.loot) {
+    e.fleeing = true;
+    e.path = [];
+    return true;
+  }
+  if (e.stealFrom !== undefined && e.tile === e.stealFrom && w.itemType[e.tile] !== NONE) {
+    const item = w.itemType[e.tile];
+    const count = w.takeItem(e.tile, Math.max(1, Math.floor(THIEF_CARRIES / itemDef(item).value)));
+    e.loot = { item, count };
+    e.fleeing = true;
+    e.path = [];
+    sim.addLog(`${e.name} grabbed ${count} ${itemDef(item).name.toLowerCase()} and is running for it!`, 'danger');
+    return true;
+  }
+  if (e.stealFrom === undefined || w.itemType[e.stealFrom] === NONE || e.path.length === 0) {
+    const region = sim.regionOf(e.tile);
+    let best: number | undefined;
+    let bestScore = 0;
+    for (const i of w.tilesWith('items')) {
+      if (!sim.isStockpile(i) || sim.regionOf(i) !== region) {
+        continue;
+      }
+      const def = itemDef(w.itemType[i]);
+      const score =
+        (def.value * Math.min(w.itemCount[i], THIEF_CARRIES / def.value)) / (1 + w.distance(e.tile, i) / 40);
+      if (score > bestScore) {
+        best = i;
+        bestScore = score;
+      }
+    }
+    e.stealFrom = best;
+    e.path = best !== undefined ? (sim.pathfinder.find(e.tile, [best]) ?? []) : [];
+    if (best === undefined || (e.path.length === 0 && e.tile !== best)) {
+      e.stealFrom = undefined;
+      return false;
+    }
+  }
+  if (e.path.length > 0) {
+    moveEnemy(sim, e);
+  }
+  return true;
 }
 
 // How much of a blow gets through a colonist's armor; the armor takes a beating doing its job.
@@ -621,6 +788,12 @@ export function updateEnemies(sim: Simulation): void {
     // A siege party keeps to its camp until it's ready.
     const siege = besieging(sim);
     if (siege && siegeTurn(sim, e, siege)) {
+      continue;
+    }
+    if (e.thief && thiefTurn(sim, e)) {
+      continue;
+    }
+    if (e.wrecker && wreckBeacon(sim, e)) {
       continue;
     }
     const target = targetFor(sim, e);
@@ -736,7 +909,15 @@ export function updateEnemies(sim: Simulation): void {
     if (raid.siege && outcome !== 'overrun') {
       sim.stats.siegesSeenOff = (sim.stats.siegesSeenOff ?? 0) + 1;
     }
-    if (outcome === 'withdrew') {
+    if (raid.thieves) {
+      sim.addLog(
+        raid.stolen
+          ? `The thieves have gone, with about ${raid.stolen} silver's worth from the stores. Colonists stand down.`
+          : 'The thieves have gone empty-handed. Colonists stand down.',
+        raid.stolen ? 'warn' : 'good',
+        true,
+      );
+    } else if (outcome === 'withdrew') {
       sim.addLog('The raiders have gone. Colonists stand down.', 'info', true);
     } else if (outcome === 'repelled') {
       sim.stats.raidsRepelled++;

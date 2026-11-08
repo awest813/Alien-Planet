@@ -11,3 +11,4 @@
 
 # Agent worktrees
 .claude/worktrees/
+*.log

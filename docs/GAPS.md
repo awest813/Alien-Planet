@@ -25,24 +25,23 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   silver is 1,300–7,700 across four runs (from 7,000–9,000): income is still a little ahead of it.
   - More sinks would help: commissions from neighbours, buying a colonist, ransoming prisoners back, paid
     caravans or expeditions, buildings that cost silver.
-- **Wealth grows from about 8k to 40–54k and changes little.** Raids now gain up to 4 raiders above 15k, but
-  nothing else responds to a rich colony.
+- **Wealth grows from about 8k to 40–54k** (closed: raids gain up to 4 raiders above 15k, thieves come more
+  often the richer the colony, and traders visit more often).
 
-## 2. Raids on Harsh are still lost in the open
+## 2. Raids on Harsh (closed)
 
-- **Partly closed.** Pain now puts raiders down, raids break once 45% are out of the fight, sandbags, embrasures
-  and traps come early (no prerequisites), blows across a barricade land less often, and the Meadow Kin sometimes
-  send fighters. Share of raids that overran the whole colony, 72 days, 12 seeds:
+- **Closed.** Raids are now capped at a fair fight against the colony's able fighters: about a third more than
+  those who can fight back (eight against six), plus half the extra a rich colony draws. Before, eleven came
+  against six on Harsh whatever the colony did. Share of raids that overran the whole colony, 72 days, 12 seeds:
 
-  | Days  | Standard, in the open (before) | Standard, in the open | Standard, from sandbags | Harsh, in the open |
-  | ----- | ------------------------------ | --------------------- | ----------------------- | ------------------ |
-  | 13–24 | 61%                            | 22%                   | 6%                      | 79%                |
-  | 25–36 | 88%                            | 35%                   | 6%                      | 97%                |
-  | 37–72 | ~100%                          | 63–72%                | 15–60%                  | ~96%               |
+  | Days  | Harsh, in the open (before) | Harsh, in the open | Harsh, from sandbags (before) | Harsh, from sandbags | Standard, in the open |
+  | ----- | --------------------------- | ------------------ | ----------------------------- | -------------------- | --------------------- |
+  | 13–24 | 60%                         | 52%                | 60%                           | 36%                  | 5%                    |
+  | 25–36 | 96%                         | 54%                | 43%                           | 8%                   | 19%                   |
+  | 37–72 | 87–97%                      | 30–48%             | 59–69%                        | 4–23%                | 25–43%                |
 
-- **Harsh raids (11 raiders against about 6 colonists) still win nearly every fight in the open**, and a
-  Standard colony that never builds cover loses most from day 37. Raiders leave the downed alone, so few die.
-  - Close it by sizing raids to the colony's fighters rather than a flat cap, or with more allies on Harsh.
+  Harsh is still lost about half the time in the open; behind cover, a sensible defence wins.
+
 - **Most downed raiders are left to die** (125 fell wounded in twelve 48-day colonies, 10 were taken prisoner).
   The test colony marks them all for capture but builds a single prisoner bed, so this mostly says the harness
   should build more; in play, an alert already walks the player through Capture, a bed and a warden.
@@ -51,11 +50,12 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 
 - **Ten-year Standard colonies lose about 2 people to raids across 184 raids.** Harsh loses 10 in 251. After the
   first winters the colony is walled, armed and well fed, and raids are the same walk-in-and-shoot every time.
-  - Partly closed: the great beast wakes once a year from the second, and returns bigger until slain; sieges
-    camp, dig in and attack later, so the colony chooses between breaking the camp and waiting it out.
-  - Close it with threat variety (Phase M): sieges that camp and build; sappers that dig through rock; raids
-    that target the stores or the beacon; a named great beast; infestations from deep shafts; winter famine
-    events.
+  - Threats now vary (closed): the named great beast wakes once a year and returns bigger until slain; sieges
+    camp, dig in and attack later; deep shafts break into caverns and let what lives there up; sappers dig
+    through rock to reach a colony with no other way in; thieves slip in to rob the stores (more often the richer
+    the colony) and run; while the beacon transmits, a third of each raid goes straight for it and batters it
+    down; vermin spoil food left on the stockpile floor, worst in winter (shelves, iceboxes and frozen stores
+    are safe).
 - **Mood sits at 55–65 late with few breaks.** Rising expectations (−6 from year 4) help but don't make the later
   years tense.
   - Close it with needs that grow: room expectations by status, the leader's demands, ageing pains, grief that
