@@ -797,8 +797,8 @@ export class ColonyScene extends Phaser.Scene {
       const { dead, downed } = c.health;
       // A bob in the step when walking (not when crawling).
       pawn.root.setPosition(x, y + (moving && !downed ? -Math.abs(Math.sin(time / 90)) * 1.2 : 0));
-      // Once the colony has boarded the ship, nobody is left on the map.
-      pawn.root.setVisible(!controller.sim.departed);
+      // Once the colony has boarded the ship, nobody is left on the map; an expedition is off it.
+      pawn.root.setVisible(!controller.sim.departed && c.away !== 'gone');
       (pawn.figure.getAt(0) as Phaser.GameObjects.Image).setTexture(stride(moving && !downed && !dead, time));
       pawn.root.setAlpha(dead ? 0.55 : 1);
       pawn.figure.setAngle(c.sleeping || dead || downed ? 90 : 0);
@@ -1496,6 +1496,9 @@ export class ColonyScene extends Phaser.Scene {
     let best: number | null = null;
     let bestDist = TILE * 0.75;
     for (const c of controller.sim.colonists) {
+      if (c.away === 'gone') {
+        continue;
+      }
       const { x, y } = this.pawnPosition(c);
       const d = Math.hypot(x - point.x, y - point.y);
       if (d < bestDist) {

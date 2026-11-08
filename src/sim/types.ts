@@ -232,6 +232,8 @@ export interface Colonist {
   childhood?: { hard: number; happy: number };
   // Losses still grieved, and remembered on their anniversaries (see grief.ts).
   grief?: Grief[];
+  // On an expedition (see expeditions.ts): on the way out to the map edge, or gone off the map.
+  away?: 'leaving' | 'gone';
 }
 
 export interface Grief {
@@ -490,7 +492,21 @@ export type Command =
   // When the ship has landed: board it (the colony's story ends) or stay.
   | { type: 'shipChoice'; board: boolean }
   // Sell the sculpture on a tile to the visiting traders.
-  | { type: 'sellArt'; tile: number };
+  | { type: 'sellArt'; tile: number }
+  // Dealings with the wider world.
+  | { type: 'world'; action: WorldAction };
+
+// Dealings with the wider world (see diplomacy.ts, alliances.ts, expeditions.ts and prisoners.ts): a truce
+// with raiders, a captive sold back, a settler bought, a side taken in a quarrel, an envoy answered, an ally's
+// call for help answered (goods, a colonist lent, or no), a party sent off the map.
+export type WorldAction =
+  | { kind: 'truce'; faction: number }
+  | { kind: 'ransom'; captive: number }
+  | { kind: 'settler'; faction: number }
+  | { kind: 'dispute'; side: number | null }
+  | { kind: 'envoy'; accept: boolean }
+  | { kind: 'call'; answer: 'goods' | 'refuse' | number }
+  | { kind: 'expedition'; to: number; purpose: 'trade' | 'salvage'; colonists: number[] };
 
 export interface LogEntry {
   tick: number;
@@ -538,6 +554,15 @@ export interface Stats {
   tributes?: number;
   // Times the friendly faction's fighters were hired.
   hired?: number;
+  // The wider world: truces made, settlers bought, captives ransomed, disputes and alliances, expeditions.
+  truces?: number;
+  settlers?: number;
+  ransomed?: number;
+  disputes?: number;
+  alliances?: number;
+  callsAnswered?: number;
+  callsRefused?: number;
+  expeditions?: number;
   // Wounds that turned infected, and lasting injuries left by old wounds.
   infections?: number;
   scars?: number;

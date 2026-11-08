@@ -11,6 +11,7 @@ import { traitValue } from './social';
 import type { Simulation } from './simulation';
 import { Animal, Colonist, Enemy } from './types';
 import { fightersHired } from './diplomacy';
+import { ALLY_HELP, alliedWith, helperFaction } from './alliances';
 import { goodwillOf } from './trade';
 import { weatherDef } from './weather';
 import { Filth, World } from './world';
@@ -1167,7 +1168,8 @@ const ALLY_SKILL = 5;
 // Called as a raid starts: whether help is on its way (decided now, so a save mid-raid keeps it).
 export function maybeSendAllies(sim: Simulation): void {
   const raid = sim.raid;
-  const friend = FACTIONS.findIndex((f) => !f.hostile);
+  // (An ally's fighters, if the colony has one and hasn't hired the Meadow Kin's.)
+  const friend = helperFaction(sim);
   if (!raid || friend < 0) {
     return;
   }
@@ -1179,7 +1181,7 @@ export function maybeSendAllies(sim: Simulation): void {
     raid.alliesAt = from + TICKS_PER_HOUR;
     return;
   }
-  if (sim.rng.next() >= allyChance(goodwillOf(sim, friend))) {
+  if (sim.rng.next() >= allyChance(goodwillOf(sim, friend)) + (alliedWith(sim, friend) ? ALLY_HELP : 0)) {
     return;
   }
   raid.allies = Math.max(2, Math.min(4, Math.round(raid.initial / 3)));
@@ -1188,7 +1190,7 @@ export function maybeSendAllies(sim: Simulation): void {
 
 function alliesArrive(sim: Simulation, count: number): void {
   const w = sim.world;
-  const friend = FACTIONS.findIndex((f) => !f.hostile);
+  const friend = helperFaction(sim);
   const region = sim.outsideRegion();
   const home = sim.homeTile() ?? sim.living()[0]?.tile;
   if (region === undefined || home === undefined) {
@@ -1309,10 +1311,10 @@ export function updateAllies(sim: Simulation): void {
     }
   }
   // (Those who walked off the map left fleeing; those struck down didn't.)
-  const walkedHome = sim.allies.some((a) => a.hp <= 0 && a.fleeing);
+  const walkedHome = sim.allies.find((a) => a.hp <= 0 && a.fleeing);
   sim.allies = sim.allies.filter((a) => a.hp > 0);
   if (walkedHome && sim.allies.length === 0) {
-    sim.addLog(`The fighters from ${kinName(FACTIONS.findIndex((f) => !f.hostile))} have gone home.`, 'info');
+    sim.addLog(`The fighters from ${kinName(walkedHome.faction)} have gone home.`, 'info');
   }
 }
 

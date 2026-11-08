@@ -33,6 +33,20 @@ export interface Caravan {
 }
 
 export const STARTING_GOODWILL = 20;
+// Raiders start out hostile; the hill clans start out guarded (they keep to themselves at first).
+export const HOSTILE_GOODWILL = -50;
+const GUARDED_GOODWILL = 5;
+// The hill clans keep to themselves until the colony has dealt with them: they trade and ask favours only
+// from this goodwill (the Meadow Kin from 0).
+const KNOWN_GOODWILL = 10;
+export const tradeFloor = (faction: number): number => (FACTIONS[faction]?.key === 'hollowstone' ? KNOWN_GOODWILL : 0);
+// Where each faction's goodwill starts, and drifts back to.
+export const startingGoodwill = (faction: number): number =>
+  FACTIONS[faction]?.hostile
+    ? HOSTILE_GOODWILL
+    : FACTIONS[faction]?.key === 'hollowstone'
+      ? GUARDED_GOODWILL
+      : STARTING_GOODWILL;
 
 // Silver changing hands for a deal, rounded in the traders' favour (so a single cheap item can't be
 // sold for double its price).
@@ -66,14 +80,56 @@ const LATER_WARES: [string, number, number][] = [
   ['scaleArmor', 0, 1],
 ];
 const LATER_FROM_DAY = 30;
+// The hill clans deal in metal and stone.
+const HILL_WARES: [string, number, number][] = [
+  ['iron', 10, 30],
+  ['toolKit', 1, 3],
+  ['stoneBlocks', 40, 120],
+  ['bricks', 0, 60],
+  ['meal', 0, 8],
+  ['leather', 0, 10],
+  ['knife', 0, 2],
+  ['spear', 0, 2],
+  ['recurveBow', 0, 1],
+];
+const HILL_LATER_WARES: [string, number, number][] = [
+  ['ironSword', 0, 1],
+  ['ironMail', 0, 1],
+  ['crossbow', 0, 1],
+  ['scaleArmor', 0, 1],
+];
+
+// What a faction's traders bring, by the colony's age.
+export function waresOf(sim: Simulation, faction: number): [string, number, number][] {
+  const hill = FACTIONS[faction]?.key === 'hollowstone';
+  const later = sim.day >= LATER_FROM_DAY;
+  if (hill) {
+    return later ? [...HILL_WARES, ...HILL_LATER_WARES] : HILL_WARES;
+  }
+  return later ? [...WARES, ...LATER_WARES] : WARES;
+}
+
+// Friendly factions on speaking terms, who might send traders.
+const tradingPartners = (sim: Simulation) =>
+  FACTIONS.filter((f) => !f.hostile && goodwillOf(sim, f.id) >= tradeFloor(f.id));
+
+// How keen the neighbours are to send a caravan: more the better the best of them thinks of the colony.
+export const caravanWeight = (sim: Simulation): number =>
+  sim.caravan ? 0 : Math.max(0, ...tradingPartners(sim).map((f) => 0.6 + goodwillOf(sim, f.id) / 100));
 // Caravans grow with the colony: more goods and a fuller purse, up to three times the first ones.
 const caravanScale = (sim: Simulation) => 1 + Math.min(sim.day, 120) / 60;
 
-export const goodwillOf = (sim: Simulation, faction: number): number => sim.goodwill[faction] ?? STARTING_GOODWILL;
+export const goodwillOf = (sim: Simulation, faction: number): number =>
+  sim.goodwill[faction] ?? startingGoodwill(faction);
+
+// Moves a faction's goodwill, kept within -100..100.
+export function shiftGoodwill(sim: Simulation, faction: number, delta: number): void {
+  sim.goodwill[faction] = Math.max(-100, Math.min(100, Math.round(goodwillOf(sim, faction) + delta)));
+}
 
 export function standingLabel(goodwill: number, hostile: boolean): string {
   if (hostile) {
-    return 'Hostile';
+    return goodwill >= -25 ? 'Uneasy' : 'Hostile';
   }
   return goodwill >= 75 ? 'Ally' : goodwill >= 40 ? 'Friendly' : goodwill >= 0 ? 'Neutral' : 'Wary';
 }
@@ -96,7 +152,10 @@ export const tradeOpen = (sim: Simulation): boolean =>
 // A caravan from a friendly faction sets out for the colony. Returns whether one could come.
 export function caravanArrives(sim: Simulation): boolean {
   const w = sim.world;
-  const faction = FACTIONS.find((f) => !f.hostile);
+  // Whoever comes, the better they think of the colony the likelier.
+  const partners = tradingPartners(sim);
+  let roll = sim.rng.next() * partners.reduce((sum, f) => sum + 0.6 + goodwillOf(sim, f.id) / 100, 0);
+  const faction = partners.find((f) => (roll -= 0.6 + goodwillOf(sim, f.id) / 100) <= 0) ?? partners[0];
   const home = sim.homeTile();
   const region = sim.outsideRegion();
   if (!faction || home === undefined || region === undefined || sim.caravan) {
@@ -118,8 +177,7 @@ export function caravanArrives(sim: Simulation): boolean {
     visitors.push({ id: sim.nextVisitorId++, name, tile: edge, path: [], moveProgress: 0, restUntil: 0 });
   }
   const scale = caravanScale(sim);
-  const wares = sim.day >= LATER_FROM_DAY ? [...WARES, ...LATER_WARES] : WARES;
-  const stock = wares
+  const stock = waresOf(sim, faction.id)
     .map(([key, lo, hi]) => ({ item: itemId(key), count: Math.round(sim.rng.int(lo, hi) * scale) }))
     .filter((s) => s.count > 0);
   sim.caravan = {
@@ -359,7 +417,7 @@ export function applyTrade(sim: Simulation, buy: [number, number][], sell: [numb
   // A good deal for both sides warms relations, a little at a time.
   const gain = Math.min(5, Math.floor((cost + income) / 80));
   if (gain > 0) {
-    sim.goodwill[caravan.faction] = Math.min(100, goodwillOf(sim, caravan.faction) + gain);
+    shiftGoodwill(sim, caravan.faction, gain);
   }
   sim.addLog(
     `Traded with ${FACTIONS[caravan.faction].name}: ${balance > 0 ? `paid ${balance}` : `received ${-balance}`} silver.`,
@@ -438,7 +496,7 @@ export function sellArt(sim: Simulation, tile: number): string | null {
   sim.artworks.delete(tile);
   caravan.silver -= price;
   sim.world.dropItemNear(sim.homeTile() ?? tile, SILVER(), price);
-  sim.goodwill[caravan.faction] = Math.min(100, goodwillOf(sim, caravan.faction) + 3);
+  shiftGoodwill(sim, caravan.faction, 3);
   sim.stats.artSold = (sim.stats.artSold ?? 0) + 1;
   sim.addLog(
     `${FACTIONS[caravan.faction].name} bought ${art.artist}'s ${name}, “${art.title}”, for ${price} silver.`,

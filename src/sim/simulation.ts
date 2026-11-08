@@ -95,6 +95,8 @@ import { emptyXp, learn, rollPassions, rustSkills, skillFactor } from './skills'
 import { PassRegions, Rooms, computePassRegions, computeRooms } from './regions';
 import { Rng, hash2 } from './rng';
 import { Caravan, sellArt, updateCaravan } from './trade';
+import { updateAlliances, worldAction } from './alliances';
+import { travel, updateExpeditions } from './expeditions';
 import { WET_CHILL, WeatherState, douse, freshWeather, isWet, updateFires, updateWeather, weatherDef } from './weather';
 import {
   converse,
@@ -831,8 +833,14 @@ export class Simulation {
     return sim;
   }
 
+  // Everyone alive and here (not away on an expedition).
   public living(): Colonist[] {
-    return this.colonists.filter((c) => !c.health.dead);
+    return this.colonists.filter((c) => !c.health.dead && !c.away);
+  }
+
+  // Everyone alive, here or away: the colony's count against its population cap.
+  public headcount(): number {
+    return this.colonists.filter((c) => !c.health.dead).length;
   }
 
   // The walkable region visitors arrive in: the colony's own if it reaches the map edge, otherwise
@@ -1042,11 +1050,18 @@ export class Simulation {
       spreadDisease(this);
       updateGreatBeast(this);
       updateDiplomacy(this);
+      updateAlliances(this);
+      updateExpeditions(this);
       this.weatherFilth();
     }
 
     for (const c of this.colonists) {
       if (c.health.dead) {
+        continue;
+      }
+      // On an expedition: walking off the map, or gone from it.
+      if (c.away) {
+        travel(this, c);
         continue;
       }
       if (slow) {
@@ -1217,6 +1232,13 @@ export class Simulation {
         }
         break;
       }
+      case 'world': {
+        const why = worldAction(this, cmd.action);
+        if (why) {
+          this.addLog(why, 'warn');
+        }
+        break;
+      }
       case 'policy':
         if (cmd.rations) {
           this.village.rations = cmd.rations;
@@ -1267,7 +1289,12 @@ export class Simulation {
         break;
       case 'draft': {
         const c = this.colonists[cmd.colonist];
-        if (!c || c.health.dead || (cmd.drafted && (c.health.downed || this.inMentalBreak(c) || c.age < DRAFT_AGE))) {
+        if (
+          !c ||
+          c.health.dead ||
+          c.away ||
+          (cmd.drafted && (c.health.downed || this.inMentalBreak(c) || c.age < DRAFT_AGE))
+        ) {
           break;
         }
         this.endJob(c);

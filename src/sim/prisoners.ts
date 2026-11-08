@@ -1,5 +1,6 @@
 import { TICKS_PER_HOUR, populationFor } from './constants';
-import { FACTIONS, featureId } from './defs';
+import { FACTIONS, featureId, itemId } from './defs';
+import { hostileDealing } from './diplomacy';
 import { traitFactor, traitValue } from './social';
 import type { Simulation } from './simulation';
 import { Captive, Colonist, Enemy } from './types';
@@ -63,6 +64,7 @@ export function updateCaptives(sim: Simulation): void {
     if (p.state === 'downed') {
       if (sim.tick - p.since >= DOWNED_TICKS) {
         remove(sim, p);
+        hostileDealing(sim, p.faction, 'leftToDie');
         sim.addLog(`${p.name} died of their wounds.`, 'info');
       }
       continue;
@@ -86,7 +88,12 @@ export function updateCaptives(sim: Simulation): void {
     }
     if (p.hungryHours >= STARVE_HOURS) {
       remove(sim, p);
-      sim.addLog(`The prisoner ${p.name} starved to death.`, 'danger', true);
+      hostileDealing(sim, p.faction, 'starved');
+      sim.addLog(
+        `The prisoner ${p.name} starved to death. ${FACTIONS[p.faction].name} won't forget it.`,
+        'danger',
+        true,
+      );
     }
   }
 }
@@ -127,6 +134,7 @@ export function talk(sim: Simulation, warden: Colonist, p: Captive): Colonist | 
     return null;
   }
   remove(sim, p);
+  hostileDealing(sim, p.faction, 'recruited');
   const c = sim.adopt(p.name, p.tile);
   c.skills.combat = Math.max(c.skills.combat, Math.min(20, Math.round(p.skill)));
   sim.stats.recruited = (sim.stats.recruited ?? 0) + 1;
@@ -135,8 +143,7 @@ export function talk(sim: Simulation, warden: Colonist, p: Captive): Colonist | 
 }
 
 // Whether the colony has room for another member (the map's population cap).
-export const roomToJoin = (sim: Simulation): boolean =>
-  sim.living().length < populationFor(sim.world.width).maxColonists;
+export const roomToJoin = (sim: Simulation): boolean => sim.headcount() < populationFor(sim.world.width).maxColonists;
 
 // Lets a prisoner (or a downed raider) go.
 export function release(sim: Simulation, id: number): boolean {
@@ -145,8 +152,38 @@ export function release(sim: Simulation, id: number): boolean {
     return false;
   }
   remove(sim, p);
-  sim.addLog(`${p.name} was released and limped away from the valley.`, 'info', true);
+  hostileDealing(sim, p.faction, p.state === 'prisoner' ? 'released' : 'releasedWounded');
+  sim.addLog(
+    `${p.name} was released and limped away from the valley. ${FACTIONS[p.faction].name} will hear of it.`,
+    'info',
+    true,
+  );
   return true;
+}
+
+// What a captive's people pay to have them back: more for a seasoned fighter, and for one kept fed in a cell.
+export const ransomPrice = (p: Captive): number =>
+  Math.round((40 + p.skill * 8 + (p.state === 'prisoner' ? 20 : 0)) / 5) * 5;
+
+// Sells a captive back to their own people: silver for the colony, and a little less bad blood (less than
+// letting them go for nothing). Returns why not, if it can't be done.
+export function ransom(sim: Simulation, id: number): string | null {
+  const p = sim.captives.find((q) => q.id === id);
+  if (!p) {
+    return 'Nobody by that name is held.';
+  }
+  const f = FACTIONS[p.faction];
+  if (sim.enemies.some((e) => e.faction === p.faction && e.hp > 0 && !e.fleeing)) {
+    return `Not while ${f.name} are attacking.`;
+  }
+  const price = ransomPrice(p);
+  remove(sim, p);
+  hostileDealing(sim, p.faction, 'ransomed');
+  const home = sim.homeTile() ?? p.tile;
+  sim.world.dropItemNear(home, itemId('silver'), price);
+  sim.stats.ransomed = (sim.stats.ransomed ?? 0) + 1;
+  sim.addLog(`${f.name} paid ${price} silver to have ${p.name} back.`, 'good', true);
+  return null;
 }
 
 function remove(sim: Simulation, p: Captive): void {

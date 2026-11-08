@@ -82,5 +82,12 @@
     "hostile": false,
     "description": "Farmers from the valley who trade and sometimes help.",
     "names": ["Bryony", "Tansy", "Corin", "Linden", "Sorrel", "Hazel", "Rowan", "Yarrow", "Briar", "Fennel"]
+  },
+  {
+    "key": "hollowstone",
+    "name": "The Hollowstone Clans",
+    "hostile": false,
+    "description": "Hill miners and smiths who trade iron and tools, and quarrel with the Meadow Kin over the valley's water.",
+    "names": ["Marl", "Shale", "Ochre", "Garnet", "Tor", "Umber", "Jasper", "Cobble", "Agate", "Slate"]
   }
 ]

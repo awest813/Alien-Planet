@@ -27,8 +27,21 @@ import {
   weaponDef,
 } from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
-import { atPeace, fightersHired, hireCost, tributeCost } from '../src/sim/diplomacy';
-import { PRISONER_BED } from '../src/sim/prisoners';
+import {
+  SETTLER_GOODWILL,
+  atPeace,
+  tributeCost,
+  TRUCE_GOODWILL,
+  fightersHired,
+  giftGoodwill,
+  hireCost,
+  onGoodTerms,
+  settlerCost,
+  settlerDays,
+  truceDays,
+} from '../src/sim/diplomacy';
+import { RUINS, cannotGo, supplyCost } from '../src/sim/expeditions';
+import { PRISONER_BED, roomToJoin } from '../src/sim/prisoners';
 import { isAvailable } from '../src/sim/research';
 import { applyTrade, colonyStock, goodwillOf, tradeOpen } from '../src/sim/trade';
 import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
@@ -213,6 +226,17 @@ interface Result {
   requestsFailed: number;
   gifts: number;
   kinGoodwill: number;
+  // The other friendly faction, and the raiders (lowest of them).
+  hillGoodwill: number;
+  raiderGoodwill: number;
+  truces: number;
+  settlers: number;
+  ransomed: number;
+  expeditions: number;
+  alliances: number;
+  callsAnswered: number;
+  callsRefused: number;
+  silver: number;
   goods: number;
   leaderless: number;
   recruited: number;
@@ -696,7 +720,7 @@ function play(seed: number): Result {
     }
     // The neighbours' requests: send the goods once they're in store; hunt the great boar down.
     const request = sim.diplomacy.request;
-    if (!passive && request?.kind === 'deliver' && colonyStock(sim, request.item) >= request.count) {
+    if (!passive && request && request.kind !== 'hunt' && colonyStock(sim, request.item) >= request.count) {
       sim.apply({ type: 'fulfilRequest' });
     }
     if (!passive && request?.kind === 'hunt') {
@@ -707,16 +731,18 @@ function play(seed: number): Result {
         sim.apply({ type: 'hunt', rect: { x0: bx, y0: by, x1: bx, y1: by }, add: true });
       }
     }
-    // Spare silver goes on keeping the Meadow Kin sweet (the diplomat only gifts while goodwill is low, and keeps the
-    // rest for tribute).
-    const kin = FACTIONS.find((f) => !f.hostile)!.id;
-    if (
-      !passive &&
-      hour % 24 === 12 &&
-      colonyStock(sim, itemId('silver')) > 400 &&
-      (!diplomat || goodwillOf(sim, kin) < 50)
-    ) {
-      sim.apply({ type: 'gift', faction: FACTIONS.find((f) => !f.hostile)!.id, silver: 50 });
+    // Spare silver goes on keeping the neighbours friendly (not on buying their love): whichever of them thinks
+    // least of the colony, while below 50.
+    if (!passive && hour % 24 === 12 && colonyStock(sim, itemId('silver')) > 400) {
+      const coolest = FACTIONS.filter(
+        (f) => !f.hostile && onGoodTerms(sim, f.id) && goodwillOf(sim, f.id) < 50 && giftGoodwill(sim, f.id, 50) > 0,
+      ).sort((a, b) => goodwillOf(sim, a.id) - goodwillOf(sim, b.id))[0];
+      if (coolest) {
+        sim.apply({ type: 'gift', faction: coolest.id, silver: 50 });
+      }
+    }
+    if (!passive) {
+      worldDealings(sim, seed, hour);
     }
     // Silver to spare: keep the Meadow Kin's fighters hired.
     if (
@@ -1090,7 +1116,8 @@ function play(seed: number): Result {
   };
   return {
     seed,
-    living: sim.living().length,
+    // (Away on an expedition counts as alive.)
+    living: sim.headcount(),
     total: sim.colonists.length,
     // The latest few, with when (the log keeps only so much); every one is counted in deathCauses.
     deaths: sim.storyLog.filter((s) => s.text.includes('has died')).map((s) => `day ${s.day} ${s.hour}h: ${s.text}`),
@@ -1140,6 +1167,16 @@ function play(seed: number): Result {
     requestsFailed: sim.stats.requestsFailed ?? 0,
     gifts: sim.stats.gifts ?? 0,
     kinGoodwill: goodwillOf(sim, FACTIONS.find((f) => !f.hostile)!.id),
+    hillGoodwill: goodwillOf(sim, FACTIONS.find((f) => f.key === 'hollowstone')!.id),
+    raiderGoodwill: Math.min(...FACTIONS.filter((f) => f.hostile).map((f) => goodwillOf(sim, f.id))),
+    truces: sim.stats.truces ?? 0,
+    settlers: sim.stats.settlers ?? 0,
+    ransomed: sim.stats.ransomed ?? 0,
+    expeditions: sim.stats.expeditions ?? 0,
+    alliances: sim.stats.alliances ?? 0,
+    callsAnswered: sim.stats.callsAnswered ?? 0,
+    callsRefused: sim.stats.callsRefused ?? 0,
+    silver: colonyStock(sim, itemId('silver')),
     goods: sim.resourceTotals().reduce((n, t) => n + t.total, 0),
     leaderless: sim.village.leader < 0 ? 1 : 0,
     recruited: sim.stats.recruited ?? 0,
@@ -1379,6 +1416,18 @@ console.log(
       .sort((a, b) => a - b)
       .join(' ')}`,
 );
+const spread = (pick: (r: Result) => number) =>
+  results
+    .map(pick)
+    .sort((a, b) => a - b)
+    .join(' ');
+console.log(
+  `  wider world: Hollowstone goodwill at the end ${spread((r) => r.hillGoodwill)}; raiders' (warier of the two) ` +
+    `${spread((r) => r.raiderGoodwill)}; ${sum((r) => r.truces)} truces, ${sum((r) => r.ransomed)} ransomed, ` +
+    `${sum((r) => r.settlers)} settlers bought, ${sum((r) => r.expeditions)} expeditions, ${sum((r) => r.alliances)} ` +
+    `alliances (${sum((r) => r.callsAnswered)} calls answered, ${sum((r) => r.callsRefused)} refused); ` +
+    `silver at the end ${spread((r) => r.silver)}`,
+);
 console.log(
   `  depths: shafts dug to ${results
     .map((r) => r.shaftDepth)
@@ -1418,5 +1467,88 @@ if (flow) {
     });
     // Taken at dawn: the day just begun ("+" columns cover the day before it).
     console.log(String(rows[0]?.daily[d].day ?? d + 1).padStart(3) + ' ' + cells.join(''));
+  }
+}
+
+// A colony's dealings with the wider world, as a sensible player might: take a side in the neighbours'
+// quarrels (usually the friend it likes better, not always), take up an alliance and answer its calls, make a
+// truce with raiders when they'll have one, sell back prisoners it has no room for, buy a settler and send
+// expeditions with silver to spare. Its whims come from the seed, not the game's dice.
+function worldDealings(sim: Simulation, seed: number, hour: number): void {
+  const d = sim.diplomacy;
+  const whim = (salt: number) => {
+    const x = Math.sin(seed * 12.9898 + sim.day * 78.233 + salt * 37.719) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  const silver = colonyStock(sim, itemId('silver'));
+  if (d.dispute && hour % 24 === 14) {
+    const { a, b } = d.dispute;
+    const [liked, other] = goodwillOf(sim, a) >= goodwillOf(sim, b) ? [a, b] : [b, a];
+    const roll = whim(1);
+    sim.apply({ type: 'world', action: { kind: 'dispute', side: roll < 0.5 ? liked : roll < 0.85 ? other : null } });
+  }
+  if (d.envoy && hour % 24 === 14) {
+    sim.apply({ type: 'world', action: { kind: 'envoy', accept: whim(2) < 0.7 } });
+  }
+  if (d.call && hour % 24 === 15) {
+    const free = sim.living().filter((c) => !cannotGo(sim, c) && !c.drafted);
+    if (colonyStock(sim, d.call.item) >= d.call.count) {
+      sim.apply({ type: 'world', action: { kind: 'call', answer: 'goods' } });
+    } else if (free.length >= 4) {
+      sim.apply({ type: 'world', action: { kind: 'call', answer: free[0].id } });
+    } else {
+      sim.apply({ type: 'world', action: { kind: 'call', answer: 'refuse' } });
+    }
+  }
+  // Raiders lying wounded with nobody to bring them in are let go rather than left to die (it softens their
+  // people, towards a truce).
+  for (const p of sim.captives.filter((q) => q.state === 'downed' && sim.tick - q.since > TICKS_PER_HOUR * 20)) {
+    sim.apply({ type: 'release', captive: p.id });
+  }
+  if (hour % 24 === 16) {
+    for (const f of FACTIONS.filter((x) => x.hostile)) {
+      if (goodwillOf(sim, f.id) >= TRUCE_GOODWILL && truceDays(sim, f.id) === 0) {
+        sim.apply({ type: 'world', action: { kind: 'truce', faction: f.id } });
+      }
+    }
+    // A full colony has no use for prisoners: sell them back.
+    if (!roomToJoin(sim)) {
+      for (const p of sim.captives.filter((q) => q.state === 'prisoner')) {
+        sim.apply({ type: 'world', action: { kind: 'ransom', captive: p.id } });
+      }
+    }
+  }
+  const kin = FACTIONS.find((f) => f.key === 'meadowKin')!.id;
+  if (
+    hour % 24 === 17 &&
+    sim.day >= 10 &&
+    roomToJoin(sim) &&
+    goodwillOf(sim, kin) >= SETTLER_GOODWILL &&
+    settlerDays(sim) === 0 &&
+    silver >= settlerCost(sim) + 300
+  ) {
+    sim.apply({ type: 'world', action: { kind: 'settler', faction: kin } });
+  }
+  // A party of two every four days or so, once there are hands to spare: to the ruins, or to whichever
+  // neighbour it gets on with less well. With silver piling up, a trading party of three every other day.
+  const rich = silver > 1500;
+  if (
+    hour % 24 === 8 &&
+    sim.day >= 12 &&
+    sim.day % (rich ? 2 : 4) === seed % (rich ? 2 : 4) &&
+    !(sim.raid && !sim.raid.outcome)
+  ) {
+    const free = sim.living().filter((c) => !cannotGo(sim, c) && !c.drafted);
+    const salvage = !rich && whim(3) < 0.5;
+    const friends = FACTIONS.filter((f) => !f.hostile && goodwillOf(sim, f.id) >= 0).sort(
+      (a, b) => goodwillOf(sim, a.id) - goodwillOf(sim, b.id),
+    );
+    const to = salvage || friends.length === 0 ? RUINS : friends[0].id;
+    const purpose = to === RUINS ? 'salvage' : 'trade';
+    const size = Math.min(rich ? 3 : 2, free.length - 3);
+    if (size > 0 && silver >= supplyCost(sim, purpose, size) + 300) {
+      const party = free.slice(-size).map((c) => c.id);
+      sim.apply({ type: 'world', action: { kind: 'expedition', to, purpose, colonists: party } });
+    }
   }
 }

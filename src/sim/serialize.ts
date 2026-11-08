@@ -102,6 +102,8 @@ interface SavedColonist {
   retired?: boolean;
   childhood?: { hard: number; happy: number };
   grief?: Grief[];
+  // On an expedition (older saves: never).
+  away?: 'leaving' | 'gone';
 }
 
 // Plain structured-cloneable data, stored as-is in IndexedDB. Jobs and reservations
@@ -271,6 +273,7 @@ export function serialize(sim: Simulation): SaveData {
         retired: c.retired,
         childhood: c.childhood,
         grief: c.grief,
+        away: c.away,
       }),
     ),
     bills: structuredClone(sim.bills),

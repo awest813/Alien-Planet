@@ -67,7 +67,8 @@ export function stageOf(age: number): LifeStage {
 export const isAdult = (c: Colonist): boolean => c.age >= ADULT;
 
 // Years gained in `hours`: children grow fast, adults age at the calendar's pace.
-const yearsIn = (age: number, hours: number) => (hours / HOURS_PER_YEAR) * (age < ADULT ? CHILD_GROWTH : ADULT_AGEING);
+export const yearsIn = (age: number, hours: number) =>
+  (hours / HOURS_PER_YEAR) * (age < ADULT ? CHILD_GROWTH : ADULT_AGEING);
 
 // Whether a colonist does this kind of work at their age.
 export function canWork(c: Colonist, work: WorkTypeKey): boolean {
