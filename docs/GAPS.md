@@ -128,7 +128,11 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   (item searches no longer build a key per item, and ice coming and going no longer redoes the rooms); pathfinding is most of the
   rest.
 - **Playtest personas never reach late content in 16 days.** No deep mining, breaches, elders or generations.
-  Run some players for 120+ days regularly (`days=120 players=...`).
+  Run some players for 120+ days regularly (`days=120 players=...`). The last 120-day run (players 40–99) found
+  no crashes or broken rules. Every colony lost was a persona that wrecks its own (neglectful, chaos,
+  demolisher), apart from two whose hut door opened into a pocket sealed by rock: the harness now picks a hut
+  site whose door leads out, and the game says when a blueprint or a colonist is cut off. Saving and loading
+  every 3 hours made no difference across the ten savescummer colonies.
 - **The balance harness plays one way.** It hunts everything, gifts silver daily, never sets policies or pays
   tribute, and builds no kiln or smelter. Its results say little about those systems.
   - `defend` now fights from cover: sandbags round the hut, longbows early, and bows, armour and leather bought
