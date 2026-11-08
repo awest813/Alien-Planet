@@ -46,8 +46,37 @@ export function createTextures(scene: Phaser.Scene): void {
       // Tinted blue, but not flat: the building's own shading shows through, so a door can be told
       // from the wall beside it and a bed from a table.
       c.globalCompositeOperation = 'source-atop';
-      c.fillStyle = 'rgba(127, 208, 255, 0.72)';
+      // (A floor plan lighter, so planned walls stand out on a planned floor.)
+      c.fillStyle = f.layer === 'floor' ? 'rgba(127, 208, 255, 0.45)' : 'rgba(127, 208, 255, 0.72)';
       c.fillRect(0, 0, TILE, TILE);
+      c.globalCompositeOperation = 'source-over';
+      if (f.blocksRoom && !f.door) {
+        // A planned wall: a solid outline, like a wall's footprint.
+        c.fillStyle = '#2b6c96';
+        c.fillRect(0, 0, TILE, 1);
+        c.fillRect(0, TILE - 1, TILE, 1);
+        c.fillRect(0, 0, 1, TILE);
+        c.fillRect(TILE - 1, 0, 1, TILE);
+      } else if (f.layer === 'floor') {
+        // A planned floor: just its corners marked.
+        c.fillStyle = '#7fd0ff';
+        for (const [x, y] of [
+          [0, 0],
+          [TILE - 3, 0],
+          [0, TILE - 1],
+          [TILE - 3, TILE - 1],
+        ]) {
+          c.fillRect(x, y, 3, 1);
+        }
+        for (const [x, y] of [
+          [0, 0],
+          [TILE - 1, 0],
+          [0, TILE - 3],
+          [TILE - 1, TILE - 3],
+        ]) {
+          c.fillRect(x, y, 1, 3);
+        }
+      }
       // A planned door gets a plain doorway mark, so it stands out in a row of planned walls.
       if (f.door) {
         c.globalCompositeOperation = 'source-over';
@@ -1125,13 +1154,35 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillRect(12, 3, 1, 1);
       break;
     case 'airConditioner':
-    case 'freezer':
-      c.fillStyle = key === 'freezer' ? '#cfe3ff' : '#d8d8de';
+      // A grey unit with a vent grille and a round fan.
+      c.fillStyle = '#d8d8de';
       c.fillRect(2, 2, 12, 12);
-      c.fillStyle = key === 'freezer' ? '#5585cc' : '#7fa8e0';
-      for (let x = 4; x < 13; x += 2) {
+      c.fillStyle = '#7fa8e0';
+      for (let x = 3; x < 8; x += 2) {
         c.fillRect(x, 4, 1, 8);
       }
+      c.fillStyle = '#6d6c73';
+      c.fillRect(9, 5, 4, 6);
+      c.fillStyle = '#b7c7dc';
+      c.fillRect(10, 7, 2, 2);
+      c.fillStyle = '#2e2e34';
+      c.fillRect(2, 13, 12, 1);
+      break;
+    case 'freezer':
+      // A frosted chest with a lid line, a handle and a snowflake.
+      c.fillStyle = '#cfe3ff';
+      c.fillRect(2, 3, 12, 11);
+      c.fillStyle = '#9ec2ee';
+      c.fillRect(2, 6, 12, 1);
+      c.fillStyle = '#5585cc';
+      c.fillRect(6, 4, 4, 1);
+      c.fillStyle = '#ffffff';
+      c.fillRect(7, 8, 1, 5);
+      c.fillRect(5, 10, 5, 1);
+      c.fillRect(6, 9, 1, 1);
+      c.fillRect(8, 9, 1, 1);
+      c.fillRect(6, 11, 1, 1);
+      c.fillRect(8, 11, 1, 1);
       c.fillStyle = '#2e2e34';
       c.fillRect(2, 13, 12, 1);
       break;
@@ -1463,6 +1514,22 @@ function drawItem(c: Ctx, key: string): void {
       c.fillRect(4, 9, 2, 2);
       c.fillRect(9, 8, 2, 2);
       c.fillRect(7, 11, 2, 1);
+      break;
+    case 'milk':
+      // A stoppered clay jug of milk.
+      c.fillStyle = '#8a5a34';
+      c.fillRect(5, 6, 7, 8);
+      c.fillRect(6, 4, 5, 2);
+      c.fillStyle = '#a8724a';
+      c.fillRect(6, 7, 2, 6);
+      c.fillStyle = '#f4f1e8';
+      c.fillRect(6, 3, 5, 1);
+      c.fillStyle = '#6b4426';
+      c.fillRect(12, 7, 2, 1);
+      c.fillRect(13, 8, 1, 3);
+      c.fillRect(12, 11, 2, 1);
+      c.fillStyle = '#d8d2c2';
+      c.fillRect(7, 2, 3, 1);
       break;
     case 'egg':
       c.fillStyle = '#efe6d2';

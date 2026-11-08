@@ -94,6 +94,8 @@ const terrainVariant = (x: number, y: number) => {
 const POOR_ART = 4;
 const SEASON_INDEX: Record<string, number> = { Spring: 0, Summer: 1, Autumn: 2, Winter: 3 };
 
+// Below this zoom, map text (names, stack counts) is too small to read.
+const READABLE_ZOOM = 0.9;
 const Depth = { WATER: 0.5, OVERLAY: 20, NIGHT: 30, PAWNS: 40, LABELS: 41, PREVIEW: 50 };
 const PAN_SPEED = 700;
 const MIN_ZOOM = 1;
@@ -119,6 +121,7 @@ export class ColonyScene extends Phaser.Scene {
   private raiders = new Map<number, Phaser.GameObjects.Container>();
   // Raiders' and allies' names, on the names' own layer above every figure (as colonists' are).
   private raiderLabels = new Map<number, Phaser.GameObjects.Text>();
+  private labelsReadable = true;
   // Raiders lying wounded and prisoners, by id.
   private captives = new Map<number, Phaser.GameObjects.Container>();
   private traders = new Map<number, Phaser.GameObjects.Container>();
@@ -167,7 +170,8 @@ export class ColonyScene extends Phaser.Scene {
 
   public create(): void {
     createTextures(this);
-    this.overlay = this.add.graphics().setDepth(Depth.OVERLAY);
+    // Above the night's shading (rings, shots and progress bars stay bright after dark), below the figures.
+    this.overlay = this.add.graphics().setDepth(Depth.NIGHT + 0.5);
     this.preview = this.add.graphics().setDepth(Depth.PREVIEW);
     this.night = this.add.rectangle(0, 0, 1, 1, 0x0a1230, 0).setOrigin(0).setDepth(Depth.NIGHT);
     this.glow = this.add
@@ -192,6 +196,12 @@ export class ColonyScene extends Phaser.Scene {
     controller.frame();
     if (controller.simVersion !== this.builtFor) {
       this.buildWorld();
+    }
+    // Zoomed far out, text shrinks to a few pixels: names and stack counts are left off until it reads again.
+    const readable = this.cameras.main.zoom >= READABLE_ZOOM;
+    if (readable !== this.labelsReadable) {
+      this.labelsReadable = readable;
+      this.itemLabels.forEach((label) => label.setVisible(readable));
     }
     const world = controller.sim.world;
     this.syncDirty(world);
@@ -247,12 +257,26 @@ export class ColonyScene extends Phaser.Scene {
       if (x < view.x0 || x > view.x1 || y < view.y0 || y > view.y1) {
         continue;
       }
-      const flicker = 0.75 + 0.25 * Math.sin(now / 70 + i * 1.7);
       const px = x * TILE;
       const py = y * TILE;
-      g.fillStyle(0xd9480f, 0.8).fillRect(px + 2, py + 5, TILE - 4, TILE - 6);
-      g.fillStyle(0xff8c1a, 0.9 * flicker).fillRect(px + 4, py + 3 + 2 * (1 - flicker), TILE - 8, TILE - 6);
-      g.fillStyle(0xffe066, flicker).fillRect(px + 6, py + 7, TILE - 12, TILE - 10);
+      const base = py + TILE - 2;
+      // Embers along the bottom, three tongues of flame each flickering to its own height, a bright core,
+      // and a puff of smoke drifting up out of it.
+      g.fillStyle(0x8a2a08, 0.85).fillRect(px + 2, base - 2, TILE - 4, 3);
+      for (let k = 0; k < 3; k++) {
+        const cx = px + 4 + k * 4;
+        const lick = 0.6 + 0.4 * Math.abs(Math.sin(now / (90 + k * 23) + i * 1.7 + k * 2.1));
+        const h = (k === 1 ? 12 : 9) * lick;
+        g.fillStyle(0xe8590c, 0.9).fillTriangle(cx - 3, base, cx + 3, base, cx, base - h);
+        g.fillStyle(0xffb347, 0.95).fillTriangle(cx - 1.5, base, cx + 1.5, base, cx, base - h * 0.6);
+      }
+      g.fillStyle(0xfff3b0, 0.9).fillRect(px + 6, base - 3, TILE - 12, 2);
+      const rise = (now / 1400 + hash2(i, 1, 31)) % 1;
+      g.fillStyle(0x5a5a60, 0.35 * (1 - rise)).fillCircle(
+        px + 8 + Math.sin(now / 500 + i) * 2,
+        py - rise * 10,
+        2.5 + rise * 3,
+      );
     }
   }
 
@@ -292,9 +316,12 @@ export class ColonyScene extends Phaser.Scene {
       }
       g.fillStyle(0xa8c8ff, kind === 'storm' ? 0.55 : 0.4);
       const drops = kind === 'storm' ? 260 : 160;
+      // Each drop has its own place and pace (hashed), so they scatter rather than fall in lines.
       for (let k = 0; k < drops; k++) {
-        const x = v.x + frac(k * 0.6180339 + now * 0.00004) * v.width;
-        const y = v.y + frac(k * 0.3819 + now * (kind === 'storm' ? 0.0014 : 0.001)) * v.height;
+        const x = v.x + frac(hash2(k, 3, 11) + now * 0.00004) * v.width;
+        const y =
+          v.y +
+          frac(hash2(k, 5, 13) + now * (kind === 'storm' ? 0.0014 : 0.001) * (0.8 + 0.4 * hash2(k, 7, 17))) * v.height;
         g.fillRect(x, y, s, 7 * s);
       }
       // Lightning: a white flash that fades over a second of game time.
@@ -306,8 +333,8 @@ export class ColonyScene extends Phaser.Scene {
       g.fillStyle(0xffffff, 0.85);
       for (let k = 0; k < 140; k++) {
         const drift = Math.sin(now / 900 + k) * 6 * s;
-        const x = v.x + frac(k * 0.6180339) * v.width + drift;
-        const y = v.y + frac(k * 0.3819 + now * 0.00018) * v.height;
+        const x = v.x + frac(hash2(k, 3, 19)) * v.width + drift;
+        const y = v.y + frac(hash2(k, 5, 23) + now * 0.00018 * (0.7 + 0.6 * hash2(k, 9, 29))) * v.height;
         g.fillRect(x, y, 2 * s, 2 * s);
       }
     } else if (kind === 'fog') {
@@ -442,12 +469,27 @@ export class ColonyScene extends Phaser.Scene {
     }
   }
 
-  private put(layer: Phaser.Tilemaps.TilemapLayer, x: number, y: number, frame: number): void {
+  private put(layer: Phaser.Tilemaps.TilemapLayer, x: number, y: number, frame: number): Phaser.Tilemaps.Tile | null {
     if (frame < 0) {
       layer.removeTileAt(x, y, false, false);
-    } else {
-      layer.putTileAt(frame, x, y, false);
+      return null;
     }
+    return layer.putTileAt(frame, x, y, false);
+  }
+
+  // Trees and bushes turn with the seasons (warm in autumn, frosted in winter), and a crop that's ready to
+  // harvest ripens to gold, so it can be told from one still growing.
+  private featureTint(world: World, i: number): number {
+    const f = world.feature[i];
+    if (f === NONE) {
+      return 0xffffff;
+    }
+    const def = featureDef(f);
+    if (def.crop) {
+      return world.growth[i] >= 1 ? 0xffe27a : 0xffffff;
+    }
+    const plant = def.natural && (def.harvest?.work === 'chop' || def.harvest?.work === 'forage');
+    return !plant ? 0xffffff : this.terrainSeason === 2 ? 0xffb36b : this.terrainSeason === 3 ? 0xc4d0de : 0xffffff;
   }
 
   // The signal beacon: a pulse spreading from it while it transmits, and the ship beside it once landed.
@@ -530,6 +572,12 @@ export class ColonyScene extends Phaser.Scene {
       const y = world.yOf(i);
       this.put(this.layers.terrain, x, y, Frames.terrain(world.terrain[i], terrainVariant(x, y), season));
     }
+    for (const i of world.tilesWith('features')) {
+      const tile = this.layers.feature.getTileAt(world.xOf(i), world.yOf(i));
+      if (tile) {
+        tile.tint = this.featureTint(world, i);
+      }
+    }
   }
 
   private drawTile(world: World, i: number): void {
@@ -544,7 +592,10 @@ export class ColonyScene extends Phaser.Scene {
     this.put(L.zone, x, y, zone === 0 ? -1 : zone >= GROW_ZONE ? Frames.GROW_ZONE : Frames.ZONE);
     const f = world.feature[i];
     const featureFrame = f === NONE ? -1 : featureDef(f).crop ? Frames.crop(f, world.growth[i]) : Frames.feature(f);
-    this.put(L.feature, x, y, featureFrame);
+    const featureTile = this.put(L.feature, x, y, featureFrame);
+    if (featureTile) {
+      featureTile.tint = this.featureTint(world, i);
+    }
     this.put(L.items, x, y, world.itemType[i] !== NONE ? Frames.item(world.itemType[i]) : -1);
     const bp = world.blueprint[i];
     const floorPlan = bp !== NONE && featureDef(bp).layer === 'floor';
@@ -579,7 +630,8 @@ export class ColonyScene extends Phaser.Scene {
         })
         .setOrigin(1, 1)
         .setResolution(6)
-        .setDepth(4.5);
+        .setDepth(4.5)
+        .setVisible(this.labelsReadable);
       this.itemLabels.set(i, label);
     }
     label.setText(count >= 1000 ? `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}k` : String(count));
@@ -678,7 +730,7 @@ export class ColonyScene extends Phaser.Scene {
       // Children are small, teens nearly grown.
       pawn.figure.setScale(c.age < TEEN ? 0.7 : c.age < ADULT ? 0.85 : 1);
       pawn.zzz.setVisible(c.sleeping).setY(-6 - ((time / 400) % 3));
-      pawn.label.setVisible(controller.settings.showNames && pawn.root.visible);
+      pawn.label.setVisible(controller.settings.showNames && this.labelsReadable && pawn.root.visible);
       pawn.alert
         .setText(downed ? '+' : '!')
         .setColor(downed ? '#ff5c5c' : '#ff7a5c')
@@ -799,12 +851,13 @@ export class ColonyScene extends Phaser.Scene {
       const y = world.yOf(v.tile) + (world.yOf(to) - world.yOf(v.tile)) * v.moveProgress;
       trader.setPosition((x + 0.5) * TILE, (y + 0.5) * TILE);
       (trader.getAt(0) as Phaser.GameObjects.Image).setTexture(stride(v.path.length > 0, this.time.now));
-      (trader.getAt(3) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames);
+      (trader.getAt(3) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames && this.labelsReadable);
     }
   }
 
   private createRaider(e: Enemy, ally = false): Phaser.GameObjects.Container {
-    const tint = ally ? 0x5f9a4a : e.faction === 0 ? 0x8a5a3c : 0x5a5a64;
+    // Allies wear the Meadow Kin's blue-green warband tunic (their traders wear plain green).
+    const tint = ally ? 0x3f7f8a : e.faction === 0 ? 0x8a5a3c : 0x5a5a64;
     // Raiders' boots are darker than colonists'.
     const legs = this.add.image(0, 0, 'pawn-legs-0').setTint(0x9a9aa0);
     const body = this.add.image(0, 0, 'pawn-body').setTint(tint);
@@ -814,8 +867,9 @@ export class ColonyScene extends Phaser.Scene {
     const parts: Phaser.GameObjects.GameObject[] = [legs, body, head];
     if (ally) {
       const shield = this.add.graphics();
-      shield.fillStyle(0x6b4a2a, 1).fillCircle(-4, 2, 2.6);
-      shield.fillStyle(0xe8d27a, 1).fillCircle(-4, 2, 1.1);
+      shield.fillStyle(0x3a2814, 1).fillCircle(-4, 2, 3.8);
+      shield.fillStyle(0x7a5530, 1).fillCircle(-4, 2, 3.1);
+      shield.fillStyle(0xe8d27a, 1).fillCircle(-4, 2, 1.2);
       parts.push(shield);
     }
     return this.add.container(0, 0, parts).setDepth(Depth.PAWNS);
@@ -897,7 +951,7 @@ export class ColonyScene extends Phaser.Scene {
             .text(0, 0, e.name, {
               fontFamily: 'system-ui, sans-serif',
               fontSize: '6px',
-              color: allies.has(e.id) ? '#9fe38a' : '#ff8a8a',
+              color: allies.has(e.id) ? '#8fe0d8' : '#ff8a8a',
               stroke: '#000000',
               strokeThickness: 2,
             })
@@ -912,7 +966,7 @@ export class ColonyScene extends Phaser.Scene {
       const y = world.yOf(e.tile) + (world.yOf(to) - world.yOf(e.tile)) * t;
       raider.setPosition((x + 0.5) * TILE, (y + 0.5) * TILE).setAlpha(e.fleeing ? 0.6 : 1);
       (raider.getAt(0) as Phaser.GameObjects.Image).setTexture(stride(e.path.length > 0, this.time.now));
-      this.raiderLabels.get(e.id)!.setVisible(controller.settings.showNames && raider.visible);
+      this.raiderLabels.get(e.id)!.setVisible(controller.settings.showNames && this.labelsReadable && raider.visible);
     }
     // A camp or a melee packs them close: a name that would overlap another goes up a line (or two), or fades
     // out if there's still no room. Compared where the labels actually sit, rows above and below included.
@@ -958,24 +1012,25 @@ export class ColonyScene extends Phaser.Scene {
           })
           .setOrigin(0.5, 1)
           .setResolution(4);
-        // Lying down: the figure turned on its side, the label kept upright.
-        const figure = this.add.container(0, 0, [body, head]).setAngle(-90);
+        // Lying down as a downed colonist does (legs and all, turned the same way), the label kept upright.
+        const legs = this.add.image(0, 0, 'pawn-legs-0').setTint(0x9a9aa0);
+        const figure = this.add.container(0, 0, [legs, body, head]).setAngle(90);
         captive = this.add.container(0, 0, [figure, label]).setDepth(Depth.PAWNS);
         this.captives.set(p.id, captive);
       }
       const figure = captive.getAt(0) as Phaser.GameObjects.Container;
-      (figure.getAt(0) as Phaser.GameObjects.Image).setTint(
+      (figure.getAt(1) as Phaser.GameObjects.Image).setTint(
         p.state === 'prisoner' ? 0xd0702c : p.faction === 0 ? 0x8a5a3c : 0x5a5a64,
       );
       // Being carried: drawn upright beside whoever carries them.
       const carried = sim.colonists.some(
         (c) => c.job?.type === 'capture' && c.job.stage === 1 && c.job.patient === p.id && c.tile === p.tile,
       );
-      figure.setAngle(carried ? 0 : -90);
+      figure.setAngle(carried ? 0 : 90);
       captive
         .setPosition((world.xOf(p.tile) + 0.5) * TILE + (carried ? 4 : 0), (world.yOf(p.tile) + 0.5) * TILE)
         .setAlpha(p.state === 'downed' ? 0.85 : 1);
-      (captive.getAt(1) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames);
+      (captive.getAt(1) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames && this.labelsReadable);
     }
   }
 
@@ -1012,7 +1067,8 @@ export class ColonyScene extends Phaser.Scene {
       if (shot.ranged) {
         g.lineStyle(1, shot.hit ? 0xffe08a : 0x9aa0a8, 0.8).lineBetween(fx, fy, tx, ty);
       } else if (shot.hit) {
-        g.fillStyle(0xff5c5c, 0.9).fillCircle(tx, ty, 3);
+        // A ring round the one struck (a dot would sit under their figure).
+        g.lineStyle(1.5, 0xff5c5c, 0.9).strokeCircle(tx, ty, 6);
       }
     }
 
@@ -1132,15 +1188,27 @@ export class ColonyScene extends Phaser.Scene {
     g.clear();
     const sim = controller.sim;
     const world = sim.world;
+    // Strong enough to read over grass and snow; each row's runs of one colour drawn as one rectangle (a
+    // zoomed-out view is thousands of tiles).
+    const colorAt = (i: number) => {
+      if (world.blocksRoom(i)) {
+        return -1;
+      }
+      const t = sim.temperatureAt(i);
+      return t <= 0 ? 0x4f7cff : t < 10 ? 0x7fc8ff : t <= 26 ? 0x8fe36b : t <= 32 ? 0xffb347 : 0xff5c5c;
+    };
     for (let y = view.y0; y <= view.y1; y++) {
-      for (let x = view.x0; x <= view.x1; x++) {
-        const i = world.idx(x, y);
-        if (world.blocksRoom(i)) {
-          continue;
+      let x = view.x0;
+      while (x <= view.x1) {
+        const color = colorAt(world.idx(x, y));
+        let end = x + 1;
+        while (end <= view.x1 && colorAt(world.idx(end, y)) === color) {
+          end++;
         }
-        const t = sim.temperatureAt(i);
-        const color = t <= 0 ? 0x4f7cff : t < 10 ? 0x7fc8ff : t <= 26 ? 0x8fe36b : t <= 32 ? 0xffb347 : 0xff5c5c;
-        g.fillStyle(color, 0.28).fillRect(x * TILE, y * TILE, TILE, TILE);
+        if (color >= 0) {
+          g.fillStyle(color, 0.42).fillRect(x * TILE, y * TILE, (end - x) * TILE, TILE);
+        }
+        x = end;
       }
     }
   }
@@ -1211,6 +1279,24 @@ export class ColonyScene extends Phaser.Scene {
           x,
           y,
           share * source.radius * TILE,
+        );
+      }
+    }
+    // A fire burning (a tree, a wall) lights the night round it too (the nearest few dozen in view).
+    let lit = 0;
+    for (const i of controller.sim.burning) {
+      const tx = world.xOf(i);
+      const ty = world.yOf(i);
+      if (lit >= 60 || tx < view.x0 - 3 || tx > view.x1 + 3 || ty < view.y0 - 3 || ty > view.y1 + 3) {
+        continue;
+      }
+      lit++;
+      const flicker = 0.8 + 0.2 * Math.sin(time / 90 + i);
+      for (let ring = 6; ring >= 1; ring--) {
+        g.fillStyle(0xff8c2a, 0.05 * dark * flicker).fillCircle(
+          (tx + 0.5) * TILE,
+          (ty + 0.5) * TILE,
+          (ring / 6) * 3 * TILE,
         );
       }
     }

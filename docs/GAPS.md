@@ -107,7 +107,19 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   drafted colonists by tap). There's no long-press to stand in for right-click on the Work grid, tap targets
   are small (speed buttons 34×22), and a phone on its side leaves little map between the bars.
 
-## 8. Testing
+## 8. Graphics
+
+- **Light passes through walls.** Fire and lamp glow are drawn as soft circles over the night shade, so a lit
+  room spills light onto the tiles outside it.
+  - Close it by clipping each light to its room (the room map already exists) or to tiles in line of sight.
+- **Name labels can cover the tile north of a colonist.** Labels are staggered up to three lines when they
+  crowd, and hidden when zoomed out, but a busy stockpile can still sit under a name.
+- **Zoomed right out, the map is costly to draw.** There are eleven tile layers, and each draws every tile in
+  view every frame, so the cost grows with the area on screen. It hasn't been measured on slow machines.
+  - Close it by baking the layers that rarely change (ground, floors, zones) into one render texture and
+    redrawing only changed tiles.
+
+## 9. Testing
 
 - **Continuous integration is new** (`.github/workflows/ci.yml`: type check, lint, formatting, tests, build on
   pushes to main and on pull requests). It hasn't run on GitHub yet; check the first run.
@@ -116,7 +128,9 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   again). Saves from before version 16 can't be loaded at all; the game says so.
 - **Performance is checked by hand** with `scripts/perf.ts` (Large map, 46–52 ms per 1,000 ticks against a 60 ms
   budget; it exits non-zero over budget). It's too noisy for CI. Goal checks, run every 40 ticks for quick
-  feedback, had pushed it to 66 ms; now only the open phase's goals are checked that often.
+  feedback, had pushed it to 66 ms; now only the open phase's goals are checked that often. A busy Large
+  colony (13 colonists, 800 items) runs 36–85 ms per 1,000 ticks over 70 days; pathfinding, the reservation
+  check and room measuring are most of it.
 - **Playtest personas never reach late content in 16 days.** No deep mining, breaches, elders or generations.
   Run some players for 120+ days regularly (`days=120 players=...`).
 - **The balance harness plays one way.** It hunts everything, gifts silver daily, never sets policies or pays
@@ -143,3 +157,11 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   - tribute doing nothing;
   - trade ignoring condition.
 - **Reporting:** the long-run report undercounting deaths and raids.
+- **Graphics:**
+  - night shading drawn under the bright overlays, and fires lighting the dark;
+  - fires with flickering flames, embers and smoke;
+  - seasonal trees and bushes, gold ripe crops;
+  - blueprints for walls and floors told apart;
+  - its own art for milk, the freezer and the air conditioner;
+  - a stronger heat map, and labels hidden when zoomed out.
+- **Sound:** fights, births, fires and collapses heard; winter quiet with stronger wind.
