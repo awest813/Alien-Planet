@@ -254,6 +254,9 @@ const CRAWL_HUNGRY = 0.15;
 const STARVING_PATIENT = 0.1;
 // Below this outdoor temperature the fires matter; then wood for this many days of them is kept back from
 // the generators.
+// Walls and doors count as this many tiles nearer than other blueprints.
+const ENCLOSURE_FIRST = 15;
+const OBJECTIVE_TICKS = 40;
 const COLD_FOR_FIRES = 8;
 const FIREWOOD_RESERVE_DAYS = 3;
 // Wood the colonists land with.
@@ -988,8 +991,9 @@ export class Simulation {
     updateAnimals(this);
     updateCaravan(this);
 
-    // Goals change slowly; checking them once an hour is plenty.
-    if (this.tick % TICKS_PER_HOUR === 0) {
+    // Goals are checked often enough that one ticks off moments after it's done (a couple of seconds at
+    // normal speed), but not every tick.
+    if (this.tick % OBJECTIVE_TICKS === 0) {
       this.checkObjectives();
     }
   }
@@ -2065,7 +2069,11 @@ export class Simulation {
     if (this.firstNight === 'pending') {
       this.firstNight = exposed === 0 ? 'success' : 'failed';
       if (exposed > 0) {
-        this.addLog('The colony made it through the first night, but not everyone had shelter.', 'warn');
+        this.addLog(
+          'The colony made it through the first night, but not everyone had shelter: that goal is missed. Nothing else is lost; get a roof over everyone before tonight.',
+          'warn',
+          true,
+        );
       }
     }
     this.addLog(`Day ${this.day} begins.`);
@@ -2486,18 +2494,20 @@ export class Simulation {
         }
       }
       // Dangerously cold (or hot) and still getting worse: drop the task and find shelter.
-      // Sleepers and eaters are handled on their own; someone helping a patient keeps at it
-      // until they're close to collapsing themselves.
+      // Sleepers are handled on their own; someone helping a patient keeps at it until they're close
+      // to collapsing themselves, and so does someone sitting down to eat. But a walk out to food in
+      // the freezing cold can wait: hunger takes days, the cold hours.
       const task = c.job?.type;
       const helping = task === 'rescue' || task === 'tend' || task === 'feed';
+      const nearCollapse = Math.max(c.health.hypothermia, c.health.heatstroke) > 0.75;
       if (
         exposed &&
         this.tick % SLOW_TICKS === 0 &&
         task !== undefined &&
         task !== 'warmUp' &&
         task !== 'sleep' &&
-        task !== 'eat' &&
-        (!helping || Math.max(c.health.hypothermia, c.health.heatstroke) > 0.75) &&
+        (task !== 'eat' || (nearCollapse && c.path.length > 0)) &&
+        (!helping || nearCollapse) &&
         this.exposedHere(c) &&
         (this.nextWarmSearch.get(c.id) ?? 0) <= this.tick
       ) {
@@ -3198,6 +3208,10 @@ export class Simulation {
     return f !== NONE && !!featureDef(f).crop && this.world.growth[i] >= 1;
   }
 
+  // Walls and doors go up before what goes inside them: a closed room by nightfall beats beds in the open.
+  private readonly enclosureFirst = (i: number): number =>
+    featureDef(this.world.blueprint[i]).blocksRoom ? -ENCLOSURE_FIRST : 0;
+
   private tryConstruct(c: Colonist): boolean {
     const region = this.regionOf(c.tile);
     const targets = this.nearestIn(
@@ -3208,6 +3222,8 @@ export class Simulation {
         this.constructable(i) &&
         !this.isReserved(`w${i}`, c) &&
         this.hasWorkSpot(i, false, region),
+      4,
+      this.enclosureFirst,
     );
     return this.startWorkJob(c, 'construct', targets, region);
   }
@@ -3860,6 +3876,7 @@ export class Simulation {
         !this.isReserved(`d${i}`, c) &&
         this.hasWorkSpot(i, false, region),
       6,
+      this.enclosureFirst,
     );
     const sourceCache = new Map<number, number | undefined>();
     for (const bp of blueprints) {
@@ -7050,6 +7067,10 @@ export const OBJECTIVES: ObjectiveDef[] = [
     label: 'Survive the first night with everyone indoors',
     phase: 1,
     check: (s) => s.firstNight === 'success',
+    progress: (s) =>
+      s.firstNight === 'pending' && s.day === 1 && s.hour < NIGHT_START
+        ? `${Math.ceil(NIGHT_START - s.hour)}h to nightfall`
+        : '',
   },
   {
     id: 'grow',

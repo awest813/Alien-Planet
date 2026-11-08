@@ -26,7 +26,7 @@ import { availableProjects, isAvailable } from '../sim/research';
 import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, yearOf } from '../sim/seasons';
 import { animalName } from '../sim/animals';
 import { armorOf } from '../sim/combat';
-import { POISONING_HOURS, bleedingOf, needsBedRest, painOf } from '../sim/health';
+import { POISONING_HOURS, bleedingOf, needsBedRest } from '../sim/health';
 import { comfortRange, qualityLabel } from '../sim/apparel';
 import { MAX_SKILL, SKILL_LABELS, xpToNext } from '../sim/skills';
 import { relationLabel } from '../sim/social';
@@ -143,7 +143,7 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
   wood: { how: 'Pick Chop and drag over trees: colonists cut them down for wood.', tool: 'chop' },
   stockpile: { how: 'Drag out a stockpile zone on open ground near your colonists.', tool: 'stockpile' },
   haul: { how: 'Haulers carry loose items into stockpiles on their own. Give them time.' },
-  shelter: { how: 'Drag a rectangle of wood walls, then click a door into one side.', tool: 'woodWall' },
+  shelter: { how: 'Drag a rectangle of wood walls, then pick Door and click one of those walls.', tool: 'woodWall' },
   bed: { how: 'Click beds inside the shelter, one per colonist.', tool: 'bed' },
   night: { how: 'Have walls, a door and beds up before 22:00, when colonists go to sleep.' },
   grow: { how: 'Drag a potato field over soil or grass.', tool: 'growPotatoes' },
@@ -396,7 +396,7 @@ export const TOOLS: ToolDef[] = [
     'Sturdier and prettier than granite: raiders take twice as long to break through',
   ),
   build('brickWall', 'Brick wall', '', 'structure', 'Sturdy fired bricks: between granite and blocks (Pottery)'),
-  build('door', 'Door', 'o', 'structure', 'Click a wall gap to place a door'),
+  build('door', 'Door', 'o', 'structure', 'Click a wall (or a gap in one) to make it a door'),
   build(
     'roof',
     'Roof',
@@ -793,6 +793,8 @@ export interface UiState {
   night: boolean;
   outdoorTemp: number;
   speed: number;
+  // A new colony waiting for the player to start the clock.
+  notStarted: boolean;
   toolId: string;
   colonists: ColonistView[];
   selectedColonist: number | null;
@@ -881,6 +883,8 @@ export class GameController {
   public cameraView = { x0: 0, y0: 0, x1: 0, y1: 0 };
 
   private speedIndex = 1;
+  // A new colony whose clock hasn't been started yet.
+  private notStarted = false;
   // Speed to restore when a menu that paused the game closes.
   private heldSpeed: number | null = null;
   private resumeSpeed = 1;
@@ -1174,6 +1178,7 @@ export class GameController {
     this.speedIndex = index;
     if (index > 0) {
       this.resumeSpeed = index;
+      this.notStarted = false;
     }
     this.publish();
   }
@@ -1306,6 +1311,14 @@ export class GameController {
       trimmed === '' ? Math.floor(Math.random() * 1e9) : /^\d+$/.test(trimmed) ? Number(trimmed) : hashSeed(trimmed);
     this.replaceSim(Simulation.newColony(seed, difficulty, size));
     this.inPlay = true;
+    // The clock waits for the player: there's a deadline (the first nightfall), and reading the goals and
+    // getting the first orders down shouldn't eat into it.
+    if (this.heldSpeed !== null) {
+      this.heldSpeed = 0;
+    } else {
+      this.setSpeed(0);
+    }
+    this.notStarted = true;
     this.notify(`New colony founded (seed ${seed}).`);
   }
 
@@ -1543,6 +1556,7 @@ export class GameController {
       night: sim.isNight(),
       outdoorTemp: Math.round(sim.outdoorTemperature()),
       speed: this.speedIndex,
+      notStarted: this.notStarted,
       toolId: toolId(this.tool),
       colonists: sim.colonists.map((c) => ({
         id: c.id,
@@ -1895,7 +1909,8 @@ export class GameController {
         });
       }
     }
-    const hurt = sim.living().some((c) => c.health.injuries.length > 0 || c.health.disease || painOf(c) > 0);
+    // (Wounds and sickness: medicine does nothing for the cold.)
+    const hurt = sim.living().some((c) => c.health.injuries.length > 0 || c.health.disease);
     if (hurt && sim.stockOf(itemId('herbalMedicine')) === 0) {
       alerts.push({ text: 'No medicine: grow healroot for better treatment', tone: 'warn' });
     }
@@ -2041,7 +2056,22 @@ export class GameController {
       }
     }
     if (!sim.hasShelter() && sim.hour >= 16 && sim.hour < NIGHT_START) {
-      alerts.push({ text: 'No shelter yet, and night falls at 22:00', tone: 'warn' });
+      const left = Math.ceil(NIGHT_START - sim.hour);
+      const walls = [...w.tilesWith('blueprints')].filter((i) => featureDef(w.blueprint[i]).blocksRoom).length;
+      alerts.push({
+        text: `No shelter yet, and night falls in ${left}h${walls > 0 ? ` (${walls} walls and doors still to build)` : ': plan walls and a door'}`,
+        tone: left <= 2 ? 'danger' : 'warn',
+      });
+    }
+    // At night, whoever sleeps in the open: worth knowing, and worth fixing tomorrow.
+    if (sim.isNight()) {
+      const outside = sim.living().filter((c) => c.sleeping && !sim.isRoofed(c.tile)).length;
+      if (outside > 0) {
+        alerts.push({
+          text: `${outside} colonist${outside > 1 ? 's are' : ' is'} sleeping outside: cold and miserable. Build a shelter with beds`,
+          tone: 'warn',
+        });
+      }
     }
     const nutrition = totals.reduce((sum, t) => sum + itemDef(t.item).nutrition * t.total, 0);
     const days = nutrition / (Math.max(1, sim.living().length) * DAILY_NUTRITION);
@@ -2157,7 +2187,8 @@ export class GameController {
       }
       const since = this.idleSince.get(c.id) ?? sim.tick;
       this.idleSince.set(c.id, since);
-      return sim.tick - since > TICKS_PER_HOUR;
+      // (On the first day, a little longer: the player is still finding their way around.)
+      return sim.tick - since > TICKS_PER_HOUR * (sim.day === 1 ? 2 : 1);
     });
     if (idle.length > 0) {
       const names = idle.map((c) => c.name).join(', ');
@@ -2303,6 +2334,13 @@ export class GameController {
         .build!.cost.map((c, line) => `${w.deliveredAt(i, line)}/${c.count} ${itemDef(c.item).name.toLowerCase()}`)
         .join(', ');
       orders.push(`Blueprint: ${def.name} (${materials})`);
+      // Building over a tree, a bush or rock waits until it's cleared.
+      const there = w.feature[i] !== NONE ? featureDef(w.feature[i]) : undefined;
+      if (there?.harvest && !there.shaft && !def.layer) {
+        const who =
+          { mine: 'a miner', chop: 'a plant cutter', forage: 'a plant cutter' }[there.harvest.work] ?? 'someone';
+        orders.push(`Waits for ${who} to clear the ${there.name.toLowerCase()} first`);
+      }
     }
     const zone = w.zone[i];
     if (zone >= GROW_ZONE) {

@@ -734,6 +734,22 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
 - Notifications: "has collapsed" cards are at most one in two hours (and none during fights), and recoveries and
   re-elections are log lines, not cards: about 4.7 cards a day, from 5.2.
 
+- A newcomer's playthrough (a fresh reviewer in a real browser) found the first day too rushed and too quiet
+  about failure. Now:
+  - A new colony starts paused, with a banner saying to give the first orders and then start the clock.
+  - The first-night goal counts the hours to nightfall.
+  - No lightning storms on day one.
+  - From 16:00 an alert counts the walls and doors still to build, turning red two hours before dark.
+  - At night an alert says who's sleeping outside, and missing the goal gets a card saying nothing else is
+    lost.
+  - Builders put up walls and doors before furniture.
+  - Planned doors look like doors, and the inspector says when a plan waits for a bush or tree to be cleared.
+  - The door instructions agree, and the research hint names the build bar.
+  - Phones get tap wording, and the goals drawer folds away when a tool is picked.
+  - Dialogs have a ✕ that stays in view.
+  - The medicine alert waits for a wound or illness, and goals tick off within a couple of seconds.
+  - A freezing colonist breaks off a walk to food to get warm.
+
 ### What to measure
 
 - Extend the balance harness for each phase (food days with preservation, generation size, break kinds,

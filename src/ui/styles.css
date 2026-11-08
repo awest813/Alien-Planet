@@ -708,6 +708,30 @@ kbd {
   z-index: 10;
 }
 
+/* The title stays in view (with its ✕) however far a long dialog is scrolled. */
+.modal-head {
+  position: sticky;
+  top: -8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -8px -10px 0;
+  padding: 8px 10px 0;
+  /* Solid, so the list scrolling under it doesn't show through. */
+  background: rgb(16, 20, 28);
+}
+
+.modal-head h2 {
+  margin: 0 0 6px;
+}
+
+.modal-x {
+  flex: none;
+  padding: 2px 8px;
+}
+
 .modal {
   width: 520px;
   max-width: calc(100% - 32px);

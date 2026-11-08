@@ -79,6 +79,10 @@ export function updateWeather(sim: Simulation): void {
       break;
     }
   }
+  // The first day is for getting a roof up: no lightning fires yet, just rain.
+  if (kind === 'storm' && sim.day <= 1) {
+    kind = 'rain';
+  }
   // Below freezing, rain and storms come down as snow.
   if ((kind === 'rain' || kind === 'storm') && sim.outdoorTemperature() - weatherDef(sim).temp < 0) {
     kind = 'snow';

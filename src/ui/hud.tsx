@@ -1,3 +1,4 @@
+import { TOUCH } from './touch';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -686,6 +687,13 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
   // Starts folded away on small screens, where it would cover the map.
   const [open, setOpen] = useState(() => window.innerWidth > 720);
   const [allAlerts, setAllAlerts] = useState(false);
+  // There, a tool picked (from a goal's button, say) folds the panel away so the map can be dragged on.
+  const toolId = state.toolId;
+  useEffect(() => {
+    if (toolId !== 'select' && window.innerWidth <= 720) {
+      setOpen(false);
+    }
+  }, [toolId]);
   // Phases the player has unfolded; the current one is always open.
   const [unfolded, setUnfolded] = useState<Set<string>>(new Set());
   // A goal with no tool or screen, opened to show how it's done.
@@ -885,7 +893,6 @@ function NextGoal({ goal, onOpen }: { goal: ObjectiveView; onOpen: (screen: Scre
 
 // Build and order tools, grouped into tabs.
 // A phone or tablet: the map is moved with a finger rather than a mouse.
-const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 
 export function Architect({ state }: { state: UiState }) {
   const current = TOOLS.find((t) => t.id === state.toolId);
@@ -970,7 +977,9 @@ export function Notices({ state, paused = false }: { state: UiState; paused?: bo
     <div className="notices" aria-live="polite">
       {paused && (
         <button className="pause-banner" onClick={() => controller.togglePause()} title="Resume (Space)">
-          ❚❚ Paused · click or Space to resume
+          {state.notStarted
+            ? '❚❚ Paused · give your first orders, then click here or press Space to start the clock'
+            : '❚❚ Paused · click or Space to resume'}
         </button>
       )}
       {state.toast && <div className="toast">{state.toast}</div>}

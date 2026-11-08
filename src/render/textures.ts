@@ -43,9 +43,21 @@ export function createTextures(scene: Phaser.Scene): void {
     at(Frames.feature(f.id), (c) => drawFeature(c, f.key));
     at(Frames.blueprint(f.id), (c) => {
       drawFeature(c, f.key);
+      // Tinted blue, but not flat: the building's own shading shows through, so a door can be told
+      // from the wall beside it and a bed from a table.
       c.globalCompositeOperation = 'source-atop';
-      c.fillStyle = '#7fd0ff';
+      c.fillStyle = 'rgba(127, 208, 255, 0.72)';
       c.fillRect(0, 0, TILE, TILE);
+      // A planned door gets a plain doorway mark, so it stands out in a row of planned walls.
+      if (f.door) {
+        c.globalCompositeOperation = 'source-over';
+        c.fillStyle = '#123a5a';
+        c.fillRect(4, 2, 8, 13);
+        c.fillStyle = '#7fd0ff';
+        c.fillRect(5, 3, 6, 12);
+        c.fillStyle = '#123a5a';
+        c.fillRect(9, 8, 1, 2);
+      }
     });
   });
   const designationColors = ['', '#ffb347', '#a8e063', '#ff7aa2', '#ff5252'];

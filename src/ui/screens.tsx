@@ -1,3 +1,4 @@
+import { TOUCH } from './touch';
 import { useEffect, useRef, useState } from 'react';
 import { UiState, controller } from '../game/controller';
 import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey } from '../sim/types';
@@ -39,7 +40,14 @@ export function Modal({
         className={`panel modal ${wide ? 'wide' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2>{title}</h2>
+        <div className="modal-head">
+          <h2>{title}</h2>
+          {closable && (
+            <button className="modal-x" onClick={onClose} aria-label="Close (Esc)" title="Close (Esc)">
+              ✕
+            </button>
+          )}
+        </div>
         {children}
         {closable && (
           <div className="row end">
@@ -73,9 +81,9 @@ export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => 
   return (
     <Modal title="Work priorities" onClose={onClose} wide>
       <p className="muted">
-        Click a cell to cycle 1 (do first) → 4 (do last) → off; right-click goes back. At equal priority, colonists work
-        left to right. The small number is the colonist's skill (★ a passion: they learn faster and enjoy it); brighter
-        cells are better at it.
+        {TOUCH ? 'Tap' : 'Click'} a cell to cycle 1 (do first) → 4 (do last) → off
+        {TOUCH ? '' : '; right-click goes back'}. At equal priority, colonists work left to right. The small number is
+        the colonist's skill (★ a passion: they learn faster and enjoy it); brighter cells are better at it.
       </p>
       <table className="grid work-grid">
         <thead>
@@ -296,11 +304,12 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
       </p>
       <ol className="help-steps big">
         <li>
-          <b>Follow the goals</b> on the right. Each one says how, and its button picks the right tool for you.
+          <b>Follow the goals</b> {TOUCH ? '(the ◀ tab at the top right)' : 'on the right'}. Each one says how, and its
+          button picks the right tool for you.
         </li>
         <li>
-          <b>Drag on the map</b> to give orders: chop trees, mark a stockpile, outline walls. Right-click drops the
-          tool.
+          <b>Drag on the map</b> to give orders: chop trees, mark a stockpile, outline walls.{' '}
+          {TOUCH ? 'Tap Select to put the tool down.' : 'Right-click drops the tool.'}
         </li>
         <li>
           <b>Watch the alerts</b> above the goals. Click one to jump to whoever or whatever it's about.
@@ -308,7 +317,7 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
       </ol>
       <p className="muted">
         First night: walls, a door and a bed for everyone before 22:00. The timber salvaged from your landing is a
-        start; a small hut (5×5) is plenty.
+        start; a small hut (5×5) is plenty. The clock waits until you start it (Space).
       </p>
       <details>
         <summary>Controls</summary>
@@ -334,7 +343,7 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             <b>Colonist bar</b> (top): click a colonist to inspect their needs, health, social life and skills.
           </li>
           <li>
-            <b>Architect</b> (bottom): orders, zones and buildings in tabs. 🔒 means research comes first.
+            <b>Build bar</b> (bottom): orders, zones and buildings in tabs. 🔒 means research comes first.
           </li>
           <li>
             <b>Work, Schedule, Production, Research</b> (top bar): who does what, when they sleep, what gets made, and
@@ -439,7 +448,7 @@ export function ResearchScreen({ state, onClose }: { state: UiState; onClose: ()
       <p className="muted">
         {state.researchBench
           ? 'Pick a project; colonists with the Research work type study it at the research bench.'
-          : 'Build a research bench (Architect › Production) first, then pick a project.'}
+          : 'Build a research bench (the Production tab of the build bar at the bottom) first, then pick a project.'}
       </p>
       <ul className="research">
         {[...state.research]
