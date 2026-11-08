@@ -82,11 +82,11 @@ describe('research', () => {
 
   it("won't start a project before its prerequisites", () => {
     const sim = Simulation.newColony(4);
-    sim.apply({ type: 'research', project: 'fortifications' });
+    sim.apply({ type: 'research', project: 'smelting' });
     expect(sim.research.current).toBeNull();
-    sim.research.done.push('archery');
-    sim.apply({ type: 'research', project: 'fortifications' });
-    expect(sim.research.current).toBe('fortifications');
+    sim.research.done.push('pottery');
+    sim.apply({ type: 'research', project: 'smelting' });
+    expect(sim.research.current).toBe('smelting');
   });
 
   it('saves research progress', () => {

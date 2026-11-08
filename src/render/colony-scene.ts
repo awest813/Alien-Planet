@@ -798,17 +798,18 @@ export class ColonyScene extends Phaser.Scene {
     }
   }
 
-  private createRaider(e: Enemy): Phaser.GameObjects.Container {
-    const tint = e.faction === 0 ? 0x8a5a3c : 0x5a5a64;
+  private createRaider(e: Enemy, ally = false): Phaser.GameObjects.Container {
+    const tint = ally ? 0x5f9a4a : e.faction === 0 ? 0x8a5a3c : 0x5a5a64;
     // Raiders' boots are darker than colonists'.
     const legs = this.add.image(0, 0, 'pawn-legs-0').setTint(0x9a9aa0);
     const body = this.add.image(0, 0, 'pawn-body').setTint(tint);
-    const head = this.add.image(0, 0, 'raider-head');
+    // Allies go bareheaded, like the traders from the same valley; raiders wear hoods.
+    const head = this.add.image(0, 0, ally ? 'pawn-head' : 'raider-head');
     const label = this.add
       .text(0, -11, e.name, {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '6px',
-        color: '#ff8a8a',
+        color: ally ? '#9fe38a' : '#ff8a8a',
         stroke: '#000000',
         strokeThickness: 2,
       })
@@ -870,17 +871,20 @@ export class ColonyScene extends Phaser.Scene {
   private syncRaiders(): void {
     const sim = controller.sim;
     const world = sim.world;
-    const alive = new Set(sim.enemies.map((e) => e.id));
+    // Raiders, and the fighters a friendly faction sent to help (drawn in its green).
+    const allies = new Set(sim.allies.map((a) => a.id));
+    const fighters = [...sim.enemies, ...sim.allies];
+    const alive = new Set(fighters.map((e) => e.id));
     for (const [id, raider] of this.raiders) {
       if (!alive.has(id)) {
         raider.destroy();
         this.raiders.delete(id);
       }
     }
-    for (const e of sim.enemies) {
+    for (const e of fighters) {
       let raider = this.raiders.get(e.id);
       if (!raider) {
-        raider = this.createRaider(e);
+        raider = this.createRaider(e, allies.has(e.id));
         this.raiders.set(e.id, raider);
       }
       const to = e.path.length > 0 ? e.path[0] : e.tile;

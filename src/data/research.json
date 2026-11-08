@@ -8,8 +8,8 @@
   {
     "key": "fortifications",
     "name": "Fortifications",
-    "cost": 1600,
-    "requires": ["archery"],
+    "cost": 900,
+    "requires": [],
     "description": "Unlocks sandbags for cover and embrasures to shoot through."
   },
   {
@@ -107,8 +107,8 @@
   {
     "key": "traps",
     "name": "Traps",
-    "cost": 1200,
-    "requires": ["fortifications"],
+    "cost": 600,
+    "requires": [],
     "description": "Unlocks spike traps that wound the first raider to step on them."
   },
   {

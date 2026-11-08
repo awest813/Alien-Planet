@@ -9,6 +9,7 @@ import { learn } from './skills';
 import { traitValue } from './social';
 import type { Simulation } from './simulation';
 import { Animal, Colonist, Enemy } from './types';
+import { goodwillOf } from './trade';
 import { weatherDef } from './weather';
 import { Filth, World } from './world';
 
@@ -27,6 +28,9 @@ export interface RaidState {
   // How the raid ended, decided the moment it broke rather than when the last raider left the
   // map (which can take hours on a big map): beaten off, gave up, or overran the colony.
   outcome?: 'repelled' | 'withdrew' | 'overrun';
+  // Fighters a friendly faction is sending to help, and when they'll come.
+  alliesAt?: number;
+  allies?: number;
 }
 
 // Raiders this close to a colonist have arrived; the raid's time limit runs from then.
@@ -37,7 +41,7 @@ const COMBAT_XP = 40;
 const SELF_DEFENCE_RANGE = 6;
 // Raiders give up after this long at the colony, or once this share of them is out of the fight.
 const RAID_TIMEOUT = TICKS_PER_HOUR * 24;
-const MORALE_BREAK = 0.6;
+const MORALE_BREAK = 0.45;
 const SHOT_LIFETIME = 8;
 // Raiders' blows land softer on colonists than colonists' on raiders: colonists bleed and can be
 // patched up, raiders just fall.
@@ -49,7 +53,9 @@ const SUPPRESS_MISS = 0.12;
 const SUPPRESS_HIT = 0.25;
 const SUPPRESS_DECAY = 0.006;
 // A raider this badly hurt may break and run on their own.
-const WOUNDED_FLEE = 0.35;
+const WOUNDED_FLEE = 0.6;
+// Pain puts a raider down this badly hurt, as it does a colonist: they fall wounded rather than fight on.
+const PAIN_DOWN = 0.3;
 // How often (ticks) archers rethink where to shoot from.
 const POST_RETHINK = 60;
 // How often (ticks) a badly hurt raider weighs running for it.
@@ -401,14 +407,17 @@ export function woundEnemy(sim: Simulation, e: Enemy, amount: number, by: string
   }
   e.hp -= amount;
   sim.world.addFilth(e.tile, Filth.BLOOD);
-  if (e.hp > 0) {
+  if (e.hp > PAIN_DOWN) {
     return;
   }
+  // Too hurt to stand: down in pain (and lying wounded), or, struck hard enough, dead or near it.
+  const inPain = e.hp > 0;
+  e.hp = 0;
   sim.stats.kills++;
   if (sim.raid) {
     sim.raid.killed++;
   }
-  const wounded = fallWounded(sim, e);
+  const wounded = fallWounded(sim, e, inPain);
   sim.addLog(
     wounded
       ? `${by} brought down ${e.name}, who lies wounded: mark them with Capture to take them prisoner.`
@@ -426,7 +435,7 @@ export function woundEnemy(sim: Simulation, e: Enemy, amount: number, by: string
   }
 }
 
-function moveEnemy(sim: Simulation, e: Enemy): void {
+function moveEnemy(sim: Simulation, e: Enemy, ally = false): void {
   const w = sim.world;
   const next = e.path[0];
   if (!w.isPassable(next)) {
@@ -440,7 +449,10 @@ function moveEnemy(sim: Simulation, e: Enemy): void {
     e.tile = next;
     e.path.shift();
     e.moveProgress = 0;
-    springTrap(sim, e);
+    // (The colony's allies know where its traps are.)
+    if (!ally) {
+      springTrap(sim, e);
+    }
   }
 }
 
@@ -460,7 +472,7 @@ function springTrap(sim: Simulation, e: Enemy): void {
   e.suppression = 1;
 }
 
-function flee(sim: Simulation, e: Enemy): void {
+function flee(sim: Simulation, e: Enemy, ally = false): void {
   const w = sim.world;
   const x = w.xOf(e.tile);
   const y = w.yOf(e.tile);
@@ -487,7 +499,7 @@ function flee(sim: Simulation, e: Enemy): void {
       return;
     }
   }
-  moveEnemy(sim, e);
+  moveEnemy(sim, e, ally);
 }
 
 // How much of a blow gets through a colonist's armor; the armor takes a beating doing its job.
@@ -578,6 +590,9 @@ export function updateEnemies(sim: Simulation): void {
         continue;
       }
     }
+    if (strikeAlly(sim, e)) {
+      continue;
+    }
     const target = targetFor(sim, e);
     if (!target && breach(sim, e)) {
       continue;
@@ -638,6 +653,7 @@ export function updateEnemies(sim: Simulation): void {
     }
   }
 
+  updateAllies(sim);
   const raid = sim.raid;
   if (raid) {
     const fighting = sim.enemies.filter((e) => e.hp > 0 && !e.fleeing);
@@ -904,4 +920,199 @@ export function weaponScore(key: string, quality: number): number {
   const w = weaponDef(key);
   const perHit = ((w.damage[0] + w.damage[1]) / 2) * qualityFactor(quality) * w.accuracy * (1 + w.pierce * 0.3);
   return (perHit / w.cooldown) * (w.range > 1 ? 1 + w.range / 8 : 0.9);
+}
+
+// ---- Allies ----
+// Now and then, when raiders come, the friendly faction sends a few fighters to help: the better they
+// think of the colony, the likelier. They come in from the edge nearest the colony an hour or few into the
+// raid, go after the raiders, and head home once the raiders are beaten or gone.
+
+// Chance of help with each raid: none below 30 goodwill, rising to one in two at 100.
+export const allyChance = (goodwill: number): number => Math.max(0, Math.min(0.5, (goodwill - 30) / 140));
+const ALLY_WEAPONS = ['recurveBow', 'recurveBow', 'shortBow', 'spear'];
+// "The Meadow Kin" in the middle of a sentence.
+const kinName = (faction: number) => FACTIONS[faction].name.replace(/^The /, 'the ');
+const ALLY_SKILL = 5;
+
+// Called as a raid starts: whether help is on its way (decided now, so a save mid-raid keeps it).
+export function maybeSendAllies(sim: Simulation): void {
+  const raid = sim.raid;
+  const friend = FACTIONS.findIndex((f) => !f.hostile);
+  if (!raid || friend < 0 || sim.rng.next() >= allyChance(goodwillOf(sim, friend))) {
+    return;
+  }
+  raid.allies = Math.max(2, Math.min(4, Math.round(raid.initial / 3)));
+  raid.alliesAt = sim.tick + sim.rng.int(1, 3) * TICKS_PER_HOUR;
+}
+
+function alliesArrive(sim: Simulation, count: number): void {
+  const w = sim.world;
+  const friend = FACTIONS.findIndex((f) => !f.hostile);
+  const region = sim.outsideRegion();
+  const home = sim.homeTile() ?? sim.living()[0]?.tile;
+  if (region === undefined || home === undefined) {
+    return;
+  }
+  // From the edge nearest the colony.
+  const onEdge = (i: number) => {
+    const x = w.xOf(i);
+    const y = w.yOf(i);
+    return (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) && sim.regionOf(i) === region;
+  };
+  const spots = sim.nearest(home, onEdge, count);
+  if (spots.length === 0) {
+    return;
+  }
+  const names = [...FACTIONS[friend].names];
+  for (let n = 0; n < count; n++) {
+    const name = names.length > 0 ? names.splice(sim.rng.int(0, names.length - 1), 1)[0] : 'Kin fighter';
+    sim.allies.push({
+      id: sim.nextEnemyId++,
+      name,
+      faction: friend,
+      tile: spots[n % spots.length],
+      path: [],
+      moveProgress: 0,
+      hp: 1,
+      weapon: sim.rng.pick(ALLY_WEAPONS),
+      armor: 0,
+      skill: ALLY_SKILL,
+      speed: 1,
+      suppression: 0,
+      cooldown: 0,
+      fleeing: false,
+      repathAt: 0,
+    });
+  }
+  sim.addLog(`${FACTIONS[friend].name} have sent ${count} fighters to help drive off the raiders!`, 'good', true);
+}
+
+// The nearest raider still fighting, in reach of this ally's region.
+function allyTarget(sim: Simulation, a: Enemy): Enemy | undefined {
+  const w = sim.world;
+  const region = sim.regionOf(a.tile);
+  let best: Enemy | undefined;
+  let bestDistance = Infinity;
+  for (const e of sim.enemies) {
+    if (e.hp <= 0 || e.fleeing || sim.regionOf(e.tile) !== region) {
+      continue;
+    }
+    const d = w.distance(a.tile, e.tile);
+    if (d < bestDistance) {
+      bestDistance = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
+// Called every tick, alongside the raiders.
+export function updateAllies(sim: Simulation): void {
+  const w = sim.world;
+  const raid = sim.raid;
+  if (raid?.alliesAt !== undefined && sim.tick >= raid.alliesAt) {
+    const count = raid.allies ?? 0;
+    raid.alliesAt = undefined;
+    // Not if the raid is already over.
+    if (count > 0 && !raid.outcome) {
+      alliesArrive(sim, count);
+    }
+  }
+  if (sim.allies.length === 0) {
+    return;
+  }
+  for (const a of sim.allies) {
+    if (a.hp <= 0) {
+      continue;
+    }
+    a.cooldown--;
+    a.suppression = Math.max(0, a.suppression - SUPPRESS_DECAY);
+    const target = a.fleeing ? undefined : allyTarget(sim, a);
+    if (!target) {
+      // The fight's over (or out of reach): home they go.
+      a.fleeing = true;
+      flee(sim, a, true);
+      continue;
+    }
+    const adjacent = chebyshev(w, a.tile, target.tile) <= 1;
+    const weapon = weaponAt(a.weapon, adjacent);
+    const canShoot =
+      weapon.range > 1 && w.distance(a.tile, target.tile) <= weapon.range && lineOfSight(w, a.tile, target.tile);
+    if (adjacent || canShoot) {
+      a.path = [];
+      a.moveProgress = 0;
+      if (a.cooldown <= 0) {
+        const hit = sim.rng.next() < hitChance(sim, weapon, a.skill, a.tile, target.tile, 0, a.suppression);
+        recordShot(sim, a.tile, target.tile, hit, weapon.range > 1);
+        if (hit) {
+          woundEnemy(sim, target, throughArmor(roll(sim, weapon.damage), target.armor, weapon), a.name);
+        } else if (weapon.range > 1) {
+          target.suppression = Math.min(1, target.suppression + SUPPRESS_MISS);
+        }
+        a.cooldown = weapon.cooldown;
+      }
+      continue;
+    }
+    if (a.path.length === 0 || a.repathAt <= sim.tick) {
+      a.repathAt = sim.tick + 30;
+      a.path =
+        sim.pathfinder.find(a.tile, [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))]) ?? [];
+    }
+    if (a.path.length > 0) {
+      moveEnemy(sim, a, true);
+    }
+  }
+  const before = sim.allies.length;
+  sim.allies = sim.allies.filter((a) => a.hp > 0);
+  if (before > 0 && sim.allies.length === 0 && !sim.raid) {
+    sim.addLog(`The fighters from ${kinName(FACTIONS.findIndex((f) => !f.hostile))} have gone home.`, 'info');
+  }
+}
+
+// A raider with an ally within reach (beside them, or in a bow's range and sight when no colonist is
+// closer) fights them rather than walking past. Returns whether they did.
+function strikeAlly(sim: Simulation, e: Enemy): boolean {
+  if (sim.allies.length === 0 || e.cooldown > 0) {
+    return false;
+  }
+  const w = sim.world;
+  const weapon = weaponDef(e.weapon);
+  let ally: Enemy | undefined;
+  let near = Infinity;
+  for (const a of sim.allies) {
+    if (a.hp <= 0 || a.fleeing) {
+      continue;
+    }
+    const d = w.distance(e.tile, a.tile);
+    const reach =
+      chebyshev(w, e.tile, a.tile) <= 1 || (weapon.range > 1 && d <= weapon.range && lineOfSight(w, e.tile, a.tile));
+    if (reach && d < near) {
+      near = d;
+      ally = a;
+    }
+  }
+  if (!ally) {
+    return false;
+  }
+  const colonistCloser = sim
+    .living()
+    .some((c) => !c.health.downed && w.distance(e.tile, c.tile) < near && lineOfSight(w, e.tile, c.tile));
+  if (colonistCloser && chebyshev(w, e.tile, ally.tile) > 1) {
+    return false;
+  }
+  const used = weaponAt(e.weapon, chebyshev(w, e.tile, ally.tile) <= 1);
+  e.path = [];
+  e.moveProgress = 0;
+  const hit = sim.rng.next() < hitChance(sim, used, e.skill, e.tile, ally.tile, RAIDER_AIM, e.suppression);
+  recordShot(sim, e.tile, ally.tile, hit, used.range > 1);
+  if (hit) {
+    ally.hp -= roll(sim, used.damage) * RAIDER_HIT;
+    if (ally.hp <= PAIN_DOWN) {
+      // Their own carry them home; they're out of this fight.
+      ally.hp = 0;
+      sim.addLog(`${ally.name} of ${kinName(ally.faction)} has been struck down fighting for the colony.`, 'warn');
+    }
+  }
+  e.cooldown = used.cooldown;
+  return true;
 }

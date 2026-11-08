@@ -32,8 +32,9 @@ export const RECRUIT_CHANCE = 0.35;
 export const PRISONER_BED = featureId('prisonerBed');
 
 // Called as a raider falls: whether they go down wounded (and become a captive) instead of dying.
-export function fallWounded(sim: Simulation, e: Enemy): boolean {
-  if (sim.rng.next() >= DOWN_CHANCE) {
+// `inPain`: knocked down by pain rather than struck dead, they always live to be taken.
+export function fallWounded(sim: Simulation, e: Enemy, inPain = false): boolean {
+  if (!inPain && sim.rng.next() >= DOWN_CHANCE) {
     return false;
   }
   sim.captives.push({

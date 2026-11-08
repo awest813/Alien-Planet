@@ -399,6 +399,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             Research better bows, armor, sandbags, embrasures and spike traps. Raiders' arrows and blows land less often
             on colonists behind sandbags.
           </li>
+          <li>
+            Raiders go down when badly hurt, and the rest run once nearly half are out of the fight. If the Meadow Kin
+            think well of the colony they may send fighters to help.
+          </li>
           <li>Maddened animals sometimes come for the colony too: draft and fight them like raiders.</li>
           <li>
             Some raiders fall wounded rather than dying. Build a <b>prisoner bed</b> (Security), drag <b>Capture</b>{' '}

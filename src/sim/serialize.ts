@@ -150,6 +150,7 @@ export interface SaveData {
   graves?: [number, Fallen][];
   story: StoryState;
   enemies: Enemy[];
+  allies?: Enemy[];
   nextEnemyId: number;
   captives?: Captive[];
   infants?: Infant[];
@@ -275,6 +276,7 @@ export function serialize(sim: Simulation): SaveData {
     artworks: [...sim.artworks].filter(([i]) => sim.artworkAt(i)).map(([i, art]) => [i, { ...art }]),
     story: structuredClone(sim.story),
     enemies: structuredClone(sim.enemies),
+    allies: structuredClone(sim.allies),
     nextEnemyId: sim.nextEnemyId,
     captives: structuredClone(sim.captives),
     infants: structuredClone(sim.infants),
@@ -389,6 +391,7 @@ export function deserialize(data: SaveData): Simulation {
   // Saves from before difficulty settings play on standard.
   sim.story = { ...structuredClone(data.story), difficulty: data.story.difficulty ?? 'standard' };
   sim.enemies = structuredClone(data.enemies);
+  sim.allies = structuredClone(data.allies ?? []);
   sim.nextEnemyId = data.nextEnemyId;
   sim.captives = structuredClone(data.captives ?? []);
   sim.infants = structuredClone(data.infants ?? []);

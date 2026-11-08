@@ -107,7 +107,7 @@ How the living simulation works:
   makes a room and its surroundings uglier until someone with Cleaning work scrubs it away; outdoors, the
   weather wears it off in time. A dirty kitchen cooks worse, riskier meals, a dirty sickroom slows healing,
   and a filthy room sours the mood.
-- **Prisoners:** some raiders fall wounded instead of dying. Build a prisoner bed, drag Capture over them, and
+- **Prisoners:** raiders downed by pain, and some struck down harder, fall wounded instead of dying. Build a prisoner bed, drag Capture over them, and
   colonists with Warden work bring them in, feed them and talk them round until they join the colony, bringing
   their fighting skill. Left lying they die within a day; a starved prisoner dies too, and one can be released
   from the Prisoners screen.
@@ -175,8 +175,10 @@ How the storytelling layer works:
 - **Combat and raids:** raiders from hostile factions arrive at the map edge. The Rust Wardens favour bows, the
   Ashen Howlers clubs and spears; later raids bring better bows, crossbows and armor. The game pauses. Archers on
   both sides look for firing positions behind cover, keep to their range and are rattled (suppressed: worse aim)
-  by shots landing close; melee fighters charge. Badly wounded raiders may break and run, and the raid flees once
-  most of them are down or running. Undrafted colonists run indoors when raiders come close, and fight back only
+  by shots landing close; melee fighters charge. Pain puts a badly hurt raider down, as it does a colonist, and
+  hurt raiders may break and run; the raid flees once nearly half of them are down or running. Now and then the
+  Meadow Kin send a few fighters to help (more likely the better they think of the colony): they come in from the
+  edge, go after the raiders and head home when it's over. Undrafted colonists run indoors when raiders come close, and fight back only
   when cornered. Walling yourself in doesn't stop them: raiders who can't reach anyone smash through the nearest
   wall or door (clubs and spears break walls faster than bows).
 - **Drafted colonists:** pick a stance in the inspector: Take cover (the default: slip into nearby cover with a

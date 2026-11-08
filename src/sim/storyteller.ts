@@ -1,6 +1,6 @@
 import { SIGNAL_RAID_WEIGHT, transmitting } from './beacon';
 import { herdArrives, manhuntersArrive, wildCap, wildCount } from './animals';
-import { spawnRaid, weaponScore } from './combat';
+import { maybeSendAllies, spawnRaid, weaponScore } from './combat';
 import { TICKS_PER_HOUR, populationFor } from './constants';
 import { ANIMALS, FACTIONS, NONE, featureDef, itemDef, itemId, terrainDef } from './defs';
 import { damage, infect } from './health';
@@ -152,7 +152,12 @@ const EVENTS: EventDef[] = [
       const size = 2 + harsh + Math.floor((sim.day - 4) / 3) + Math.floor(armed / 3) + rich;
       const count = Math.max(2, Math.round(Math.min(cap, size) * threatScale(sim)));
       const factions = raiders(sim);
-      return factions.length > 0 && spawnRaid(sim, sim.rng.pick(factions).id, count);
+      if (factions.length === 0 || !spawnRaid(sim, sim.rng.pick(factions).id, count)) {
+        return false;
+      }
+      // Now and then, friends come to help.
+      maybeSendAllies(sim);
+      return true;
     },
   },
   {

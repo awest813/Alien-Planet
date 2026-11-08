@@ -604,6 +604,8 @@ export class Simulation {
   public artworks = new Map<number, Artwork>();
   public story: StoryState = freshStory();
   public enemies: Enemy[] = [];
+  // Fighters a friendly faction sent to help against a raid (see combat.ts).
+  public allies: Enemy[] = [];
   // Raiders lying wounded, and prisoners (see prisoners.ts).
   public captives: Captive[] = [];
   // The colony's leader and policies (see village.ts).

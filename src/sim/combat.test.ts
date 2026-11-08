@@ -297,6 +297,7 @@ describe('defenses', () => {
 
   it('spike traps wound a raider who steps on one, and go back on the build list', () => {
     const { sim, w, x, y } = field(8);
+    sim.research.done.push('traps');
     const trap = w.idx(x + 5, y);
     w.setFeature(trap, featureId('spikeTrap'));
     const e = raider(sim, w.idx(x + 6, y), 'club');
@@ -307,8 +308,8 @@ describe('defenses', () => {
     }
     expect(w.feature[trap]).toBe(NONE);
     expect(e.hp).toBeLessThan(0.75);
-    // Rebuilt once the raid is over.
-    expect(sim.pendingRebuilds.some(([i]) => i === trap)).toBe(true);
+    // Back on the build list: at once if that ended the raid, otherwise once it's over.
+    expect(sim.pendingRebuilds.some(([i]) => i === trap) || w.blueprint[trap] === featureId('spikeTrap')).toBe(true);
   });
 });
 
