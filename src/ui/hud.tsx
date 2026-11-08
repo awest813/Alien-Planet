@@ -83,7 +83,6 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
             </button>
           ))}
         </div>
-        {state.speed === 0 && <span className="paused">Paused</span>}
       </div>
       <div className="tb-resources">
         <FoodDays days={state.foodDays} />
@@ -326,7 +325,7 @@ function ColonistCard({ c }: { c: ColonistView }) {
             title={
               c.age < DRAFT_AGE
                 ? `${c.name} is too young to fight`
-                : 'Draft for combat (Q). Right-click the map to move.'
+                : `Draft for combat (Q). ${TOUCH ? 'Tap' : 'Right-click'} the map to move.`
             }
           >
             {c.drafted ? 'Drafted' : 'Draft'}
@@ -694,6 +693,12 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
       setOpen(false);
     }
   }, [toolId]);
+  // Starting a goal there folds the panel away too, even when its tool is already in hand.
+  const foldOnPhone = () => {
+    if (window.innerWidth <= 720) {
+      setOpen(false);
+    }
+  };
   // Phases the player has unfolded; the current one is always open.
   const [unfolded, setUnfolded] = useState<Set<string>>(new Set());
   // A goal with no tool or screen, opened to show how it's done.
@@ -705,8 +710,10 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
   }))
     // A phase stays on the list while it has goals still to reach (a failed one doesn't count).
     .filter((p) => p.objectives.some((o) => !o.done && !o.failed));
-  // The goal to work on next: the first one still open in the current phase.
-  const next = phases[0]?.objectives.find((o) => !o.done && !o.failed);
+  // The goal to work on next: the first one still open in the current phase that the player can act on now
+  // (not one whose order is already given, or that only needs waiting for), else the first one open.
+  const openGoals = phases[0]?.objectives.filter((o) => !o.done && !o.failed) ?? [];
+  const next = openGoals.find((o) => (o.tool || o.screen) && !o.underway) ?? openGoals[0];
   if (!open) {
     return (
       <button
@@ -767,7 +774,7 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
             <div className="muted">Every objective is complete. The colony is yours.</div>
           ) : (
             <>
-              {next && <NextGoal goal={next} onOpen={onOpen} />}
+              {next && <NextGoal goal={next} onOpen={onOpen} onStarted={foldOnPhone} />}
               {phases.map((p, index) => {
                 const shownPhase = index === 0 || unfolded.has(p.name);
                 const toggle = () =>
@@ -813,7 +820,7 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
                                 aria-expanded={!o.tool && !o.screen ? explained === o.id : undefined}
                                 onClick={() =>
                                   o.tool || o.screen
-                                    ? startGoal(o, onOpen)
+                                    ? startGoal(o, onOpen, foldOnPhone)
                                     : setExplained(explained === o.id ? null : o.id)
                                 }
                               >
@@ -821,6 +828,7 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
                                 <span className="goal-text">
                                   {o.label}
                                   {o.progress && <span className="muted"> {o.progress}</span>}
+                                  {o.underway && <span className="muted small"> · under way</span>}
                                 </span>
                               </button>
                               {explained === o.id && o.how && o !== next && <div className="goal-how">{o.how}</div>}
@@ -864,16 +872,25 @@ function AlertLine({ alert }: { alert: Alert }) {
 }
 
 // Picks the goal's tool, or opens the screen it's done from.
-function startGoal(goal: ObjectiveView, onOpen: (screen: Screen) => void): void {
+function startGoal(goal: ObjectiveView, onOpen: (screen: Screen) => void, onStarted?: () => void): void {
   if (goal.tool) {
     controller.selectToolById(goal.tool);
   } else if (goal.screen) {
     onOpen(goal.screen);
   }
+  onStarted?.();
 }
 
 // The goal to work on next, with how to do it and a button that gets it started.
-function NextGoal({ goal, onOpen }: { goal: ObjectiveView; onOpen: (screen: Screen) => void }) {
+function NextGoal({
+  goal,
+  onOpen,
+  onStarted,
+}: {
+  goal: ObjectiveView;
+  onOpen: (screen: Screen) => void;
+  onStarted?: () => void;
+}) {
   const tool = goal.tool ? TOOLS.find((t) => t.id === goal.tool) : undefined;
   return (
     <div className="next-goal">
@@ -882,9 +899,9 @@ function NextGoal({ goal, onOpen }: { goal: ObjectiveView; onOpen: (screen: Scre
       {goal.progress && <span className="muted"> {goal.progress}</span>}
       {goal.how && <p>{goal.how}</p>}
       {(tool || goal.screen) && (
-        <button className="primary" onClick={() => startGoal(goal, onOpen)}>
+        <button className="primary" onClick={() => startGoal(goal, onOpen, onStarted)}>
           {tool ? `Use ${tool.label}` : `Open ${goal.screen![0].toUpperCase()}${goal.screen!.slice(1)}`}
-          {tool?.hotkey && <kbd>{tool.hotkey.toUpperCase()}</kbd>}
+          {!TOUCH && tool?.hotkey && <kbd>{tool.hotkey.toUpperCase()}</kbd>}
         </button>
       )}
     </div>
@@ -967,7 +984,7 @@ export function Architect({ state }: { state: UiState }) {
             >
               {locked && '🔒 '}
               {t.label}
-              {t.hotkey && <kbd>{t.hotkey === 'Escape' ? 'Esc' : t.hotkey.toUpperCase()}</kbd>}
+              {!TOUCH && t.hotkey && <kbd>{t.hotkey === 'Escape' ? 'Esc' : t.hotkey.toUpperCase()}</kbd>}
             </button>
           );
         })}

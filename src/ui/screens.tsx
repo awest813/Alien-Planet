@@ -86,87 +86,89 @@ export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => 
         {TOUCH ? '' : '; right-click goes back'}. At equal priority, colonists work left to right. The small number is
         the colonist's skill (★ a passion: they learn faster and enjoy it); brighter cells are better at it.
       </p>
-      <table className="grid work-grid">
-        <thead>
-          <tr>
-            <th />
-            {WORK_TYPES.map((work) => (
-              <th key={work}>{WORK_LABELS[work]}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {state.colonists
-            .filter((c) => !c.dead)
-            .map((c) => (
-              <tr key={c.id}>
-                <td className="row-label">
-                  <span className="swatch" style={{ background: c.color }} /> {c.name}
-                  {c.age < ADULT && (
-                    <span className="muted small">
-                      {' '}
-                      ({c.stage}, {c.age})
-                    </span>
-                  )}
-                </td>
-                {WORK_TYPES.map((work) => {
-                  const value = c.priorities[work];
-                  const key = WORK_SKILL[work];
-                  const skill = key ? c.skillList.find((sk) => sk.key === key) : undefined;
-                  const set = (next: number) =>
-                    controller.command({ type: 'priority', colonist: c.id, work, value: next });
-                  const stars = skill?.passion ? '★'.repeat(skill.passion) : '';
-                  // Children don't work, and teens only do light work.
-                  if (c.age < ADULT && (c.age < TEEN || !TEEN_WORK.includes(work))) {
+      <div className="table-scroll">
+        <table className="grid work-grid">
+          <thead>
+            <tr>
+              <th />
+              {WORK_TYPES.map((work) => (
+                <th key={work}>{WORK_LABELS[work]}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {state.colonists
+              .filter((c) => !c.dead)
+              .map((c) => (
+                <tr key={c.id}>
+                  <td className="row-label">
+                    <span className="swatch" style={{ background: c.color }} /> {c.name}
+                    {c.age < ADULT && (
+                      <span className="muted small">
+                        {' '}
+                        ({c.stage}, {c.age})
+                      </span>
+                    )}
+                  </td>
+                  {WORK_TYPES.map((work) => {
+                    const value = c.priorities[work];
+                    const key = WORK_SKILL[work];
+                    const skill = key ? c.skillList.find((sk) => sk.key === key) : undefined;
+                    const set = (next: number) =>
+                      controller.command({ type: 'priority', colonist: c.id, work, value: next });
+                    const stars = skill?.passion ? '★'.repeat(skill.passion) : '';
+                    // Children don't work, and teens only do light work.
+                    if (c.age < ADULT && (c.age < TEEN || !TEEN_WORK.includes(work))) {
+                      return (
+                        <td key={work}>
+                          <span
+                            className="priority too-young"
+                            role="img"
+                            aria-label={`${c.name}, ${WORK_LABELS[work]}: too young`}
+                            title={`${c.name} is too young for this work`}
+                          >
+                            ·
+                          </span>
+                        </td>
+                      );
+                    }
                     return (
                       <td key={work}>
-                        <span
-                          className="priority too-young"
-                          role="img"
-                          aria-label={`${c.name}, ${WORK_LABELS[work]}: too young`}
-                          title={`${c.name} is too young for this work`}
+                        <button
+                          className={`priority p${value}`}
+                          style={
+                            skill
+                              ? { background: `rgba(143, 195, 255, ${(0.03 + (skill.level / 20) * 0.32).toFixed(2)})` }
+                              : undefined
+                          }
+                          title={
+                            skill
+                              ? `${c.name}: ${skill.label} ${skill.level}${skill.passion === 2 ? ', burning passion' : skill.passion === 1 ? ', interested' : ''}`
+                              : `${c.name}: ${WORK_LABELS[work]}`
+                          }
+                          aria-label={`${c.name}, ${WORK_LABELS[work]}: ${value === 0 ? 'off' : `priority ${value}`}`}
+                          onClick={() => set(forward(value))}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            set(back(value));
+                          }}
                         >
-                          ·
-                        </span>
+                          <span className="prio">{value === 0 ? '–' : value}</span>
+                          {skill && (
+                            <span className="skill">
+                              {skill.level}
+                              {stars && <span className="passion">{stars}</span>}
+                            </span>
+                          )}
+                        </button>
                       </td>
                     );
-                  }
-                  return (
-                    <td key={work}>
-                      <button
-                        className={`priority p${value}`}
-                        style={
-                          skill
-                            ? { background: `rgba(143, 195, 255, ${(0.03 + (skill.level / 20) * 0.32).toFixed(2)})` }
-                            : undefined
-                        }
-                        title={
-                          skill
-                            ? `${c.name}: ${skill.label} ${skill.level}${skill.passion === 2 ? ', burning passion' : skill.passion === 1 ? ', interested' : ''}`
-                            : `${c.name}: ${WORK_LABELS[work]}`
-                        }
-                        aria-label={`${c.name}, ${WORK_LABELS[work]}: ${value === 0 ? 'off' : `priority ${value}`}`}
-                        onClick={() => set(forward(value))}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          set(back(value));
-                        }}
-                      >
-                        <span className="prio">{value === 0 ? '–' : value}</span>
-                        {skill && (
-                          <span className="skill">
-                            {skill.level}
-                            {stars && <span className="passion">{stars}</span>}
-                          </span>
-                        )}
-                      </button>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-        </tbody>
-      </table>
+                  })}
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
     </Modal>
   );
 }
@@ -179,6 +181,27 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
   const living = state.colonists.filter((c) => !c.dead);
   // The "Everyone" row paints an hour for the whole colony.
   const paintAll = (hour: number) => living.forEach((c) => paint(c.id, hour));
+  // Painting by mouse or finger: the cell under the pointer (a finger's drag doesn't enter cells), each
+  // cell once per stroke.
+  const lastCell = useRef('');
+  const paintAt = (x: number, y: number) => {
+    const cell = document.elementFromPoint(x, y)?.closest<HTMLElement>('td[data-hour]');
+    const key = cell ? `${cell.dataset.who}:${cell.dataset.hour}` : '';
+    if (!cell || key === lastCell.current) {
+      return;
+    }
+    lastCell.current = key;
+    const hour = Number(cell.dataset.hour);
+    if (cell.dataset.who === 'all') {
+      paintAll(hour);
+    } else {
+      paint(Number(cell.dataset.who), hour);
+    }
+  };
+  const stop = () => {
+    setPainting(false);
+    lastCell.current = '';
+  };
   const now = parseInt(state.time, 10);
   return (
     <Modal title="Schedule" onClose={onClose} wide>
@@ -193,57 +216,65 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
           </button>
         ))}
         <span className="muted">
-          Pick a brush, then click or drag across hours. The Everyone row sets the whole colony.
+          Pick a brush, then {TOUCH ? 'tap' : 'click'} or drag across hours. The Everyone row sets the whole colony.
         </span>
       </div>
-      <table className="grid schedule" onMouseLeave={() => setPainting(false)} onMouseUp={() => setPainting(false)}>
-        <thead>
-          <tr>
-            <th />
-            {Array.from({ length: 24 }, (_, h) => (
-              <th key={h} className={h === now ? 'now' : ''} title={h === now ? 'Now' : undefined}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          <tr className="everyone">
-            <td className="row-label muted">Everyone</td>
-            {Array.from({ length: 24 }, (_, hour) => (
-              <td
-                key={hour}
-                className={`hour slot-all ${hour === now ? 'now' : ''}`}
-                title={`${hour}:00 · set for everyone`}
-                onMouseDown={() => {
-                  setPainting(true);
-                  paintAll(hour);
-                }}
-                onMouseEnter={() => painting && paintAll(hour)}
-              />
-            ))}
-          </tr>
-          {living.map((c) => (
-            <tr key={c.id}>
-              <td className="row-label">
-                <span className="swatch" style={{ background: c.color }} /> {c.name}
-              </td>
-              {c.schedule.map((slot, hour) => (
+      <div className="table-scroll">
+        <table
+          className="grid schedule"
+          onPointerDown={(e) => {
+            if ((e.target as HTMLElement).closest('td[data-hour]')) {
+              setPainting(true);
+              paintAt(e.clientX, e.clientY);
+            }
+          }}
+          onPointerMove={(e) => painting && paintAt(e.clientX, e.clientY)}
+          onPointerUp={stop}
+          onPointerCancel={stop}
+          onPointerLeave={stop}
+        >
+          <thead>
+            <tr>
+              <th />
+              {Array.from({ length: 24 }, (_, h) => (
+                <th key={h} className={h === now ? 'now' : ''} title={h === now ? 'Now' : undefined}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="everyone">
+              <td className="row-label muted">Everyone</td>
+              {Array.from({ length: 24 }, (_, hour) => (
                 <td
                   key={hour}
-                  className={`hour slot-${slot} ${hour === now ? 'now' : ''}`}
-                  title={`${hour}:00 ${SLOT_LABELS[slot]}`}
-                  onMouseDown={() => {
-                    setPainting(true);
-                    paint(c.id, hour);
-                  }}
-                  onMouseEnter={() => painting && paint(c.id, hour)}
+                  className={`hour slot-all ${hour === now ? 'now' : ''}`}
+                  title={`${hour}:00 · set for everyone`}
+                  data-who="all"
+                  data-hour={hour}
                 />
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+            {living.map((c) => (
+              <tr key={c.id}>
+                <td className="row-label">
+                  <span className="swatch" style={{ background: c.color }} /> {c.name}
+                </td>
+                {c.schedule.map((slot, hour) => (
+                  <td
+                    key={hour}
+                    className={`hour slot-${slot} ${hour === now ? 'now' : ''}`}
+                    title={`${hour}:00 ${SLOT_LABELS[slot]}`}
+                    data-who={c.id}
+                    data-hour={hour}
+                  />
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Modal>
   );
 }
@@ -313,7 +344,8 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
           {TOUCH ? 'Tap Select to put the tool down.' : 'Right-click drops the tool.'}
         </li>
         <li>
-          <b>Watch the alerts</b> above the goals. Click one to jump to whoever or whatever it's about.
+          <b>Watch the alerts</b> above the goals. {TOUCH ? 'Tap' : 'Click'} one to jump to whoever or whatever it's
+          about.
         </li>
       </ol>
       <p className="muted">
@@ -360,10 +392,13 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             Raiders pause the game. Press <kbd>Q</kbd> to draft everyone (or a selected colonist).
           </li>
           <li>
-            Pick a stance in the inspector: take cover, hold or charge. Right-click the map to move a drafted colonist,
-            or a raider to focus fire on them.
+            Pick a stance in the inspector: take cover, hold or charge. {TOUCH ? 'Tap' : 'Right-click'} the map to move
+            a drafted colonist, or a raider to focus fire on them.
           </li>
-          <li>Research better bows, armor, sandbags, embrasures and spike traps.</li>
+          <li>
+            Research better bows, armor, sandbags, embrasures and spike traps. Raiders' arrows and blows land less often
+            on colonists behind sandbags.
+          </li>
           <li>Maddened animals sometimes come for the colony too: draft and fight them like raiders.</li>
           <li>
             Some raiders fall wounded rather than dying. Build a <b>prisoner bed</b> (Security), drag <b>Capture</b>{' '}

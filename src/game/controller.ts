@@ -734,6 +734,8 @@ export interface ObjectiveView {
   how: string;
   tool?: string;
   screen?: 'work' | 'production' | 'research' | 'schedule' | 'ship';
+  // The order is given (trees marked, blueprints or a field laid out) and colonists are on it.
+  underway?: boolean;
 }
 
 export interface ChronicleYear {
@@ -1678,6 +1680,7 @@ export class GameController {
         failed: sim.objectiveFailed(o.id),
         progress: o.progress?.(sim),
         ...(GOAL_HELP[o.id] ?? { how: '' }),
+        underway: !sim.objectivesDone[o.id] && this.goalUnderway(GOAL_HELP[o.id]?.tool),
       })),
       bills: sim.bills.map((bill) => {
         const recipe = RECIPES[bill.recipe];
@@ -2283,6 +2286,27 @@ export class GameController {
     }
     this.chronicleCache = { length: sim.chronicle.length, last, sim, years: [...years.values()].reverse() };
     return this.chronicleCache.years;
+  }
+
+  // Whether a goal's order has been given: its tool has left marks on the map that colonists are working
+  // through (trees marked for chopping, blueprints of its building, its kind of zone).
+  private goalUnderway(toolId: string | undefined): boolean {
+    const tool = toolId ? TOOLS.find((t) => t.id === toolId)?.tool : undefined;
+    const w = this.sim.world;
+    switch (tool?.kind) {
+      case 'designate': {
+        const mark = { mine: Designation.MINE, chop: Designation.CHOP, forage: Designation.FORAGE }[
+          tool.designation as 'mine' | 'chop' | 'forage'
+        ];
+        return mark !== undefined && [...w.tilesWith('designations')].some((i) => w.designation[i] === mark);
+      }
+      case 'build':
+        return [...w.tilesWith('blueprints')].some((i) => w.blueprint[i] === tool.feature);
+      case 'zone':
+        return [...w.tilesWith('zones')].some((i) => w.zone[i] === tool.zone);
+      default:
+        return false;
+    }
   }
 
   private diplomacyView(): DiplomacyView {

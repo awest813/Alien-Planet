@@ -368,14 +368,6 @@ kbd {
   padding: 3px 6px;
 }
 
-.paused {
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 11px;
-  background: rgba(255, 209, 102, 0.2);
-  color: var(--accent);
-}
-
 .tb-resources {
   display: flex;
   flex-wrap: wrap;
@@ -745,6 +737,25 @@ kbd {
   width: 880px;
 }
 
+/* A wide table scrolls sideways on its own, with the names column kept in view. */
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.table-scroll .row-label,
+.table-scroll thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #141922;
+}
+
+/* Dragging across the schedule paints it (rather than scrolling the page). */
+.schedule td.hour {
+  touch-action: none;
+}
+
 .row {
   display: flex;
   flex-wrap: wrap;
@@ -986,16 +997,25 @@ button.brush.active {
 }
 
 @media (max-width: 720px) {
+  /* One column: the colonist or tile card gets the screen's width (up to a card's), and the alerts and
+     goals panel floats over the map in the same row, so both start below the top bar however tall it is. */
   .ui {
-    grid-template-columns: minmax(0, 220px) 1fr 0;
+    grid-template-columns: minmax(0, 1fr) 0 0;
   }
 
-  /* The alerts and goals panel floats over the map, folded away until opened. */
+  .left-column {
+    max-width: 360px;
+  }
+
+  /* Notices along the bottom of the map, clear of a colonist's card at the top. */
+  .notices {
+    grid-column: 1 / -1;
+    align-self: end;
+  }
+
   .right-column {
-    position: fixed;
-    top: 120px;
-    right: var(--gap);
-    bottom: 110px;
+    grid-column: 1 / -1;
+    justify-self: end;
     width: min(240px, 70vw);
     z-index: 5;
   }
@@ -1058,6 +1078,14 @@ button.link:focus-visible {
   padding: 0 4px;
 }
 
+/* A phone on its side: no room for the minimap beside the goals. */
+@media (max-height: 480px) {
+  .minimap,
+  .minimap-toggle {
+    display: none;
+  }
+}
+
 @media (max-width: 560px) {
   .minimap,
   .minimap-toggle {
@@ -1079,11 +1107,6 @@ button.link:focus-visible {
   .speeds button {
     min-width: 26px;
     padding: 2px 4px;
-  }
-
-  /* The banner over the map says so already. */
-  .topbar .paused {
-    display: none;
   }
 
   /* Notices take the whole width (the middle column is narrow here), keeping clear of the

@@ -688,23 +688,34 @@ export class ColonyScene extends Phaser.Scene {
     this.fadeCountsUnderNames();
   }
 
-  // Colonists side by side would run their names together: one that would overlap its neighbour's
-  // goes up a line.
+  // Colonists side by side would run their names together: one that would overlap a neighbour's goes up
+  // a line (up to two lines), and one that still would is faded out rather than drawn over the others.
+  // A colonist's "!" or "+" sits just above their own name.
   private staggerNames(): void {
     const NAME_Y = -11;
+    const LINE = 7;
+    const LEVELS = 3;
     const pawns = [...this.pawns.values()].sort((a, b) => a.root.x - b.root.x);
-    const placed: { left: number; right: number; y: number; raised: boolean }[] = [];
+    const placed: { left: number; right: number; y: number; level: number }[] = [];
     for (const pawn of pawns) {
       const half = pawn.label.width / 2;
       const left = pawn.root.x - half;
       const right = pawn.root.x + half;
-      const clash = (raised: boolean) =>
+      const clash = (level: number) =>
         placed.some(
-          (o) => o.raised === raised && Math.abs(o.y - pawn.root.y) < 8 && o.right + 1 > left && o.left < right + 1,
+          (o) => o.level === level && Math.abs(o.y - pawn.root.y) < 8 && o.right + 1 > left && o.left < right + 1,
         );
-      const raised = clash(false) && !clash(true);
-      pawn.label.setPosition(pawn.root.x, pawn.root.y + (raised ? NAME_Y - 7 : NAME_Y));
-      placed.push({ left, right, y: pawn.root.y, raised });
+      let level = 0;
+      while (level < LEVELS && clash(level)) {
+        level++;
+      }
+      const fits = level < LEVELS;
+      const offset = NAME_Y - (fits ? level : 0) * LINE;
+      pawn.label.setPosition(pawn.root.x, pawn.root.y + offset).setAlpha(fits ? 1 : 0);
+      pawn.alert.setY(pawn.label.visible && fits ? offset - LINE : NAME_Y - LINE);
+      if (fits) {
+        placed.push({ left, right, y: pawn.root.y, level });
+      }
     }
   }
 
@@ -1333,13 +1344,15 @@ export class ColonyScene extends Phaser.Scene {
         return;
       }
       if (this.pan && this.pan.button === 0 && pointer.button === 0) {
-        // A one-finger touch pan; a tap that didn't move selects, as a click would.
+        // A one-finger touch pan; a tap that didn't move selects, as a click would. With a drafted colonist
+        // selected, a tap on the ground (or on a raider) sends them there instead, as a right-click does.
         if (!this.pan.moved) {
           const colonist = this.pickColonist(pointer);
+          const tile = this.tileAt(pointer);
           if (colonist !== null) {
             controller.selectColonist(colonist);
-          } else {
-            controller.selectTile(this.tileAt(pointer));
+          } else if (tile === null || controller.tool.kind !== 'select' || !controller.orderMove(tile)) {
+            controller.selectTile(tile);
           }
         }
         this.pan = null;
