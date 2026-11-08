@@ -564,20 +564,21 @@ export class ColonyScene extends Phaser.Scene {
       return;
     }
     if (!label) {
+      // A small badge in the tile's corner, so the item itself still shows.
       label = this.add
-        .text((world.xOf(i) + 1) * TILE - 1, (world.yOf(i) + 1) * TILE, '', {
+        .text((world.xOf(i) + 1) * TILE, (world.yOf(i) + 1) * TILE, '', {
           fontFamily: 'monospace',
-          fontSize: '6px',
+          fontSize: '5px',
           color: '#ffffff',
-          stroke: '#000000',
-          strokeThickness: 2,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          padding: { x: 1, y: 0 },
         })
         .setOrigin(1, 1)
-        .setResolution(4)
+        .setResolution(6)
         .setDepth(4.5);
       this.itemLabels.set(i, label);
     }
-    label.setText(String(count));
+    label.setText(count >= 1000 ? `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}k` : String(count));
   }
 
   private syncDirty(world: World): void {
