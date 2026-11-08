@@ -1785,3 +1785,21 @@ button.big {
     flex-shrink: 0;
   }
 }
+
+/* ---------- Colonists overview ---------- */
+.colonists-table td {
+  white-space: nowrap;
+}
+
+.colonists-table .warn {
+  color: var(--accent);
+}
+
+.colonists-table tbody tr {
+  cursor: pointer;
+}
+
+.colonists-table tbody tr:hover,
+.colonists-table tbody tr.selected {
+  background: rgba(255, 255, 255, 0.06);
+}

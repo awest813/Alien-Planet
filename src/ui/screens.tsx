@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChronicleYear, UiState, controller } from '../game/controller';
 import { ChronicleKind } from '../sim/chronicle';
 import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey } from '../sim/types';
-import { Bar, SLOT_LABELS, WORK_LABELS } from './common';
+import { Bar, SLOT_LABELS, WORK_LABELS, moodColor } from './common';
 import { ADULT, TEEN, TEEN_WORK } from '../sim/lifespans';
 import { Hours, POLICY_TEXT, Rations } from '../sim/village';
 
@@ -978,5 +978,82 @@ export function ConfirmButton({
     >
       {armed ? confirm : label}
     </button>
+  );
+}
+
+// Everyone at a glance: mood, needs, health, what they're doing, and what they're best at. A row picks that
+// colonist (and closes the screen, so the camera can go to them).
+export function ColonistsScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+  const living = state.colonists.filter((c) => !c.dead);
+  const need = (value: number) => (
+    <span className={value < 0.25 ? 'bad' : value < 0.5 ? 'warn' : ''}>{Math.round(value * 100)}%</span>
+  );
+  return (
+    <Modal title={`Colonists (${living.length})`} onClose={onClose} wide>
+      <div className="table-scroll">
+        <table className="grid colonists-table">
+          <thead>
+            <tr>
+              <th />
+              <th>Mood</th>
+              <th>Food</th>
+              <th>Rest</th>
+              <th>Fun</th>
+              <th>Health</th>
+              <th>Doing</th>
+              <th>Best at</th>
+            </tr>
+          </thead>
+          <tbody>
+            {living.map((c) => {
+              const best = [...c.skillList]
+                .sort((a, b) => b.level - a.level || b.passion - a.passion)
+                .slice(0, 2)
+                .map((s) => `${s.label} ${s.level}${'★'.repeat(s.passion)}`)
+                .join(', ');
+              const pick = () => {
+                controller.selectColonist(c.id, true);
+                onClose();
+              };
+              return (
+                <tr key={c.id} className={state.selectedColonist === c.id ? 'selected' : ''} onClick={pick}>
+                  <td className="row-label">
+                    <button
+                      className="link"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        pick();
+                      }}
+                    >
+                      <span className="swatch" style={{ background: c.color }} /> {c.name}
+                    </button>
+                    <span className="muted small"> {c.age < ADULT ? `${c.stage}, ${c.age}` : c.age}</span>
+                    {c.leader && <span className="tag good">leader</span>}
+                  </td>
+                  <td>
+                    <span style={{ color: moodColor(c.mood) }}>{c.mood}</span>
+                    {c.inBreak && <span className="tag danger">break</span>}
+                  </td>
+                  <td>{need(c.needs.food)}</td>
+                  <td>{need(c.needs.rest)}</td>
+                  <td>{need(c.needs.joy)}</td>
+                  <td>
+                    {c.status === 'Healthy' ? (
+                      <span className="muted">fine</span>
+                    ) : (
+                      <span className={c.status === 'Downed' ? 'bad' : 'warn'}>{c.status.toLowerCase()}</span>
+                    )}
+                    {c.bleeding && <span className="bad"> bleeding</span>}
+                    {c.disease && <span className="muted small"> {c.disease.label.toLowerCase()}</span>}
+                  </td>
+                  <td className="small">{c.drafted ? 'Drafted' : c.activity}</td>
+                  <td className="small">{best}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Modal>
   );
 }

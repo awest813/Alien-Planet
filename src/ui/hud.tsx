@@ -34,6 +34,7 @@ export type Screen =
   | 'prisoners'
   | 'village'
   | 'factions'
+  | 'colonists'
   | null;
 
 const SPEEDS = [
@@ -252,7 +253,7 @@ function statusIcons(c: ColonistView): { icon: string; title: string }[] {
   return icons;
 }
 
-export function ColonistBar({ state }: { state: UiState }) {
+export function ColonistBar({ state, onOpen }: { state: UiState; onOpen: (screen: Screen) => void }) {
   return (
     <div className="colonist-bar" role="toolbar" aria-label="Colonists">
       {state.colonists.map((c) => {
@@ -279,6 +280,14 @@ export function ColonistBar({ state }: { state: UiState }) {
           </button>
         );
       })}
+      <button
+        className="chip"
+        onClick={() => onOpen('colonists')}
+        title="Everyone at a glance: mood, needs, health and skills"
+        aria-label="All colonists"
+      >
+        ☰
+      </button>
     </div>
   );
 }

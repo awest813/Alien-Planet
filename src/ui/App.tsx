@@ -15,6 +15,7 @@ import {
 } from './menus';
 import { Minimap } from './minimap';
 import {
+  ColonistsScreen,
   HelpScreen,
   PrisonersScreen,
   VillageScreen,
@@ -183,7 +184,7 @@ export function App() {
       ) : (
         <>
           <TopBar state={state} onOpen={setScreen} />
-          <ColonistBar state={state} />
+          <ColonistBar state={state} onOpen={setScreen} />
           <div className="left-column">
             <Inspector state={state} />
           </div>
@@ -208,6 +209,7 @@ export function App() {
           {screen === 'prisoners' && <PrisonersScreen state={state} onClose={close} />}
           {screen === 'village' && <VillageScreen state={state} onClose={close} />}
           {screen === 'factions' && <FactionsScreen state={state} onClose={close} />}
+          {screen === 'colonists' && <ColonistsScreen state={state} onClose={close} />}
           {screen === 'trade' && <TradeScreen state={state} onClose={close} />}
         </>
       )}
