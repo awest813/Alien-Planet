@@ -118,7 +118,7 @@ function interact(sim: Simulation, a: Colonist, b: Colonist, insults = 1): void 
     if (
       a.lover < 0 &&
       b.lover < 0 &&
-      canRomance(a, b) &&
+      canRomance(sim, a, b) &&
       chemistry > 0.2 &&
       mutualOpinion(a, b) >= LOVER_OPINION &&
       sim.rng.next() < 0.3
@@ -145,6 +145,39 @@ function interact(sim: Simulation, a: Colonist, b: Colonist, insults = 1): void 
     sim.addLog(`${a.name} and ${b.name} have become friends.`, 'good', true);
   } else if (after !== before && after === 'Rival') {
     sim.addLog(`${a.name} and ${b.name} have become rivals.`, 'warn', true);
+  }
+}
+
+// Each morning, feelings fade a little towards indifference: a friendship needs keeping up, and a
+// grudge wears off unless it's fed. So relationships can change over the years instead of settling
+// for good.
+const OPINION_FADE = 0.02;
+export function fadeOpinions(sim: Simulation): void {
+  const living = sim.living();
+  const before = new Map<string, string | null>();
+  for (let i = 0; i < living.length; i++) {
+    for (let j = i + 1; j < living.length; j++) {
+      before.set(`${i}:${j}`, relationLabel(living[i], living[j]));
+    }
+  }
+  for (const c of living) {
+    for (const o of living) {
+      if (o !== c && c.opinions[o.id] !== undefined) {
+        c.opinions[o.id] *= 1 - OPINION_FADE;
+      }
+    }
+  }
+  for (let i = 0; i < living.length; i++) {
+    for (let j = i + 1; j < living.length; j++) {
+      const [a, b] = [living[i], living[j]];
+      const was = before.get(`${i}:${j}`);
+      const now = relationLabel(a, b);
+      if (was === 'Rival' && now !== 'Rival') {
+        sim.addLog(`${a.name} and ${b.name} have let their quarrel go.`, 'good');
+      } else if (was === 'Friend' && now !== 'Friend' && now !== 'Lover') {
+        sim.addLog(`${a.name} and ${b.name} have drifted apart.`, 'info');
+      }
+    }
   }
 }
 

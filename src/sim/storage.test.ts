@@ -82,6 +82,10 @@ describe('stockpile settings', () => {
     sim.apply({ type: 'zone', rect: a, zone: STOCKPILE_ZONE });
     sim.apply({ type: 'zone', rect: b, zone: STOCKPILE_ZONE });
     sim.colonists[0].priorities.hauling = 1;
+    // The landing's timber and rations would muddle the counts.
+    for (const i of [...c.w.tilesWith('items')]) {
+      c.w.takeItem(i, c.w.itemCount[i]);
+    }
     return { ...c, a: c.w.idx(a.x0, a.y0), b: c.w.idx(b.x0, b.y0) };
   }
   const where = (sim: Simulation, item: number) =>

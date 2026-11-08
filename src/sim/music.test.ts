@@ -80,6 +80,9 @@ describe('instruments', () => {
 describe('concerts', () => {
   it('draw off-duty colonists to a skilled player in the evening', () => {
     const { sim, spot } = stage(3, 'lute', 18);
+    // A mild evening, so nobody stays in out of the cold, and no party to draw them off instead.
+    sim.temperatureAt = () => 18;
+    (sim as unknown as { nextPartyTick: number }).nextPartyTick = Number.MAX_SAFE_INTEGER;
     const [player, ...audience] = sim.colonists;
     player.skills.artistic = 12;
     player.needs.joy = 0.1;
@@ -94,6 +97,10 @@ describe('concerts', () => {
     let listening = 0;
     for (let t = 0; t < HOUR * 4 && !(began && !sim.concert); t++) {
       sim.step();
+      // (A concert starts at some point while they play: keep them wanting to, until it does.)
+      if (!began) {
+        player.needs.joy = Math.min(player.needs.joy, 0.2);
+      }
       began ||= sim.concert?.player === player.id && sim.concert.tile === spot;
       listening = Math.max(listening, audience.filter((c) => c.job?.listening).length);
     }

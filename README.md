@@ -121,7 +121,10 @@ How the living simulation works:
   fail them and they snap.
 - **Families:** colonists have ages and backstories. Married couples have children: babies are carried by a
   parent, then grow up through childhood (learning by watching the adults work) and their teens (light work) into
-  full colonists who take after their parents. The old slow down, and in time die of old age.
+  full colonists who take after their parents. Grown-ups age three years a year, so over a long game the
+  founders slow down, grow old and die of old age while their children raise families of their own. Nobody
+  courts family within two generations (cousins, aunts, uncles and grandparents included). As the colony
+  settles in, expectations rise: what pleased at the landing is taken for granted years later.
 - **The village:** once there are three adults, the colony chooses a leader by vote, each backing whoever they
   think best of (kind natures win votes, abrasive ones lose them), and votes again each season or when the
   leader dies. A cheerful leader lifts everyone; a miserable one drags them down. The Village screen sets the
@@ -155,7 +158,8 @@ How the storytelling layer works:
 
 - **Traits and relationships:** every colonist has two traits (hard worker, optimist, glutton, tough,
   sharpshooter, abrasive, …). Nearby colonists chat, have deep talks, or trade insults, which moves their
-  opinions of each other; friends, rivals and lovers emerge and affect mood.
+  opinions of each other; friends, rivals and lovers emerge and affect mood. Feelings fade a little each day,
+  so friendships need keeping up and grudges wear off: relationships keep changing over the years.
 - **Health:** wounds bleed until a doctor tends them (better with herbal medicine from healroot). Too much pain
   or blood loss and a colonist collapses; too much and they die, and everyone grieves. Marsh fever is a race
   between severity and immunity that bed rest and tending tilt in the patient's favour. Doctors get out of bed

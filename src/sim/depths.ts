@@ -21,6 +21,8 @@ export interface Shaft {
 }
 
 export const METRES_PER_LEVEL = 2;
+// Bedrock: how many stretches deep a shaft can go.
+export const MAX_DEPTH = 60;
 // Below this depth something may break through.
 export const BREACH_DEPTH = 10;
 // After a breach, this many more stretches before anything else can come up.
@@ -76,7 +78,16 @@ export function digDeeper(sim: Simulation, c: Colonist, tile: number): void {
     w.dropItemNear(tile, itemId(key), count);
     sim.stats.produced[key] = (sim.stats.produced[key] ?? 0) + count;
   }
-  shaft.depth++;
+  // At bedrock it goes no deeper, and keeps giving what it gives there.
+  if (shaft.depth < MAX_DEPTH) {
+    shaft.depth++;
+    if (shaft.depth === MAX_DEPTH) {
+      sim.addLog(
+        `The mine shaft has reached bedrock at ${MAX_DEPTH * METRES_PER_LEVEL} metres. It goes no deeper.`,
+        'info',
+      );
+    }
+  }
   w.progress[tile] = 0;
   // Spoil from the shaft lands beside it.
   const beside = w.neighbors(tile, false).find((n) => w.isPassable(n));

@@ -304,7 +304,7 @@ function play(seed: number): Result {
   const fell = new Set<number>();
   let beaconPlaced = false;
   let shaftPlaced = false;
-  let poplarsPlanted = false;
+  let poplarsPlanted = 0;
   let shipsLanded = 0;
   let bannerPlaced = false;
   let labTile = -1;
@@ -437,8 +437,13 @@ function play(seed: number): Result {
       }
     }
     // The forest running out: plant a grove of poplars for firewood.
-    if (!poplarsPlanted && Math.floor(sim.hour) === 8 && sim.countFeature((f) => f === featureId('tree')) < 60) {
-      poplarsPlanted = true;
+    // (And a second one later, if wood still runs short.)
+    if (
+      Math.floor(sim.hour) === 8 &&
+      ((poplarsPlanted === 0 && sim.countFeature((f) => f === featureId('tree')) < 60) ||
+        (poplarsPlanted === 1 && sim.day > 60 && sim.stockOf(itemId('wood')) < 150))
+    ) {
+      poplarsPlanted++;
       const grove = findSite(sim, 6, 5, avoid);
       if (grove) {
         claim(avoid, sim, grove.x, grove.y, 6, 5);

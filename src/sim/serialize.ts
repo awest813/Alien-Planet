@@ -55,6 +55,7 @@ interface SavedColonist {
   backstory?: string;
   parents?: number[];
   expectingUntil?: number;
+  expectingWith?: number;
   breakKind?: 'daze' | 'sulk' | 'binge' | 'tantrum';
   tile: number;
   skills: Skills;
@@ -253,6 +254,7 @@ export function serialize(sim: Simulation): SaveData {
         backstory: c.backstory,
         parents: [...c.parents],
         expectingUntil: c.expectingUntil,
+        expectingWith: c.expectingWith,
         breakKind: c.breakKind,
       }),
     ),

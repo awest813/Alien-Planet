@@ -158,6 +158,8 @@ export interface Colonist {
   parents: number[];
   // When their child is due, while the couple is expecting.
   expectingUntil?: number;
+  // The child's other parent (set when the child was conceived).
+  expectingWith?: number;
   // The kind of mental break they're in (while breakUntil is ahead).
   breakKind?: 'daze' | 'sulk' | 'binge' | 'tantrum';
   tile: number;

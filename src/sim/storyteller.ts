@@ -130,7 +130,8 @@ const EVENTS: EventDef[] = [
     weight: (sim) =>
       sim.story.difficulty === 'peaceful' || raiders(sim).length === 0
         ? 0
-        : 3 * (transmitting(sim) ? SIGNAL_RAID_WEIGHT : 1),
+        : // Each faction bought off is a share of the raids that don't come.
+          3 * (raiders(sim).length / hostileFactions().length) * (transmitting(sim) ? SIGNAL_RAID_WEIGHT : 1),
     run: (sim) => {
       // Two raiders on day 4 and one more every three days, plus extra for a well-armed colony. The cap
       // is seven at first (nine on harsh), rising by one every eight days after day 19; then all of it
@@ -593,6 +594,12 @@ export function triggerEvent(sim: Simulation, key: string): boolean {
 }
 
 export const EVENT_KEYS = EVENTS.map((e) => e.key);
+
+// How likely an event is to be picked right now, relative to the others (for tests and tools).
+export const eventWeight = (sim: Simulation, key: string): number => {
+  const event = EVENTS.find((e) => e.key === key);
+  return event ? weightOf(sim, event) : 0;
+};
 
 // Events that count as threats (more frequent on harsh, rarer on peaceful).
 export const THREAT_EVENTS = EVENTS.filter((e) => e.threat).map((e) => e.key);

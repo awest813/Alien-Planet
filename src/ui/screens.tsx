@@ -555,7 +555,7 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
                   <button
                     disabled={d.silver < d.tributeCost}
                     onClick={() => controller.command({ type: 'tribute', faction: f.id })}
-                    title="Pay them to leave the colony alone for 12 days"
+                    title="Pay them to leave the colony alone for 12 days: their share of the raids stops (the others still come)"
                   >
                     Pay {d.tributeCost} silver for peace
                   </button>
@@ -564,7 +564,7 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
                     {d.giftSizes.map((s, k) => (
                       <button
                         key={s}
-                        disabled={d.silver < s}
+                        disabled={d.silver < s || f.giftGains[k] <= 0}
                         onClick={() => controller.command({ type: 'gift', faction: f.id, silver: s })}
                         title={`Goodwill +${f.giftGains[k]}`}
                       >
@@ -674,7 +674,9 @@ export function PrisonersScreen({ state, onClose }: { state: UiState; onClose: (
                 <td className="num">
                   {p.talksLeft > 0
                     ? `About ${p.talksLeft} talk${p.talksLeft > 1 ? 's' : ''} from ready`
-                    : 'Ready to be won over'}
+                    : p.noRoom
+                      ? 'Ready, but the colony is full'
+                      : 'Ready to be won over'}
                 </td>
                 <td>
                   <ConfirmButton

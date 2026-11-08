@@ -3,6 +3,7 @@ import {
   ADULT,
   BACKSTORIES,
   COLONY_BORN,
+  ADULT_AGEING,
   CHILD_GROWTH,
   DRAFT_AGE,
   EXPECTING_DAYS,
@@ -56,12 +57,12 @@ describe('ages and backstories', () => {
     expect(copy.colonists.map((c) => [c.age, c.backstory])).toEqual(sim.colonists.map((c) => [c.age, c.backstory]));
   });
 
-  it('age a year every year, and children grow faster', () => {
+  it('age three years every year, and children faster still', () => {
     const { sim, days } = family(2);
     const c = sim.colonists[0];
     c.age = 30;
     days(DAYS_PER_YEAR / 2);
-    expect(c.age).toBeCloseTo(30.5, 1);
+    expect(c.age).toBeCloseTo(30 + ADULT_AGEING / 2, 1);
     const kid = sim.colonists[1];
     kid.age = 5;
     days(DAYS_PER_YEAR / 4);
@@ -116,7 +117,7 @@ describe('families', () => {
     expect(child.parents.sort()).toEqual([a.id, b.id].sort());
     expect(stageOf(child.age)).toBe('child');
     // Family don't fall for each other.
-    expect(canRomance(child, a)).toBe(false);
+    expect(canRomance(sim, child, a)).toBe(false);
   });
 
   it('teach children by watching the adults at work', () => {

@@ -33,7 +33,7 @@ import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
-import { DOWNED_TICKS, persuasion } from '../sim/prisoners';
+import { DOWNED_TICKS, persuasion, roomToJoin } from '../sim/prisoners';
 import { DRAFT_AGE, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans';
 import { LEGEND } from '../sim/minds';
 import { PART_LABELS, SCAR_LABELS, isInfected, scarsOf } from '../sim/body';
@@ -662,6 +662,8 @@ export interface CaptiveView {
   food: number;
   // Talks still needed before they'll consider joining (0: ready).
   talksLeft: number;
+  // The colony is full: they can't join until there's room.
+  noRoom: boolean;
 }
 
 export interface PowerView {
@@ -2277,12 +2279,26 @@ export class GameController {
   // A colonist's family, as lines for the inspector.
   private familyOf(c: Colonist): string[] {
     const sim = this.sim;
-    const name = (id: number) => sim.colonists[id]?.name ?? '?';
+    // The dead are named as remembered.
+    const name = (id: number) => {
+      const o = sim.colonists[id];
+      return o ? `${o.name}${o.health.dead ? ' (died)' : ''}` : '?';
+    };
     const lines: string[] = [];
+    const spouse = sim.colonists[c.spouse];
+    if (spouse && !spouse.health.dead) {
+      lines.push(`Married to ${spouse.name}`);
+    } else if (!c.health.dead) {
+      // Widowed: the dead keep their spouse, the living don't (the latest, if more than one).
+      const late = sim.colonists.filter((o) => o.health.dead && o.spouse === c.id).pop();
+      if (late) {
+        lines.push(`Widowed: ${late.name} died`);
+      }
+    }
     if (c.parents.length > 0) {
       lines.push(`Child of ${c.parents.map(name).join(' and ')}`);
     }
-    const children = sim.colonists.filter((o) => o.parents.includes(c.id)).map((o) => o.name);
+    const children = sim.colonists.filter((o) => o.parents.includes(c.id)).map((o) => name(o.id));
     const babies = sim.infants.filter((i) => i.parents.includes(c.id)).map((i) => `baby ${i.name}`);
     if (children.length + babies.length > 0) {
       lines.push(`Parent of ${[...children, ...babies].join(', ')}`);
@@ -2321,6 +2337,7 @@ export class GameController {
         p.state === 'downed' ? Math.max(0, Math.ceil((p.since + DOWNED_TICKS - sim.tick) / TICKS_PER_HOUR)) : 0,
       food: p.food,
       talksLeft: Math.ceil(p.resistance / Math.max(0.3, Math.max(...sim.living().map(persuasion), 0.3))),
+      noRoom: !roomToJoin(sim),
     }));
   }
 

@@ -750,6 +750,25 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
   - The medicine alert waits for a wound or illness, and goals tick off within a couple of seconds.
   - A freezing colonist breaks off a walk to food to get warm.
 
+- Ten-year runs (240 days, 12 colonies) and a reviewer's audit of factions and relationships found long-game
+  problems:
+  - Prisoners were recruited past the population cap (small-map colonies of 15–22), which also stopped births.
+    They now join only while there's room.
+  - Opinions never faded, so every pair settled as friends or rivals for good. They now fade 2% a day.
+  - Nobody grew old: adults aged a year a year, from 18–52. They now age three years a year, newcomers are
+    mostly young, and births are a little likelier. Ten-year colonies see births, children growing up and
+    old-age deaths, and keep 6–9 people on a small map.
+  - Kinship covered only parents and siblings. It now covers two generations, and a child's other parent is
+    recorded at conception.
+  - Goodwill pinned at 100, with gifts at 100 taking silver for nothing. Above 40 it now cools a point every
+    three days, and gifts that can't help are refused.
+  - Tribute to one raider faction changed nothing (the other raided as often). Raids now scale with the share
+    not paid off. Requests, hunt rewards and tribute stop growing after day 80.
+  - Mine shafts went 1,000 metres deep. They stop at bedrock (120 m).
+  - Mood stayed high (55–58) with almost no breaks in later years. Rising expectations (+4 in the first 12
+    days, −3 from year 2, −6 from year 4) bring it to 50–53.
+  - Names ran out (24): there are now 60.
+
 ### What to measure
 
 - Extend the balance harness for each phase (food days with preservation, generation size, break kinds,

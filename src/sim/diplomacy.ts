@@ -45,6 +45,10 @@ const DECLINE_GOODWILL = -3;
 const LAPSE_GOODWILL = -8;
 // Hard feelings fade: goodwill below where it started creeps back, one point every two days.
 const MENDING_DAYS = 2;
+// And warm feelings cool unless kept up: above this, goodwill slips a point every few days, so a close
+// friendship takes favours, trade or gifts now and then.
+const KEPT_UP_ABOVE = 40;
+const COOLING_DAYS = 3;
 // Below this the friendly faction won't ask (or trade, or send anything).
 export const WARY = 0;
 // Silver for one goodwill, before the drop-off as they come to like you anyway.
@@ -80,10 +84,13 @@ const roomToGrow = (sim: Simulation) => sim.living().length < populationFor(sim.
 // Called every in-game hour: a new request now and then (mid-morning), and a lapsed one closed.
 export function updateDiplomacy(sim: Simulation): void {
   const d = sim.diplomacy;
-  if (Math.floor(sim.hour) === 0 && sim.day % MENDING_DAYS === 0) {
+  if (Math.floor(sim.hour) === 0) {
     for (const f of friendly()) {
-      if (goodwillOf(sim, f.id) < STARTING_GOODWILL) {
+      const g = goodwillOf(sim, f.id);
+      if (g < STARTING_GOODWILL && sim.day % MENDING_DAYS === 0) {
         changeGoodwill(sim, f.id, 1);
+      } else if (g > KEPT_UP_ABOVE && sim.day % COOLING_DAYS === 0) {
+        changeGoodwill(sim, f.id, -1);
       }
     }
   }
@@ -122,7 +129,8 @@ function canHunt(sim: Simulation): boolean {
 // A new favour asked (a delivery or a hunt, by chance unless `kind` is given).
 export function makeRequest(sim: Simulation, faction: number, kind?: RequestKind): void {
   const d = sim.diplomacy;
-  const growth = 1 + sim.day / 40;
+  // More as the colony grows, up to three times the first asks (by day 80).
+  const growth = 1 + Math.min(sim.day, 80) / 40;
   const hunt = kind
     ? kind === 'hunt'
     : sim.day >= 6 && sim.story.difficulty !== 'peaceful' && canHunt(sim) && sim.rng.next() < 0.3;
@@ -140,7 +148,7 @@ export function makeRequest(sim: Simulation, faction: number, kind?: RequestKind
       count: 0,
       quarry: beast.id,
       until: sim.tick + HUNT_DAYS * DAY,
-      silver: Math.round((60 + sim.day * 2) / 5) * 5,
+      silver: Math.round((60 + Math.min(sim.day, 80) * 2) / 5) * 5,
       recruit: false,
       goodwill: DONE_GOODWILL + 3,
     };
@@ -260,7 +268,9 @@ export function decline(sim: Simulation): void {
 // Goodwill a gift of silver would earn: less the better they already think of you.
 export function giftGoodwill(sim: Simulation, faction: number, silver: number): number {
   const g = goodwillOf(sim, faction);
-  return Math.max(1, Math.round((silver / SILVER_PER_GOODWILL) * Math.max(0.25, (100 - g) / 100)));
+  const gain = Math.max(1, Math.round((silver / SILVER_PER_GOODWILL) * Math.max(0.25, (100 - g) / 100)));
+  // (No higher than it goes.)
+  return Math.max(0, Math.min(gain, 100 - g));
 }
 
 export function gift(sim: Simulation, faction: number, silver: number): string | null {
@@ -271,10 +281,13 @@ export function gift(sim: Simulation, faction: number, silver: number): string |
   if (!Number.isInteger(silver) || silver <= 0) {
     return 'A gift has to be something.';
   }
+  const gain = giftGoodwill(sim, faction, silver);
+  if (gain <= 0) {
+    return `${f.name} already think the world of the colony: keep the silver.`;
+  }
   if (colonyStock(sim, itemId('silver')) < silver) {
     return 'Not enough silver in the stockpiles.';
   }
-  const gain = giftGoodwill(sim, faction, silver);
   takeFromStockpiles(sim, itemId('silver'), silver);
   changeGoodwill(sim, faction, gain);
   sim.stats.gifts = (sim.stats.gifts ?? 0) + 1;
@@ -282,8 +295,8 @@ export function gift(sim: Simulation, faction: number, silver: number): string |
   return null;
 }
 
-// What raiders want to leave the colony alone for a while: more as it grows richer and older.
-export const tributeCost = (sim: Simulation): number => Math.round((60 + sim.day * 5) / 10) * 10;
+// What raiders want to leave the colony alone for a while: more as it grows richer and older (up to 460).
+export const tributeCost = (sim: Simulation): number => Math.round((60 + Math.min(sim.day, 80) * 5) / 10) * 10;
 
 export function payTribute(sim: Simulation, faction: number): string | null {
   const f = FACTIONS[faction];

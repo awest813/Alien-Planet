@@ -465,5 +465,17 @@
   "dayOfRest": {
     "label": "A day of rest",
     "mood": 4
+  },
+  "lowExpectations": {
+    "label": "Just landed: low expectations",
+    "mood": 4
+  },
+  "highExpectations": {
+    "label": "Settled in: higher expectations",
+    "mood": -3
+  },
+  "veryHighExpectations": {
+    "label": "Long settled: high expectations",
+    "mood": -6
   }
 }

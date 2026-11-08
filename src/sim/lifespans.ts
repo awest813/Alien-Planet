@@ -25,6 +25,9 @@ export const backstoryOf = (key: string): Backstory => BACKSTORIES.find((b) => b
 export const COLONY_BORN = 'colonyBorn';
 
 export const CHILD_GROWTH = 6;
+// Grown-ups age three years a year: over a long game the founders grow old and make way, and the
+// children grow up to raise families of their own.
+export const ADULT_AGEING = 3;
 // Babies are carried until they toddle; children play and learn; teens do light work.
 export const TODDLER = 3;
 export const TEEN = 13;
@@ -37,7 +40,7 @@ export const OLD_AGE_DEATH_PER_YEAR = 0.07;
 export const PARENT_MIN = 18;
 export const PARENT_MAX = 50;
 // Chance a couple who could have a child starts expecting, each day; and how long until the birth.
-export const CONCEPTION_PER_DAY = 0.05;
+export const CONCEPTION_PER_DAY = 0.07;
 export const EXPECTING_DAYS = 6;
 // Only this many people (counting babies) above the colony's usual size.
 export const FAMILY_ROOM = 3;
@@ -60,20 +63,40 @@ export function stageOf(age: number): LifeStage {
 export const isAdult = (c: Colonist): boolean => c.age >= ADULT;
 
 // Years gained in `hours`: children grow fast, adults age at the calendar's pace.
-const yearsIn = (age: number, hours: number) => (hours / HOURS_PER_YEAR) * (age < ADULT ? CHILD_GROWTH : 1);
+const yearsIn = (age: number, hours: number) => (hours / HOURS_PER_YEAR) * (age < ADULT ? CHILD_GROWTH : ADULT_AGEING);
 
 // Whether a colonist does this kind of work at their age.
 export function canWork(c: Colonist, work: WorkTypeKey): boolean {
   return c.age >= ADULT || (c.age >= TEEN && TEEN_WORK.includes(work));
 }
 
-// Family: parents and children, or brothers and sisters.
-export function related(a: Colonist, b: Colonist): boolean {
-  return a.parents.includes(b.id) || b.parents.includes(a.id) || a.parents.some((p) => b.parents.includes(p));
+// Someone and their parents and grandparents, by id.
+function lineage(sim: Simulation, c: Colonist): Set<number> {
+  const ids = new Set<number>([c.id]);
+  for (const p of c.parents) {
+    ids.add(p);
+    for (const g of sim.colonists[p]?.parents ?? []) {
+      ids.add(g);
+    }
+  }
+  return ids;
+}
+
+// Family: anyone sharing a parent or grandparent, or descended one from the other within two
+// generations (parents, grandparents, brothers and sisters, aunts and uncles, nieces, nephews, cousins).
+export function related(sim: Simulation, a: Colonist, b: Colonist): boolean {
+  const mine = lineage(sim, a);
+  for (const id of lineage(sim, b)) {
+    if (mine.has(id)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // Who may fall in love: grown adults who aren't family.
-export const canRomance = (a: Colonist, b: Colonist): boolean => isAdult(a) && isAdult(b) && !related(a, b);
+export const canRomance = (sim: Simulation, a: Colonist, b: Colonist): boolean =>
+  isAdult(a) && isAdult(b) && !related(sim, a, b);
 
 // Work and walking pace for age: the young and the old are slower.
 export const agePace = (c: Colonist): { work: number; move: number } =>
@@ -81,7 +104,8 @@ export const agePace = (c: Colonist): { work: number; move: number } =>
 
 // A starting adult: an age, and a past that tilts their skills.
 export function rollPast(c: Colonist, rng: Rng): void {
-  c.age = rng.int(18, 52) + rng.next();
+  // Mostly young adults (a settler's life suits them), now and then someone older.
+  c.age = 18 + 35 * rng.next() ** 1.6;
   const pool = BACKSTORIES.filter((b) => !b.hidden);
   applyBackstory(c, rng.pick(pool).key);
 }
@@ -162,6 +186,7 @@ function conceive(sim: Simulation): void {
     if (sim.rng.chance(CONCEPTION_PER_DAY)) {
       const carrier = sim.rng.chance(0.5) ? a : b;
       carrier.expectingUntil = sim.tick + EXPECTING_DAYS * 24 * TICKS_PER_HOUR;
+      carrier.expectingWith = carrier === a ? b.id : a.id;
       sim.addLog(`${a.name} and ${b.name} are expecting a child!`, 'good', true);
     }
   }
@@ -169,8 +194,11 @@ function conceive(sim: Simulation): void {
 
 function birth(sim: Simulation, carrier: Colonist): void {
   carrier.expectingUntil = undefined;
-  const partner = sim.colonists[carrier.spouse];
-  const parents = partner && !partner.health.dead ? [carrier.id, partner.id] : [carrier.id];
+  // The child's parents are the couple who conceived them, whatever has happened since (a father who
+  // died while they waited is still the father).
+  const other = carrier.expectingWith ?? carrier.spouse;
+  carrier.expectingWith = undefined;
+  const parents = other >= 0 && sim.colonists[other] ? [carrier.id, other] : [carrier.id];
   const infant: Infant = {
     id: sim.nextInfantId++,
     name: sim.freshName(),

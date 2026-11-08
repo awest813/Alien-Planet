@@ -87,7 +87,7 @@ import {
 import { Pathfinder } from './pathfinding';
 import { PowerState, freshPower, updatePower } from './power';
 import { ResearchState, freshResearch, isAvailable, isResearched } from './research';
-import { Season, daysUntilWinter, seasonDay, seasonOf, yearOf } from './seasons';
+import { DAYS_PER_YEAR, Season, daysUntilWinter, seasonDay, seasonOf, yearOf } from './seasons';
 import { emptyXp, learn, rollPassions, rustSkills, skillFactor } from './skills';
 import { PassRegions, Rooms, computePassRegions, computeRooms } from './regions';
 import { Rng, hash2 } from './rng';
@@ -102,6 +102,7 @@ import {
   traitFactor,
   traitValue,
   updateSocial,
+  fadeOpinions,
 } from './social';
 import {
   Difficulty,
@@ -257,6 +258,8 @@ const STARVING_PATIENT = 0.1;
 // Walls and doors count as this many tiles nearer than other blueprints.
 const ENCLOSURE_FIRST = 15;
 const OBJECTIVE_TICKS = 40;
+// The first days, when colonists expect little.
+const LOW_EXPECTATION_DAYS = 12;
 const COLD_FOR_FIRES = 8;
 const FIREWOOD_RESERVE_DAYS = 3;
 // Wood the colonists land with.
@@ -2058,6 +2061,7 @@ export class Simulation {
       rustSkills(c, this.tick);
       fadeRecentJoy(c);
     }
+    fadeOpinions(this);
     for (const c of this.colonists) {
       // Only colonists who were around for a good part of the night count (not late arrivals).
       if (c.nightTicks > TICKS_PER_HOUR * 2 && c.exposedTicks > c.nightTicks * 0.5) {
@@ -2223,6 +2227,16 @@ export class Simulation {
       keys.push('infectedWound');
     }
     keys.push(...villageThoughts(this, c));
+    // Expectations rise as the colony settles in: what pleased at the landing is taken for granted in
+    // later years.
+    const years = (this.day - 1) / DAYS_PER_YEAR;
+    if (this.day <= LOW_EXPECTATION_DAYS) {
+      keys.push('lowExpectations');
+    } else if (years >= 4) {
+      keys.push('veryHighExpectations');
+    } else if (years >= 2) {
+      keys.push('highExpectations');
+    }
     if (inHospitalBed(this, c)) {
       keys.push('inHospital');
     }

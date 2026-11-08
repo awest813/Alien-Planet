@@ -1,4 +1,4 @@
-import { TICKS_PER_HOUR } from './constants';
+import { TICKS_PER_HOUR, populationFor } from './constants';
 import { FACTIONS, featureId } from './defs';
 import { traitFactor, traitValue } from './social';
 import type { Simulation } from './simulation';
@@ -116,6 +116,11 @@ export function talk(sim: Simulation, warden: Colonist, p: Captive): Colonist | 
     sim.addLog(`${p.name} is warming to the colony: ${warden.name} may win them over soon.`, 'good');
     return null;
   }
+  // A full colony can't take them in (as with travellers asking to join): they'll wait, or can be let go.
+  if (!roomToJoin(sim)) {
+    sim.addLog(`${p.name} would join, but the colony has no room for more. Release them, or wait.`);
+    return null;
+  }
   if (!sim.rng.chance(Math.min(0.9, RECRUIT_CHANCE * power))) {
     sim.addLog(`${warden.name} tried to win over ${p.name}, who isn't ready yet.`);
     return null;
@@ -127,6 +132,10 @@ export function talk(sim: Simulation, warden: Colonist, p: Captive): Colonist | 
   sim.addLog(`${warden.name} has won over ${p.name}, who joins the colony!`, 'good', true);
   return c;
 }
+
+// Whether the colony has room for another member (the map's population cap).
+export const roomToJoin = (sim: Simulation): boolean =>
+  sim.living().length < populationFor(sim.world.width).maxColonists;
 
 // Lets a prisoner (or a downed raider) go.
 export function release(sim: Simulation, id: number): boolean {
