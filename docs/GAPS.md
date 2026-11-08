@@ -107,12 +107,14 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 
 ## 8. Testing
 
-- **There's no continuous integration.** Tests, lint and the build run only by hand (`.github/workflows` is
-  empty).
+- **Continuous integration is new** (`.github/workflows/ci.yml`: type check, lint, formatting, tests, build on
+  pushes to main and on pull requests). It hasn't run on GitHub yet; check the first run.
 - **There are no browser tests in the suite.** UI checks so far have been one-off Playwright scripts.
-- **Save compatibility across versions is untested.** There's no stored old save that the tests load.
-- **There's no performance regression check.** Busy Large maps measure about 48 ms per 1,000 ticks against a
-  60 ms budget, by hand.
+- **Old saves are tested** (`src/sim/oldsaves.test.ts` loads two earlier version-16 saves, plays a day, saves
+  again). Saves from before version 16 can't be loaded at all; the game says so.
+- **Performance is checked by hand** with `scripts/perf.ts` (Large map, 46–52 ms per 1,000 ticks against a 60 ms
+  budget; it exits non-zero over budget). It's too noisy for CI. Goal checks, run every 40 ticks for quick
+  feedback, had pushed it to 66 ms; now only the open phase's goals are checked that often.
 - **Playtest personas never reach late content in 16 days.** No deep mining, breaches, elders or generations.
   Run some players for 120+ days regularly (`days=120 players=...`).
 - **The balance harness plays one way.** It hunts everything, gifts silver daily, never sets policies or pays

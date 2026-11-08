@@ -1009,8 +1009,10 @@ export class Simulation {
 
     // Goals are checked often enough that one ticks off moments after it's done (a couple of seconds at
     // normal speed), but not every tick.
+    // The goals the player is working on now are checked often, so a finished one ticks off at once; the rest
+    // (some look over the whole map) once an hour.
     if (this.tick % OBJECTIVE_TICKS === 0) {
-      this.checkObjectives();
+      this.checkObjectives(this.tick % TICKS_PER_HOUR !== 0);
     }
   }
 
@@ -1342,14 +1344,19 @@ export class Simulation {
   // A fire burning in the open warms the ground right around it (its full heat beside it, half two
   // tiles off), so colonists caught without shelter can huddle by it. Rebuilt when fires, fuel or walls
   // change.
-  private fireWarmthCache: { key: string; warmth: Map<number, number> } = { key: '', warmth: new Map() };
+  private fireWarmthCache = { structure: -1, features: -1, fuel: -1, warmth: new Map<number, number>() };
   private fireWarmth(): Map<number, number> {
     const w = this.world;
-    this.refreshGrid();
-    const key = `${w.structureVersion}:${w.featureVersion}:${this.fuelVersion}`;
-    if (this.fireWarmthCache.key === key) {
-      return this.fireWarmthCache.warmth;
+    const cache = this.fireWarmthCache;
+    // (Looked up with every temperature: compared as numbers, nothing built.)
+    if (
+      cache.structure === w.structureVersion &&
+      cache.features === w.featureVersion &&
+      cache.fuel === this.fuelVersion
+    ) {
+      return cache.warmth;
     }
+    this.refreshGrid();
     const warmth = new Map<number, number>();
     for (const f of this.fireTiles) {
       const def = featureDef(w.feature[f]);
@@ -1371,7 +1378,12 @@ export class Simulation {
         }
       }
     }
-    this.fireWarmthCache = { key, warmth };
+    this.fireWarmthCache = {
+      structure: w.structureVersion,
+      features: w.featureVersion,
+      fuel: this.fuelVersion,
+      warmth,
+    };
     return warmth;
   }
 
@@ -1410,20 +1422,25 @@ export class Simulation {
 
   public hasShelter(): boolean {
     this.ensureRegions();
-    const reachable = new Set(this.living().map((c) => this.regions.region[c.tile]));
-    const counted = new Set<number>();
-    for (let i = 0; i < this.world.size; i++) {
-      const room = this.rooms.room[i];
-      if (room < 0 || counted.has(room) || !this.rooms.enclosed[room] || this.rooms.sizes[room] < 4) {
-        continue;
+    // The regions that hold an enclosed room of four tiles or more, worked out again only when walls change.
+    if (this.shelterRegions.version !== this.world.structureVersion) {
+      const regions = new Set<number>();
+      const counted = new Set<number>();
+      for (let i = 0; i < this.world.size; i++) {
+        const room = this.rooms.room[i];
+        if (room < 0 || counted.has(room) || !this.rooms.enclosed[room] || this.rooms.sizes[room] < 4) {
+          continue;
+        }
+        counted.add(room);
+        regions.add(this.regions.region[i]);
       }
-      if (reachable.has(this.regions.region[i])) {
-        return true;
-      }
-      counted.add(room);
+      this.shelterRegions = { version: this.world.structureVersion, regions };
     }
-    return false;
+    const { regions } = this.shelterRegions;
+    return regions.size > 0 && this.living().some((c) => regions.has(this.regions.region[c.tile]));
   }
+
+  private shelterRegions = { version: -1, regions: new Set<number>() };
 
   public countFeature(test: (featureId: number) => boolean): number {
     let n = 0;
@@ -2175,9 +2192,14 @@ export class Simulation {
     this.planDay();
   }
 
-  private checkObjectives(): void {
+  // `currentOnly`: just the goals of the phase now open.
+  private checkObjectives(currentOnly = false): void {
     const active = OBJECTIVES.filter((o) => !o.hidden?.(this));
+    const open = PHASE_NAMES.findIndex((_, index) => !this.objectivesDone[`phase:${index + 1}`]) + 1;
     for (const objective of active) {
+      if (currentOnly && objective.phase !== open) {
+        continue;
+      }
       if (!this.objectivesDone[objective.id] && objective.check(this)) {
         this.objectivesDone[objective.id] = true;
         this.addLog(`Goal complete: ${objective.label}`, 'good', true);
@@ -7108,6 +7130,16 @@ const recreationKinds = (s: Simulation) => {
 
 // Phase 1 is the vertical slice (gather, haul, build, survive the night);
 // phase 2 asks the colony to feed, entertain, and warm itself.
+// Whether any zoned tile passes the test (looking only at zoned tiles, not the whole map).
+const anyZone = (s: Simulation, test: (zone: number) => boolean): boolean => {
+  for (const i of s.world.tilesWith('zones')) {
+    if (test(s.world.zone[i])) {
+      return true;
+    }
+  }
+  return false;
+};
+
 export const OBJECTIVES: ObjectiveDef[] = [
   {
     id: 'wood',
@@ -7120,7 +7152,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'stockpile',
     label: 'Designate a stockpile zone',
     phase: 1,
-    check: (s) => s.world.zone.some((z) => z !== 0 && z < GROW_ZONE),
+    check: (s) => anyZone(s, (z) => z < GROW_ZONE),
   },
   {
     id: 'haul',
@@ -7155,7 +7187,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'grow',
     label: 'Create a growing zone',
     phase: 2,
-    check: (s) => s.world.zone.some((z) => z >= GROW_ZONE),
+    check: (s) => anyZone(s, (z) => z >= GROW_ZONE),
   },
   {
     id: 'harvest',
