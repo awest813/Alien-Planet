@@ -103,3 +103,20 @@ describe('wood that lasts', () => {
     expect(w.fuel[generator]).toBeGreaterThan(0);
   });
 });
+
+describe('a fire in the open', () => {
+  it('warms the ground right around it while it burns', () => {
+    const { sim, w, x, y } = camp(21);
+    const fire = w.idx(x + 4, y + 4);
+    w.setFeature(fire, featureId('campfire'));
+    w.fuel[fire] = 10;
+    const out = sim.outdoorTemperature();
+    expect(sim.temperatureAt(w.idx(x + 5, y + 4))).toBeCloseTo(out + 12);
+    expect(sim.temperatureAt(w.idx(x + 6, y + 4))).toBeCloseTo(out + 6);
+    expect(sim.temperatureAt(w.idx(x + 7, y + 4))).toBeCloseTo(out);
+    // Gone out: no warmth.
+    w.fuel[fire] = 0;
+    sim.fuelVersion++;
+    expect(sim.temperatureAt(w.idx(x + 5, y + 4))).toBeCloseTo(out);
+  });
+});

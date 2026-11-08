@@ -157,7 +157,8 @@ How the living simulation works:
   for winter.
 - **Rooms and temperature:** enclosed rooms get a role (bedroom, barracks, kitchen, …) and an impressiveness
   score from furniture beauty and size. Outdoor temperature follows a day/night cycle; rooms drift towards it
-  and campfires heat them.
+  and campfires heat them. A fire in the open warms the ground within two tiles, so colonists caught without
+  shelter huddle by it.
 
 How the storytelling layer works:
 

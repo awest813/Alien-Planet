@@ -421,10 +421,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
           </li>
           <li>Floors make rooms nicer, roofs keep the rain off open shelters, tool kits make workers faster.</li>
           <li>
-            Campfires, hearths and torches burn wood, which haulers bring: keep a woodpile for winter. Click a stockpile
-            to choose what it takes and its priority (haulers move things up to higher ones). Shelves fit three stacks
-            on a tile; lock a door from its card to keep everyone out; <b>Forbid</b> items to keep everyone's hands off
-            them.
+            Campfires, hearths and torches burn wood, which haulers bring: keep a woodpile for winter. A fire in the
+            open warms the tiles around it, somewhere to huddle before there's a roof. Click a stockpile to choose what
+            it takes and its priority (haulers move things up to higher ones). Shelves fit three stacks on a tile; lock
+            a door from its card to keep everyone out; <b>Forbid</b> items to keep everyone's hands off them.
           </li>
           <li>
             Blood, rubble and tracked-in dirt make rooms uglier, spoil cooking and tending, and sour moods: give someone{' '}

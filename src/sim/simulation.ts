@@ -1332,7 +1332,45 @@ export class Simulation {
   public temperatureAt(i: number): number {
     this.ensureRegions();
     const room = this.doorway(i) ?? this.rooms.room[i];
-    return room >= 0 && this.rooms.enclosed[room] ? this.roomTemps[room] : this.outdoorTemperature();
+    return room >= 0 && this.rooms.enclosed[room]
+      ? this.roomTemps[room]
+      : this.outdoorTemperature() + (this.fireWarmth().get(i) ?? 0);
+  }
+
+  // A fire burning in the open warms the ground right around it (its full heat beside it, half two
+  // tiles off), so colonists caught without shelter can huddle by it. Rebuilt when fires, fuel or walls
+  // change.
+  private fireWarmthCache: { key: string; warmth: Map<number, number> } = { key: '', warmth: new Map() };
+  private fireWarmth(): Map<number, number> {
+    const w = this.world;
+    this.refreshGrid();
+    const key = `${w.structureVersion}:${w.featureVersion}:${this.fuelVersion}`;
+    if (this.fireWarmthCache.key === key) {
+      return this.fireWarmthCache.warmth;
+    }
+    const warmth = new Map<number, number>();
+    for (const f of this.fireTiles) {
+      const def = featureDef(w.feature[f]);
+      if (w.fuel[f] <= 0 || def.workbench || !(def.heater > 0) || this.isIndoors(f)) {
+        continue;
+      }
+      const x0 = w.xOf(f);
+      const y0 = w.yOf(f);
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const x = x0 + dx;
+          const y = y0 + dy;
+          if (x < 0 || y < 0 || x >= w.width || y >= w.height) {
+            continue;
+          }
+          const i = w.idx(x, y);
+          const heat = Math.max(Math.abs(dx), Math.abs(dy)) <= 1 ? def.heater : def.heater / 2;
+          warmth.set(i, Math.max(warmth.get(i) ?? 0, heat));
+        }
+      }
+    }
+    this.fireWarmthCache = { key, warmth };
+    return warmth;
   }
 
   // A door belongs to the room it opens into: standing in the doorway is as warm (and as dry) as
