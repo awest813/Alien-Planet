@@ -197,6 +197,8 @@ function jealousy(sim: Simulation, c: Colonist, other: Colonist, chemistry: numb
   if (
     !spouse ||
     spouse.health.dead ||
+    // (Away on an expedition: they don't see it.)
+    !!spouse.away ||
     spouse === other ||
     chemistry < JEALOUS_CHEMISTRY ||
     !canRomance(sim, c, other) ||
@@ -316,7 +318,8 @@ const PARENTS_PARTED = 48;
 export function checkMarriages(sim: Simulation): void {
   for (const a of sim.living()) {
     const b = sim.colonists[a.spouse];
-    if (!b || b.health.dead || a.id > b.id) {
+    // (Not while one of them is away: no strain from a distance, and none settled either.)
+    if (!b || b.health.dead || b.away || a.id > b.id) {
       continue;
     }
     if (Math.min(a.mood, b.mood) < HARD_TIMES_MOOD) {
@@ -356,7 +359,8 @@ export function separate(sim: Simulation, a: Colonist, b: Colonist): void {
   for (const child of sim.living()) {
     if (child.parents.includes(a.id) || child.parents.includes(b.id)) {
       sim.addThought(child, child.age < ADULT ? 'parentsSeparated' : 'parentsSeparatedGrown');
-      if (child.childhood) {
+      if (child.age < ADULT) {
+        child.childhood ??= { hard: 0, happy: 0 };
         child.childhood.hard += PARENTS_PARTED;
       }
     }

@@ -1205,7 +1205,8 @@ export class ColonyScene extends Phaser.Scene {
     }
 
     const selected = controller.selectedColonist !== null ? sim.colonists[controller.selectedColonist] : null;
-    if (selected) {
+    // (Gone off the map on an expedition: no ring where they last stood.)
+    if (selected && selected.away !== 'gone') {
       const { x, y } = this.pawnPosition(selected);
       g.lineStyle(1, 0xffffff, 0.9).strokeCircle(x, y, 8);
       if (selected.path.length > 0) {

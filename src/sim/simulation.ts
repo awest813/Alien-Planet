@@ -2881,7 +2881,8 @@ export class Simulation {
       if (
         this.burning.size > 0 &&
         this.tick % SLOW_TICKS === 0 &&
-        (c.priorities.hauling > 0 || c.priorities.construction > 0) &&
+        ((c.priorities.hauling > 0 && canWork(c, 'hauling')) ||
+          (c.priorities.construction > 0 && canWork(c, 'construction'))) &&
         now !== undefined &&
         (FIRE_INTERRUPTS.has(now) || (now === 'sleep' && this.fireWithin(c.tile, Simulation.SMOKE_WAKES)))
       ) {
@@ -3025,7 +3026,12 @@ export class Simulation {
     }
     // The frail wait for their meals to be brought, and only fetch their own when nobody has.
     const cared = needsCare(c);
-    if (((food < rationsEatBelow(this.village) && slot !== 'W' && !cared) || food < 0.15) && this.tryEat(c)) {
+    // (Not while someone is already on the way with a meal for them.)
+    const bringing = cared && (this.reservations.get(`fd${c.id}`) ?? c.id) !== c.id;
+    if (
+      ((food < rationsEatBelow(this.village) && slot !== 'W' && !cared) || (food < 0.15 && !bringing)) &&
+      this.tryEat(c)
+    ) {
       if (cared) {
         this.addThought(c, 'leftToFend');
       }
@@ -3099,15 +3105,19 @@ export class Simulation {
 
   private tryWorkByPriority(c: Colonist): boolean {
     // After a few harvests in a row, clear up the mess before cutting more.
-    if (c.priorities.hauling > 0 && c.workStreak >= 3 && this.tryHaul(c)) {
+    if (c.priorities.hauling > 0 && canWork(c, 'hauling') && c.workStreak >= 3 && this.tryHaul(c)) {
       return true;
     }
     // A fire near home comes before everything: anyone who hauls or builds turns out for it.
-    if ((c.priorities.hauling > 0 || c.priorities.construction > 0) && this.tryFirefight(c)) {
+    if (
+      ((c.priorities.hauling > 0 && canWork(c, 'hauling')) ||
+        (c.priorities.construction > 0 && canWork(c, 'construction'))) &&
+      this.tryFirefight(c)
+    ) {
       return true;
     }
     // A generator about to run dry takes priority over everything else a hauler might do.
-    if (c.priorities.hauling > 0 && this.generatorRunningLow() && this.tryRefuel(c, true)) {
+    if (c.priorities.hauling > 0 && canWork(c, 'hauling') && this.generatorRunningLow() && this.tryRefuel(c, true)) {
       return true;
     }
     const order = this.workOrder();
@@ -5562,7 +5572,7 @@ export class Simulation {
     // A raid, or the people it's for being unable to come, calls it off.
     const away = (id: number | undefined) => {
       const c = id === undefined ? undefined : this.colonists[id];
-      return !c || c.health.dead || c.health.downed || c.drafted;
+      return !c || c.health.dead || c.health.downed || c.drafted || !!c.away;
     };
     // A wedding needs both of them, and still in love.
     const [one, two] = (g.couple ?? []).map((id) => this.colonists[id]);
@@ -5878,6 +5888,8 @@ export class Simulation {
       if (
         !b ||
         b.health.dead ||
+        // (Both at home for it.)
+        !!b.away ||
         a.id > b.id ||
         a.spouse === b.id ||
         mutualOpinion(a, b) < WEDDING_OPINION ||

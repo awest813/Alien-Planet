@@ -25,7 +25,8 @@ const MAX_GRIEFS = 6;
 
 // Everyone left behind mourns: the sharp thought, by how they were tied, and a lasting grief.
 export function mourn(sim: Simulation, dead: Colonist): void {
-  for (const other of sim.living()) {
+  // (Those away on an expedition too: the news reaches them.)
+  for (const other of sim.colonists.filter((c) => !c.health.dead)) {
     if (other === dead) {
       continue;
     }
@@ -62,8 +63,10 @@ export function mourn(sim: Simulation, dead: Colonist): void {
     if (weight > 0) {
       const griefs = (other.grief ??= []);
       griefs.push({ id: dead.id, name: dead.name, day: sim.day, weight });
+      // Carrying too many: the lightest loss (the oldest of those) is let go, not a spouse's or a child's.
       if (griefs.length > MAX_GRIEFS) {
-        griefs.shift();
+        const lightest = griefs.reduce((low, g, k) => (g.weight < griefs[low].weight ? k : low), 0);
+        griefs.splice(lightest, 1);
       }
     }
   }

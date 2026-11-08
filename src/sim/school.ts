@@ -52,12 +52,26 @@ const free = (sim: Simulation, c: Colonist) =>
   !c.health.downed && !c.drafted && !c.sleeping && !sim.inMentalBreak(c) && !c.health.dead;
 const bestSkill = (c: Colonist): number => Math.max(...SKILL_KEYS.map((k) => c.skills[k]));
 
-// Who teaches: the retired first (it's what they're for), then the most skilled grown-up.
+// Whether someone can get to a board: one with a free tile beside it in their part of the map.
+const reachesBoard = (sim: Simulation, c: Colonist) =>
+  lessonBoards(sim).some((b) =>
+    sim.world.neighbors(b).some((n) => sim.world.isPassable(n) && sim.regionOf(n) === sim.regionOf(c.tile)),
+  );
+
+// Who teaches: the retired first (it's what they're for), then the most skilled grown-up; only someone who'll
+// actually come (not on their own time or asleep by the schedule, and able to reach a board).
 export function teacherFor(sim: Simulation): Colonist | undefined {
   return sim
     .living()
     .filter(
-      (c) => c.age >= ADULT && free(sim, c) && bestSkill(c) >= TEACHER_SKILL && !c.health.ailments?.includes('frailty'),
+      (c) =>
+        c.age >= ADULT &&
+        free(sim, c) &&
+        bestSkill(c) >= TEACHER_SKILL &&
+        !c.health.ailments?.includes('frailty') &&
+        sim.slotOf(c) !== 'J' &&
+        sim.slotOf(c) !== 'S' &&
+        reachesBoard(sim, c),
     )
     .sort((a, b) => Number(!!b.retired) - Number(!!a.retired) || bestSkill(b) - bestSkill(a) || a.id - b.id)[0];
 }
@@ -108,10 +122,15 @@ export function tryLesson(sim: Simulation, c: Colonist): boolean {
   if (!pupil && teacher !== c) {
     return false;
   }
-  if (!pupil && !sim.living().some((o) => pupilAge(o) && free(sim, o))) {
+  // The teacher goes once a child is on the way (not just because there are children about: a child who's
+  // elsewhere left the teacher walking to the board and away again all morning).
+  if (!pupil && !sim.living().some((o) => o.job?.type === 'lesson' && o.job.line === 0)) {
     return false;
   }
-  const board = [...boards].sort((a, b) => sim.world.distance(c.tile, a) - sim.world.distance(c.tile, b))[0];
+  // Everyone to the board nearest the teacher, so they meet.
+  const board = [...boards].sort(
+    (a, b) => sim.world.distance(teacher.tile, a) - sim.world.distance(teacher.tile, b),
+  )[0];
   const until = (SCHOOL_END - sim.hour) * TICKS_PER_HOUR;
   return sim.sendTo(c, 'lesson', seats(sim, board, c), {
     source: board,

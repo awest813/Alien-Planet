@@ -180,6 +180,25 @@ export function updateLifespans(sim: Simulation): void {
   }
 }
 
+// Ages someone through a stretch of hours spent away (an expedition), birthday by birthday: coming of age
+// on the road still brings a full share of the work, and the years count against the old as they would at
+// home.
+export function ageBy(sim: Simulation, c: Colonist, hours: number): void {
+  let left = hours;
+  while (left > 0 && !c.health.dead) {
+    const perHour = yearsIn(c.age, 1);
+    const next = Math.floor(c.age) + 1;
+    const toNext = (next - c.age) / perHour;
+    if (toNext > left) {
+      c.age += perHour * left;
+      return;
+    }
+    c.age = next;
+    left -= toNext;
+    birthday(sim, c);
+  }
+}
+
 function birthday(sim: Simulation, c: Colonist): void {
   const age = Math.floor(c.age);
   if (age === TEEN) {
@@ -207,7 +226,8 @@ function conceive(sim: Simulation): void {
   const living = sim.living();
   const room = populationFor(sim.world.width).maxColonists + FAMILY_ROOM;
   const expecting = living.filter((c) => c.expectingUntil !== undefined).length;
-  if (living.length + sim.infants.length + expecting >= room) {
+  // (Those away on an expedition still count against the room.)
+  if (sim.headcount() + sim.infants.length + expecting >= room) {
     return;
   }
   for (const a of living) {
@@ -215,6 +235,8 @@ function conceive(sim: Simulation): void {
     if (
       !b ||
       b.health.dead ||
+      // Both at home.
+      !!b.away ||
       a.id > b.id ||
       a.expectingUntil !== undefined ||
       b.expectingUntil !== undefined ||
@@ -262,9 +284,10 @@ function growInfants(sim: Simulation): void {
   for (const infant of [...sim.infants]) {
     infant.age += yearsIn(infant.age, 1);
     const carer = sim.colonists[infant.carer];
-    if (!carer || carer.health.dead) {
+    // A carer gone (or away on an expedition, as a parent can be when the baby passes to them).
+    if (!carer || carer.health.dead || carer.away) {
       const next =
-        infant.parents.map((p) => sim.colonists[p]).find((p) => p && !p.health.dead) ??
+        infant.parents.map((p) => sim.colonists[p]).find((p) => p && !p.health.dead && !p.away) ??
         sim.living().find((c) => isAdult(c)) ??
         sim
           .living()

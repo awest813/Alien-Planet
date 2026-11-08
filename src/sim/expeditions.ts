@@ -2,7 +2,7 @@ import { TICKS_PER_HOUR, populationFor } from './constants';
 import { FACTIONS, itemDef, itemId, quantity } from './defs';
 import { changeGoodwill } from './diplomacy';
 import { damage } from './health';
-import { DRAFT_AGE, yearsIn } from './lifespans';
+import { DRAFT_AGE, ageBy } from './lifespans';
 import type { Simulation } from './simulation';
 import { colonyStock, goodwillOf, takeFromStockpiles, waresOf } from './trade';
 import type { Colonist } from './types';
@@ -171,6 +171,13 @@ function leave(sim: Simulation, c: Colonist): void {
   if (sim.concert?.player === c.id) {
     sim.concert = null;
   }
+  // An animal chasing them loses them (it turns on someone else, or calms down, on its next turn).
+  for (const a of sim.animals) {
+    if (a.revengeOn === c.id) {
+      a.revengeOn = -1;
+      a.path = [];
+    }
+  }
 }
 
 const onEdge = (sim: Simulation, i: number) => {
@@ -270,14 +277,18 @@ function comeHome(sim: Simulation, e: Expedition): void {
     // They ate and slept on the road.
     c.needs.food = Math.max(c.needs.food, 0.5);
     c.needs.rest = Math.max(c.needs.rest, 0.6);
-    c.age += yearsIn(c.age, hours);
+    ageBy(sim, c, hours);
+    // (Old age can catch up with them on the way home.)
+    if (c.health.dead) {
+      continue;
+    }
     // Whoever they left behind who has since died.
     if (c.spouse >= 0 && sim.colonists[c.spouse]?.health.dead) {
       c.spouse = -1;
     }
+    // (They mourned when word reached them on the road.)
     if (c.lover >= 0 && sim.colonists[c.lover]?.health.dead) {
       c.lover = -1;
-      sim.addThought(c, 'loverDied');
     }
     sim.addThought(c, 'backFromJourney');
   }

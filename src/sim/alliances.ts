@@ -114,6 +114,10 @@ export function updateAlliances(sim: Simulation): void {
   }
   if (d.alliance && d.alliance.until <= sim.tick) {
     sim.addLog(`The alliance with ${name(d.alliance.faction)} has run its course.`, 'info', true);
+    // A call for help still open goes with it (no ally, no broken promise).
+    if (d.call?.faction === d.alliance.faction) {
+      d.call = null;
+    }
     d.alliance = null;
   }
   // News comes in the late morning.
@@ -147,7 +151,8 @@ export function updateAlliances(sim: Simulation): void {
     }
     return;
   }
-  if (ally && !d.call && sim.day >= ally.nextCallDay) {
+  // (Not with too little of the alliance left to answer in.)
+  if (ally && !d.call && sim.day >= ally.nextCallDay && ally.until - sim.tick >= CALL_DAYS * DAY) {
     ally.nextCallDay = gap(sim, CALL_GAP);
     const growth = 1 + Math.min(sim.day, 80) / 80;
     const [key, base] = sim.rng.pick(CALL_GOODS);
@@ -252,11 +257,13 @@ export function answerCall(sim: Simulation, answer: 'goods' | 'refuse' | number)
   }
   if (answer === 'refuse') {
     d.call = null;
+    // Only an ally is owed help.
+    if (!alliedWith(sim, call.faction)) {
+      return null;
+    }
     changeGoodwill(sim, call.faction, -REFUSE_LOSS);
     sim.stats.callsRefused = (sim.stats.callsRefused ?? 0) + 1;
-    if (alliedWith(sim, call.faction)) {
-      d.alliance = null;
-    }
+    d.alliance = null;
     sim.addLog(
       `The colony didn't help ${name(call.faction)} when they were attacked. They've broken off the alliance (goodwill -${REFUSE_LOSS}).`,
       'danger',

@@ -653,6 +653,8 @@ export function updateAnimals(sim: Simulation): void {
         !target ||
         target.health.dead ||
         target.health.downed ||
+        // (Off on an expedition: out of reach.)
+        !!target.away ||
         !(a.revengeUntil > sim.tick) ||
         sim.regionOf(target.tile) !== sim.regionOf(a.tile)
       ) {

@@ -363,6 +363,7 @@ export function ShipScreen({ state, onClose }: { state: UiState; onClose: () => 
     );
   }
   const aboard = state.colonists.filter((c) => !c.dead).map((c) => c.name);
+  const away = state.colonists.filter((c) => c.status === 'Away').map((c) => c.name);
   return (
     <Modal title="The ship has landed" onClose={onClose}>
       <p>
@@ -370,9 +371,15 @@ export function ShipScreen({ state, onClose }: { state: UiState; onClose: () => 
         story ends here, on your terms. Stay, and the ship leaves without you; you can always signal again. Close this
         to decide later.
       </p>
+      {away.length > 0 && (
+        <p className="warn-text">
+          {away.join(' and ')} {away.length === 1 ? 'is' : 'are'} away on an expedition: the colony won't leave without
+          them. Board once they're back, or stay and signal again.
+        </p>
+      )}
       {!confirm.armed ? (
         <div className="title-buttons">
-          <button className="primary" autoFocus onClick={confirm.arm}>
+          <button className="primary" autoFocus onClick={confirm.arm} disabled={away.length > 0}>
             Board the ship…
           </button>
           <button

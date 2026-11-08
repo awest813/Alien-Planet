@@ -85,7 +85,8 @@ export function elderBirthday(sim: Simulation, c: Colonist): void {
     (c.health.ailments ??= []).push(ailment);
     sim.addLog(`${c.name}'s ${AILMENTS[ailment].onset}.`, 'warn', ailment === 'frailty');
   }
-  if (!c.retired && (age >= RETIRE_AGE || frail(c)) && workersBesides(sim, c) >= WORKERS_TO_RETIRE) {
+  // (Not one the player has kept on: `retired: false` is their choice, undefined is nobody's yet.)
+  if (c.retired === undefined && (age >= RETIRE_AGE || frail(c)) && workersBesides(sim, c) >= WORKERS_TO_RETIRE) {
     retire(sim, c);
   }
 }
@@ -96,6 +97,11 @@ const workersBesides = (sim: Simulation, c: Colonist) =>
 
 export function retire(sim: Simulation, c: Colonist): void {
   c.retired = true;
+  // Heavy work in hand is put down.
+  if (c.job && !['sleep', 'rest', 'eat', 'joy', 'wander', 'lesson'].includes(c.job.type)) {
+    sim.dropCarried(c);
+    sim.endJob(c);
+  }
   sim.addLog(
     `${c.name} has retired from heavy work, and spends the days on gardening, crafts and teaching the young.`,
     'good',

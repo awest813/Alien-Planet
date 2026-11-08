@@ -214,6 +214,22 @@ describe('envoys and alliances', () => {
     expect(sim.stats.callsRefused).toBe(1);
   });
 
+  it('a call for help ends with the alliance, at no cost, and none comes too late to answer', () => {
+    const { sim } = colony(12);
+    sim.goodwill[KIN] = 60;
+    sim.diplomacy.alliance = { faction: KIN, until: sim.tick + HOUR * 5, nextCallDay: 1000 };
+    sim.diplomacy.call = { faction: KIN, until: sim.tick + DAY * 2, item: itemId('meal'), count: 5 };
+    run(sim, DAY * 3);
+    expect(sim.diplomacy.alliance).toBeNull();
+    expect(sim.diplomacy.call).toBeNull();
+    expect(goodwillOf(sim, KIN)).toBeGreaterThanOrEqual(55);
+    expect(sim.log.some((l) => l.text.includes('broken off the alliance'))).toBe(false);
+    // An alliance a day from its end asks nothing.
+    sim.diplomacy.alliance = { faction: KIN, until: sim.tick + DAY, nextCallDay: 0 };
+    run(sim, DAY / 2);
+    expect(sim.diplomacy.call).toBeNull();
+  });
+
   it('lending a colonist: they go off to help, and come back to the ally’s thanks', () => {
     const { sim } = colony(9);
     sim.goodwill[KIN] = 60;

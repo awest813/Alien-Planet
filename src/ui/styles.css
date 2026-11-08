@@ -969,7 +969,7 @@ button.brush.active {
   border-color: var(--accent);
 }
 
-.research .warn-text {
+.warn-text {
   color: var(--warn);
   margin-top: 2px;
 }

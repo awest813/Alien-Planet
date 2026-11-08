@@ -121,9 +121,10 @@ export function needsTending(sim: Simulation, c: Colonist): boolean {
   );
 }
 
-// Whether a colonist should stop working and rest in bed.
+// Whether a colonist should stop working and rest in bed. (Not for the standing aches of old age and old
+// scars: rest doesn't mend those, and together they could keep an elder in bed for good.)
 export function needsBedRest(c: Colonist): boolean {
-  return !!c.health.disease || bleedingOf(c) > 0 || painOf(c) > 0.25;
+  return !!c.health.disease || bleedingOf(c) > 0 || painOf(c) - scarPain(c) > 0.25;
 }
 
 // Work speed multiplier from pain and illness.

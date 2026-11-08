@@ -1507,7 +1507,7 @@ export class GameController {
     if (id !== null) {
       this.selectedTile = null;
     }
-    if (id !== null && focus) {
+    if (id !== null && focus && this.sim.colonists[id].away !== 'gone') {
       this.focusRequest = this.sim.colonists[id].tile;
     }
     this.publish();

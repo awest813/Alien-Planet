@@ -86,6 +86,10 @@ describe('old age', () => {
     sim.apply({ type: 'retire', colonist: old.id, retired: false });
     expect(old.retired).toBe(false);
     expect(canWork(old, 'mining')).toBe(true);
+    // Kept on by the player: a later birthday doesn't retire them again.
+    old.age = RETIRE_AGE + 1;
+    elderBirthday(sim, old);
+    expect(old.retired).toBe(false);
   });
 
   it('keeps an elder working when the colony is too small to spare them', () => {

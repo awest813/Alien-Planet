@@ -104,8 +104,9 @@ export function chooseToStay(
 }
 
 // The colony boards the ship: the story ends here.
+// Not while anyone is away on an expedition: the colony doesn't leave its own behind.
 export function depart(sim: Simulation): boolean {
-  if (!sim.beacon.landed || sim.living().length === 0) {
+  if (!sim.beacon.landed || sim.living().length === 0 || sim.headcount() > sim.living().length) {
     return false;
   }
   sim.beacon.choice = 'depart';

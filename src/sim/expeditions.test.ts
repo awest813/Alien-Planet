@@ -5,6 +5,7 @@ import { RUINS, TRIP_DAYS, cannotGo, expeditions, sendExpedition, supplyCost } f
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
 import { HOUR, clearAround, run } from './test-helpers';
+import { updateLifespans } from './lifespans';
 import { colonyStock, goodwillOf } from './trade';
 
 const KIN = FACTIONS.findIndex((f) => f.key === 'meadowKin');
@@ -170,5 +171,66 @@ describe('a settler from the Meadow Kin', () => {
     expect(colonyStock(sim, SILVER)).toBe(1200 - cost);
     // Not another one straight away.
     expect(buySettler(sim, KIN)).toMatch(/while/);
+  });
+
+  it('come of age on the road and come home a full worker, and an animal on their heels loses them', () => {
+    const { sim } = colony(3);
+    const [a, b, teen] = sim.colonists;
+    teen.age = 17.6;
+    for (const key of Object.keys(teen.priorities) as (keyof typeof teen.priorities)[]) {
+      teen.priorities[key] = 0;
+    }
+    // A boar set on revenge against them.
+    sim.animals.push({
+      id: sim.nextAnimalId++,
+      kind: 'boar',
+      tile: a.tile,
+      path: [],
+      moveProgress: 0,
+      hp: 1,
+      hunted: false,
+      taming: false,
+      tame: false,
+      revengeOn: teen.id,
+      cooldown: 0,
+      restUntil: 0,
+      revengeUntil: sim.tick + 100 * HOUR,
+    });
+    expect(sendExpedition(sim, RUINS, 'salvage', [teen.id])).toBeNull();
+    // Leaving clears the chase.
+    expect(sim.animals.at(-1)!.revengeOn).toBe(-1);
+    for (let k = 0; k < (TRIP_DAYS.salvage + 2) * 24 && teen.away; k++) {
+      for (const c of [a, b]) {
+        c.needs.food = c.needs.rest = c.needs.joy = 1;
+      }
+      run(sim, HOUR);
+    }
+    expect(teen.away).toBeUndefined();
+    expect(teen.age).toBeGreaterThanOrEqual(18);
+    expect(teen.priorities.mining).toBeGreaterThan(0);
+    expect(sim.log.some((l) => l.text.startsWith(`${teen.name} has come of age`))).toBe(true);
+  });
+
+  it("don't start a family while one of the couple is away", () => {
+    const expecting = (away: boolean) => {
+      const { sim } = colony(4);
+      const [a, b] = sim.colonists;
+      a.spouse = b.id;
+      b.spouse = a.id;
+      a.age = b.age = 25;
+      if (away) {
+        sendExpedition(sim, RUINS, 'salvage', [b.id]);
+        b.away = 'gone';
+      }
+      for (let day = 0; day < 60; day++) {
+        // (The clock starts at 07:00: this is 06:00, when couples may start expecting.)
+        sim.tick = (day * 24 + 23) * HOUR;
+        sim.syncClock();
+        updateLifespans(sim);
+      }
+      return a.expectingUntil !== undefined || b.expectingUntil !== undefined || sim.infants.length > 0;
+    };
+    expect(expecting(false)).toBe(true);
+    expect(expecting(true)).toBe(false);
   });
 });
