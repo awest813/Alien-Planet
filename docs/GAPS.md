@@ -49,7 +49,8 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 
 - **Ten-year Standard colonies lose about 2 people to raids across 184 raids.** Harsh loses 10 in 251. After the
   first winters the colony is walled, armed and well fed, and raids are the same walk-in-and-shoot every time.
-  - Partly closed: the great beast wakes once a year from the second, and returns bigger until slain.
+  - Partly closed: the great beast wakes once a year from the second, and returns bigger until slain; sieges
+    camp, dig in and attack later, so the colony chooses between breaking the camp and waiting it out.
   - Close it with threat variety (Phase M): sieges that camp and build; sappers that dig through rock; raids
     that target the stores or the beacon; a named great beast; infestations from deep shafts; winter famine
     events.

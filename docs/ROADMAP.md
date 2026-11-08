@@ -747,7 +747,9 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
     starts gentler and later. 48 days: Standard 72/73, Harsh 71/74, with about one death from the beast in
     each. Ten years, Standard: 7 deaths from wounds (from 2), which is the later danger the gap list asked
     for.
-  - Not done: wall engravings, sieges, sappers, and infestations.
+  - Sieges (a later slice): a war party camps 20–28 tiles out, digs in behind sandbags round a fire, shoots
+    anyone in reach, and attacks after 10–20 hours; from day 40, about a sixth as often as raids.
+  - Not done: wall engravings, sappers, and infestations.
 
 ### Audits after Phase L
 

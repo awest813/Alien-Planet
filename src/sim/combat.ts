@@ -2,7 +2,7 @@ import { hurtAnimal } from './animals';
 import { scarAim } from './body';
 import { qualityFactor } from './apparel';
 import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
-import { FACTIONS, NONE, NORMAL_QUALITY, WeaponDef, featureDef, itemDef, itemId, weaponDef } from './defs';
+import { FACTIONS, NONE, NORMAL_QUALITY, WeaponDef, featureDef, featureId, itemDef, itemId, weaponDef } from './defs';
 import { damage, painOf } from './health';
 import { fallWounded } from './prisoners';
 import { learn } from './skills';
@@ -31,6 +31,18 @@ export interface RaidState {
   // Fighters a friendly faction is sending to help, and when they'll come.
   alliesAt?: number;
   allies?: number;
+  // A siege: the raiders make camp out of reach, dig in, and attack when they're ready.
+  siege?: SiegeState;
+}
+
+export interface SiegeState {
+  // The camp's centre, and where each raider takes up their post around it.
+  camp: number;
+  posts: number[];
+  // When they stop waiting and attack.
+  attackAt: number;
+  dugIn?: boolean;
+  attacking?: boolean;
 }
 
 // Raiders this close to a colonist have arrived; the raid's time limit runs from then.
@@ -206,7 +218,7 @@ function raiderArmor(sim: Simulation): number | undefined {
   return r < scale + leather ? itemId('leatherArmor') : undefined;
 }
 
-export function spawnRaid(sim: Simulation, faction: number, count: number): boolean {
+export function spawnRaid(sim: Simulation, faction: number, count: number, siege = false): boolean {
   const w = sim.world;
   const region = sim.outsideRegion();
   if (region === undefined) {
@@ -256,6 +268,16 @@ export function spawnRaid(sim: Simulation, faction: number, count: number): bool
       });
     }
     sim.raid = { faction, initial: count, killed: 0, startedTick: sim.tick };
+    if (siege && setupSiege(sim, centre)) {
+      const hours = Math.round((sim.raid.siege!.attackAt - sim.tick) / TICKS_PER_HOUR);
+      sim.addLog(
+        `Siege! ${count} raiders from ${def.name} are coming from the ${side} to make camp. They'll dig in and attack in about ${hours} hours: break the camp first, or fortify and wait.`,
+        'danger',
+        true,
+      );
+      sim.events.push('raid');
+      return true;
+    }
     sim.addLog(
       `Raid! ${count} raiders from ${def.name} are coming from the ${side}. Draft your colonists.`,
       'danger',
@@ -593,6 +615,11 @@ export function updateEnemies(sim: Simulation): void {
     if (strikeAlly(sim, e)) {
       continue;
     }
+    // A siege party keeps to its camp until it's ready.
+    const siege = besieging(sim);
+    if (siege && siegeTurn(sim, e, siege)) {
+      continue;
+    }
     const target = targetFor(sim, e);
     if (!target && breach(sim, e)) {
       continue;
@@ -656,9 +683,12 @@ export function updateEnemies(sim: Simulation): void {
   updateAllies(sim);
   const raid = sim.raid;
   if (raid) {
+    updateSiege(sim, raid);
     const fighting = sim.enemies.filter((e) => e.hp > 0 && !e.fleeing);
     if (
       raid.arrivedTick === undefined &&
+      // (A siege party waiting in its camp hasn't arrived yet, however close the camp.)
+      !besieging(sim) &&
       fighting.some((e) => sim.living().some((c) => w.distance(e.tile, c.tile) <= ARRIVAL_RANGE))
     ) {
       raid.arrivedTick = sim.tick;
@@ -1127,3 +1157,127 @@ function strikeAlly(sim: Simulation, e: Enemy): boolean {
   e.cooldown = used.cooldown;
   return true;
 }
+
+// ---- Sieges ----
+// Instead of walking straight in, a siege party makes camp a little way from the colony, digs in behind
+// sandbags round a fire, and shoots at anyone who comes within reach. Half a day or so later they attack as
+// a raid would. Going out to break the camp means attacking raiders behind cover; waiting means facing all of
+// them at once.
+
+// How far from the colony they camp, and how long they wait.
+const CAMP_DISTANCE: [number, number] = [20, 28];
+const SIEGE_HOURS: [number, number] = [10, 20];
+// Sandbags they put up round the camp, on the side facing the colony.
+const CAMP_SANDBAGS = 6;
+// A melee raider at camp charges anyone who comes this close.
+const CAMP_CHARGE = 4;
+
+// Picks the camp (between the raiders' edge and the colony) and their posts. False if there's nowhere.
+function setupSiege(sim: Simulation, from: number): boolean {
+  const w = sim.world;
+  const raid = sim.raid!;
+  const home = sim.homeTile() ?? sim.living()[0]?.tile;
+  const region = sim.regionOf(from);
+  if (home === undefined) {
+    return false;
+  }
+  const open = (i: number) =>
+    w.isPassable(i) && w.feature[i] === NONE && w.blueprint[i] === NONE && sim.regionOf(i) === region;
+  const pick = ([lo, hi]: [number, number]) =>
+    sim.nearest(from, (i) => open(i) && w.distance(i, home) >= lo && w.distance(i, home) <= hi, 1)[0];
+  const camp = pick(CAMP_DISTANCE) ?? pick([14, 34]);
+  if (camp === undefined) {
+    return false;
+  }
+  const posts = sim.nearest(camp, (i) => open(i) && chebyshev(w, i, camp) <= 1, raid.initial);
+  raid.siege = {
+    camp,
+    posts: posts.length > 0 ? posts : [camp],
+    attackAt: sim.tick + sim.rng.int(SIEGE_HOURS[0], SIEGE_HOURS[1]) * TICKS_PER_HOUR,
+  };
+  return true;
+}
+
+// The first to reach camp sets it up: a fire in the middle, sandbags on the side facing the colony.
+function digIn(sim: Simulation, siege: SiegeState): void {
+  const w = sim.world;
+  siege.dugIn = true;
+  const home = sim.homeTile() ?? siege.camp;
+  const ring = sim
+    .nearest(
+      siege.camp,
+      (i) =>
+        chebyshev(w, i, siege.camp) === 2 &&
+        w.isPassable(i) &&
+        w.feature[i] === NONE &&
+        w.blueprint[i] === NONE &&
+        !w.tilesWith('items').has(i) &&
+        w.distance(i, home) < w.distance(siege.camp, home),
+      16,
+    )
+    .sort((a, b) => w.distance(a, home) - w.distance(b, home))
+    .slice(0, CAMP_SANDBAGS);
+  for (const i of ring) {
+    w.setFeature(i, featureId('sandbags'));
+  }
+  if (w.feature[siege.camp] === NONE) {
+    w.setFeature(siege.camp, featureId('campfire'));
+    w.fuel[siege.camp] = 10;
+    sim.fuelVersion++;
+  }
+  sim.addLog('The siege party has made camp and dug in behind sandbags.', 'warn');
+}
+
+// A raider's turn while the siege waits: to their post, dig in, and shoot anyone in reach. Returns false to
+// fight as usual (a melee raider with a colonist close by).
+function siegeTurn(sim: Simulation, e: Enemy, siege: SiegeState): boolean {
+  const w = sim.world;
+  const weapon = weaponDef(e.weapon);
+  const colonists = sim.living().filter((c) => !c.health.downed && sim.regionOf(c.tile) === sim.regionOf(e.tile));
+  if (weapon.range <= 1 && colonists.some((c) => chebyshev(w, c.tile, e.tile) <= CAMP_CHARGE)) {
+    return false;
+  }
+  const post = siege.posts[e.id % siege.posts.length];
+  if (e.tile !== post && chebyshev(w, e.tile, siege.camp) > 1) {
+    if (e.path.length === 0 || e.repathAt <= sim.tick) {
+      e.repathAt = sim.tick + 60;
+      e.path = sim.pathfinder.find(e.tile, [post, ...w.neighbors(post).filter((n) => w.isPassable(n))]) ?? [];
+    }
+    if (e.path.length > 0) {
+      moveEnemy(sim, e);
+    }
+    return true;
+  }
+  e.path = [];
+  e.moveProgress = 0;
+  if (!siege.dugIn) {
+    digIn(sim, siege);
+  }
+  if (weapon.range > 1 && e.cooldown <= 0) {
+    const target = colonists
+      .filter((c) => w.distance(e.tile, c.tile) <= weapon.range && lineOfSight(w, e.tile, c.tile))
+      .sort((a, b) => w.distance(e.tile, a.tile) - w.distance(e.tile, b.tile))[0];
+    if (target) {
+      enemyAttack(sim, e, target);
+    }
+  }
+  return true;
+}
+
+// Called every tick with a raid on: once the wait is over, the siege becomes an attack.
+function updateSiege(sim: Simulation, raid: RaidState): void {
+  const siege = raid.siege;
+  if (!siege || siege.attacking || sim.tick < siege.attackAt) {
+    return;
+  }
+  siege.attacking = true;
+  if (sim.enemies.some((e) => e.hp > 0 && !e.fleeing)) {
+    raid.arrivedTick = sim.tick;
+    sim.addLog('The siege party is breaking camp and attacking! Draft your colonists.', 'danger', true);
+    sim.events.push('raidNear');
+  }
+}
+
+// Whether the raiders are still waiting in their camp.
+export const besieging = (sim: Simulation): SiegeState | undefined =>
+  sim.raid?.siege && !sim.raid.siege.attacking ? sim.raid.siege : undefined;

@@ -32,7 +32,7 @@ const RULES: [RegExp, ChronicleKind][] = [
   [/ has died of /, 'death'],
   [/ are married!/, 'marriage'],
   [
-    /^The raid is over\.|left the colony for dead|turned back before reaching|giving up and leaving|fighters to help/,
+    /^The raid is over\.|^Siege!|left the colony for dead|turned back before reaching|giving up and leaving|fighters to help/,
     'battle',
   ],
   [

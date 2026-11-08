@@ -26,7 +26,7 @@ import { availableProjects, isAvailable } from '../sim/research';
 import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, seasonOf, yearOf } from '../sim/seasons';
 import { ChronicleKind } from '../sim/chronicle';
 import { animalName } from '../sim/animals';
-import { armorOf } from '../sim/combat';
+import { armorOf, besieging } from '../sim/combat';
 import { POISONING_HOURS, bleedingOf, needsBedRest } from '../sim/health';
 import { comfortRange, qualityLabel } from '../sim/apparel';
 import { MAX_SKILL, SKILL_LABELS, xpToNext } from '../sim/skills';
@@ -1863,7 +1863,15 @@ export class GameController {
         tile: sim.burning.values().next().value,
       });
     }
-    if (raiders > 0) {
+    const siege = besieging(sim);
+    if (raiders > 0 && siege) {
+      const hours = Math.max(1, Math.ceil((siege.attackAt - sim.tick) / TICKS_PER_HOUR));
+      alerts.push({
+        text: `Siege: ${raiders} raider${raiders > 1 ? 's' : ''} camped nearby, attacking in about ${hours}h. Break the camp, or fortify and wait.`,
+        tone: 'danger',
+        tile: siege.camp,
+      });
+    } else if (raiders > 0) {
       alerts.push({
         text: `Raid: ${raiders} raider${raiders > 1 ? 's' : ''} from ${FACTIONS[sim.enemies[0].faction].name}. Draft with Q.`,
         tone: 'danger',

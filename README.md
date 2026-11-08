@@ -181,6 +181,9 @@ How the storytelling layer works:
   edge, go after the raiders and head home when it's over. Undrafted colonists run indoors when raiders come close, and fight back only
   when cornered. Walling yourself in doesn't stop them: raiders who can't reach anyone smash through the nearest
   wall or door (clubs and spears break walls faster than bows).
+- **Sieges:** from the second year a war party may come to stay instead: they make camp 20–28 tiles from the
+  colony, dig in behind sandbags round a fire, shoot anyone who comes within reach, and attack half a day or so
+  later. Break the camp early (attacking raiders behind cover) or fortify and face them all at once.
 - **Drafted colonists:** pick a stance in the inspector: Take cover (the default: slip into nearby cover with a
   clear shot), Hold (stay exactly where sent) or Charge (close in; chargers prefer melee weapons when equipping).
   Right-click the map to send the selected colonist somewhere (they get there before stopping to shoot), or

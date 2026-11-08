@@ -458,7 +458,8 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
           </li>
           <li>
             Raiders go down when badly hurt, and the rest run once nearly half are out of the fight. If the Meadow Kin
-            think well of the colony they may send fighters to help.
+            think well of the colony they may send fighters to help. A siege party camps nearby and attacks later: break
+            the camp early, or fortify and wait.
           </li>
           <li>Maddened animals sometimes come for the colony too: draft and fight them like raiders.</li>
           <li>

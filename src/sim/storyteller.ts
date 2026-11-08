@@ -125,6 +125,33 @@ const raiders = (sim: Simulation) => hostileFactions().filter((f) => !atPeace(si
 const animalLabel = (kind: string) => ANIMALS[kind].plural;
 const friendlyFaction = () => FACTIONS.find((f) => !f.hostile)!;
 
+// How many raiders come: two on day 4 and one more every three days, plus extra for a well-armed colony. The
+// cap is seven at first (nine on harsh), rising by one every eight days after day 19; then all of it scaled
+// to the colony's size.
+function raidSize(sim: Simulation): number {
+  const harsh = sim.story.difficulty === 'harsh' ? 2 : 0;
+  const armed = sim
+    .living()
+    .filter((c) => weaponScore(c.weapon, c.weaponQuality) >= weaponScore('recurveBow', 4)).length;
+  // A rich colony draws bigger raids: one more raider for every 7,500 silver of goods beyond the first
+  // 15,000, up to four more (and the cap rises with it).
+  const rich = Math.max(0, Math.min(4, Math.floor((colonyWealth(sim) - 15000) / 7500)));
+  const cap = Math.min(9 + harsh, 7 + harsh + Math.max(0, Math.floor((sim.day - 19) / 8))) + rich;
+  const size = 2 + harsh + Math.floor((sim.day - 4) / 3) + Math.floor(armed / 3) + rich;
+  return Math.max(2, Math.round(Math.min(cap, size) * threatScale(sim)));
+}
+
+// A raid, or a siege: raiders from one of the hostile factions (not those paid off), and now and then friends
+// come to help.
+function attack(sim: Simulation, siege: boolean): boolean {
+  const factions = raiders(sim);
+  if (factions.length === 0 || !spawnRaid(sim, sim.rng.pick(factions).id, raidSize(sim), siege)) {
+    return false;
+  }
+  maybeSendAllies(sim);
+  return true;
+}
+
 const EVENTS: EventDef[] = [
   {
     key: 'raid',
@@ -137,28 +164,20 @@ const EVENTS: EventDef[] = [
         ? 0
         : // Each faction bought off is a share of the raids that don't come.
           3 * (raiders(sim).length / hostileFactions().length) * (transmitting(sim) ? SIGNAL_RAID_WEIGHT : 1),
-    run: (sim) => {
-      // Two raiders on day 4 and one more every three days, plus extra for a well-armed colony. The cap
-      // is seven at first (nine on harsh), rising by one every eight days after day 19; then all of it
-      // scaled to the colony's size.
-      const harsh = sim.story.difficulty === 'harsh' ? 2 : 0;
-      const armed = sim
-        .living()
-        .filter((c) => weaponScore(c.weapon, c.weaponQuality) >= weaponScore('recurveBow', 4)).length;
-      // A rich colony draws bigger raids: one more raider for every 7,500 silver of goods beyond the
-      // first 15,000, up to four more (and the cap rises with it).
-      const rich = Math.max(0, Math.min(4, Math.floor((colonyWealth(sim) - 15000) / 7500)));
-      const cap = Math.min(9 + harsh, 7 + harsh + Math.max(0, Math.floor((sim.day - 19) / 8))) + rich;
-      const size = 2 + harsh + Math.floor((sim.day - 4) / 3) + Math.floor(armed / 3) + rich;
-      const count = Math.max(2, Math.round(Math.min(cap, size) * threatScale(sim)));
-      const factions = raiders(sim);
-      if (factions.length === 0 || !spawnRaid(sim, sim.rng.pick(factions).id, count)) {
-        return false;
-      }
-      // Now and then, friends come to help.
-      maybeSendAllies(sim);
-      return true;
-    },
+    run: (sim) => attack(sim, false),
+  },
+  {
+    // From the second year, now and then the raiders come to stay a while: they camp, dig in, and attack
+    // when they're ready.
+    key: 'siege',
+    minDay: 40,
+    cooldownDays: 12,
+    threat: true,
+    weight: (sim) =>
+      sim.story.difficulty === 'peaceful' || raiders(sim).length === 0
+        ? 0
+        : 0.5 * (raiders(sim).length / hostileFactions().length),
+    run: (sim) => attack(sim, true),
   },
   {
     // Once a year from the second, the great beast of the hills comes down.
