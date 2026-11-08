@@ -1182,14 +1182,19 @@ function setupSiege(sim: Simulation, from: number): boolean {
     return false;
   }
   const open = (i: number) =>
-    w.isPassable(i) && w.feature[i] === NONE && w.blueprint[i] === NONE && sim.regionOf(i) === region;
+    w.isPassable(i) &&
+    w.feature[i] === NONE &&
+    w.blueprint[i] === NONE &&
+    !w.tilesWith('items').has(i) &&
+    sim.regionOf(i) === region;
   const pick = ([lo, hi]: [number, number]) =>
     sim.nearest(from, (i) => open(i) && w.distance(i, home) >= lo && w.distance(i, home) <= hi, 1)[0];
   const camp = pick(CAMP_DISTANCE) ?? pick([14, 34]);
   if (camp === undefined) {
     return false;
   }
-  const posts = sim.nearest(camp, (i) => open(i) && chebyshev(w, i, camp) <= 1, raid.initial);
+  // Round the fire (the camp's centre is the fire itself).
+  const posts = sim.nearest(camp, (i) => i !== camp && open(i) && chebyshev(w, i, camp) <= 1, raid.initial);
   raid.siege = {
     camp,
     posts: posts.length > 0 ? posts : [camp],
@@ -1220,7 +1225,12 @@ function digIn(sim: Simulation, siege: SiegeState): void {
   for (const i of ring) {
     w.setFeature(i, featureId('sandbags'));
   }
-  if (w.feature[siege.camp] === NONE) {
+  // (Not on anything dropped there since, or anyone standing in it.)
+  const occupied =
+    w.tilesWith('items').has(siege.camp) ||
+    sim.enemies.some((e) => e.hp > 0 && e.tile === siege.camp) ||
+    sim.living().some((c) => c.tile === siege.camp);
+  if (w.feature[siege.camp] === NONE && !occupied) {
     w.setFeature(siege.camp, featureId('campfire'));
     w.fuel[siege.camp] = 10;
     sim.fuelVersion++;

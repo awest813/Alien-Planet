@@ -32,7 +32,7 @@ describe('sieges', () => {
     const home = sim.homeTile()!;
     const w = sim.world;
     // Waiting: they gather at the camp and don't come closer, and the raid hasn't "arrived".
-    for (let t = 0; t < 6 * TICKS_PER_HOUR; t++) {
+    for (let t = 0; t < 6 * TICKS_PER_HOUR && !siege.dugIn; t++) {
       keepWell();
       sim.step();
     }
