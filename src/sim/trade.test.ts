@@ -10,7 +10,10 @@ import {
   artForSale,
   artPrice,
   colonyStock,
+  condition,
   goodwillOf,
+  lotsValue,
+  saleLots,
   sellArt,
   tradeOpen,
 } from './trade';
@@ -153,5 +156,35 @@ describe('selling art: orders', () => {
     expect(w.designation[tile]).toBe(0);
     run(sim, HOUR * 6);
     expect(w.floor[tile]).toBe(featureId('woodFloor'));
+  });
+});
+
+describe('selling by condition', () => {
+  it('a worn piece fetches less than a sound one, and goes first', () => {
+    const { sim, w, x, y } = market(5);
+    const tunic = itemId('tunic');
+    const worn = w.idx(x - 2, y + 5);
+    const sound = w.idx(x - 1, y + 5);
+    w.addItem(worn, tunic, 1, 0.1);
+    w.addItem(sound, tunic, 1, 1);
+    const lots = saleLots(sim, tunic);
+    expect(lots[0].tile).toBe(worn);
+    expect(lots[0].price).toBeLessThan(lots[1].price * 0.5);
+    const silver = colonyStock(sim, itemId('silver'));
+    expect(applyTrade(sim, [], [[tunic, 1]])).toBeNull();
+    // The worn one went; the sound one is kept.
+    expect(w.itemCount[worn]).toBe(0);
+    expect(w.itemCount[sound]).toBe(1);
+    run(sim, HOUR * 2);
+    expect(colonyStock(sim, itemId('silver'))).toBeGreaterThan(silver);
+    expect(lotsValue(lots, 2)).toBeCloseTo(lots[0].price + lots[1].price);
+  });
+
+  it('food about to spoil sells for half', () => {
+    const { w, x, y } = market(6);
+    const meal = itemId('meal');
+    const tile = w.idx(x + 2, y + 5);
+    w.addItem(tile, meal, 4, 0.5);
+    expect(condition(w, tile)).toBeCloseTo(0.5);
   });
 });

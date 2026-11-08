@@ -126,6 +126,7 @@ interface Result {
   living: number;
   total: number;
   deaths: string[];
+  deathCauses: Record<string, number>;
   raids: number;
   raidKills: number;
   diseaseCases: number;
@@ -744,7 +745,7 @@ function play(seed: number): Result {
     }
   }
 
-  const story = sim.storyLog.map((s) => s.text);
+  const story = fullStories.get(sim) ?? [];
   const count = (re: RegExp) => story.filter((s) => re.test(s)).length;
   const events: Record<string, number> = {
     raid: count(/^Raid!/),
@@ -777,7 +778,9 @@ function play(seed: number): Result {
     seed,
     living: sim.living().length,
     total: sim.colonists.length,
+    // The latest few, with when (the log keeps only so much); every one is counted in deathCauses.
     deaths: sim.storyLog.filter((s) => s.text.includes('has died')).map((s) => `day ${s.day} ${s.hour}h: ${s.text}`),
+    deathCauses: { ...(sim.stats.deaths ?? {}) },
     raids: events.raid,
     raidKills: sim.stats.kills,
     diseaseCases: story
@@ -830,6 +833,8 @@ function play(seed: number): Result {
 }
 
 // Mental breaks aren't story entries, so count them via a wrapped logger.
+// The whole story of each colony (the game's own log keeps only the latest entries).
+const fullStories = new Map<Simulation, string[]>();
 const breakCounts = new WeakMap<Simulation, number>();
 // The day Tailoring arrives (the story log is capped, so early entries may be gone by the end).
 const tailoringDays = new WeakMap<Simulation, number>();
@@ -840,6 +845,12 @@ function countBreaks(sim: Simulation): number {
 }
 const originalAddLog = Simulation.prototype.addLog;
 Simulation.prototype.addLog = function (this: Simulation, text, tone, story) {
+  // Every story entry, kept here in full (the game keeps only the latest).
+  if (story) {
+    const all = fullStories.get(this) ?? [];
+    all.push(text);
+    fullStories.set(this, all);
+  }
   if (text.includes('has had enough')) {
     breakCounts.set(this, (breakCounts.get(this) ?? 0) + 1);
   }
@@ -938,6 +949,14 @@ const sum = (f: (r: Result) => number) => results.reduce((n, r) => n + f(r), 0);
 console.log(
   `\n${passive ? 'PASSIVE' : 'ACTIVE'} ${difficulty} ${mapSize}×${mapSize} ${days} days × ${seeds} seeds in ${((performance.now() - started) / 1000).toFixed(1)}s\n` +
     `  survivors ${sum((r) => r.living)}/${sum((r) => r.total)}, colonies wiped ${results.filter((r) => r.living === 0).length}\n` +
+    `  deaths by cause ${JSON.stringify(
+      results.reduce<Record<string, number>>((all, r) => {
+        for (const [cause, n] of Object.entries(r.deathCauses)) {
+          all[cause] = (all[cause] ?? 0) + n;
+        }
+        return all;
+      }, {}),
+    )}\n` +
     `  raids ${sum((r) => r.raids)}, kills ${sum((r) => r.raidKills)}\n` +
     `  fever cases ${sum((r) => r.diseaseCases)}, fever deaths ${sum((r) => r.diseaseDeaths)}\n` +
     `  mental breaks ${sum((r) => r.breaks)}, mean mood ${(sum((r) => r.avgMood) / results.length).toFixed(1)}\n` +

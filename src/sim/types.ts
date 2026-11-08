@@ -479,6 +479,8 @@ export interface Stats {
   requestsDone?: number;
   // Breaches from below, through deep mine shafts.
   breaches?: number;
+  // Every death, by cause (the log only keeps the latest).
+  deaths?: Record<string, number>;
   requestsFailed?: number;
   gifts?: number;
   tributes?: number;

@@ -304,6 +304,8 @@ export function die(sim: Simulation, c: Colonist, cause: string): void {
   }
   c.health.dead = true;
   c.health.downed = false;
+  sim.stats.deaths ??= {};
+  sim.stats.deaths[cause] = (sim.stats.deaths[cause] ?? 0) + 1;
   c.expectingUntil = undefined;
   c.expectingWith = undefined;
   c.drafted = false;

@@ -2,6 +2,8 @@ import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
 import { artBeauty } from './art';
 import { FACTIONS, ITEMS, NONE, NORMAL_QUALITY, featureDef, itemDef, itemId } from './defs';
 import type { Simulation } from './simulation';
+import { qualityFactor } from './apparel';
+import type { World } from './world';
 
 // Friendly factions send caravans. Traders walk in from the map edge, set up near the colony for
 // most of a day, and leave. While they're there the player can buy and sell; goods change hands
@@ -210,11 +212,11 @@ export function colonyStock(sim: Simulation, item: number): number {
   return n;
 }
 
-// Takes `count` of an item out of the colony's stockpiles.
-export function takeFromStockpiles(sim: Simulation, item: number, count: number): void {
+// Takes `count` of an item out of the colony's stockpiles (from the given stacks first, if any).
+export function takeFromStockpiles(sim: Simulation, item: number, count: number, order?: number[]): void {
   const w = sim.world;
   let left = count;
-  for (const i of [...w.tilesWith('items')]) {
+  for (const i of [...(order ?? []), ...w.tilesWith('items')]) {
     if (left <= 0) {
       break;
     }
@@ -222,6 +224,51 @@ export function takeFromStockpiles(sim: Simulation, item: number, count: number)
       left -= w.takeItem(i, left);
     }
   }
+}
+
+// How much of its full price a stack fetches: how well it was made, how worn it is (clothes, armor,
+// tools), and whether it's about to spoil. A normal, unworn, fresh one fetches the full price.
+export function condition(w: World, i: number): number {
+  const def = itemDef(w.itemType[i]);
+  let factor = qualityFactor(w.quality[i]) / qualityFactor(NORMAL_QUALITY);
+  if (def.apparel || def.armor || def.tool) {
+    factor *= 0.3 + 0.7 * Math.max(0, Math.min(1, w.fresh[i]));
+  } else if (def.shelfLife !== undefined && w.fresh[i] < SPOILING_DAYS) {
+    factor *= 0.5;
+  }
+  return factor;
+}
+// Food with less than this many days left is about to spoil, and sells for half.
+const SPOILING_DAYS = 1;
+
+// What the traders would pay for an item from the stockpiles, stack by stack, the worst first (that's
+// the order it goes in, so the best is kept back): each lot's count and price per unit.
+export function saleLots(sim: Simulation, item: number): { tile: number; count: number; price: number }[] {
+  const w = sim.world;
+  const caravan = sim.caravan;
+  const base = caravan ? prices(sim, caravan.faction).sell(item) : itemDef(item).value;
+  const lots: { tile: number; count: number; price: number }[] = [];
+  for (const i of w.tilesWith('items')) {
+    if (w.itemType[i] === item && sim.isStockpile(i)) {
+      lots.push({ tile: i, count: w.itemCount[i], price: base * condition(w, i) });
+    }
+  }
+  return lots.sort((a, b) => a.price - b.price || a.tile - b.tile);
+}
+
+// What selling `count` of these lots fetches (worst first).
+export function lotsValue(lots: { count: number; price: number }[], count: number): number {
+  let left = count;
+  let total = 0;
+  for (const lot of lots) {
+    const n = Math.min(left, lot.count);
+    total += n * lot.price;
+    left -= n;
+    if (left <= 0) {
+      break;
+    }
+  }
+  return total;
 }
 
 function mergeLines(lines: [number, number][]): [number, number][] {
@@ -255,7 +302,9 @@ export function applyTrade(sim: Simulation, buy: [number, number][], sell: [numb
     }
   }
   const cost = buy.reduce((sum, [item, n]) => sum + n * price.buy(item), 0);
-  const income = sell.reduce((sum, [item, n]) => sum + n * price.sell(item), 0);
+  // Sold as it stands: a fine piece fetches more, a worn or spoiling one less, and the worst goes first.
+  const lots = new Map(sell.map(([item]) => [item, saleLots(sim, item)]));
+  const income = sell.reduce((sum, [item, n]) => sum + lotsValue(lots.get(item)!, n), 0);
   const balance = dealBalance(cost, income);
   if (balance > colonyStock(sim, silver)) {
     return 'Not enough silver in the stockpiles.';
@@ -266,7 +315,12 @@ export function applyTrade(sim: Simulation, buy: [number, number][], sell: [numb
   const home = sim.homeTile() ?? caravan.visitors[0].tile;
   for (const [item, count] of sell) {
     if (count > 0) {
-      takeFromStockpiles(sim, item, count);
+      takeFromStockpiles(
+        sim,
+        item,
+        count,
+        lots.get(item)!.map((l) => l.tile),
+      );
       const line = caravan.stock.find((s) => s.item === item);
       if (line) {
         line.count += count;

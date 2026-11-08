@@ -768,6 +768,13 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
   - Mood stayed high (55–58) with almost no breaks in later years. Rising expectations (+4 in the first 12
     days, −3 from year 2, −6 from year 4) bring it to 50–53.
   - Names ran out (24): there are now 60.
+  - The balance harness read deaths and events from the game's story log, which keeps only the latest 200,
+    so ten-year reports showed a handful of raids where 40 had come, and deaths with no cause. Deaths are now
+    counted by cause in the stats, and the harness keeps the whole story itself.
+  - Trade priced everything at its base value: worn clothes and spoiling food sold at full price, and fine
+    work at normal. Goods now sell by condition, the worst first, and a pick that outlasts its stock is
+    flagged before the deal.
+  - 120-day playtests (20 players) found no invariant problems.
 
 ### What to measure
 

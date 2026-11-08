@@ -41,6 +41,7 @@ import { Hours, Rations, tally } from '../sim/village';
 import {
   applyTrade,
   colonyStock,
+  saleLots,
   goodwillOf,
   prices,
   standingLabel,
@@ -700,8 +701,10 @@ export interface TradeLine {
   item: number;
   name: string;
   count: number;
-  // Silver per unit.
+  // Silver per unit (for the colony's goods, at full condition).
   price: number;
+  // The colony's goods, stack by stack as they'd be sold (worst first): how many, and silver each.
+  lots?: { count: number; price: number }[];
 }
 
 export interface TradeView {
@@ -1407,7 +1410,11 @@ export class GameController {
         price: price.buy(s.item),
       })),
       ours: tradableItems()
-        .map((item) => ({ item, name: itemDef(item).name, count: stock.get(item) ?? 0, price: price.sell(item) }))
+        .map((item) => {
+          // Sold worst first, each stack by its condition.
+          const lots = saleLots(sim, item).map((l) => ({ count: l.count, price: l.price }));
+          return { item, name: itemDef(item).name, count: stock.get(item) ?? 0, price: price.sell(item), lots };
+        })
         .filter((line) => line.count > 0),
       art: artForSale(sim).map((offer) => ({
         tile: offer.tile,

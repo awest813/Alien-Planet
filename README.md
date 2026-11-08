@@ -256,7 +256,9 @@ How the storytelling layer works:
 - **Trade and factions:** now and then a caravan from the friendly Meadow Kin walks in and stays for most of a
   day. Open Trade in the top bar to buy their goods and sell anything in your stockpiles for silver (the colony
   lands with 100). Prices depend on goodwill, which grows with every sizeable deal and brings caravans more
-  often; the Factions screen lists every faction and where you stand with it.
+  often; the Factions screen lists every faction and where you stand with it. Goods sell as they stand: finely
+  made pieces fetch more, worn clothes and food about to spoil less, and the worst go first, so the best is
+  kept back.
 - **Water:** shallow water is slow to wade through and leaves colonists soaked (a small mood hit); deep water
   is impassable until you build a bridge over it. Fishing spots on the shore let hunters catch raw fish while
   the colony is short of food. In hard frost the shallows freeze from the shore inwards and can be walked

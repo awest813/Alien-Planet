@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react';
-import { SAVE_SLOTS, UiState, controller, slotLabel } from '../game/controller';
+import { SAVE_SLOTS, UiState, controller, slotLabel, TradeLine } from '../game/controller';
 import { SaveMeta } from '../game/save-store';
 import { DEFAULT_SETTINGS, NOTICE_TIMES, PAN_SPEEDS, Settings, UI_SCALES, forgetHelp } from '../game/settings';
 import { SAVE_VERSION } from '../sim/serialize';
 import { MAP_SIZE, MAP_SIZES } from '../sim/simulation';
 import { DIFFICULTIES, Difficulty } from '../sim/storyteller';
-import { dealBalance } from '../sim/trade';
+import { dealBalance, lotsValue } from '../sim/trade';
+
+// One price, or the range when the stacks differ (worn, spoiling or finely made); the worst go first.
+function priceLabel(line: TradeLine): string {
+  const prices = line.lots?.filter((l) => l.count > 0).map((l) => l.price) ?? [line.price];
+  const lo = Math.min(...prices);
+  const hi = Math.max(...prices);
+  return hi - lo < 0.05 ? lo.toFixed(1) : `${lo.toFixed(1)}–${hi.toFixed(1)} (worst first)`;
+}
 import { ConfirmButton, Modal } from './screens';
 
 // What a menu can ask the app to do.
@@ -569,15 +577,31 @@ export function TradeScreen({ state, onClose }: { state: UiState; onClose: () =>
     );
   }
   const cost = trade.theirs.reduce((sum, line) => sum + (buy[line.item] ?? 0) * line.price, 0);
-  const income = trade.ours.reduce((sum, line) => sum + (sell[line.item] ?? 0) * line.price, 0);
+  const income = trade.ours.reduce(
+    (sum, line) => sum + (line.lots ? lotsValue(line.lots, sell[line.item] ?? 0) : (sell[line.item] ?? 0) * line.price),
+    0,
+  );
   const balance = dealBalance(cost, income);
+  // A pick can outlast the stock it was made from (eaten, used, hauled out of the stockpiles meanwhile).
+  const stale = [
+    ...trade.ours.filter((l) => (sell[l.item] ?? 0) > l.count),
+    ...trade.theirs.filter((l) => (buy[l.item] ?? 0) > l.count),
+  ][0];
+  const gone = [
+    ...Object.keys(sell).filter((k) => (sell[Number(k)] ?? 0) > 0 && !trade.ours.some((l) => l.item === Number(k))),
+    ...Object.keys(buy).filter((k) => (buy[Number(k)] ?? 0) > 0 && !trade.theirs.some((l) => l.item === Number(k))),
+  ].length;
   const problem = !trade.open
     ? 'The traders are not open for business.'
-    : balance > trade.silver
-      ? 'Not enough silver.'
-      : -balance > trade.traderSilver
-        ? 'The traders cannot afford that.'
-        : null;
+    : stale
+      ? `Only ${stale.count} ${stale.name.toLowerCase()} left now: lower the amount.`
+      : gone > 0
+        ? 'Something picked is no longer there: clear and pick again.'
+        : balance > trade.silver
+          ? 'Not enough silver.'
+          : -balance > trade.traderSilver
+            ? 'The traders cannot afford that.'
+            : null;
   const lines = (side: 'buy' | 'sell') => {
     const list = side === 'buy' ? trade.theirs : trade.ours;
     const picked = side === 'buy' ? buy : sell;
@@ -601,7 +625,7 @@ export function TradeScreen({ state, onClose }: { state: UiState; onClose: () =>
               <td>
                 {line.name}
                 <div className="muted small">
-                  {line.count} · {line.price.toFixed(1)} silver each
+                  {line.count} · {priceLabel(line)} silver each
                 </div>
               </td>
               <td className="qty">
