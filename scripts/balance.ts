@@ -17,6 +17,7 @@ import {
   FEATURES,
   NONE,
   RECIPES,
+  RESEARCH,
   featureDef,
   featureId,
   itemDef,
@@ -581,10 +582,18 @@ function play(seed: number): Result {
         sim.apply({ type: 'build', feature: bench, tiles: [labTile] });
       }
     }
-    // Keep research going, in a sensible order, and use what it unlocks.
-    if (!sim.research.current) {
-      const next = researchOrder.find((key) => isAvailable(sim.research, researchDef(key)!));
-      if (next) {
+    // Keep research going, in a sensible order, and use what it unlocks. After the list, whatever else can be
+    // studied; and a project stuck waiting on a building or materials is set aside for one that isn't.
+    const held = (key: string) => {
+      const hold = sim.researchHold(key);
+      return (
+        !!hold.building || (hold.short.length > 0 && (sim.research.progress[key] ?? 0) >= researchDef(key)!.cost - 1)
+      );
+    };
+    if (!sim.research.current || held(sim.research.current)) {
+      const ready = (key: string) => isAvailable(sim.research, researchDef(key)!) && !held(key);
+      const next = researchOrder.find(ready) ?? RESEARCH.map((r) => r.key).find(ready);
+      if (next && next !== sim.research.current) {
         sim.apply({ type: 'research', project: next });
       }
     }
