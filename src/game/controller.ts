@@ -71,6 +71,7 @@ import {
   STOCKPILE_ZONE,
   STORAGE_GROUPS,
   StockpilePriority,
+  TileKind,
   isStockpileZone,
   refusedGroups,
   stockpilePriority,
@@ -2304,17 +2305,27 @@ export class GameController {
   private goalUnderway(toolId: string | undefined): boolean {
     const tool = toolId ? TOOLS.find((t) => t.id === toolId)?.tool : undefined;
     const w = this.sim.world;
+    // Looked at on every refresh: stop at the first match, without copying the sets.
+    const any = (kind: TileKind, test: (i: number) => boolean) => {
+      for (const i of w.tilesWith(kind)) {
+        if (test(i)) {
+          return true;
+        }
+      }
+      return false;
+    };
     switch (tool?.kind) {
       case 'designate': {
         const mark = { mine: Designation.MINE, chop: Designation.CHOP, forage: Designation.FORAGE }[
           tool.designation as 'mine' | 'chop' | 'forage'
         ];
-        return mark !== undefined && [...w.tilesWith('designations')].some((i) => w.designation[i] === mark);
+        return mark !== undefined && any('designations', (i) => w.designation[i] === mark);
       }
       case 'build':
-        return [...w.tilesWith('blueprints')].some((i) => w.blueprint[i] === tool.feature);
+        return any('blueprints', (i) => w.blueprint[i] === tool.feature);
       case 'zone':
-        return [...w.tilesWith('zones')].some((i) => w.zone[i] === tool.zone);
+        // (A stockpile's value carries its settings; any stockpile counts.)
+        return any('zones', (i) => (isStockpileZone(tool.zone) ? isStockpileZone(w.zone[i]) : w.zone[i] === tool.zone));
       default:
         return false;
     }

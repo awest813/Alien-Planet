@@ -84,4 +84,36 @@ describe('allies', () => {
     }
     expect(sim.allies).toHaveLength(0);
   });
+
+  it("don't come once every raider is already running", () => {
+    const sim = Simulation.newColony(3);
+    const e = raider(sim, sim.colonists[0].tile + 8);
+    e.fleeing = true;
+    sim.raid!.allies = 3;
+    sim.raid!.alliesAt = sim.tick;
+    updateAllies(sim);
+    expect(sim.allies).toHaveLength(0);
+  });
+
+  it('keep a raider busy: between blows it stands its ground', () => {
+    const sim = Simulation.newColony(4);
+    const { x, y } = clearAround(sim, 12);
+    const e = raider(sim, sim.world.idx(x + 6, y));
+    // One raider, hardy enough to last the test, and the raid not about to break.
+    sim.raid!.initial = 1;
+    e.hp = 50;
+    sim.raid!.allies = 2;
+    sim.raid!.alliesAt = sim.tick;
+    updateAllies(sim);
+    const ally = sim.allies[0];
+    ally.tile = sim.world.idx(x + 7, y);
+    ally.hp = 50;
+    ally.weapon = 'fists';
+    sim.allies.slice(1).forEach((a) => (a.hp = 0));
+    const start = e.tile;
+    for (let t = 0; t < 120; t++) {
+      sim.step();
+    }
+    expect(e.tile).toBe(start);
+  });
 });

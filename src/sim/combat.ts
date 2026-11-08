@@ -1013,8 +1013,8 @@ export function updateAllies(sim: Simulation): void {
   if (raid?.alliesAt !== undefined && sim.tick >= raid.alliesAt) {
     const count = raid.allies ?? 0;
     raid.alliesAt = undefined;
-    // Not if the raid is already over.
-    if (count > 0 && !raid.outcome) {
+    // Not if the raid is already over, or every raider's already running.
+    if (count > 0 && !raid.outcome && sim.enemies.some((e) => e.hp > 0 && !e.fleeing)) {
       alliesArrive(sim, count);
     }
   }
@@ -1029,8 +1029,12 @@ export function updateAllies(sim: Simulation): void {
     a.suppression = Math.max(0, a.suppression - SUPPRESS_DECAY);
     const target = a.fleeing ? undefined : allyTarget(sim, a);
     if (!target) {
-      // The fight's over (or out of reach): home they go.
-      a.fleeing = true;
+      // The fight's over (or out of reach): home they go, by the nearest way out.
+      if (!a.fleeing) {
+        a.fleeing = true;
+        a.path = [];
+        a.moveProgress = 0;
+      }
       flee(sim, a, true);
       continue;
     }
@@ -1062,9 +1066,10 @@ export function updateAllies(sim: Simulation): void {
       moveEnemy(sim, a, true);
     }
   }
-  const before = sim.allies.length;
+  // (Those who walked off the map left fleeing; those struck down didn't.)
+  const walkedHome = sim.allies.some((a) => a.hp <= 0 && a.fleeing);
   sim.allies = sim.allies.filter((a) => a.hp > 0);
-  if (before > 0 && sim.allies.length === 0 && !sim.raid) {
+  if (walkedHome && sim.allies.length === 0) {
     sim.addLog(`The fighters from ${kinName(FACTIONS.findIndex((f) => !f.hostile))} have gone home.`, 'info');
   }
 }
@@ -1072,7 +1077,7 @@ export function updateAllies(sim: Simulation): void {
 // A raider with an ally within reach (beside them, or in a bow's range and sight when no colonist is
 // closer) fights them rather than walking past. Returns whether they did.
 function strikeAlly(sim: Simulation, e: Enemy): boolean {
-  if (sim.allies.length === 0 || e.cooldown > 0) {
+  if (sim.allies.length === 0) {
     return false;
   }
   const w = sim.world;
@@ -1099,6 +1104,12 @@ function strikeAlly(sim: Simulation, e: Enemy): boolean {
     .some((c) => !c.health.downed && w.distance(e.tile, c.tile) < near && lineOfSight(w, e.tile, c.tile));
   if (colonistCloser && chebyshev(w, e.tile, ally.tile) > 1) {
     return false;
+  }
+  // Between blows they stand their ground rather than wander off after a colonist.
+  if (e.cooldown > 0) {
+    e.path = [];
+    e.moveProgress = 0;
+    return true;
   }
   const used = weaponAt(e.weapon, chebyshev(w, e.tile, ally.tile) <= 1);
   e.path = [];

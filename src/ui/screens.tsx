@@ -35,7 +35,10 @@ export function Modal({
   // Keyboard focus moves into the dialog when it opens (unless a button in it already took it), Tab keeps it
   // there, and on closing it goes back to wherever it was.
   useEffect(() => {
-    const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // (Only keyboard focus: a button clicked with the mouse shouldn't take the focus back and with it Tab and
+    // Space from the game.)
+    const active = document.activeElement;
+    const before = active instanceof HTMLElement && active.matches(':focus-visible') ? active : null;
     if (!panel.current?.contains(document.activeElement)) {
       panel.current?.focus();
     }
@@ -269,7 +272,7 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
         <table
           className="grid schedule"
           onPointerDown={(e) => {
-            if ((e.target as HTMLElement).closest('td[data-hour]')) {
+            if (e.button === 0 && (e.target as HTMLElement).closest('td[data-hour]')) {
               setPainting(true);
               paintAt(e.clientX, e.clientY);
             }
