@@ -1,3 +1,4 @@
+import { ailmentAim, ailmentMove, ailmentPain, ailmentWork } from './ageing';
 import type { Simulation } from './simulation';
 import { Colonist, Injury } from './types';
 
@@ -73,12 +74,15 @@ export function rollPart(sim: Simulation): BodyPart {
 export const scarsOf = (c: Colonist): Scar[] => c.health.scars ?? [];
 const count = (c: Colonist, kind: ScarKind) => scarsOf(c).filter((s) => s.kind === kind).length;
 
-// What lasting injuries do: walking and working pace, aim, and a little standing pain. Fitted (prosthetics
-// research), a limp, a stiff hand or a lost eye costs half as much.
-export const scarMove = (c: Colonist, fitted = false): number => (fitted ? 0.925 : 0.85) ** count(c, 'limp');
-export const scarWork = (c: Colonist, fitted = false): number => (fitted ? 0.95 : 0.9) ** count(c, 'stiffHand');
-export const scarAim = (c: Colonist, fitted = false): number => (fitted ? -0.06 : -0.12) * count(c, 'lostEye');
-export const scarPain = (c: Colonist): number => 0.03 * count(c, 'scar');
+// What lasting injuries (and the aches of old age) do: walking and working pace, aim, and a little
+// standing pain. Fitted (prosthetics research), a limp, a stiff hand or a lost eye costs half as much.
+export const scarMove = (c: Colonist, fitted = false): number =>
+  (fitted ? 0.925 : 0.85) ** count(c, 'limp') * ailmentMove(c);
+export const scarWork = (c: Colonist, fitted = false): number =>
+  (fitted ? 0.95 : 0.9) ** count(c, 'stiffHand') * ailmentWork(c);
+export const scarAim = (c: Colonist, fitted = false): number =>
+  (fitted ? -0.06 : -0.12) * count(c, 'lostEye') + ailmentAim(c);
+export const scarPain = (c: Colonist): number => 0.03 * count(c, 'scar') + ailmentPain(c);
 
 export const isInfected = (injury: Injury): boolean => (injury.infection ?? 0) > 0 && !injury.treated;
 

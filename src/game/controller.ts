@@ -36,9 +36,10 @@ import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
 import { DOWNED_TICKS, persuasion, roomToJoin } from '../sim/prisoners';
-import { DRAFT_AGE, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans';
+import { DRAFT_AGE, ELDER, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans';
 import { LEGEND } from '../sim/minds';
 import { PART_LABELS, SCAR_LABELS, isInfected, scarsOf } from '../sim/body';
+import { AILMENTS, ailmentsOf } from '../sim/ageing';
 import { Hours, Rations, tally } from '../sim/village';
 import {
   applyTrade,
@@ -472,6 +473,13 @@ export const TOOLS: ToolDef[] = [
     'Games for two: players chat as they play. Alone, it is much less fun',
   ),
   build('cardTable', 'Card table', '', 'furniture', 'Social recreation for up to four. Alone, it is much less fun'),
+  build(
+    'lessonBoard',
+    'Lesson board',
+    '',
+    'furniture',
+    'Morning lessons: the most skilled grown-up (a retired elder first) teaches the children here',
+  ),
   build('telescope', 'Telescope', '', 'furniture', 'Stargazing on clear nights; it must stand under the open sky'),
   build('drum', 'Drum', '', 'furniture', 'Music: players train Artistic and anyone within earshot enjoys it'),
   build('flute', 'Flute stand', '', 'furniture', 'Music: players train Artistic and anyone within earshot enjoys it'),
@@ -630,6 +638,9 @@ export interface ColonistView {
   traits: { label: string; description: string }[];
   // Chosen to lead the colony.
   leader: boolean;
+  // Old enough to retire, and retired.
+  canRetire: boolean;
+  retired: boolean;
   // Age in whole years, life stage, past, and family lines ("Mother of …", "Caring for baby …").
   age: number;
   stage: string;
@@ -1357,6 +1368,10 @@ export class GameController {
     return true;
   }
 
+  public setRetired(colonist: number, retired: boolean): void {
+    this.command({ type: 'retire', colonist, retired });
+  }
+
   public setStance(colonist: number, stance: Stance): void {
     this.command({ type: 'stance', colonist, stance });
   }
@@ -1724,8 +1739,10 @@ export class GameController {
         schedule: [...c.schedule],
         traits: c.traits.map((key) => ({ label: TRAITS[key].label, description: TRAITS[key].description })),
         leader: sim.village.leader === c.id,
+        canRetire: !c.health.dead && (c.age >= ELDER || !!c.retired),
+        retired: !!c.retired,
         age: Math.floor(c.age),
-        stage: stageOf(c.age),
+        stage: c.retired ? 'elder, retired' : stageOf(c.age),
         backstory: (({ title, description }) => ({ title, description }))(backstoryOf(c.backstory)),
         family: this.familyOf(c),
         bleeding: !c.health.dead && bleedingOf(c) > 0,
@@ -1745,7 +1762,7 @@ export class GameController {
           tended: injury.tended > 0,
           infected: isInfected(injury),
         })),
-        scars: scarsOf(c).map((s) => SCAR_LABELS[s.kind]),
+        scars: [...scarsOf(c).map((s) => SCAR_LABELS[s.kind]), ...ailmentsOf(c).map((a) => AILMENTS[a].label)],
         bloodLoss: c.health.bloodLoss,
         disease: c.health.disease && {
           label: c.health.disease.label,
@@ -2568,6 +2585,10 @@ export class GameController {
       if (late) {
         lines.push(`Widowed: ${late.name} died`);
       }
+    }
+    const former = sim.colonists[c.separatedFrom ?? -1];
+    if (former && c.spouse < 0) {
+      lines.push(`Separated from ${name(former.id)}`);
     }
     if (c.parents.length > 0) {
       lines.push(`Child of ${c.parents.map(name).join(' and ')}`);

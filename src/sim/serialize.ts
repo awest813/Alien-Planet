@@ -39,6 +39,7 @@ import {
   Artwork,
   Fallen,
   Gathering,
+  Grief,
 } from './types';
 import { Caravan } from './trade';
 import { WeatherState } from './weather';
@@ -96,6 +97,11 @@ interface SavedColonist {
   path: number[];
   practicedAt?: Partial<Record<SkillKey, number>>;
   recentJoy: Partial<Record<JoyKind, number>>;
+  strainedSince?: number;
+  separatedFrom?: number;
+  retired?: boolean;
+  childhood?: { hard: number; happy: number };
+  grief?: Grief[];
 }
 
 // Plain structured-cloneable data, stored as-is in IndexedDB. Jobs and reservations
@@ -260,6 +266,11 @@ export function serialize(sim: Simulation): SaveData {
         expectingUntil: c.expectingUntil,
         expectingWith: c.expectingWith,
         breakKind: c.breakKind,
+        strainedSince: c.strainedSince,
+        separatedFrom: c.separatedFrom,
+        retired: c.retired,
+        childhood: c.childhood,
+        grief: c.grief,
       }),
     ),
     bills: structuredClone(sim.bills),

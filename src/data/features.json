@@ -1333,5 +1333,23 @@
       ],
       "work": 220
     }
+  },
+  {
+    "key": "lessonBoard",
+    "name": "Lesson board",
+    "beauty": 1,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 25
+        },
+        {
+          "item": "stone",
+          "count": 10
+        }
+      ],
+      "work": 160
+    }
   }
 ]

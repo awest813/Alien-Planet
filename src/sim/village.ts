@@ -1,6 +1,7 @@
 import { seasonDay } from './seasons';
 import { foodDays } from './storyteller';
-import { ADULT } from './lifespans';
+import { ADULT, ELDER } from './lifespans';
+import { DAYS_PER_YEAR } from './seasons';
 import type { Simulation } from './simulation';
 import { traitValue } from './social';
 import { Colonist } from './types';
@@ -175,17 +176,33 @@ export function updateRest(sim: Simulation): void {
   }
 }
 
+// The colony expects more of its leader as the years pass: from the third year, the mood that counts as
+// leading well (or badly) rises this much a year, up to the most.
+const LEADER_BAR_PER_YEAR = 2;
+const LEADER_BAR_MAX = 12;
+// From this year, leading weighs on the leader.
+const OFFICE_WEIGHS_FROM_YEAR = 2;
+
+export function leaderBar(sim: Simulation): number {
+  const years = Math.floor((sim.day - 1) / DAYS_PER_YEAR);
+  return Math.min(LEADER_BAR_MAX, Math.max(0, years - 1) * LEADER_BAR_PER_YEAR);
+}
+
 // How each colonist feels about the leader and the policies, as thought keys.
 export function villageThoughts(sim: Simulation, c: Colonist): string[] {
   const v = sim.village;
   const keys: string[] = [];
   const leader = sim.colonists[v.leader];
   if (leader && !leader.health.dead && leader !== c && c.age >= ADULT) {
-    if (leader.mood >= GOOD_LEADER_MOOD) {
+    const bar = leaderBar(sim);
+    if (leader.mood >= GOOD_LEADER_MOOD + bar) {
       keys.push(sim.isResearched('civics') ? 'wellLedCivic' : 'wellLed');
-    } else if (leader.mood < POOR_LEADER_MOOD) {
+    } else if (leader.mood < POOR_LEADER_MOOD + bar) {
       keys.push('poorlyLed');
     }
+  }
+  if (leader === c && (sim.day - 1) / DAYS_PER_YEAR >= OFFICE_WEIGHS_FROM_YEAR) {
+    keys.push('weightOfOffice');
   }
   if (v.rations === 'frugal') {
     keys.push(c.traits.includes('glutton') ? 'frugalRationsGlutton' : 'frugalRations');
@@ -201,4 +218,13 @@ export function villageThoughts(sim: Simulation, c: Colonist): string[] {
     keys.push('dayOfRest');
   }
   return keys;
+}
+
+// Waking up: the leader expects a bedroom of their own, and a nice one; elders, a room of their own. Returns
+// the thought when they didn't get it.
+export function bedroomExpectation(sim: Simulation, c: Colonist, ownRoom: boolean, nice: boolean): string | null {
+  if (sim.village.leader === c.id) {
+    return !ownRoom ? 'leaderNoRoom' : !nice ? 'leaderPlainRoom' : null;
+  }
+  return c.age >= ELDER && !ownRoom ? 'elderNoRoom' : null;
 }

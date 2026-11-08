@@ -523,6 +523,18 @@ function SocialTab({ c }: { c: ColonistView }) {
       <h4>
         {c.age} years old{c.stage !== 'adult' && <span className="muted"> · {c.stage}</span>}
       </h4>
+      {c.canRetire && (
+        <button
+          onClick={() => controller.setRetired(c.id, !c.retired)}
+          title={
+            c.retired
+              ? 'Call them back to a full share of the work'
+              : 'Let them stop heavy work: they garden, cook, craft, make art and teach the children, and are glad of it'
+          }
+        >
+          {c.retired ? 'Back to work' : 'Retire'}
+        </button>
+      )}
       <div>
         <b>{c.backstory.title}</b> <span className="muted">{c.backstory.description}</span>
       </div>

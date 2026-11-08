@@ -3,7 +3,8 @@ import { TICKS_PER_HOUR } from './constants';
 import { comfortRange } from './apparel';
 import { WET_CHILL, isWet } from './weather';
 import { itemId, weaponDef } from './defs';
-import { FRIEND_OPINION, mutualOpinion, traitFactor, traitValue } from './social';
+import { traitFactor, traitValue } from './social';
+import { mourn } from './grief';
 import {
   HOSPITAL_HEALING,
   HOSPITAL_TENDING,
@@ -365,25 +366,15 @@ export function die(sim: Simulation, c: Colonist, cause: string): void {
     sim.village.leader = -1;
     sim.addLog('The colony has lost its leader. A new one will be chosen.', 'warn');
   }
-  // Parents grieve a child above all.
-  for (const parent of c.parents) {
-    const p = sim.colonists[parent];
-    if (p && !p.health.dead) {
-      sim.addThought(p, 'childDied');
-    }
-  }
   sim.events.push('death');
+  // Thoughts for everyone left behind, by how close they were (worked out before the widowed are freed).
+  mourn(sim, c);
   for (const other of sim.living()) {
     if (other.spouse === c.id) {
       other.spouse = -1;
     }
     if (other.lover === c.id) {
       other.lover = -1;
-      sim.addThought(other, 'loverDied');
-    } else if (mutualOpinion(other, c) >= FRIEND_OPINION) {
-      sim.addThought(other, 'friendDied');
-    } else {
-      sim.addThought(other, 'colonistDied');
     }
   }
   c.lover = -1;

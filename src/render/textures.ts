@@ -765,6 +765,28 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillRect(5, 13, 1, 2);
       c.fillRect(10, 13, 1, 2);
       break;
+    case 'lessonBoard':
+      // A dark slate on a wooden easel, with a few chalk marks and a sum.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(2, 14, 12, 1);
+      c.fillStyle = '#6b4424';
+      c.fillRect(3, 10, 1, 5);
+      c.fillRect(12, 10, 1, 5);
+      c.fillRect(7, 11, 2, 4);
+      c.fillStyle = '#9a6a3a';
+      c.fillRect(1, 1, 14, 11);
+      c.fillStyle = '#2b3530';
+      c.fillRect(2, 2, 12, 9);
+      c.fillStyle = '#e8ece6';
+      c.fillRect(3, 4, 3, 1);
+      c.fillRect(4, 3, 1, 3);
+      c.fillRect(7, 4, 2, 1);
+      c.fillRect(10, 3, 3, 1);
+      c.fillRect(10, 5, 3, 1);
+      c.fillRect(3, 8, 8, 1);
+      c.fillStyle = '#b8864f';
+      c.fillRect(2, 11, 12, 1);
+      break;
     case 'flute':
       // A pale wooden flute held upright on the diagonal in a little stand, finger holes showing.
       c.fillStyle = 'rgba(0,0,0,0.2)';

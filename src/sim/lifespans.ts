@@ -2,6 +2,8 @@ import backstoriesJson from '../data/backstories.json';
 import { TICKS_PER_HOUR, populationFor } from './constants';
 import { DAYS_PER_YEAR } from './seasons';
 import { learn } from './skills';
+import { elderBirthday } from './ageing';
+import { comeOfAge } from './school';
 import type { Rng } from './rng';
 import type { Simulation } from './simulation';
 import { TRAITS } from './defs';
@@ -48,6 +50,8 @@ export const FAMILY_ROOM = 3;
 export const DRAFT_AGE = 16;
 // Work a teenager can do.
 export const TEEN_WORK: readonly WorkTypeKey[] = ['hauling', 'cleaning', 'growing', 'plantCutting', 'art'];
+// Work the retired still do, as hobbies (and they teach; see school.ts).
+export const RETIRED_WORK: readonly WorkTypeKey[] = ['growing', 'cooking', 'crafting', 'art'];
 // A carer gets hungry this much faster while looking after a baby.
 export const CARER_HUNGER = 1.2;
 // How far a child watches the adults at work, and what an hour of watching teaches (a tenth of doing).
@@ -67,23 +71,30 @@ const yearsIn = (age: number, hours: number) => (hours / HOURS_PER_YEAR) * (age 
 
 // Whether a colonist does this kind of work at their age.
 export function canWork(c: Colonist, work: WorkTypeKey): boolean {
+  if (c.retired) {
+    return RETIRED_WORK.includes(work);
+  }
   return c.age >= ADULT || (c.age >= TEEN && TEEN_WORK.includes(work));
 }
 
-// Someone and their parents and grandparents, by id.
-function lineage(sim: Simulation, c: Colonist): Set<number> {
+// Someone and all their forebears, by id, however far back the colony's records go. A family is a
+// handful of people over a few generations, so walking the tree each time costs next to nothing.
+export function lineage(sim: Simulation, c: Colonist): Set<number> {
   const ids = new Set<number>([c.id]);
-  for (const p of c.parents) {
-    ids.add(p);
-    for (const g of sim.colonists[p]?.parents ?? []) {
-      ids.add(g);
+  const queue = [...c.parents];
+  while (queue.length > 0) {
+    const id = queue.pop()!;
+    if (ids.has(id)) {
+      continue;
     }
+    ids.add(id);
+    queue.push(...(sim.colonists[id]?.parents ?? []));
   }
   return ids;
 }
 
-// Family: anyone sharing a parent or grandparent, or descended one from the other within two
-// generations (parents, grandparents, brothers and sisters, aunts and uncles, nieces, nephews, cousins).
+// Family: anyone descended from the other, or sharing any forebear at all (brothers and sisters, aunts and
+// uncles, cousins of any degree), however many generations back.
 export function related(sim: Simulation, a: Colonist, b: Colonist): boolean {
   const mine = lineage(sim, a);
   for (const id of lineage(sim, b)) {
@@ -92,6 +103,34 @@ export function related(sim: Simulation, a: Colonist, b: Colonist): boolean {
     }
   }
   return false;
+}
+
+export type Kin = 'spouse' | 'parent' | 'child' | 'sibling' | 'grandparent' | 'grandchild' | 'kin';
+
+// How `b` is related to `a`, closest tie first, or null for no family at all.
+export function kinOf(sim: Simulation, a: Colonist, b: Colonist): Kin | null {
+  if (a === b) {
+    return null;
+  }
+  if (a.spouse === b.id) {
+    return 'spouse';
+  }
+  if (a.parents.includes(b.id)) {
+    return 'parent';
+  }
+  if (b.parents.includes(a.id)) {
+    return 'child';
+  }
+  if (a.parents.some((p) => b.parents.includes(p))) {
+    return 'sibling';
+  }
+  if (a.parents.some((p) => sim.colonists[p]?.parents.includes(b.id))) {
+    return 'grandparent';
+  }
+  if (b.parents.some((p) => sim.colonists[p]?.parents.includes(a.id))) {
+    return 'grandchild';
+  }
+  return related(sim, a, b) ? 'kin' : null;
 }
 
 // Who may fall in love: grown adults who aren't family.
@@ -152,10 +191,11 @@ function birthday(sim: Simulation, c: Colonist): void {
       c.priorities[work] ||= 3;
     }
     sim.addThought(c, 'grewUp');
-    sim.addLog(`${c.name} has come of age, and takes on a full share of the work.`, 'good', true);
+    sim.addLog(`${c.name} has come of age, and takes on a full share of the work.${comeOfAge(sim, c)}`, 'good', true);
   } else if (age === ELDER) {
     sim.addLog(`${c.name} turns ${ELDER}, and is slowing down a little.`, 'info');
   }
+  elderBirthday(sim, c);
   if (age >= OLD_AGE && sim.rng.chance(Math.min(0.9, OLD_AGE_DEATH_PER_YEAR * (age - OLD_AGE + 1)))) {
     sim.dieOf(c, 'old age');
   }
