@@ -144,6 +144,20 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // A HUD button clicked with the mouse (not a dialog's) lets go of the focus afterwards, so the game's keys
+  // (Tab to the next colonist, Space to pause) keep working rather than going to that button. Buttons pressed
+  // from the keyboard keep it.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const button = (e.target as HTMLElement | null)?.closest?.('button');
+      if (button && e.detail > 0 && !button.closest('.modal') && document.activeElement === button) {
+        button.blur();
+      }
+    };
+    window.addEventListener('click', onClick);
+    return () => window.removeEventListener('click', onClick);
+  }, []);
+
   // Interface size: scale everything from the top-left corner and give it the room to fill.
   const scale = state.settings.uiScale;
   const scaled =

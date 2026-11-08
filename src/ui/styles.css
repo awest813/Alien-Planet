@@ -84,6 +84,7 @@ body {
 }
 
 .ui > .bottom {
+  position: relative;
   grid-column: 1 / -1;
   grid-row: 4;
   display: flex;
@@ -424,6 +425,11 @@ kbd {
   box-shadow: 0 0 0 1px var(--accent);
 }
 
+/* Hovered, a chip stays solid (the general button hover is see-through, unreadable over snow). */
+.chip:hover:not(:disabled) {
+  background: #232a36;
+}
+
 .chip.dead {
   opacity: 0.45;
 }
@@ -460,8 +466,17 @@ kbd {
 
 .card-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px 6px;
+}
+
+/* A long name gives way before the buttons do. */
+.card-head .card-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .card-head button {
@@ -525,6 +540,10 @@ kbd {
   width: 260px;
   font-size: 12px;
   pointer-events: none;
+  /* Floats over the map just above the build bar, so it never shifts the panels around it. */
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + var(--gap));
 }
 
 .hover-colonist {
@@ -669,6 +688,12 @@ kbd {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
+/* A toast answers what the player just did, often in a dialog: it shows above the dialog's backdrop. */
+.toast {
+  position: relative;
+  z-index: 11;
+}
+
 .notification {
   width: 100%;
   text-align: left;
@@ -735,6 +760,21 @@ kbd {
 
 .modal.wide {
   width: 880px;
+}
+
+.modal.medium {
+  width: 680px;
+}
+
+/* ...and so do its buttons at the bottom. */
+.modal > .row.end:last-child {
+  position: sticky;
+  bottom: -8px;
+  z-index: 1;
+  margin: 8px -10px -8px;
+  padding: 6px 10px 8px;
+  background: rgb(16, 20, 28);
+  border-top: 1px solid var(--border);
 }
 
 /* A wide table scrolls sideways on its own, with the names column kept in view. */
@@ -1515,7 +1555,7 @@ button.primary:hover:not(:disabled) {
 }
 
 .work-grid .skill {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 400;
   color: var(--muted);
 }

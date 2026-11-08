@@ -104,6 +104,10 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   drafted colonists by tap). There's no long-press to stand in for right-click on the Work grid, tap targets
   are small (speed buttons 34×22), and a phone on its side leaves little map between the bars.
 
+- **Map labels crowd what they label.** Stack counts sit over the item sprites (a stockpile reads as numbers),
+  and raiders, traders, allies and prisoners are told apart only by label colour. Close it with counts in a
+  corner badge, and a shape or icon per kind of figure.
+
 ## 8. Testing
 
 - **There's no continuous integration.** Tests, lint and the build run only by hand (`.github/workflows` is

@@ -1155,7 +1155,14 @@ export class GameController {
 
   public command(cmd: Command): void {
     this.commandCount++;
+    const before = this.sim.log[this.sim.log.length - 1];
     this.sim.apply(cmd);
+    // Dealings with the neighbours say how they went on the spot (the Factions screen is open over the log).
+    const said = this.sim.log[this.sim.log.length - 1];
+    if (said && said !== before && (cmd.type === 'gift' || cmd.type === 'tribute' || cmd.type === 'fulfilRequest')) {
+      this.notify(said.text);
+      return;
+    }
     this.publish();
   }
 
@@ -1213,6 +1220,10 @@ export class GameController {
   public toggleDraftAll(): void {
     const able = this.sim.living().filter((c) => !c.health.downed && c.age >= DRAFT_AGE);
     const draft = able.some((c) => !c.drafted);
+    // Done what the "press Q" toast asked: it can go.
+    if (draft && this.toast?.includes('Press Q')) {
+      this.toast = null;
+    }
     for (const c of able) {
       this.command({ type: 'draft', colonist: c.id, drafted: draft });
     }

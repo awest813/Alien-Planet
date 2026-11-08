@@ -202,8 +202,27 @@ export function TitleScreen({ state, actions }: { state: UiState; actions: MenuA
 export function PauseMenu({ state, onClose, actions }: { state: UiState; onClose: () => void; actions: MenuActions }) {
   const [view, setView] = useState<'main' | 'saves' | 'new'>('main');
   const current = DIFFICULTIES.find((d) => d.key === state.difficulty);
+  // Esc from saves or a new colony goes back to the menu, as Back does (before the game's own Esc closes it).
+  useEffect(() => {
+    if (view === 'main') {
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.repeat && !(e.target instanceof HTMLInputElement && e.target.type === 'text')) {
+        e.stopPropagation();
+        setView('main');
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [view]);
   return (
-    <Modal title="Paused" onClose={onClose}>
+    <Modal
+      title="Paused"
+      onClose={onClose}
+      closeButton={view !== 'main'}
+      footer={view !== 'main' && <button onClick={() => setView('main')}>Back</button>}
+    >
       <p className="muted">
         Day {state.day} · {state.colonists.filter((c) => !c.dead).length} colonists · {current?.label} ·{' '}
         {MAP_SIZES.find((m) => m.size === state.mapSize)?.label ?? `${state.mapSize}×${state.mapSize}`} map · seed{' '}
@@ -233,19 +252,9 @@ export function PauseMenu({ state, onClose, actions }: { state: UiState; onClose
               ? 'The game autosaves every dawn and when you leave the page.'
               : 'Autosave is off (Settings): save by hand.'}
           </p>
-          <div className="row end">
-            <button onClick={() => setView('main')}>Back</button>
-          </div>
         </>
       )}
-      {view === 'new' && (
-        <>
-          <NewColonyForm confirm onStarted={actions.onPlay} />
-          <div className="row end">
-            <button onClick={() => setView('main')}>Back</button>
-          </div>
-        </>
-      )}
+      {view === 'new' && <NewColonyForm confirm onStarted={actions.onPlay} />}
     </Modal>
   );
 }

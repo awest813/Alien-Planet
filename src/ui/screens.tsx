@@ -14,21 +14,59 @@ export function Modal({
   onClose,
   children,
   wide,
+  medium,
   closable = true,
+  footer,
+  closeButton = true,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   wide?: boolean;
+  medium?: boolean;
   // False for screens the player has to act on (the fallen colony).
   closable?: boolean;
+  // Buttons that go beside Close at the bottom (Back, say).
+  footer?: React.ReactNode;
+  // False when the dialog has its own way out at the bottom (the pause menu's Resume); ✕ stays.
+  closeButton?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
-  // Move keyboard focus into the dialog when it opens (unless a button in it already took it).
+  // Keyboard focus moves into the dialog when it opens (unless a button in it already took it), Tab keeps it
+  // there, and on closing it goes back to wherever it was.
   useEffect(() => {
+    const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (!panel.current?.contains(document.activeElement)) {
       panel.current?.focus();
     }
+    const onKey = (e: KeyboardEvent) => {
+      const box = panel.current;
+      if (e.key !== 'Tab' || !box) {
+        return;
+      }
+      const items = [
+        ...box.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), input:not(:disabled), select:not(:disabled), summary, [tabindex="0"], a[href]',
+        ),
+      ].filter((el) => el.offsetParent !== null);
+      if (items.length === 0) {
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const at = document.activeElement;
+      if (!box.contains(at) || (e.shiftKey ? at === first || at === box : at === last)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      if (before && before !== document.body && document.contains(before)) {
+        before.focus({ preventScroll: true });
+      }
+    };
   }, []);
   return (
     <div className="modal-backdrop" onClick={closable ? onClose : undefined}>
@@ -38,7 +76,7 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className={`panel modal ${wide ? 'wide' : ''}`}
+        className={`panel modal ${wide ? 'wide' : medium ? 'medium' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-head">
@@ -50,9 +88,10 @@ export function Modal({
           )}
         </div>
         {children}
-        {closable && (
+        {closable && (closeButton || footer) && (
           <div className="row end">
-            <button onClick={onClose}>Close</button>
+            {footer}
+            {closeButton && <button onClick={onClose}>Close</button>}
           </div>
         )}
       </div>
@@ -202,6 +241,13 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
     setPainting(false);
     lastCell.current = '';
   };
+  // From the keyboard: Enter or Space paints the focused hour with the brush.
+  const onCellKey = (e: React.KeyboardEvent, apply: () => void) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      apply();
+    }
+  };
   const now = parseInt(state.time, 10);
   return (
     <Modal title="Schedule" onClose={onClose} wide>
@@ -253,6 +299,10 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
                   title={`${hour}:00 · set for everyone`}
                   data-who="all"
                   data-hour={hour}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Everyone, ${hour}:00: set to ${SLOT_LABELS[brush]}`}
+                  onKeyDown={(e) => onCellKey(e, () => paintAll(hour))}
                 />
               ))}
             </tr>
@@ -268,6 +318,10 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
                     title={`${hour}:00 ${SLOT_LABELS[slot]}`}
                     data-who={c.id}
                     data-hour={hour}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`${c.name}, ${hour}:00: ${SLOT_LABELS[slot]}`}
+                    onKeyDown={(e) => onCellKey(e, () => paint(c.id, hour))}
                   />
                 ))}
               </tr>
@@ -282,7 +336,7 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
 export function ProductionScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
   const set = (recipe: number, target: number) => controller.command({ type: 'bill', recipe, target });
   return (
-    <Modal title="Production" onClose={onClose}>
+    <Modal title="Production" onClose={onClose} medium>
       <p className="muted">
         Colonists keep making each product until the colony holds the target amount (bows, clothes and tool kits already
         in use don't count, so the target is how many spares to keep).
@@ -356,8 +410,8 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
         <summary>Controls</summary>
         <ul className="help-steps">
           <li>
-            <kbd>Space</kbd> pauses, <kbd>1</kbd>–<kbd>3</kbd> set the speed, <kbd>Esc</kbd> backs out (and opens the
-            menu for saves and settings).
+            <kbd>Space</kbd> pauses, <kbd>1</kbd>–<kbd>3</kbd> set the speed, <kbd>Q</kbd> drafts everyone (or the
+            selected colonist) to fight, <kbd>Esc</kbd> backs out (and opens the menu for saves and settings).
           </li>
           <li>
             <kbd>W</kbd>
@@ -484,11 +538,12 @@ const researchRank = (p: UiState['research'][number]) => (p.current ? 0 : p.done
 
 export function ResearchScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
   return (
-    <Modal title={`Research · year ${state.year}`} onClose={onClose}>
+    <Modal title="Research" onClose={onClose}>
       <p className="muted">
         {state.researchBench
-          ? 'Pick a project; colonists with the Research work type study it at the research bench.'
-          : 'Build a research bench (the Production tab of the build bar at the bottom) first, then pick a project.'}
+          ? 'Pick a project; colonists with the Research work type study it at the research bench, a few hundred points an hour each.'
+          : 'Build a research bench (the Production tab of the build bar at the bottom) first, then pick a project.'}{' '}
+        {state.research.filter((p) => p.done).length} of {state.research.length} projects learned.
       </p>
       <ul className="research">
         {[...state.research]
@@ -498,13 +553,18 @@ export function ResearchScreen({ state, onClose }: { state: UiState; onClose: ()
             <li key={p.key} className={p.done ? 'done' : p.current ? 'current' : p.available ? '' : 'locked'}>
               <div className="research-head">
                 <b>{p.name}</b>
-                <span className="muted">{p.done ? 'Done' : `${Math.round(p.progress * p.cost)}/${p.cost}`}</span>
+                <span className="muted">
+                  {p.done
+                    ? 'Done'
+                    : `${Math.round(p.progress * p.cost).toLocaleString()} / ${p.cost.toLocaleString()} points`}
+                </span>
+                {p.current && <span className="tag good">studying now</span>}
                 {!p.done && p.available && (
                   <button
-                    className={p.current ? 'active' : ''}
                     onClick={() => controller.setResearch(p.current ? null : p.key)}
+                    title={p.current ? 'Stop studying this (progress is kept)' : 'Study this next (progress is kept)'}
                   >
-                    {p.current ? 'Researching' : 'Research'}
+                    {p.current ? 'Stop' : 'Research'}
                   </button>
                 )}
               </div>
@@ -587,7 +647,7 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
               </td>
               <td className="num">
                 {f.relation}
-                {f.goodwill !== null && <span className="muted"> ({f.goodwill})</span>}
+                {f.goodwill !== null && <div className="muted small">goodwill {f.goodwill}</div>}
                 {f.peaceDays > 0 && <div className="muted small">{f.peaceDays} days of peace left</div>}
               </td>
               <td>
@@ -606,9 +666,13 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
                         key={s}
                         disabled={d.silver < s || f.giftGains[k] <= 0}
                         onClick={() => controller.command({ type: 'gift', faction: f.id, silver: s })}
-                        title={`Goodwill +${f.giftGains[k]}`}
+                        title={
+                          f.giftGains[k] > 0
+                            ? `Give ${s} silver: goodwill +${f.giftGains[k]}`
+                            : 'They already think the world of the colony'
+                        }
                       >
-                        Gift {s}
+                        Gift {s} silver
                       </button>
                     ))}
                   </div>
@@ -705,6 +769,7 @@ export function PrisonersScreen({ state, onClose }: { state: UiState; onClose: (
                   <div className="muted small">{p.faction}</div>
                 </td>
                 <td>
+                  <div className="muted small">Fed {Math.round(p.food * 100)}%</div>
                   <Bar
                     value={p.food}
                     color={p.food < 0.25 ? '#ff6b6b' : '#8fd16b'}
@@ -720,8 +785,8 @@ export function PrisonersScreen({ state, onClose }: { state: UiState; onClose: (
                 </td>
                 <td>
                   <ConfirmButton
-                    label="Release"
-                    confirm="Let them go?"
+                    label="Set free"
+                    confirm="Set them free?"
                     onConfirm={() => controller.command({ type: 'release', captive: p.id })}
                   />
                 </td>

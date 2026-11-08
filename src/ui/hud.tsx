@@ -114,8 +114,12 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
       </div>
       <nav className="screens">
         {state.raid && (
-          <button className="danger" onClick={() => controller.toggleDraftAll()} title="Draft or release everyone (Q)">
-            {anyFree ? 'Draft all' : 'Release all'}
+          <button
+            className="danger"
+            onClick={() => controller.toggleDraftAll()}
+            title="Draft or stand down everyone (Q)"
+          >
+            {anyFree ? 'Draft all' : 'Stand down all'}
           </button>
         )}
         <button onClick={() => onOpen('work')}>Work</button>
@@ -148,7 +152,7 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
             Trade
           </button>
         )}
-        <button onClick={() => onOpen('help')} title="How to play">
+        <button onClick={() => onOpen('help')} title="How to play" aria-label="How to play">
           ?
         </button>
         <button onClick={() => onOpen('menu')}>Menu</button>
@@ -306,8 +310,8 @@ function ColonistCard({ c }: { c: ColonistView }) {
         <span className="swatch" style={{ background: c.color }} />
         <b className="card-title">{c.name}</b>
         {!c.dead && (
-          <span className="mood" style={{ color: moodColor(c.mood) }} title="Mood">
-            {c.mood}
+          <span className="mood" style={{ color: moodColor(c.mood) }} title="Mood (0–100)">
+            <span className="muted small">mood</span> {c.mood}
           </span>
         )}
         {c.leader && <span className="tag good">leader</span>}

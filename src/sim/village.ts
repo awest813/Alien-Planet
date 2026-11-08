@@ -39,12 +39,12 @@ export const freshVillage = (): Village => ({
 export const POLICY_TEXT = {
   rations: {
     frugal: 'Frugal rations: everyone eats a fifth less, and grumbles about it (gluttons most)',
-    normal: 'Normal rations',
+    normal: 'Normal rations: everyone eats when hungry, as much as they need; no one minds',
     generous: 'Generous rations: everyone eats sooner and more, and enjoys it',
   },
   hours: {
     short: 'Short hours: work goes 10% slower, and everyone is glad of it (the lazy most)',
-    normal: 'Normal hours',
+    normal: 'Normal hours: work goes at its usual pace, and no one minds',
     long: "Long hours: work goes 10% faster, and everyone resents it (hard workers don't mind)",
   },
 } as const;
