@@ -1171,12 +1171,15 @@ export class GameController {
   public command(cmd: Command): void {
     this.commandCount++;
     const before = this.sim.log[this.sim.log.length - 1];
+    const stories = this.sim.storyCount;
     this.sim.apply(cmd);
-    // Dealings with the neighbours say how they went on the spot (the Factions screen is open over the log).
+    // Dealings with the neighbours say how they went on the spot (the Factions screen is open over the log),
+    // unless it's news the notifications show already.
     const said = this.sim.log[this.sim.log.length - 1];
     if (
       said &&
       said !== before &&
+      this.sim.storyCount === stories &&
       (cmd.type === 'gift' || cmd.type === 'tribute' || cmd.type === 'fulfilRequest' || cmd.type === 'hireFighters')
     ) {
       this.notify(said.text);
