@@ -26,3 +26,19 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+
+  # The game in a real browser (e2e/): starting a colony, every screen, saving and loading, a phone-sized screen.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests
+        run: npx playwright test --trace off
