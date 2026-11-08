@@ -105,9 +105,6 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   drafted colonists by tap). There's no long-press to stand in for right-click on the Work grid, tap targets
   are small (speed buttons 34×22), and a phone on its side leaves little map between the bars.
 
-- **Traders and allies look alike on the map** (partly closed: stack counts are small corner badges; raiders wear
-  hoods, prisoners lie down). Both are green and bareheaded; a shield or pack per kind would tell them apart.
-
 ## 8. Testing
 
 - **There's no continuous integration.** Tests, lint and the build run only by hand (`.github/workflows` is

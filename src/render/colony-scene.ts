@@ -816,7 +816,15 @@ export class ColonyScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 1)
       .setResolution(4);
-    return this.add.container(0, 0, [legs, body, head, label]).setDepth(Depth.PAWNS);
+    // Allies carry a small round shield on the arm, so they read as fighters rather than traders.
+    const parts: Phaser.GameObjects.GameObject[] = [legs, body, head];
+    if (ally) {
+      const shield = this.add.graphics();
+      shield.fillStyle(0x6b4a2a, 1).fillCircle(-4, 2, 2.6);
+      shield.fillStyle(0xe8d27a, 1).fillCircle(-4, 2, 1.1);
+      parts.push(shield);
+    }
+    return this.add.container(0, 0, [...parts, label]).setDepth(Depth.PAWNS);
   }
 
   private syncAnimals(): void {
@@ -895,7 +903,7 @@ export class ColonyScene extends Phaser.Scene {
       raider.setPosition((x + 0.5) * TILE, (y + 0.5) * TILE).setAlpha(e.fleeing ? 0.6 : 1);
       (raider.getAt(0) as Phaser.GameObjects.Image).setTexture(stride(e.path.length > 0, this.time.now));
       // The name label is the container's last child.
-      (raider.getAt(3) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames);
+      (raider.getAt(raider.length - 1) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames);
     }
   }
 
