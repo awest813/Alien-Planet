@@ -214,6 +214,7 @@ import {
   zoneAccepts,
 } from './world';
 import { generateWorld } from './worldgen';
+import type { Biome, MapKind } from './biomes';
 
 export { MAP_SIZE, MAP_SIZES, NIGHT_END, NIGHT_START, START_HOUR, TICKS_PER_HOUR, populationFor } from './constants';
 const LOG_LIMIT = 60;
@@ -618,6 +619,8 @@ export class Simulation {
   // Finished sculptures by tile.
   public artworks = new Map<number, Artwork>();
   public story: StoryState = freshStory();
+  // The land the colony started in: its climate, weather and wildlife (see biomes.ts).
+  public biome: Biome = 'temperate';
   public enemies: Enemy[] = [];
   // Fighters a friendly faction sent to help against a raid (see combat.ts).
   public allies: Enemy[] = [];
@@ -766,8 +769,14 @@ export class Simulation {
     this.wasNight = this.isNight();
   }
 
-  public static newColony(seed: number, difficulty: Difficulty = 'standard', size = MAP_SIZE): Simulation {
-    const { world, spawn } = generateWorld(size, size, seed);
+  public static newColony(
+    seed: number,
+    difficulty: Difficulty = 'standard',
+    size = MAP_SIZE,
+    land: { biome?: Biome; map?: MapKind } = {},
+  ): Simulation {
+    const biome = land.biome ?? 'temperate';
+    const { world, spawn } = generateWorld(size, size, seed, biome, land.map);
     const rng = new Rng(seed ^ 0x9e3779b9);
     const names = [...COLONIST_NAMES];
     const colonists: Colonist[] = [];
@@ -792,6 +801,7 @@ export class Simulation {
     world.dropItemNear(spawn, itemId('wood'), SALVAGED_WOOD);
     const sim = new Simulation(world, colonists, seed, rng);
     sim.story = freshStory(difficulty);
+    sim.biome = biome;
     // Eight animals on the standard map, more on bigger ones.
     populateWildlife(sim, Math.round((8 * world.size) / (MAP_SIZE * MAP_SIZE)), spawn);
     sim.wildCover = wildPlantCover(sim);
@@ -920,7 +930,9 @@ export class Simulation {
     const coldSnap = coldSnapOn(this) ? 12 : 0;
     const heatWave = heatWaveOn(this) ? 10 : 0;
     const eclipse = eclipseOn(this) ? 3 : 0;
-    return outdoorTemperature(this.totalHours, this.seed) - coldSnap + heatWave - eclipse + weatherDef(this).temp;
+    return (
+      outdoorTemperature(this.totalHours, this.seed, this.biome) - coldSnap + heatWave - eclipse + weatherDef(this).temp
+    );
   }
 
   // Whether clouds or rain hide the sky (no aurora to see).

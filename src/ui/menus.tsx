@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, NOTICE_TIMES, PAN_SPEEDS, Settings, UI_SCALES, forget
 import { SAVE_VERSION } from '../sim/serialize';
 import { MAP_SIZE, MAP_SIZES } from '../sim/simulation';
 import { DIFFICULTIES, Difficulty } from '../sim/storyteller';
+import { BIOME_LIST, Biome, MAP_KINDS, MapKind } from '../sim/biomes';
 import { dealBalance, lotsValue } from '../sim/trade';
 
 // One price, or the range when the stacks differ (worn, spoiling or finely made); the worst go first.
@@ -30,6 +31,7 @@ const saveDetails = (meta: SaveMeta) =>
     `Day ${meta.day}, ${String(meta.hour).padStart(2, '0')}:00`,
     meta.colonists !== undefined ? `${meta.colonists} colonists` : null,
     DIFFICULTIES.find((d) => d.key === meta.difficulty)?.label ?? null,
+    meta.biome && meta.biome !== 'temperate' ? (BIOME_LIST.find((b) => b.key === meta.biome)?.label ?? null) : null,
     meta.mapSize !== undefined
       ? `${MAP_SIZES.find((m) => m.size === meta.mapSize)?.label ?? `${meta.mapSize}×${meta.mapSize}`} map`
       : null,
@@ -47,8 +49,10 @@ function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: ()
     DIFFICULTIES.find((d) => d.key === last.newDifficulty)?.key ?? 'standard',
   );
   const [mapSize, setMapSize] = useState(MAP_SIZES.find((m) => m.size === last.newMapSize)?.size ?? MAP_SIZE);
+  const [biome, setBiome] = useState<Biome>(BIOME_LIST.find((b) => b.key === last.newBiome)?.key ?? 'temperate');
+  const [mapKind, setMapKind] = useState<MapKind>(MAP_KINDS.find((m) => m.key === last.newMap)?.key ?? 'valley');
   const start = () => {
-    controller.newColony(seed, difficulty, mapSize);
+    controller.newColony(seed, difficulty, mapSize, biome, mapKind);
     onStarted();
   };
   return (
@@ -67,6 +71,24 @@ function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: ()
         {MAP_SIZES.map((m) => (
           <button key={m.size} className={mapSize === m.size ? 'active' : ''} onClick={() => setMapSize(m.size)}>
             <b>{m.label} map</b>
+            <span>{m.description}</span>
+          </button>
+        ))}
+      </div>
+      <h3>Land</h3>
+      <div className="difficulties four">
+        {BIOME_LIST.map((b) => (
+          <button key={b.key} className={biome === b.key ? 'active' : ''} onClick={() => setBiome(b.key)}>
+            <b>{b.label}</b>
+            <span>{b.description}</span>
+          </button>
+        ))}
+      </div>
+      <h3>Lie of the land</h3>
+      <div className="difficulties">
+        {MAP_KINDS.map((m) => (
+          <button key={m.key} className={mapKind === m.key ? 'active' : ''} onClick={() => setMapKind(m.key)}>
+            <b>{m.label}</b>
             <span>{m.description}</span>
           </button>
         ))}
@@ -225,6 +247,7 @@ export function PauseMenu({ state, onClose, actions }: { state: UiState; onClose
     >
       <p className="muted">
         Day {state.day} · {state.colonists.filter((c) => !c.dead).length} colonists · {current?.label} ·{' '}
+        {BIOME_LIST.find((b) => b.key === state.biome)?.label} ·{' '}
         {MAP_SIZES.find((m) => m.size === state.mapSize)?.label ?? `${state.mapSize}×${state.mapSize}`} map · seed{' '}
         {state.seed}
       </p>

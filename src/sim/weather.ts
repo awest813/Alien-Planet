@@ -1,3 +1,4 @@
+import { biomeDef } from './biomes';
 import { TICKS_PER_HOUR } from './constants';
 import { NONE, featureDef, itemDef, itemId } from './defs';
 import { damage } from './health';
@@ -69,7 +70,8 @@ export function updateWeather(sim: Simulation): void {
     }
     return;
   }
-  const chances = CHANCES[sim.season];
+  // A desert sees little rain and long droughts; the tundra snows from autumn.
+  const chances = biomeDef(sim.biome).weather?.[sim.season] ?? CHANCES[sim.season];
   let roll = sim.rng.next() * Object.values(chances).reduce((sum, p) => sum + (p ?? 0), 0);
   let kind: WeatherKind = 'clear';
   for (const [key, p] of Object.entries(chances) as [WeatherKind, number][]) {

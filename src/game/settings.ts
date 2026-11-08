@@ -27,9 +27,11 @@ export interface Settings {
   masterVolume: number;
   musicVolume: number;
   effectsVolume: number;
-  // The last new colony's difficulty and map size, offered again next time.
+  // The last new colony's difficulty, map size, land and map, offered again next time.
   newDifficulty: string;
   newMapSize: number;
+  newBiome: string;
+  newMap: string;
 }
 
 function defaultScale(): number {
@@ -68,6 +70,8 @@ export const DEFAULT_SETTINGS: Settings = {
   effectsVolume: 0.8,
   newDifficulty: 'standard',
   newMapSize: 64,
+  newBiome: 'temperate',
+  newMap: 'valley',
 };
 
 export const UI_SCALES = [

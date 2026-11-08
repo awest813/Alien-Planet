@@ -2,12 +2,14 @@
 // survival, combat, health, mood and social statistics.
 //
 //   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive|defend] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K] [nohunt] [flow]
+//     [biome=tundra|desert|forest] [map=river|island]
 //
 // "passive" never drafts during raids, to measure the worst case; "defend" holds a sandbag line; "peaceful" and "harsh" pick the
 // storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies;
 // "size=96" or "size=128" plays on a bigger map; "seed=N" replays one colony; "start=K" skips the
 // first K seeds; "nohunt" leaves the wildlife alone. With DEBUG=1 in the environment, a trace also
 // shows research, production, bills, rooms and heaters.
+import { Biome, MapKind } from '../src/sim/biomes';
 import { colonistTarget, lineOfSight } from '../src/sim/combat';
 import {
   ANIMALS,
@@ -51,6 +53,9 @@ const policy =
     ?.slice(7)
     .split(',') ?? [];
 const mapSize = Number(process.argv.find((a) => a.startsWith('size='))?.slice(5) ?? 64);
+// "biome=tundra" (or desert, forest) and "map=river" (or island) pick the land.
+const biome = (process.argv.find((a) => a.startsWith('biome='))?.slice(6) ?? 'temperate') as Biome;
+const mapKind = (process.argv.find((a) => a.startsWith('map='))?.slice(4) ?? 'valley') as MapKind;
 const difficulty: Difficulty = process.argv.includes('harsh')
   ? 'harsh'
   : process.argv.includes('peaceful')
@@ -258,7 +263,7 @@ function snapshot(sim: Simulation): Record<string, number> {
 }
 
 function play(seed: number): Result {
-  const sim = Simulation.newColony(seed, difficulty, mapSize);
+  const sim = Simulation.newColony(seed, difficulty, mapSize, { biome, map: mapKind });
   sim.apply({
     type: 'policy',
     rations: policy.includes('frugal') ? 'frugal' : policy.includes('generous') ? 'generous' : 'normal',
@@ -1032,7 +1037,7 @@ for (const seed of seedList) {
 }
 const sum = (f: (r: Result) => number) => results.reduce((n, r) => n + f(r), 0);
 console.log(
-  `\n${passive ? 'PASSIVE' : 'ACTIVE'} ${difficulty} ${mapSize}×${mapSize} ${days} days × ${seeds} seeds in ${((performance.now() - started) / 1000).toFixed(1)}s\n` +
+  `\n${passive ? 'PASSIVE' : 'ACTIVE'} ${difficulty} ${biome} ${mapKind} ${mapSize}×${mapSize} ${days} days × ${seeds} seeds in ${((performance.now() - started) / 1000).toFixed(1)}s\n` +
     `  survivors ${sum((r) => r.living)}/${sum((r) => r.total)}, colonies wiped ${results.filter((r) => r.living === 0).length}\n` +
     `  deaths by cause ${JSON.stringify(
       results.reduce<Record<string, number>>((all, r) => {

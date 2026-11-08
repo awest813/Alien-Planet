@@ -17,6 +17,7 @@ export interface SaveMeta {
   difficulty?: string;
   // Tiles per side.
   mapSize?: number;
+  biome?: string;
 }
 
 interface SaveRecord {

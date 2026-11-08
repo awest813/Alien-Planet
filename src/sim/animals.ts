@@ -7,6 +7,7 @@ import type { Simulation } from './simulation';
 import { Animal, Colonist } from './types';
 import { Filth } from './world';
 import { beastLeaves, beastSlain } from './beast';
+import { animalWeight } from './biomes';
 
 // Wild animals on the standard 64×64 map; bigger maps hold proportionally more.
 export const MAX_ANIMALS = 14;
@@ -26,11 +27,15 @@ const chebyshev = (sim: Simulation, a: number, b: number) =>
   Math.max(Math.abs(sim.world.xOf(a) - sim.world.xOf(b)), Math.abs(sim.world.yOf(a) - sim.world.yOf(b)));
 
 function pickKind(sim: Simulation, allow: (key: string) => boolean = () => true): string {
-  // Creatures of the deep (weight 0) never wander in from outside.
-  const kinds = Object.values(ANIMALS).filter((a) => a.weight > 0 && allow(a.key));
-  let roll = sim.rng.next() * kinds.reduce((sum, a) => sum + a.weight, 0);
+  // Creatures of the deep (weight 0) never wander in from outside, and each land has its own mix.
+  const weight = (key: string) => animalWeight(sim.biome, key, ANIMALS[key].weight);
+  const kinds = Object.values(ANIMALS).filter((a) => weight(a.key) > 0 && allow(a.key));
+  if (kinds.length === 0) {
+    return 'hare';
+  }
+  let roll = sim.rng.next() * kinds.reduce((sum, a) => sum + weight(a.key), 0);
   for (const a of kinds) {
-    roll -= a.weight;
+    roll -= weight(a.key);
     if (roll <= 0) {
       return a.key;
     }

@@ -1,4 +1,5 @@
 import type { Obsession } from './minds';
+import type { Biome } from './biomes';
 import { Village, freshVillage } from './village';
 import { Diplomacy, freshDiplomacy } from './diplomacy';
 import { Shaft } from './depths';
@@ -149,6 +150,8 @@ export interface SaveData {
   unburied?: Fallen[];
   graves?: [number, Fallen][];
   story: StoryState;
+  // The land the colony started in (older saves: temperate).
+  biome?: Biome;
   enemies: Enemy[];
   allies?: Enemy[];
   nextEnemyId: number;
@@ -275,6 +278,7 @@ export function serialize(sim: Simulation): SaveData {
     graves: [...sim.graves].filter(([i]) => sim.graveAt(i)).map(([i, f]) => [i, { ...f }]),
     artworks: [...sim.artworks].filter(([i]) => sim.artworkAt(i)).map(([i, art]) => [i, { ...art }]),
     story: structuredClone(sim.story),
+    biome: sim.biome,
     enemies: structuredClone(sim.enemies),
     allies: structuredClone(sim.allies),
     nextEnemyId: sim.nextEnemyId,
@@ -390,6 +394,7 @@ export function deserialize(data: SaveData): Simulation {
   sim.storyCount = sim.storyLog.length;
   // Saves from before difficulty settings play on standard.
   sim.story = { ...structuredClone(data.story), difficulty: data.story.difficulty ?? 'standard' };
+  sim.biome = data.biome ?? 'temperate';
   sim.enemies = structuredClone(data.enemies);
   sim.allies = structuredClone(data.allies ?? []);
   sim.nextEnemyId = data.nextEnemyId;

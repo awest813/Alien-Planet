@@ -4,6 +4,9 @@
 // stuck for a day, and a save that loads into exactly the same game.
 //
 //   npx tsx scripts/playtest.ts [days=16] [from=0] [to=100] [only=persona] [players=3,40]
+//     [biome=tundra|desert|forest] [map=river|island] [lands]
+//
+// "lands" gives each player a different biome and map (otherwise temperate valleys, or as asked).
 //
 // To look into one colony, set in the environment: TRACE=day (colonists hour by hour from that day),
 // BUILD=1 (buildings, wood and fires each noon), WHERE=day (where everyone sleeps, and the beds and door),
@@ -12,6 +15,7 @@
 import type { Hours, Rations } from '../src/sim/village';
 import { writeFileSync } from 'node:fs';
 import { comfortRange } from '../src/sim/apparel';
+import { BIOME_LIST, Biome, MAP_KINDS, MapKind } from '../src/sim/biomes';
 import { MAP_SIZES } from '../src/sim/constants';
 import { FACTIONS, FEATURES, NONE, RECIPES, featureDef, featureId, terrainDef } from '../src/sim/defs';
 import { deserialize, serialize } from '../src/sim/serialize';
@@ -29,6 +33,9 @@ const DAYS = arg('days', 16);
 const FROM = arg('from', 0);
 const TO = arg('to', 100);
 const ONLY = process.argv.find((a) => a.startsWith('only='))?.slice(5);
+const BIOME = (process.argv.find((a) => a.startsWith('biome='))?.slice(6) ?? 'temperate') as Biome;
+const MAP_KIND = (process.argv.find((a) => a.startsWith('map='))?.slice(4) ?? 'valley') as MapKind;
+const MIXED_LANDS = process.argv.includes('lands');
 // "players=3,20,40" plays just those.
 const PLAYERS = process.argv
   .find((a) => a.startsWith('players='))
@@ -335,7 +342,13 @@ function play(player: number): Report {
   const seed = 1000 + player * 7717;
   const difficulty = DIFFICULTIES[Math.floor(player / PERSONAS.length) % 3];
   const size = MAP_SIZES[Math.floor(player / (PERSONAS.length * 3)) % MAP_SIZES.length].size;
-  let sim = Simulation.newColony(seed, difficulty, size);
+  const land = MIXED_LANDS
+    ? {
+        biome: BIOME_LIST[player % BIOME_LIST.length].key,
+        map: MAP_KINDS[Math.floor(player / 4) % MAP_KINDS.length].key,
+      }
+    : { biome: BIOME, map: MAP_KIND };
+  let sim = Simulation.newColony(seed, difficulty, size, land);
   // The player's own whims, separate from the game's dice.
   const rng = new Rng(seed ^ 0x5eed);
   const w = () => sim.world;

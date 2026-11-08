@@ -23,6 +23,7 @@ import {
   type JoyKind,
 } from '../sim/defs';
 import { availableProjects, isAvailable } from '../sim/research';
+import type { Biome, MapKind } from '../sim/biomes';
 import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, seasonOf, yearOf } from '../sim/seasons';
 import { ChronicleKind } from '../sim/chronicle';
 import { animalName } from '../sim/animals';
@@ -892,6 +893,8 @@ export interface UiState {
   difficulty: Difficulty;
   // Tiles per side.
   mapSize: number;
+  // The land the colony started in.
+  biome: Biome;
 }
 
 const toolId = (tool: Tool): string =>
@@ -1360,13 +1363,19 @@ export class GameController {
   // Set by the UI while a full-screen menu is open, so game hotkeys don't act behind it.
   public modalOpen = false;
 
-  public newColony(seedText: string, difficulty: Difficulty = 'standard', size = MAP_SIZE): void {
+  public newColony(
+    seedText: string,
+    difficulty: Difficulty = 'standard',
+    size = MAP_SIZE,
+    biome: Biome = 'temperate',
+    map: MapKind = 'valley',
+  ): void {
     // Offer the same choices next time.
-    this.setSettings({ newDifficulty: difficulty, newMapSize: size });
+    this.setSettings({ newDifficulty: difficulty, newMapSize: size, newBiome: biome, newMap: map });
     const trimmed = seedText.trim();
     const seed =
       trimmed === '' ? Math.floor(Math.random() * 1e9) : /^\d+$/.test(trimmed) ? Number(trimmed) : hashSeed(trimmed);
-    this.replaceSim(Simulation.newColony(seed, difficulty, size));
+    this.replaceSim(Simulation.newColony(seed, difficulty, size, { biome, map }));
     this.inPlay = true;
     // The clock waits for the player: there's a deadline (the first nightfall), and reading the goals and
     // getting the first orders down shouldn't eat into it.
@@ -1494,6 +1503,7 @@ export class GameController {
           colonists: sim.living().length,
           difficulty: sim.story.difficulty,
           mapSize: sim.world.width,
+          biome: sim.biome,
         },
         serialize(sim),
       );
@@ -1813,6 +1823,7 @@ export class GameController {
       seed: sim.seed,
       difficulty: sim.story.difficulty,
       mapSize: sim.world.width,
+      biome: sim.biome,
     };
   }
 
