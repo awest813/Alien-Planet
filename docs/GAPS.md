@@ -2,37 +2,60 @@
 
 Where Colony Alpha is thin, unbalanced or untested, from ten-year runs (Small, Medium and Large maps; Peaceful,
 Standard and Harsh), 48-day balance runs, 100-player playtests, a newcomer's browser playthrough and code
-audits. Each gap says what the evidence is and what would close it. Ordered by how much it would improve the
-game; the roadmap (ROADMAP.md) holds the longer plans.
+audits. Each gap says what the evidence is and what would close it. The roadmap (ROADMAP.md) holds the longer
+plans.
 
-Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the same, a line a year),
-`scripts/playtest.ts` (100 scripted players with invariants). Bundle with esbuild for speed (see ROADMAP).
+Tools: `scripts/balance.ts` (seeded colonies, summary; modes `defend`, `craft`, `diplomat`, `surplus`, `pen`,
+`biome=`, `map=`), `scripts/years.ts` (the same, a line a year), `scripts/playtest.ts` (100 scripted players with
+invariants; `npm run playtest:long` for 120 days), and `npm run test:e2e` (browser tests). Bundle the scripts
+with esbuild for speed (see ROADMAP).
 
-## 1. The long game runs out of things to do
+## Still open
 
-- **Research is done by the third year** (partly closed: ten later projects of 10,000–16,000 points). The test
-  colony, with a dedicated researcher, finishes the first 18 projects by day 16 and all 30 it studies by about
-  day 51. Seven years with nothing to study.
-  - Close it with a deeper tree, gated by materials and buildings as well as time: smelting and steel; glass
-    and greenhouses; medicine (surgery, prosthetics; see body.ts); late defences; a longer path to the beacon.
-- **Goals stop at 41–46 of 50 by year 4** (partly closed: a seventh phase, Generations, of eight goals from the
-  colony's story: children grown, a third generation, an elder, a siege, the beast, allies, a cavern, a decade). The rest are niche: sandbags, cold storage, taming, iron, fine art,
-  feasts, parkas, recruiting. After that there's no direction.
-  - Close it with later goal phases (generations, legends, a great work), or goals that come from the story,
-    such as "survive the siege" or "raise a child to adulthood".
-- **Silver still piles up, more slowly** (partly closed: hiring the Meadow Kin's fighters, 12 days at tribute
-  prices, about 920 silver a year kept up). With the test colony hiring whenever it can spare the silver, year-10
-  silver is 1,300–7,700 across four runs (from 7,000–9,000): income is still a little ahead of it.
-  - More sinks would help: commissions from neighbours, buying a colonist, ransoming prisoners back, paid
-    caravans or expeditions, buildings that cost silver.
-- **Wealth grows from about 8k to 40–54k** (closed: raids gain up to 4 raiders above 15k, thieves come more
-  often the richer the colony, and traders visit more often).
+- **The last research waits on materials.** Late projects need a building and materials as well as points, and
+  the test colony (`craft`) learns 37 of 44 by year 4. The other seven wait one point short for iron, stone and
+  stone blocks it never keeps in storage. A player who stockpiles them finishes, but the tree still ends: there's
+  no repeatable study for the last years.
+- **Goals reach 53–55 of 65 by year 10** in the test colony; the rest are niche or need a player's choices
+  (masterwork crafts, winter greenhouses, all research).
+- **A walled, armed colony still rarely loses anyone to raids.** Deaths in ten-year Standard runs now come from
+  disease (the shaking sickness and grey flu, 1–2 a decade) rather than raids.
+- **Mood is lower but breaks come in bursts.** The late yearly average is about 47–52 (from 52–56), but most breaks
+  come around a death: a grieving colonist can break several times in a few days because the break cooldown is
+  short. Separations are rare (one in six ten-year runs).
+- **Elders barely appear in ten years** (founders are 18–53), so ailments, care and retirement show little in the
+  usual runs; care is meals only.
+- **Some dealings are thin:** there's no execute action (so that can't harden raiders); envoys and returning
+  expeditions are log lines and figures at the map edge, not visitors who walk in; colonists away don't hear of
+  deaths at home; the harness seldom buys settlers (its population is at the cap). Meadow Kin goodwill still
+  ends at 100 in some runs.
+- **The desert is the hardest land:** heat waves at the height of summer can kill several colonists before they
+  get shelter. It may want gentler tuning.
+- **Pens:** troughs take only potatoes, and there's no warning for a fence with no gate or a pen too big.
+- **Drawing zoomed right out on a slow machine:** with 4× CPU throttling a desktop window showing the whole Large
+  map takes about 28–31 ms a frame (phones about 14–16 ms). The feature layer (about 9 ms) can't use the GPU
+  layer, and rebuilding the interface's state costs about 8 ms each time it's published (5 times a second), of
+  which the alerts are about 6 ms.
+- **Testing:** the browser tests haven't run on GitHub yet, and the long-press hasn't been tried on a real
+  iPhone. Performance is still checked by hand (`scripts/perf.ts`); it's too noisy for CI. Saves from before
+  version 16 can't be loaded (the game says so).
 
-## 2. Raids on Harsh (closed)
+## Closed in this pass
 
-- **Closed.** Raids are now capped at a fair fight against the colony's able fighters: about a third more than
-  those who can fight back (eight against six), plus half the extra a rich colony draws. Before, eleven came
-  against six on Harsh whatever the colony did. Share of raids that overran the whole colony, 72 days, 12 seeds:
+- **Research ran out by the third year:** nine late projects (steelmaking, glassmaking, double glazing,
+  reinforced walls, barbed traps, antiseptics, plant breeding, prosthetics, precision tools), each needing a
+  building and materials, and the beacon now needs engineering. The Research screen and an alert say what a
+  project is waiting on.
+- **Goals stopped by year 4:** an eighth phase, Mastery (a winter harvest, steel, a masterwork craft, a thief
+  caught, a raid seen off with nobody down, 60,000 wealth, all research), ending with ten years.
+- **Silver piled up:** expedition supplies and trading purses, settlers bought from the Meadow Kin, and hired
+  fighters; a fuller silver stack (2,500 a tile) so the harness's silver is in the stores where it can be spent.
+  Year-10 silver is about 600–1,400 (from 6,100–9,500). Commissions from neighbours pay in goods, and ransoms
+  bring silver in.
+- **Nothing answered a rich colony:** raids gain up to 4 raiders above 15k, thieves come more often the richer
+  the colony, and traders visit more often.
+- **Harsh raids were lost whatever the colony did:** raids are capped at a fair fight against the colony's able
+  fighters. Share of raids that overran the whole colony, 72 days, 12 seeds:
 
   | Days  | Harsh, in the open (before) | Harsh, in the open | Harsh, from sandbags (before) | Harsh, from sandbags | Standard, in the open |
   | ----- | --------------------------- | ------------------ | ----------------------------- | -------------------- | --------------------- |
@@ -40,103 +63,48 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   | 25–36 | 96%                         | 54%                | 43%                           | 8%                   | 19%                   |
   | 37–72 | 87–97%                      | 30–48%             | 59–69%                        | 4–23%                | 25–43%                |
 
-  Harsh is still lost about half the time in the open; behind cover, a sensible defence wins.
-
-- **Most downed raiders are left to die** (125 fell wounded in twelve 48-day colonies, 10 were taken prisoner).
-  The test colony marks them all for capture but builds a single prisoner bed, so this mostly says the harness
-  should build more; in play, an alert already walks the player through Capture, a bed and a warden.
-
-## 3. The late game is too safe
-
-- **Ten-year Standard colonies lose about 2 people to raids across 184 raids.** Harsh loses 10 in 251. After the
-  first winters the colony is walled, armed and well fed, and raids are the same walk-in-and-shoot every time.
-  - Threats now vary (closed): the named great beast wakes once a year and returns bigger until slain; sieges
-    camp, dig in and attack later; deep shafts break into caverns and let what lives there up; sappers dig
-    through rock to reach a colony with no other way in; thieves slip in to rob the stores (more often the richer
-    the colony) and run; while the beacon transmits, a third of each raid goes straight for it and batters it
-    down; vermin spoil food left on the stockpile floor, worst in winter (shelves, iceboxes and frozen stores
-    are safe).
-- **Mood sits at 55–65 late with few breaks.** Rising expectations (−6 from year 4) help but don't make the later
-  years tense.
-  - Close it with needs that grow: room expectations by status, the leader's demands, ageing pains, grief that
-    lasts.
-- **Disease is toothless** (partly closed: a catching winter cough). There is one disease (marsh fever), with 36–56 cases a colony a decade and no
-  deaths.
-  - Close it with variety: a winter flu, a plague that spreads by contact, wound infection already exists;
-    illness that weighs on the old.
-
-## 4. Factions and the wider world are one-dimensional
-
-- **There is one friendly faction and two hostile ones**, and the hostile ones have no goodwill at all.
-  Capturing, releasing, starving or recruiting their people changes nothing with them. Tribute is the only
-  dealing.
-- **Goodwill with the Meadow Kin ends at 93–100 in nearly every run.** It now cools above 40, but trade and
-  frequent gifts keep it pinned; at the top, requests stop mattering.
-  - Close it with relations that can go both ways: a rival friendly faction, envoys, alliances with obligations,
-    allied help in raids, and costs to refusing an ally (roadmap Phase K).
-- **There are no expeditions or wider world.** Nothing happens off the map.
-
-## 5. Relationships and families are thin in places
-
-- **There are no fights, arguments or divorces.** Rivals only cost mood, and marriages never end except by death.
-- **Children learn only by watching.** There is no schooling, play between children, or childhood memories
-  that shape adults.
-- **Elders only slow down.** They need no care and there are no age-related illnesses or retirement.
-- **The kin check covers two generations.** That's enough for ten years, but a longer game could reach a
-  fourth.
-
-## 6. Animals and the land
-
-- **Wildlife can still be wiped out, but recovers if left alone** (partly closed: wild herds raise young in
-  spring and summer up to three quarters of the valley's room; more than 8 kills in 5 days makes the herds wary,
-  halving how many wander in for 10 days). The test colony hunts everything on sight, so its valley stays empty.
-  - Still missing: a way to hunt only the surplus (leave breeding pairs), and the Meadow Kin minding it.
-- **There is no animal husbandry beyond taming.** No pens, fences, feeding troughs or breeding management;
-  tame animals in the test runs number zero.
-- **There is one biome and one map type.** No desert, tundra or forest starts, and no rivers or islands as
-  deliberate challenges.
-- **Food is too easy on Peaceful.** Peaceful colonies stockpile 35–60 days of food; Standard holds 4–8 days.
-
-## 7. Interface and flow
-
-- **History is on the Story screen** (closed: the chronicle, and graphs of colonists, average mood, wealth and days
-  of food, recorded each dawn).
-- **There is a colonist overview** (closed: the ☰ at the end of the colonist bar).
-- **Phone polish is basic in places** (partly closed: full-width cards, the goals drawer below the top bar, Work
-  and Schedule tables that scroll on their own with names kept in view, painting the schedule by finger, moving
-  drafted colonists by tap, larger buttons on touch screens). The Work grid's right-click (priority down) has
-  no touch stand-in on iPhones, where a long press doesn't send one; tapping cycles through all the priorities
-  instead.
-
-## 8. Graphics
-
-- **Drawing is cheap for now.** On a Large map a frame takes about 2.5 ms of script time at the usual zoom and
-  5 ms zoomed right out (eleven tile layers, each drawing the tiles in view), measured in a headless browser.
-  It hasn't been measured on a slow phone.
-
-## 9. Testing
-
-- **Continuous integration is new** (`.github/workflows/ci.yml`: type check, lint, formatting, tests, build on
-  pushes to main and on pull requests). It hasn't run on GitHub yet; check the first run.
-- **There are no browser tests in the suite.** UI checks so far have been one-off Playwright scripts.
-- **Old saves are tested** (`src/sim/oldsaves.test.ts` loads two earlier version-16 saves, plays a day, saves
-  again). Saves from before version 16 can't be loaded at all; the game says so.
-- **Performance is checked by hand** with `scripts/perf.ts` (Large map, 46–52 ms per 1,000 ticks against a 60 ms
-  budget; it exits non-zero over budget). It's too noisy for CI. Goal checks, run every 40 ticks for quick
-  feedback, had pushed it to 66 ms; now only the open phase's goals are checked that often. A busy Large
-  colony (13 colonists, 800 items) runs 40–72 ms per 1,000 ticks over 70 days; days 50–70 are down from 64–85
-  (item searches no longer build a key per item, and ice coming and going no longer redoes the rooms); pathfinding is most of the
-  rest.
-- **Playtest personas never reach late content in 16 days.** No deep mining, breaches, elders or generations.
-  Run some players for 120+ days regularly (`days=120 players=...`). The last 120-day run (players 40–99) found
-  no crashes or broken rules. Every colony lost was a persona that wrecks its own (neglectful, chaos,
-  demolisher), apart from two whose hut door opened into a pocket sealed by rock: the harness now picks a hut
-  site whose door leads out, and the game says when a blueprint or a colonist is cut off. Saving and loading
-  every 3 hours made no difference across the ten savescummer colonies.
-- **The balance harness plays one way.** It hunts everything, gifts silver daily, never sets policies or pays
-  tribute, and builds no kiln or smelter. Its results say little about those systems.
-  - `defend` now fights from cover: sandbags round the hut, longbows early, and bows, armour and leather bought
-    from caravans. `policy=` sets the village policies. Still missing: a diplomat and a craftsman.
+- **Downed raiders were left to die:** the harness builds a prisoner bed for each raider marked for capture and
+  puts a warden on it: 90 of 114 who fell wounded were taken prisoner in twelve 48-day colonies (from 9 of 147).
+- **Raids were the same every time:** sappers dig through rock; thieves rob the stores and run; while the beacon
+  transmits a third of each raid goes straight for it; vermin spoil food left on the floor, mostly in winter.
+  (The named great beast, sieges and breaches from deep shafts were already in.)
+- **Disease was toothless:** the grey flu (winter, catching, can kill) and the shaking sickness (rare, passes by
+  touch, deadly untended); every illness weighs harder on the old. Ten-year runs now see 1–2 deaths from disease.
+- **Mood sat high late:** grief that lasts weeks and returns on anniversaries; a leader the colony expects more
+  of each year; the leader and elders expect rooms of their own; ageing pains.
+- **Hostile factions had no goodwill:** releasing and ransoming soften them, starving their people hardens
+  them, and a soft enough faction takes a truce (18 days without their raids). Raid pressure follows goodwill.
+- **Goodwill with the Meadow Kin was pinned at 100:** a rival friendly faction (the Hollowstone Clans), quarrels
+  where backing one costs the other, alliances with obligations and a price for refusing, and cooling above 75.
+  End-of-run Meadow Kin goodwill across eight 96-day colonies: 50–99 (from 67–100, four at 100).
+- **Nothing happened off the map:** expeditions to the neighbours (trade) or the ruins (salvage), gone 3–5
+  days, back with goods, sometimes a recruit, sometimes hurt.
+- **No fights, arguments or divorces:** arguments (5–20 a year), fistfights between rivals (0–4 a year, broken up),
+  and separations for a marriage that stays sour.
+- **Children only learned by watching:** lessons at a lesson board, play between children, and childhood
+  memories that leave a thought and sometimes a trait when they come of age.
+- **Elders only slowed down:** ailments (stiff joints, a sore back, failing eyes, frailty), meals brought to the
+  frail, and retirement.
+- **The kin check covered two generations:** kinship now follows the whole family tree (tested with four
+  generations).
+- **Wildlife was hunted out:** a "Surplus only" hunting policy leaves a breeding pair of each kind (Peaceful keeps
+  9–10 wild animals through 48 days, from 2–4), and the Meadow Kin take it badly when the valley is emptied.
+- **No husbandry beyond taming:** fences, gates and feeding troughs; tame animals stay in their pen, and fed
+  pairs breed in any season (tame animals in harness runs: about 5 a colony, from 0).
+- **One biome and one map type:** temperate, tundra, desert and forest lands; a river or a lake around an island.
+- **Food was too easy on Peaceful:** Peaceful fields give a fifth less: food at the end of 48 days is 47 days'
+  worth (from 65); Standard holds about 37–39.
+- **No touch stand-in for right-click on the Work grid:** holding a cell steps it down.
+- **Drawing zoomed out was slow:** the ground is a GPU layer, sparse layers draw only their filled tiles, and
+  pawn marks no longer redraw their text every frame. With 4× throttling, a phone showing the whole Large map went
+  from 57–62 ms a frame to 14–16 ms.
+- **No browser tests:** a Playwright suite (every screen, save and load, the phone layout, the Work grid's long
+  press) runs in CI. Long playtests run weekly in their own workflow.
+- **The balance harness played one way:** `craft` (kiln, smelter, bricks, iron, gear) and `diplomat` (tribute,
+  policies, requests) modes.
+- **Late content in playtests:** the 120-day playtest (players 40–99) found no crashes or broken rules; the
+  colonies lost were the self-wrecking personas, apart from two sealed-in huts (the harness now checks the door
+  leads out, and the game says when a blueprint or a colonist is cut off).
 
 ## Fixed in the recent passes (for reference)
 
@@ -157,6 +125,8 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   - tribute doing nothing;
   - trade ignoring condition.
 - **Reporting:** the long-run report undercounting deaths and raids.
+- **Interface:** history graphs on the Story screen; the colonist overview (the ☰ at the end of the colonist bar);
+  phone layout (full-width cards, the goals drawer, tables that scroll with names kept in view).
 - **Graphics:**
   - night shading drawn under the bright overlays, and fires lighting the dark;
   - light stopped by walls: a fire lights its own room and the inside of the walls, not the grass outside;

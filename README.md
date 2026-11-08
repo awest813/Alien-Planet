@@ -11,7 +11,8 @@ how nice their rooms are. Let mood drop too far for too long and a colonist will
 ## Playing
 
 The game opens on a title screen: **Continue** picks up your most recent save, **New colony** asks for a
-difficulty, map size and seed, and **Load game**, **Settings** and **How to play** are there too. In a game,
+difficulty, map size, land (temperate, tundra, desert or forest), lie of the land (an open valley, a river
+crossing it, or an island in a lake) and seed, and **Load game**, **Settings** and **How to play** are there too. In a game,
 Esc (once there's no tool or selection to drop) or the Menu button opens the pause menu: resume, save or
 load, start a new colony, settings, help, or quit to the title (which autosaves). The game also autosaves
 every dawn and whenever you leave the page, so a closed tab doesn't lose the colony. When everyone has
@@ -60,9 +61,44 @@ Objectives:
   whenever you like.
 - **Phase 7 – Generations:** goals the colony's own story brings, for those who stay: raise a child born here to
   adulthood, see a third generation, a colonist reach 65, a siege seen off, the great beast brought down, the
-  Meadow Kin fighting alongside, a cavern broken into below, and ten years in the valley.
+  Meadow Kin fighting alongside, and a cavern broken into below.
+- **Phase 8 – Mastery:** what a long-settled colony can do: a harvest brought in during winter, steel, a
+  masterwork craft, a thief brought down, a raid seen off with nobody left down, 60,000 silver in wealth, every
+  research project learned, and ten years in the valley.
 
 How the living simulation works:
+
+- **Lands:** a tundra start is colder, rockier and snowier, with muskoxen; a desert has little wood or water,
+  hot afternoons and cold nights; a forest is thick with trees and berry bushes and wetter. A river or a lake
+  around an island can cut the valley up, crossed at shallow fords.
+- **Threats that vary:** raids are sized to a fair fight against the colony's able fighters (about a third more
+  than can fight back, and a little more for a rich colony). Raiders who can't get in break walls and doors, and
+  sappers dig through rock. Thieves slip in to grab the richest stack from the stores and run, more often the
+  richer the colony; bring one down and they drop it. While the signal beacon transmits, a third of each raid
+  goes straight for it. Vermin spoil food left on the stockpile floor, mostly in winter (shelves, iceboxes and
+  frozen stores are safe).
+- **Late research:** later projects need a building standing to study (a smelter for steel, a kiln for glass)
+  and materials from storage to finish: steelmaking, glassmaking (daylight through the roof, so a warm
+  greenhouse grows in winter), double glazing, reinforced walls, barbed traps, antiseptics, plant breeding,
+  prosthetics and precision tools. The beacon needs engineering first.
+- **More disease:** marsh fever, the winter cough, the grey flu (winter, catching, can kill) and the rare
+  shaking sickness (passes by touch, deadly untended). Every illness is harder on the old.
+- **Family life:** colonists who dislike each other argue, and bitter rivals can come to blows (someone breaks it
+  up); a marriage that sours for long enough can end. Children have lessons at a lesson board from the most
+  skilled adult, play together, and come of age remembering a hard or a happy childhood. From 65, elders may
+  get stiff joints, a sore back, failing eyes or frailty; the frail have their meals brought, and elders can
+  retire. Grief for a spouse, child, parent or friend lasts weeks and returns on the anniversary; the colony
+  expects more of its leader as the years pass, and the leader and elders want rooms of their own.
+- **The wider world:** the raiders have goodwill too: releasing or ransoming their people softens them,
+  starving them hardens them, and once they're soft enough they'll take a truce. A second friendly faction,
+  the Hollowstone Clans, trades iron, tools and stone and quarrels with the Meadow Kin: back one and the other
+  takes it badly. Envoys offer alliances; an ally's fighters come to raids more often, and when they're raided
+  they ask for a colonist or goods, and refusing ends the alliance. Send one to three colonists on an expedition
+  to a neighbour's settlement (to trade) or the ruins (to salvage); they come back days later with goods,
+  maybe a recruit, maybe hurt. Silver buys expedition supplies and settlers from the Meadow Kin.
+- **Pens and hunting:** fence a pen with a gate, put in a feeding trough (haulers fill it with potatoes), and
+  tame animals stay there; fed pairs breed in any season. A village policy can limit hunting to the surplus,
+  leaving a breeding pair of each kind, and the Meadow Kin take it badly if the valley is hunted out.
 
 - **Needs:** food, rest and recreation drain over time. Colonists eat when hungry (cooked meals first) and sleep
   during scheduled hours or when exhausted. A starving colonist (food at zero) works at 80% and walks at 90% until
@@ -424,6 +460,11 @@ npx tsx scripts/playtest.ts days=20 only=warden  # one play style
 npx tsx scripts/playtest.ts days=20 players=3,40 # particular players (TRACE=17 or BUILD=1 for detail)
 npx tsx scripts/years.ts 240 1 seed=150461       # a ten-year game, one line a year
 ```
+
+The harness also takes `craft` (kiln, smelter, bricks, iron and gear), `diplomat` (tribute, policies,
+requests), `surplus` and `pen` (hunting and husbandry), and `biome=` / `map=`. `npm run playtest:long` plays
+players 40–49 for 120 days (a weekly GitHub workflow runs it too), and `npm run test:e2e` runs the browser
+tests (Playwright: every screen, save and load, the phone layout and the Work grid's long press).
 
 [docs/GAPS.md](docs/GAPS.md) lists where the game is thin, unbalanced or untested, with the evidence.
 
