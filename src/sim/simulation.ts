@@ -110,6 +110,7 @@ import {
   Difficulty,
   StoryState,
   coldSnapOn,
+  colonyWealth,
   eclipseOn,
   freshStory,
   heatWaveOn,
@@ -599,6 +600,8 @@ export class Simulation {
   public storyLog: StoryEntry[] = [];
   // The colony's history, kept for good.
   public chronicle: ChronicleEntry[] = [];
+  // The colony at each dawn, for the history graphs: [day, people, average mood, wealth, days of food].
+  public history: [number, number, number, number, number][] = [];
   // The signal beacon's progress towards a ship, and whether the colony has boarded it (the end).
   public beacon: BeaconState = freshBeacon();
   public departed = false;
@@ -2195,6 +2198,7 @@ export class Simulation {
       }
     }
     this.addLog(`Day ${this.day} begins.`);
+    this.recordDay();
     if (this.rotted > 0) {
       this.addLog(`${this.rotted} food rotted. Iceboxes or a cold storeroom keep it fresh.`, 'warn');
       this.rotted = 0;
@@ -2464,6 +2468,22 @@ export class Simulation {
     }
     const owner = this.reservations.get(key);
     return owner !== undefined && owner !== c.id;
+  }
+
+  // Notes how the colony stands this morning, for the history graphs.
+  private recordDay(): void {
+    const living = this.living();
+    const mood = living.length > 0 ? living.reduce((sum, c) => sum + c.mood, 0) / living.length : 0;
+    const food =
+      this.resourceTotals().reduce((sum, t) => sum + itemDef(t.item).nutrition * t.total, 0) /
+      (Math.max(1, living.length) * 1.4);
+    this.history.push([
+      this.day,
+      living.length,
+      Math.round(mood),
+      Math.round(colonyWealth(this)),
+      Math.round(food * 10) / 10,
+    ]);
   }
 
   // Out of reach of the siege camp: to the nearest tile clear of it.

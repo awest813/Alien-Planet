@@ -159,6 +159,7 @@ export interface SaveData {
   diplomacy?: Diplomacy;
   shafts?: Record<number, Shaft>;
   chronicle?: ChronicleEntry[];
+  history?: [number, number, number, number, number][];
   nextInfantId?: number;
   animals: Animal[];
   nextAnimalId: number;
@@ -285,6 +286,7 @@ export function serialize(sim: Simulation): SaveData {
     diplomacy: structuredClone(sim.diplomacy),
     shafts: structuredClone(sim.shafts),
     chronicle: structuredClone(sim.chronicle),
+    history: sim.history.map((d) => [...d] as [number, number, number, number, number]),
     nextInfantId: sim.nextInfantId,
     animals: structuredClone(sim.animals),
     caravan: structuredClone(sim.caravan),
@@ -401,6 +403,7 @@ export function deserialize(data: SaveData): Simulation {
   sim.shafts = structuredClone(data.shafts ?? {});
   // Older saves have no chronicle: start one from what the story log still holds.
   sim.chronicle = structuredClone(data.chronicle ?? chronicleFromStory(sim.storyLog));
+  sim.history = (data.history ?? []).map((d) => [...d] as [number, number, number, number, number]);
   sim.nextInfantId = data.nextInfantId ?? 0;
   sim.animals = structuredClone(data.animals);
   sim.caravan = structuredClone(data.caravan);

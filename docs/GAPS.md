@@ -99,10 +99,9 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 
 ## 7. Interface and flow
 
-- **There is no history screen** (partly closed: the chronicle on the Story screen). There are no graphs (population, wealth, mood over time) and no chronicle; the
-  story log keeps only the latest 200 entries (Phase M's chronicle).
-- **There is no colonist overview.** No table of everyone's needs, skills and moods; the colonist bar and Work
-  screen cover part of it.
+- **History is on the Story screen** (closed: the chronicle, and graphs of colonists, average mood, wealth and days
+  of food, recorded each dawn).
+- **There is a colonist overview** (closed: the ☰ at the end of the colonist bar).
 - **Phone polish is basic in places** (partly closed: full-width cards, the goals drawer below the top bar, Work
   and Schedule tables that scroll on their own with names kept in view, painting the schedule by finger, moving
   drafted colonists by tap). There's no long-press to stand in for right-click on the Work grid, tap targets

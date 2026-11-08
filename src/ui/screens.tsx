@@ -914,9 +914,109 @@ function Chronicle({ years }: { years: ChronicleYear[] }) {
   );
 }
 
+// One measure over the days, as a line: a single series, so the title names it (no legend), a recessive
+// baseline, the first and last day under it, and a crosshair with the day's value on hover.
+const CHART_W = 240;
+const CHART_H = 64;
+function HistoryChart({
+  title,
+  points,
+  format,
+}: {
+  title: string;
+  points: [number, number][];
+  format: (value: number) => string;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  const max = Math.max(1, ...points.map(([, v]) => v));
+  const first = points[0][0];
+  const last = points[points.length - 1][0];
+  const x = (day: number) => ((day - first) / Math.max(1, last - first)) * CHART_W;
+  const y = (v: number) => CHART_H - (v / max) * (CHART_H - 6);
+  const path = points.map(([d, v], k) => `${k === 0 ? 'M' : 'L'}${x(d).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const shown = hover !== null ? points[hover] : points[points.length - 1];
+  return (
+    <figure className="history-chart">
+      <figcaption>
+        <span>{title}</span>
+        <span className="history-value">
+          {hover !== null && <span className="muted small">day {shown[0]} · </span>}
+          {format(shown[1])}
+        </span>
+      </figcaption>
+      <div className="history-plot">
+        {hover !== null && (
+          <span
+            className="history-dot"
+            style={{ left: `${(x(shown[0]) / CHART_W) * 100}%`, top: `${((y(shown[1]) + 2) / (CHART_H + 4)) * 100}%` }}
+          />
+        )}
+        <svg
+          viewBox={`0 -2 ${CHART_W} ${CHART_H + 4}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={`${title}, day ${first} to ${last}: from ${format(points[0][1])} to ${format(points[points.length - 1][1])}`}
+          onMouseMove={(e) => {
+            const box = e.currentTarget.getBoundingClientRect();
+            const day = first + ((e.clientX - box.left) / box.width) * (last - first);
+            let best = 0;
+            points.forEach(([d], k) => {
+              if (Math.abs(d - day) < Math.abs(points[best][0] - day)) {
+                best = k;
+              }
+            });
+            setHover(best);
+          }}
+          onMouseLeave={() => setHover(null)}
+        >
+          <line className="history-base" x1={0} x2={CHART_W} y1={CHART_H} y2={CHART_H} />
+          <path className="history-line" d={path} vectorEffect="non-scaling-stroke" />
+          {hover !== null && (
+            <>
+              <line
+                className="history-cross"
+                x1={x(shown[0])}
+                x2={x(shown[0])}
+                y1={0}
+                y2={CHART_H}
+                vectorEffect="non-scaling-stroke"
+              />
+            </>
+          )}
+        </svg>
+      </div>
+      <div className="history-axis muted small">
+        <span>day {first}</span>
+        <span>day {last}</span>
+      </div>
+    </figure>
+  );
+}
+
+// The colony over time, from its daily record: four measures, each in its own chart.
+function History({ history }: { history: UiState['history'] }) {
+  if (history.length < 2) {
+    return <p className="muted">The first days are still to be written: the graphs start after a couple of days.</p>;
+  }
+  // A long game has hundreds of days: no more than about 120 points a line.
+  const step = Math.ceil(history.length / 120);
+  const days = history.filter((_, k) => k % step === 0 || k === history.length - 1);
+  const series = (k: number) => days.map((d) => [d[0], d[k]] as [number, number]);
+  return (
+    <div className="history-grid">
+      <HistoryChart title="Colonists" points={series(1)} format={(v) => String(v)} />
+      <HistoryChart title="Average mood" points={series(2)} format={(v) => String(v)} />
+      <HistoryChart title="Wealth" points={series(3)} format={(v) => `${(v / 1000).toFixed(1)}k silver`} />
+      <HistoryChart title="Food" points={series(4)} format={(v) => `${v.toFixed(1)} days`} />
+    </div>
+  );
+}
+
 export function StoryScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
   return (
     <Modal title="The story so far" onClose={onClose}>
+      <h3>History</h3>
+      <History history={state.history} />
       <h3>Chronicle</h3>
       <Chronicle years={state.chronicle} />
       <h3>Festivals</h3>

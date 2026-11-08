@@ -55,3 +55,20 @@ describe('the chronicle rules', () => {
     expect(chronicleKind('Colonists stand down.')).toBeNull();
   });
 });
+
+describe('the history', () => {
+  it('notes the colony each dawn, and keeps it in the save', () => {
+    const sim = Simulation.newColony(7);
+    for (let t = 0; t < 3 * 24 * 200; t++) {
+      sim.step();
+    }
+    expect(sim.history.length).toBeGreaterThanOrEqual(2);
+    const [day, people, mood, wealth, food] = sim.history.at(-1)!;
+    expect(day).toBe(sim.day);
+    expect(people).toBe(sim.living().length);
+    expect(mood).toBeGreaterThan(0);
+    expect(wealth).toBeGreaterThan(0);
+    expect(food).toBeGreaterThanOrEqual(0);
+    expect(deserialize(structuredClone(serialize(sim))).history).toEqual(sim.history);
+  });
+});

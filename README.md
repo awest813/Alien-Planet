@@ -139,7 +139,9 @@ How the living simulation works:
   named and larger than life, and comes for the colony; drive it off and it returns bigger, bring it down
   and it's gone for good. In the cold months a catching cough spreads to anyone close by. The Story screen
   keeps the colony's chronicle: births and deaths, marriages, battles, great works, leaders and
-  milestones, year by year, for as long as the colony lasts.
+  milestones, year by year, for as long as the colony lasts, with graphs of the colonists, their mood, the
+  colony's wealth and its days of food over time. The ☰ at the end of the colonist bar shows everyone at a
+  glance: mood, needs, health, what they're doing and what they're best at.
 - **Into the rock:** research Deep mining (after Smelting) and sink a mine shaft. Miners with nothing else to do
   dig it deeper, a stretch at a time, for stone, iron ore and silver; the deeper it goes the richer the rock and
   the harder the digging. Past twenty metres something may break through from below: cave crawlers pour up out

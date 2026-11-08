@@ -1803,3 +1803,73 @@ button.big {
 .colonists-table tbody tr.selected {
   background: rgba(255, 255, 255, 0.06);
 }
+
+/* ---------- History graphs (Story screen) ---------- */
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+@media (max-width: 560px) {
+  .history-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.history-chart {
+  margin: 0;
+}
+
+.history-chart figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.history-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.history-chart svg {
+  display: block;
+  width: 100%;
+  height: 64px;
+  cursor: crosshair;
+}
+
+.history-line {
+  fill: none;
+  stroke: #3987e5;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.history-base,
+.history-cross {
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 1;
+}
+
+.history-plot {
+  position: relative;
+}
+
+.history-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: #3987e5;
+  box-shadow: 0 0 0 2px rgb(16, 20, 28);
+  pointer-events: none;
+}
+
+.history-axis {
+  display: flex;
+  justify-content: space-between;
+}

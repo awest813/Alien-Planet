@@ -884,6 +884,8 @@ export interface UiState {
   factions: FactionView[];
   // The colony's history, year by year (newest first), each year's entries in order.
   chronicle: ChronicleYear[];
+  // The colony each dawn: [day, people, average mood, wealth, days of food].
+  history: readonly (readonly [number, number, number, number, number])[];
   // A favour the neighbours have asked, and what the colony can pay with.
   diplomacy: DiplomacyView;
   // Current weather, e.g. { label: 'Rain', icon: '🌧' } (no icon when clear).
@@ -1811,6 +1813,7 @@ export class GameController {
       })),
       diplomacy: this.diplomacyView(),
       chronicle: this.chronicleView(),
+      history: this.historyView(),
       fires: sim.burning.size,
       stats: {
         raidsRepelled: sim.stats.raidsRepelled,
@@ -2369,6 +2372,21 @@ export class GameController {
       default:
         return false;
     }
+  }
+
+  // A copy of the day-by-day history, made again only when a day is added.
+  private historyCache: { length: number; sim: Simulation | null; view: UiState['history'] } = {
+    length: -1,
+    sim: null,
+    view: [],
+  };
+  private historyView(): UiState['history'] {
+    const sim = this.sim;
+    const cache = this.historyCache;
+    if (cache.sim !== sim || cache.length !== sim.history.length) {
+      this.historyCache = { length: sim.history.length, sim, view: sim.history.map((d) => [...d] as const) };
+    }
+    return this.historyCache.view;
   }
 
   private diplomacyView(): DiplomacyView {
