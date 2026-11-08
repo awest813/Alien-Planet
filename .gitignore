@@ -8,3 +8,6 @@
 /resources/android/splash/
 /resources/ios/icon/
 /resources/ios/splash/
+
+# Agent worktrees
+.claude/worktrees/
