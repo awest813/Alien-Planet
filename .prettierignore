@@ -2,3 +2,5 @@
 /dist/
 /ios/
 /.claude/
+/playwright-report/
+/test-results/

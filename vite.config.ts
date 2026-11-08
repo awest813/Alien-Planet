@@ -4,8 +4,9 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   base: '',
   test: {
-    // Not the copies of the project that agents work in (.claude/worktrees).
-    exclude: ['**/node_modules/**', '**/dist/**', '.claude/**'],
+    // Not the copies of the project that agents work in (.claude/worktrees), nor the browser tests (Playwright
+    // runs those: npm run test:e2e).
+    exclude: ['**/node_modules/**', '**/dist/**', '.claude/**', 'e2e/**'],
   },
   server: {
     host: '0.0.0.0',

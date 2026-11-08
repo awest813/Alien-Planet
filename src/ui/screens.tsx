@@ -117,16 +117,78 @@ const WORK_SKILL: Partial<Record<WorkTypeKey, SkillKey>> = {
   research: 'research',
 };
 
+// How long a finger rests on a Work cell to step back, and how far it can wander before it's a scroll instead.
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP = 10;
+
+// A held finger standing in for a right-click. iPhones send no contextmenu for one at all; Android sends one
+// as well, so while a finger is down the contextmenu is left to the hold. After a hold fires, the click that
+// lifting the finger makes is swallowed.
+function useLongPress() {
+  const hold = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null);
+  const stop = () => {
+    if (hold.current) {
+      clearTimeout(hold.current.timer);
+    }
+  };
+  useEffect(() => stop, []);
+  return (onTap: () => void, onBack: () => void) => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      stop();
+      hold.current = null;
+      if (e.pointerType !== 'touch') {
+        return;
+      }
+      const h = { timer: 0, x: e.clientX, y: e.clientY, fired: false };
+      h.timer = window.setTimeout(() => {
+        h.fired = true;
+        navigator.vibrate?.(15);
+        onBack();
+      }, LONG_PRESS_MS);
+      hold.current = h;
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const h = hold.current;
+      if (h && !h.fired && Math.hypot(e.clientX - h.x, e.clientY - h.y) > LONG_PRESS_SLOP) {
+        stop();
+        hold.current = null;
+      }
+    },
+    onPointerUp: stop,
+    // The table scrolling under the finger.
+    onPointerCancel: () => {
+      stop();
+      hold.current = null;
+    },
+    onClick: () => {
+      const held = hold.current?.fired;
+      stop();
+      hold.current = null;
+      if (!held) {
+        onTap();
+      }
+    },
+    onContextMenu: (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (!hold.current) {
+        onBack();
+      }
+    },
+  });
+}
+
 export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
-  // Left click raises the number (1 → 4 → off → 1); right click goes the other way.
+  // Left click raises the number (1 → 4 → off → 1); right click (or a long press) goes the other way.
   const forward = (value: number) => (value === 0 ? 1 : value === 4 ? 0 : value + 1);
   const back = (value: number) => (value === 0 ? 4 : value === 1 ? 0 : value - 1);
+  const press = useLongPress();
   return (
     <Modal title="Work priorities" onClose={onClose} wide>
       <p className="muted">
         {TOUCH ? 'Tap' : 'Click'} a cell to cycle 1 (do first) → 4 (do last) → off
-        {TOUCH ? '' : '; right-click goes back'}. At equal priority, colonists work left to right. The small number is
-        the colonist's skill (★ a passion: they learn faster and enjoy it); brighter cells are better at it.
+        {TOUCH ? '; hold one to go back' : '; right-click goes back'}. At equal priority, colonists work left to right.
+        The small number is the colonist's skill (★ a passion: they learn faster and enjoy it); brighter cells are
+        better at it.
       </p>
       <div className="table-scroll">
         <table className="grid work-grid">
@@ -189,11 +251,10 @@ export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => 
                               : `${c.name}: ${WORK_LABELS[work]}`
                           }
                           aria-label={`${c.name}, ${WORK_LABELS[work]}: ${value === 0 ? 'off' : `priority ${value}`}`}
-                          onClick={() => set(forward(value))}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                            set(back(value));
-                          }}
+                          {...press(
+                            () => set(forward(value)),
+                            () => set(back(value)),
+                          )}
                         >
                           <span className="prio">{value === 0 ? '–' : value}</span>
                           {skill && (

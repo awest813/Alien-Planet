@@ -1,9 +1,11 @@
 // Headless balance harness: an "autoplayer" runs a sensible colony on many seeds and prints
 // survival, combat, health, mood and social statistics.
 //
-//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive|defend] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K] [nohunt] [flow]
+//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive|defend] [craft] [diplomat] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K] [nohunt] [flow]
 //
-// "passive" never drafts during raids, to measure the worst case; "defend" holds a sandbag line; "peaceful" and "harsh" pick the
+// "passive" never drafts during raids, to measure the worst case; "defend" holds a sandbag line; "craft" builds a
+// kiln and a smelter and makes bricks, iron and iron goods; "diplomat" buys off raids, sets the village policies
+// as things go and answers the Meadow Kin's requests; "peaceful" and "harsh" pick the
 // storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies;
 // "size=96" or "size=128" plays on a bigger map; "seed=N" replays one colony; "start=K" skips the
 // first K seeds; "nohunt" leaves the wildlife alone. With DEBUG=1 in the environment, a trace also
@@ -24,13 +26,14 @@ import {
   weaponDef,
 } from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
-import { fightersHired, hireCost } from '../src/sim/diplomacy';
+import { atPeace, fightersHired, hireCost, tributeCost } from '../src/sim/diplomacy';
+import { PRISONER_BED } from '../src/sim/prisoners';
 import { isAvailable } from '../src/sim/research';
 import { applyTrade, colonyStock, goodwillOf, tradeOpen } from '../src/sim/trade';
 import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { mutualOpinion } from '../src/sim/social';
-import { Difficulty } from '../src/sim/storyteller';
-import { GROW_ZONE, STOCKPILE_ZONE } from '../src/sim/world';
+import { Difficulty, foodDays } from '../src/sim/storyteller';
+import { Designation, GROW_ZONE, STOCKPILE_ZONE } from '../src/sim/world';
 
 const days = Number(process.argv[2] ?? 20);
 const seeds = Number(process.argv[3] ?? 8);
@@ -38,6 +41,13 @@ const passive = process.argv.includes('passive');
 // "defend" fights from cover: a ring of sandbags round the hut once fortifications are known, and in a
 // raid colonists hold just inside it on the side facing the raiders instead of advancing.
 const defend = process.argv.includes('defend');
+// "craft": a craftsman. Pottery and smelting early, a kiln and a smelter, clay and iron ore dug, bricks fired and
+// iron smelted while there's clay and ore, and iron made into tool kits, swords and mail.
+const craft = process.argv.includes('craft');
+// "diplomat": pays a raiding faction off when it can spare the silver, keeps the village policies in step with
+// food and mood, gifts only while goodwill is low, and answers requests (making what's asked for, or turning it
+// down in good time rather than letting it lapse).
+const diplomat = process.argv.includes('diplomat');
 const trace = process.argv.includes('trace');
 const noHunt = process.argv.includes('nohunt');
 // "flow" prints a day-by-day table of food, materials and wildlife, averaged over the seeds.
@@ -91,10 +101,15 @@ const RESEARCH_ORDER = [
   'surgery',
 ];
 
-// A defending colony learns longbows (which outrange raiders' bows) straight after fortifications.
-const researchOrder = defend
-  ? RESEARCH_ORDER.filter((k) => k !== 'longbows').flatMap((k) => (k === 'fortifications' ? [k, 'longbows'] : [k]))
-  : RESEARCH_ORDER;
+// A defending colony learns longbows (which outrange raiders' bows) straight after fortifications; a crafting one
+// learns pottery and smelting after field medicine.
+const reorder = (order: string[], after: string, keys: string[]) =>
+  order.filter((k) => !keys.includes(k)).flatMap((k) => (k === after ? [k, ...keys] : [k]));
+const researchOrder = reorder(
+  defend ? reorder(RESEARCH_ORDER, 'fortifications', ['longbows']) : RESEARCH_ORDER,
+  craft ? 'fieldMedicine' : '',
+  craft ? ['pottery', 'smelting'] : [],
+);
 const ARMS = ['crossbow', 'recurveBow', 'scaleArmor', 'leather'];
 
 // Finds the nearest w×h rectangle to the colonists where every tile can take a blueprint.
@@ -200,7 +215,28 @@ interface Result {
   goods: number;
   leaderless: number;
   recruited: number;
+  prisonBeds: number;
+  // "craft": the workshops standing at the end, and what went through them.
+  kilns: number;
+  smelters: number;
+  made: Record<string, number>;
+  // "diplomat": tribute paid (times, silver), raids bought off on the way in, policy changes, the days spent
+  // under each policy, requests turned down in time, and fighters hired.
+  tributes: number;
+  tributeSilver: number;
+  boughtOff: number;
+  policyChanges: number;
+  policyDays: Record<string, number>;
+  declined: number;
+  hired: number;
 }
+
+// What the craft report counts as made (or dug).
+const CRAFT_GOODS = ['clay', 'ironOre', 'bricks', 'iron', 'toolKit', 'ironSword', 'ironMail'];
+// Silver the diplomat keeps back after paying tribute.
+const TRIBUTE_RESERVE = 50;
+// The most prisoner beds the colony builds.
+const MAX_PRISON_BEDS = 8;
 
 // Every enclosed room on the map, once each.
 function roomsAtEnd(sim: Simulation): { role: string; impressiveness: number }[] {
@@ -275,6 +311,13 @@ function play(seed: number): Result {
   // hearths arrive well before winter.
   const researcher = [...sim.colonists].sort((a, b) => b.skills.research - a.skills.research)[0];
   sim.apply({ type: 'priority', colonist: researcher.id, work: 'research', value: 1 });
+  // A craftsman puts the best crafter (other than the researcher) on crafting first.
+  const crafter = [...sim.colonists]
+    .filter((c) => c !== researcher)
+    .sort((a, b) => b.skills.crafting - a.skills.crafting)[0];
+  if (craft && crafter) {
+    sim.apply({ type: 'priority', colonist: crafter.id, work: 'crafting', value: 1 });
+  }
 
   // Day 1: chop and forage nearby, mine a little, a stockpile, and a 9x7 hut with a door, beds and a fire.
   sim.apply({ type: 'designate', rect: { x0: cx - 15, y0: cy - 15, x1: cx + 15, y1: cy + 15 }, kind: 'chop' });
@@ -344,6 +387,14 @@ function play(seed: number): Result {
   let cutterPlanned = false;
   let millPlaced = false;
   let prisonPlaced = false;
+  let prisonBeds = 0;
+  let kilnPlaced = false;
+  let smelterPlaced = false;
+  let tributeSilver = 0;
+  let boughtOff = 0;
+  let policyChanges = 0;
+  let declined = 0;
+  const policyDays: Record<string, number> = {};
   const fell = new Set<number>();
   let beaconPlaced = false;
   let shaftPlaced = false;
@@ -354,6 +405,39 @@ function play(seed: number): Result {
   let telescopePlaced = false;
   let fishingPlaced = false;
   let chopRadius = 15;
+  const setBill = (key: string, target: number) => {
+    const recipe = RECIPES.find((r) => r.key === key)!;
+    if (sim.bills[recipe.id].target !== target) {
+      sim.apply({ type: 'bill', recipe: recipe.id, target });
+    }
+  };
+  // One building on a free tile near the colonists; the tile, or null if there's no room.
+  const buildOne = (key: string): number | null => {
+    const spot = findSite(sim, 1, 1, avoid);
+    if (!spot) {
+      return null;
+    }
+    claim(avoid, sim, spot.x, spot.y, 1, 1);
+    sim.apply({ type: 'build', feature: featureId(key), tiles: [at(spot.x, spot.y)] });
+    return at(spot.x, spot.y);
+  };
+  // Marks the nearest few deposits of a kind the colonists can get at for mining, unless enough are marked already.
+  const dig = (key: string, count: number) => {
+    const f = featureId(key);
+    const home = (sim.living()[0] ?? sim.colonists[0]).tile;
+    const region = sim.regionOf(home);
+    const reachable = (i: number) =>
+      sim.regionOf(i) === region || w.neighbors(i).some((n) => sim.regionOf(n) === region);
+    const marked = sim.nearest(home, (i) => w.feature[i] === f && w.designation[i] === Designation.MINE, count);
+    const more = sim.nearest(
+      home,
+      (i) => w.feature[i] === f && w.designation[i] === Designation.NONE && reachable(i),
+      count,
+    );
+    for (const i of more.slice(0, count - marked.length)) {
+      sim.apply({ type: 'designate', rect: { x0: w.xOf(i), y0: w.yOf(i), x1: w.xOf(i), y1: w.yOf(i) }, kind: 'mine' });
+    }
+  };
   let friendDay = -1;
   let starvingHours = 0;
   const starvingByDay: Record<number, number> = {};
@@ -372,6 +456,16 @@ function play(seed: number): Result {
       // (on a big map they can take hours to walk in from the edge).
       // Maddened animals get the same answer as raiders.
       const manhunters = sim.animals.some((a) => a.manhunter && a.hp > 0 && a.revengeOn >= 0);
+      // The diplomat buys off a raid still on its way in (or a siege still camped), if the silver can be spared.
+      const raid = sim.raid;
+      if (diplomat && raid && !raid.outcome && (raid.arrivedTick === undefined || !raid.siege?.attacking)) {
+        const cost = tributeCost(sim);
+        if (!atPeace(sim, raid.faction) && colonyStock(sim, itemId('silver')) >= cost + TRIBUTE_RESERVE) {
+          sim.apply({ type: 'tribute', faction: raid.faction });
+          tributeSilver += cost;
+          boughtOff++;
+        }
+      }
       if (!passive && ((sim.enemies.some((e) => !e.fleeing) && sim.raid?.arrivedTick !== undefined) || manhunters)) {
         for (const c of sim.living()) {
           const fit = !c.health.downed && painOf(c) < 0.35;
@@ -546,13 +640,20 @@ function play(seed: number): Result {
     }
     // Two graves on day 6, so the fallen can be laid to rest.
     // A prisoner bed on day 8; every wounded raider is marked for capture once the fighting stops.
+    // A bed for each one marked (up to eight), since the wounded die within a day.
+    const prisonBedsAt = (n: number) => {
+      const row = findSite(sim, n, 1, avoid);
+      if (row) {
+        claim(avoid, sim, row.x, row.y, n, 1);
+        const tiles = Array.from({ length: n }, (_, k) => at(row.x + k, row.y));
+        sim.apply({ type: 'build', feature: PRISONER_BED, tiles });
+        prisonBeds += n;
+      }
+      return !!row;
+    };
     if (!prisonPlaced && sim.day >= 8) {
       prisonPlaced = true;
-      const spot = findSite(sim, 1, 1, avoid);
-      if (spot) {
-        claim(avoid, sim, spot.x, spot.y, 1, 1);
-        sim.apply({ type: 'build', feature: featureId('prisonerBed'), tiles: [at(spot.x, spot.y)] });
-      }
+      prisonBedsAt(1);
     }
     for (const p of sim.captives) {
       fell.add(p.id);
@@ -563,6 +664,25 @@ function play(seed: number): Result {
         rect: { x0: 0, y0: 0, x1: sim.world.width - 1, y1: sim.world.height - 1 },
         add: true,
       });
+    }
+    const beds = Math.min(MAX_PRISON_BEDS, sim.captives.filter((p) => p.capture || p.state === 'prisoner').length);
+    // ...and a warden who puts it first (with everything at the same priority, other work always comes first).
+    if (!passive && beds > 0 && !sim.living().some((c) => c.priorities.warden === 1)) {
+      const warden = sim
+        .living()
+        .filter((c) => c.id !== researcher.id && !c.health.downed && c.age >= 18)
+        .sort((a, b) => b.mood - a.mood)[0];
+      if (warden) {
+        sim.apply({ type: 'priority', colonist: warden.id, work: 'warden', value: 1 });
+      }
+    }
+    if (!passive && beds > prisonBeds) {
+      // A row if there's room for one, else one at a time.
+      if (!prisonBedsAt(beds - prisonBeds)) {
+        while (prisonBeds < beds && prisonBedsAt(1)) {
+          // One more.
+        }
+      }
     }
     // The neighbours' requests: send the goods once they're in store; hunt the great boar down.
     const request = sim.diplomacy.request;
@@ -577,8 +697,15 @@ function play(seed: number): Result {
         sim.apply({ type: 'hunt', rect: { x0: bx, y0: by, x1: bx, y1: by }, add: true });
       }
     }
-    // Spare silver goes on keeping the Meadow Kin sweet.
-    if (!passive && hour % 24 === 12 && colonyStock(sim, itemId('silver')) > 400) {
+    // Spare silver goes on keeping the Meadow Kin sweet (the diplomat only gifts while goodwill is low, and keeps the
+    // rest for tribute).
+    const kin = FACTIONS.find((f) => !f.hostile)!.id;
+    if (
+      !passive &&
+      hour % 24 === 12 &&
+      colonyStock(sim, itemId('silver')) > 400 &&
+      (!diplomat || goodwillOf(sim, kin) < 50)
+    ) {
       sim.apply({ type: 'gift', faction: FACTIONS.find((f) => !f.hostile)!.id, silver: 50 });
     }
     // Silver to spare: keep the Meadow Kin's fighters hired.
@@ -784,6 +911,89 @@ function play(seed: number): Result {
       bedsBuilt++;
     }
 
+    if (craft) {
+      // The workshops, as soon as they're known (the smelter waits on bricks from the kiln).
+      if (!kilnPlaced && sim.isResearched('pottery')) {
+        kilnPlaced = buildOne('kiln') !== null;
+        setBill('fireBricks', 60);
+      }
+      if (!smelterPlaced && sim.isResearched('smelting')) {
+        smelterPlaced = buildOne('smelter') !== null;
+        setBill('smeltIron', 40);
+        // Iron tool kits rather than stone ones from here on; a sword for every other colonist, mail for all.
+        setBill('makeTools', 0);
+        setBill('makeIronTools', 4);
+      }
+      if (smelterPlaced) {
+        setBill('makeIronSword', Math.ceil(sim.living().length / 2));
+        setBill('makeIronMail', sim.living().length);
+      }
+      // Each morning, dig more clay and ore when the stock runs low and little is marked.
+      if (Math.floor(sim.hour) === 6) {
+        if (kilnPlaced && sim.stockOf(itemId('clay')) < 12) {
+          dig('clayBank', 4);
+        }
+        if (smelterPlaced && sim.stockOf(itemId('ironOre')) < 12) {
+          dig('ironVein', 3);
+        }
+      }
+    }
+
+    if (diplomat) {
+      // The village policies each morning: rations by the food in store, hours and days of rest by mood.
+      if (Math.floor(sim.hour) === 7) {
+        const v = sim.village;
+        const food = foodDays(sim);
+        const living = sim.living();
+        const mood = living.reduce((n, c) => n + c.mood, 0) / Math.max(1, living.length);
+        const rations =
+          food < 3
+            ? 'frugal'
+            : food > 12
+              ? 'generous'
+              : (v.rations === 'frugal' && food > 5) || (v.rations === 'generous' && food < 8)
+                ? 'normal'
+                : v.rations;
+        const hours =
+          mood < 35
+            ? 'short'
+            : mood > 65
+              ? 'long'
+              : (v.hours === 'short' && mood > 45) || (v.hours === 'long' && mood < 55)
+                ? 'normal'
+                : v.hours;
+        const restDays = mood < 45 ? true : mood > 60 ? false : v.restDays;
+        if (rations !== v.rations || hours !== v.hours || restDays !== v.restDays) {
+          sim.apply({ type: 'policy', rations, hours, restDays });
+          policyChanges++;
+        }
+        for (const key of [`rations ${rations}`, `hours ${hours}`, restDays ? 'rest days' : 'no rest days']) {
+          policyDays[key] = (policyDays[key] ?? 0) + 1;
+        }
+      }
+      // The Meadow Kin's requests: make what they ask for if a bill can, and turn down what can't be done in time
+      // (a refusal costs less goodwill than letting it lapse).
+      const asked = sim.diplomacy.request;
+      const short = asked?.kind === 'deliver' && colonyStock(sim, asked.item) < asked.count;
+      if (asked && short) {
+        const recipe = RECIPES.find(
+          (r) => r.product.item === asked.item && !r.mend && (!r.research || sim.isResearched(r.research)),
+        );
+        if (recipe && sim.bills[recipe.id].target < asked.count + 5) {
+          sim.apply({ type: 'bill', recipe: recipe.id, target: asked.count + 5 });
+        }
+      }
+      const noHunter =
+        asked?.kind === 'hunt' &&
+        !sim.living().some((c) => !c.health.downed && c.priorities.hunting > 0 && weaponDef(c.weapon).range > 1);
+      // (A hunt still going this late is unlikely to end in time either.)
+      const late = asked && asked.until - sim.tick < 12 * TICKS_PER_HOUR && (short || asked.kind === 'hunt');
+      if (noHunter || late) {
+        sim.apply({ type: 'declineRequest' });
+        declined++;
+      }
+    }
+
     if (flow && Math.floor(sim.hour) === 6) {
       daily.push(snapshot(sim));
     }
@@ -914,6 +1124,17 @@ function play(seed: number): Result {
     goods: sim.resourceTotals().reduce((n, t) => n + t.total, 0),
     leaderless: sim.village.leader < 0 ? 1 : 0,
     recruited: sim.stats.recruited ?? 0,
+    prisonBeds: sim.countFeature((f) => f === PRISONER_BED),
+    kilns: sim.countFeature((f) => f === featureId('kiln')),
+    smelters: sim.countFeature((f) => f === featureId('smelter')),
+    made: Object.fromEntries(CRAFT_GOODS.map((k) => [k, sim.stats.produced[k] ?? 0])),
+    tributes: sim.stats.tributes ?? 0,
+    tributeSilver,
+    boughtOff,
+    policyChanges,
+    policyDays,
+    declined,
+    hired: sim.stats.hired ?? 0,
     mess: [...sim.world.tilesWith('filth')].filter((i) => sim.isRoofed(i)).length,
   };
 }
@@ -1032,8 +1253,11 @@ for (const seed of seedList) {
   }
 }
 const sum = (f: (r: Result) => number) => results.reduce((n, r) => n + f(r), 0);
+const modes = [defend && 'defend', craft && 'craft', diplomat && 'diplomat', noHunt && 'nohunt'].filter(
+  (m): m is string => !!m,
+);
 console.log(
-  `\n${passive ? 'PASSIVE' : 'ACTIVE'} ${difficulty} ${mapSize}×${mapSize} ${days} days × ${seeds} seeds in ${((performance.now() - started) / 1000).toFixed(1)}s\n` +
+  `\n${passive ? 'PASSIVE' : 'ACTIVE'}${modes.length > 0 ? ` [${modes.join(', ')}]` : ''} ${difficulty} ${mapSize}×${mapSize} ${days} days × ${seeds} seeds in ${((performance.now() - started) / 1000).toFixed(1)}s\n` +
     `  survivors ${sum((r) => r.living)}/${sum((r) => r.total)}, colonies wiped ${results.filter((r) => r.living === 0).length}\n` +
     `  deaths by cause ${JSON.stringify(
       results.reduce<Record<string, number>>((all, r) => {
@@ -1100,8 +1324,35 @@ console.log(
 );
 console.log(
   `  prisoners: ${sum((r) => r.fellWounded)} raiders fell wounded, ${sum((r) => r.captured)} taken prisoner, ` +
-    `${sum((r) => r.recruited)} won over`,
+    `${sum((r) => r.recruited)} won over; prisoner beds at the end ${results
+      .map((r) => r.prisonBeds)
+      .sort((a, b) => a - b)
+      .join(' ')}`,
 );
+if (craft) {
+  console.log(
+    `  craft: kilns built in ${results.filter((r) => r.kilns > 0).length}/${results.length} colonies, smelters in ` +
+      `${results.filter((r) => r.smelters > 0).length}; made in all ${CRAFT_GOODS.map((k) => `${k} ${sum((r) => r.made[k])}`).join(', ')}`,
+  );
+}
+if (diplomat) {
+  const underPolicy = results.reduce<Record<string, number>>((all, r) => {
+    for (const [k, n] of Object.entries(r.policyDays)) {
+      all[k] = (all[k] ?? 0) + n;
+    }
+    return all;
+  }, {});
+  const allDays = Math.max(1, sum((r) => Object.values(r.policyDays).reduce((a, b) => a + b, 0)) / 3);
+  console.log(
+    `  diplomat: ${sum((r) => r.tributes)} tributes (${sum((r) => r.tributeSilver)} silver; ${sum((r) => r.boughtOff)} raids ` +
+      `bought off on the way in), ${sum((r) => r.hired)} times fighters hired, ${sum((r) => r.declined)} requests ` +
+      `turned down in time, ${sum((r) => r.policyChanges)} policy changes; days under each policy ` +
+      Object.entries(underPolicy)
+        .sort((a, b) => b[1] - a[1])
+        .map(([k, n]) => `${k} ${((100 * n) / allDays).toFixed(0)}%`)
+        .join(', '),
+  );
+}
 console.log(
   `  neighbours: ${sum((r) => r.requestsDone)} requests done, ${sum((r) => r.requestsFailed)} turned down or lapsed, ` +
     `${sum((r) => r.gifts)} gifts; goodwill at the end ${results
