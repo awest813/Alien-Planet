@@ -664,22 +664,40 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
                     Pay {d.tributeCost} silver for peace
                   </button>
                 ) : (
-                  <div className="row">
-                    {d.giftSizes.map((s, k) => (
+                  <>
+                    <div className="row">
+                      {d.giftSizes.map((s, k) => (
+                        <button
+                          key={s}
+                          disabled={d.silver < s || f.giftGains[k] <= 0}
+                          onClick={() => controller.command({ type: 'gift', faction: f.id, silver: s })}
+                          title={
+                            f.giftGains[k] > 0
+                              ? `Give ${s} silver: goodwill +${f.giftGains[k]}`
+                              : 'They already think the world of the colony'
+                          }
+                        >
+                          Gift {s} silver
+                        </button>
+                      ))}
+                    </div>
+                    <div className="row">
                       <button
-                        key={s}
-                        disabled={d.silver < s || f.giftGains[k] <= 0}
-                        onClick={() => controller.command({ type: 'gift', faction: f.id, silver: s })}
+                        disabled={d.silver < d.hireCost || (f.goodwill ?? 0) < d.hireGoodwill}
+                        onClick={() => controller.command({ type: 'hireFighters', faction: f.id })}
                         title={
-                          f.giftGains[k] > 0
-                            ? `Give ${s} silver: goodwill +${f.giftGains[k]}`
-                            : 'They already think the world of the colony'
+                          (f.goodwill ?? 0) < d.hireGoodwill
+                            ? `They won't fight for the colony below goodwill ${d.hireGoodwill}`
+                            : `Their fighters come to every raid and siege for ${d.hireDays} days, within the hour`
                         }
                       >
-                        Gift {s} silver
+                        Hire fighters: {d.hireCost} silver
                       </button>
-                    ))}
-                  </div>
+                      {d.hiredDaysLeft > 0 && (
+                        <span className="muted small">Fighters hired for {d.hiredDaysLeft} more days</span>
+                      )}
+                    </div>
+                  </>
                 )}
               </td>
             </tr>

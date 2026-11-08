@@ -9,6 +9,7 @@ import { learn } from './skills';
 import { traitValue } from './social';
 import type { Simulation } from './simulation';
 import { Animal, Colonist, Enemy } from './types';
+import { fightersHired } from './diplomacy';
 import { goodwillOf } from './trade';
 import { weatherDef } from './weather';
 import { Filth, World } from './world';
@@ -968,7 +969,16 @@ const ALLY_SKILL = 5;
 export function maybeSendAllies(sim: Simulation): void {
   const raid = sim.raid;
   const friend = FACTIONS.findIndex((f) => !f.hostile);
-  if (!raid || friend < 0 || sim.rng.next() >= allyChance(goodwillOf(sim, friend))) {
+  if (!raid || friend < 0) {
+    return;
+  }
+  // Hired, they come for sure, within the hour, and in strength.
+  if (fightersHired(sim)) {
+    raid.allies = Math.max(3, Math.min(5, Math.round(raid.initial / 2)));
+    raid.alliesAt = sim.tick + TICKS_PER_HOUR;
+    return;
+  }
+  if (sim.rng.next() >= allyChance(goodwillOf(sim, friend))) {
     return;
   }
   raid.allies = Math.max(2, Math.min(4, Math.round(raid.initial / 3)));

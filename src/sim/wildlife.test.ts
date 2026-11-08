@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { animalsAtDawn, herdArrives, wildCap } from './animals';
+import { animalsAtDawn, herdArrives, herdsWary, hurtAnimal, wildCap } from './animals';
 import { ANIMALS, featureId, itemId, matchesIngredient } from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
@@ -194,5 +194,38 @@ describe('wildlife variety', () => {
     const saved = copy.animals.find((a) => a.id === wolf.id)!;
     expect(saved.chasing).toBe(99);
     expect(saved.fedUntil).toBe(1234);
+  });
+});
+
+describe('a living valley', () => {
+  it('has wild herds raise young in spring and summer, while there is room', () => {
+    const { sim, w, x, y } = field(31);
+    sim.tick = 3 * 24 * 200;
+    sim.syncClock();
+    expect(sim.season).toBe('Spring');
+    for (let k = 0; k < 4; k++) {
+      place(sim, 'deer', w.idx(x + 5 + k, y + 5));
+    }
+    for (let d = 0; d < 20 && sim.animals.length === 4; d++) {
+      animalsAtDawn(sim);
+    }
+    expect(sim.animals.length).toBeGreaterThan(4);
+    expect(sim.animals.every((a) => a.kind === 'deer' && !a.tame)).toBe(true);
+    expect(sim.animals.length).toBeLessThanOrEqual(Math.ceil(wildCap(sim) * 0.75) + 1);
+  });
+
+  it('grows wary of a colony that hunts it hard', () => {
+    const { sim, w, x, y } = field(32);
+    expect(herdsWary(sim)).toBe(false);
+    for (let k = 0; k < 9; k++) {
+      const a = place(sim, 'hare', w.idx(x + 3, y + k - 4), { hunted: true });
+      hurtAnimal(sim, a, 100, sim.colonists[0]);
+    }
+    expect(herdsWary(sim)).toBe(true);
+    expect(sim.storyLog.some((s) => s.text.includes('grown wary'))).toBe(true);
+    // A save keeps it, and it passes.
+    expect(herdsWary(deserialize(structuredClone(serialize(sim))))).toBe(true);
+    sim.tick += 11 * 24 * 200;
+    expect(herdsWary(sim)).toBe(false);
   });
 });

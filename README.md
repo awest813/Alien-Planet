@@ -146,7 +146,8 @@ How the living simulation works:
   hunted down, within a few days. Doing it pays silver (sometimes a new colonist) and wins goodwill; turning it
   down or letting it lapse costs some. Goodwill means better prices, more caravans and more gifts of supplies;
   fall below zero and they stop dealing with you until hard feelings fade. Send gifts of silver to win them
-  round, or pay raiders tribute for twelve days' peace, all from the Factions screen.
+  round, pay raiders tribute for twelve days' peace, or (at goodwill 30 or more) hire the Meadow Kin's fighters to
+  come to every raid and siege for twelve days, all from the Factions screen.
 - **Food and materials:** grow grain, mill it into flour and bake bread that keeps a month; hang meat, fish and
   berries on drying racks to keep them for months without power. Dig clay from the riverbanks and fire it into
   bricks in a kiln, and mine the rusty iron veins in the rock for a smelter's iron: tool kits, swords and mail.

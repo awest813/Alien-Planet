@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { QUARRY_TOUGHNESS } from './animals';
 import { FACTIONS, itemId, quantity } from './defs';
+import { maybeSendAllies, spawnRaid } from './combat';
 import {
+  HIRE_DAYS,
   atPeace,
   decline,
+  fightersHired,
   fulfil,
   gift,
   giftGoodwill,
+  hireCost,
   makeRequest,
   onGoodTerms,
   payTribute,
@@ -199,5 +203,28 @@ describe('quantities', () => {
     expect(quantity(itemId('recurveBow'), 3)).toBe('3 recurve bows');
     expect(quantity(itemId('wood'), 40)).toBe('40 wood');
     expect(quantity(itemId('herbalMedicine'), 5)).toBe('5 herbal medicine');
+  });
+});
+
+describe('hiring fighters', () => {
+  it('needs goodwill and silver, and brings help to every raid while it lasts', () => {
+    const { sim } = colony(9);
+    sim.goodwill[KIN] = 10;
+    sim.apply({ type: 'hireFighters', faction: KIN });
+    expect(fightersHired(sim)).toBe(false);
+    sim.goodwill[KIN] = 60;
+    const silver = colonyStock(sim, SILVER);
+    sim.apply({ type: 'hireFighters', faction: KIN });
+    expect(fightersHired(sim)).toBe(true);
+    expect(colonyStock(sim, SILVER)).toBe(silver - hireCost(sim));
+    expect(deserialize(structuredClone(serialize(sim))).diplomacy.fightersUntil).toBe(sim.diplomacy.fightersUntil);
+    // A raid: they're coming, for sure, within the hour.
+    expect(spawnRaid(sim, RAIDERS[0], 6)).toBe(true);
+    maybeSendAllies(sim);
+    expect(sim.raid!.allies).toBeGreaterThanOrEqual(3);
+    expect(sim.raid!.alliesAt).toBe(sim.tick + HOUR);
+    // Twelve days on, it's over.
+    sim.tick += HIRE_DAYS * 24 * HOUR;
+    expect(fightersHired(sim)).toBe(false);
   });
 });

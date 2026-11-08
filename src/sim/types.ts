@@ -445,6 +445,7 @@ export type Command =
   // Whether the colony keeps the seasonal festivals.
   | { type: 'festivals'; on: boolean }
   | { type: 'fulfilRequest' }
+  | { type: 'hireFighters'; faction: number }
   | { type: 'declineRequest' }
   | { type: 'gift'; faction: number; silver: number }
   | { type: 'tribute'; faction: number }
@@ -492,6 +493,8 @@ export interface Stats {
   requestsFailed?: number;
   gifts?: number;
   tributes?: number;
+  // Times the friendly faction's fighters were hired.
+  hired?: number;
   // Wounds that turned infected, and lasting injuries left by old wounds.
   infections?: number;
   scars?: number;

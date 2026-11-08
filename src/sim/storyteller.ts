@@ -1,5 +1,5 @@
 import { SIGNAL_RAID_WEIGHT, transmitting } from './beacon';
-import { herdArrives, manhuntersArrive, wildCap, wildCount } from './animals';
+import { herdArrives, herdsWary, manhuntersArrive, wildCap, wildCount } from './animals';
 import { maybeSendAllies, spawnRaid, weaponScore } from './combat';
 import { TICKS_PER_HOUR, populationFor } from './constants';
 import { ANIMALS, FACTIONS, NONE, featureDef, itemDef, itemId, terrainDef } from './defs';
@@ -31,6 +31,9 @@ export interface StoryState {
   manhuntersActive?: boolean;
   // ...and it's the great beast alone (whose leaving or death says enough).
   beastHunt?: boolean;
+  // Ticks of the colony's recent kills in the hunt, and until when the herds are wary of the valley.
+  recentHunts?: number[];
+  waryUntil?: number;
   // The great beast of the hills, once it has woken.
   beast?: BeastState;
   // When the last "has collapsed" notification went out (they come in bursts; one card is enough).
@@ -260,7 +263,7 @@ const EVENTS: EventDef[] = [
     key: 'herd',
     minDay: 2,
     cooldownDays: 4,
-    weight: (sim) => (wildCount(sim) < wildCap(sim) - 3 ? 1 : 0),
+    weight: (sim) => (wildCount(sim) < wildCap(sim) - 3 ? (herdsWary(sim) ? 0.5 : 1) : 0),
     run: (sim) => {
       const count = herdArrives(sim);
       if (count === 0) {

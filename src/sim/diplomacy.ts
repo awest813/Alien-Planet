@@ -31,6 +31,8 @@ export interface Diplomacy {
   nextRequestDay: number;
   // Hostile faction id → the tick its paid-for peace ends.
   peaceUntil: Record<number, number>;
+  // Until this tick the friendly faction has been paid to send fighters to every raid.
+  fightersUntil?: number;
 }
 
 export const freshDiplomacy = (): Diplomacy => ({ request: null, nextRequestDay: 5, peaceUntil: {} });
@@ -297,6 +299,38 @@ export function gift(sim: Simulation, faction: number, silver: number): string |
 
 // What raiders want to leave the colony alone for a while: more as it grows richer and older (up to 460).
 export const tributeCost = (sim: Simulation): number => Math.round((60 + Math.min(sim.day, 80) * 5) / 10) * 10;
+
+// Hiring the friendly faction's fighters: paid by the same scale as tribute, they come to every raid (and
+// siege) for twelve days, sooner and more of them than when they come of their own accord. They won't take
+// silver to fight for a colony they think little of.
+export const HIRE_DAYS = 12;
+export const HIRE_GOODWILL = 30;
+export const hireCost = tributeCost;
+export const fightersHired = (sim: Simulation): boolean => (sim.diplomacy.fightersUntil ?? 0) > sim.tick;
+
+export function hireFighters(sim: Simulation, faction: number): string | null {
+  const f = FACTIONS[faction];
+  if (!f || f.hostile) {
+    return "They won't fight for the colony.";
+  }
+  if (goodwillOf(sim, faction) < HIRE_GOODWILL) {
+    return `${f.name} won't fight for a colony they think so little of (goodwill ${HIRE_GOODWILL} needed).`;
+  }
+  const cost = hireCost(sim);
+  if (colonyStock(sim, itemId('silver')) < cost) {
+    return `They want ${cost} silver.`;
+  }
+  takeFromStockpiles(sim, itemId('silver'), cost);
+  const d = sim.diplomacy;
+  d.fightersUntil = Math.max(d.fightersUntil ?? 0, sim.tick) + HIRE_DAYS * DAY;
+  sim.stats.hired = (sim.stats.hired ?? 0) + 1;
+  sim.addLog(
+    `The colony paid ${f.name} ${cost} silver: their fighters will come to every raid for the next ${HIRE_DAYS} days.`,
+    'good',
+    true,
+  );
+  return null;
+}
 
 export function payTribute(sim: Simulation, faction: number): string | null {
   const f = FACTIONS[faction];

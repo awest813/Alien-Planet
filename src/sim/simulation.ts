@@ -177,7 +177,16 @@ import {
 import { updateGreatBeast } from './beast';
 import { ChronicleEntry, addToChronicle, chronicleKind, chronicleText } from './chronicle';
 import { Shaft, digDeeper, digWork, shaftAt } from './depths';
-import { Diplomacy, decline, freshDiplomacy, fulfil, gift, payTribute, updateDiplomacy } from './diplomacy';
+import {
+  Diplomacy,
+  decline,
+  freshDiplomacy,
+  fulfil,
+  gift,
+  hireFighters,
+  payTribute,
+  updateDiplomacy,
+} from './diplomacy';
 import {
   BREAK_LABELS,
   BreakKind,
@@ -1146,6 +1155,13 @@ export class Simulation {
         break;
       case 'gift': {
         const why = gift(this, cmd.faction, cmd.silver);
+        if (why) {
+          this.addLog(why, 'warn');
+        }
+        break;
+      }
+      case 'hireFighters': {
+        const why = hireFighters(this, cmd.faction);
         if (why) {
           this.addLog(why, 'warn');
         }

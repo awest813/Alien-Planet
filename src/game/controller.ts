@@ -51,7 +51,16 @@ import {
   artForSale,
 } from '../sim/trade';
 import { METRES_PER_LEVEL, breachFrom, oreChances } from '../sim/depths';
-import { GIFT_SIZES, atPeace, describeRequest, giftGoodwill, tributeCost } from '../sim/diplomacy';
+import {
+  GIFT_SIZES,
+  HIRE_DAYS,
+  HIRE_GOODWILL,
+  atPeace,
+  describeRequest,
+  giftGoodwill,
+  hireCost,
+  tributeCost,
+} from '../sim/diplomacy';
 import { weatherDef } from '../sim/weather';
 import {
   Colonist,
@@ -771,6 +780,11 @@ export interface DiplomacyView {
   silver: number;
   tributeCost: number;
   giftSizes: readonly number[];
+  // Hiring the friendly faction's fighters: the price, the goodwill they need, and days of it left.
+  hireCost: number;
+  hireGoodwill: number;
+  hireDays: number;
+  hiredDaysLeft: number;
 }
 
 export interface Alert {
@@ -1160,7 +1174,11 @@ export class GameController {
     this.sim.apply(cmd);
     // Dealings with the neighbours say how they went on the spot (the Factions screen is open over the log).
     const said = this.sim.log[this.sim.log.length - 1];
-    if (said && said !== before && (cmd.type === 'gift' || cmd.type === 'tribute' || cmd.type === 'fulfilRequest')) {
+    if (
+      said &&
+      said !== before &&
+      (cmd.type === 'gift' || cmd.type === 'tribute' || cmd.type === 'fulfilRequest' || cmd.type === 'hireFighters')
+    ) {
       this.notify(said.text);
       return;
     }
@@ -2358,6 +2376,10 @@ export class GameController {
       silver: colonyStock(sim, itemId('silver')),
       tributeCost: tributeCost(sim),
       giftSizes: GIFT_SIZES,
+      hireCost: hireCost(sim),
+      hireGoodwill: HIRE_GOODWILL,
+      hireDays: HIRE_DAYS,
+      hiredDaysLeft: Math.max(0, Math.ceil(((sim.diplomacy.fightersUntil ?? 0) - sim.tick) / (TICKS_PER_HOUR * 24))),
     };
   }
 

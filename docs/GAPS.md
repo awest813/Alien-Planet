@@ -19,10 +19,10 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   feasts, parkas, recruiting. After that there's no direction.
   - Close it with later goal phases (generations, legends, a great work), or goals that come from the story,
     such as "survive the siege" or "raise a child to adulthood".
-- **Silver piles up.** By year 10 colonies hold 7,000–9,000 silver. Caravans now grow with the colony (up to
-  three times the goods and purse, with finer wares from day 30), but there is still little to spend on.
-  - Close it with silver sinks: commissions from neighbours, hiring help, buying a colonist, ransoming prisoners
-    back, paid caravans or expeditions, buildings that cost silver.
+- **Silver has one real use** (partly closed: hiring the Meadow Kin's fighters, 12 days at tribute prices). With
+  the test colony hiring whenever it can spare the silver, year-10 silver is 1,300–3,400, from 7,000–9,000.
+  - More sinks would help: commissions from neighbours, buying a colonist, ransoming prisoners back, paid
+    caravans or expeditions, buildings that cost silver.
 - **Wealth grows from about 8k to 40–54k and changes little.** Raids now gain up to 4 raiders above 15k, but
   nothing else responds to a rich colony.
 
@@ -85,10 +85,10 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 
 ## 6. Animals and the land
 
-- **Wildlife can be wiped out.** The test colony hunts everything on sight, and wildlife sits at zero from year
-  one on every map. Migration refills only up to half the cap, and every newcomer is hunted.
-  - Close it with hunting limits or consequences: wary herds that leave, seasons when animals are scarce, the
-    Meadow Kin minding over-hunting.
+- **Wildlife can still be wiped out, but recovers if left alone** (partly closed: wild herds raise young in
+  spring and summer up to three quarters of the valley's room; more than 8 kills in 5 days makes the herds wary,
+  halving how many wander in for 10 days). The test colony hunts everything on sight, so its valley stays empty.
+  - Still missing: a way to hunt only the surplus (leave breeding pairs), and the Meadow Kin minding it.
 - **There is no animal husbandry beyond taming.** No pens, fences, feeding troughs or breeding management;
   tame animals in the test runs number zero.
 - **There is one biome and one map type.** No desert, tundra or forest starts, and no rivers or islands as

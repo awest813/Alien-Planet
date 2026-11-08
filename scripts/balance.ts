@@ -24,6 +24,7 @@ import {
   weaponDef,
 } from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
+import { fightersHired, hireCost } from '../src/sim/diplomacy';
 import { isAvailable } from '../src/sim/research';
 import { applyTrade, colonyStock, goodwillOf, tradeOpen } from '../src/sim/trade';
 import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
@@ -579,6 +580,15 @@ function play(seed: number): Result {
     // Spare silver goes on keeping the Meadow Kin sweet.
     if (!passive && hour % 24 === 12 && colonyStock(sim, itemId('silver')) > 400) {
       sim.apply({ type: 'gift', faction: FACTIONS.find((f) => !f.hostile)!.id, silver: 50 });
+    }
+    // Silver to spare: keep the Meadow Kin's fighters hired.
+    if (
+      !passive &&
+      hour % 24 === 13 &&
+      !fightersHired(sim) &&
+      colonyStock(sim, itemId('silver')) >= hireCost(sim) + 300
+    ) {
+      sim.apply({ type: 'hireFighters', faction: FACTIONS.find((f) => !f.hostile)!.id });
     }
     if (!gravesPlaced && sim.day >= 6) {
       gravesPlaced = true;

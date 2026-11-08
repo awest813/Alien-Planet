@@ -352,6 +352,7 @@ export function animalsAtDawn(sim: Simulation): void {
   if (born.length > 0) {
     sim.addLog(`New ${born.length > 1 ? 'young' : 'young one'} in the herd: ${born.join(', ')}.`, 'good');
   }
+  wildYoung(sim);
   moveOn(sim);
   migrate(sim);
   // Wounds mend, a quarter of an animal's health a day.
@@ -370,12 +371,56 @@ export function animalsAtDawn(sim: Simulation): void {
   }
 }
 
+// In spring and summer wild herds have young too, while the valley has room (three quarters of what it
+// holds), so a valley that isn't hunted out keeps its wildlife. Half as often as tame animals breed.
+function wildYoung(sim: Simulation): void {
+  if ((sim.season !== 'Spring' && sim.season !== 'Summer') || wildCount(sim) >= wildCap(sim) * 0.75) {
+    return;
+  }
+  const settled = sim.animals.filter(
+    (a) => !a.tame && a.hp > 0 && !a.leaving && !a.manhunter && !a.quarry && ANIMALS[a.kind].weight > 0,
+  );
+  for (const kind of new Set(settled.map((a) => a.kind))) {
+    const herd = settled.filter((a) => a.kind === kind);
+    for (let pair = 0; pair < Math.floor(herd.length / 2); pair++) {
+      if (wildCount(sim) >= wildCap(sim) * 0.75 || !sim.rng.chance(ANIMALS[kind].breedChance * 0.5)) {
+        continue;
+      }
+      addAnimal(sim, herd[pair * 2].tile, kind);
+    }
+  }
+}
+
+// Hunt too hard and the herds grow wary of the valley: more than this many kills in five days, and for ten
+// days after, half as many wander in.
+const WARY_KILLS = 8;
+const WARY_WINDOW = TICKS_PER_HOUR * 24 * 5;
+const WARY_DAYS = 10;
+export const herdsWary = (sim: Simulation): boolean => (sim.story.waryUntil ?? 0) > sim.tick;
+
+function huntedOne(sim: Simulation): void {
+  const recent = (sim.story.recentHunts ?? []).filter((t) => t > sim.tick - WARY_WINDOW);
+  recent.push(sim.tick);
+  sim.story.recentHunts = recent;
+  if (recent.length > WARY_KILLS && !herdsWary(sim)) {
+    sim.story.waryUntil = sim.tick + WARY_DAYS * TICKS_PER_HOUR * 24;
+    sim.addLog(
+      'The colony has hunted the valley hard: the herds have grown wary, and fewer will wander in for a while.',
+      'warn',
+      true,
+    );
+  }
+}
+
 // A hunted-out valley fills back up slowly: while the wild population is under half the room there
 // is, a few grazers sometimes wander in on their own, most often in spring and rarely in winter. The
 // storyteller's herds are the bigger, announced arrivals.
 const MIGRATION_CHANCE: Record<Season, number> = { Spring: 0.4, Summer: 0.3, Autumn: 0.25, Winter: 0.1 };
 function migrate(sim: Simulation): void {
-  if (wildCount(sim) >= wildCap(sim) / 2 || !sim.rng.chance(MIGRATION_CHANCE[sim.season])) {
+  if (
+    wildCount(sim) >= wildCap(sim) / 2 ||
+    !sim.rng.chance(MIGRATION_CHANCE[sim.season] * (herdsWary(sim) ? 0.5 : 1))
+  ) {
     return;
   }
   const count = herdArrives(sim, true);
@@ -609,6 +654,7 @@ export function hurtAnimal(sim: Simulation, a: Animal, amount: number, attacker:
     // Slaughtering livestock, or fending off an angry animal, isn't hunting.
     if (!a.tame && a.hunted) {
       sim.stats.hunted++;
+      huntedOne(sim);
     }
     if (a.kind === 'greatBeast') {
       beastSlain(sim, a, attacker);
