@@ -1548,6 +1548,10 @@ button.primary:hover:not(:disabled) {
   align-items: center;
   justify-content: center;
   line-height: 1.05;
+  /* A finger held on a cell steps it back: no text selection or iPhone callout in the way. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .work-grid .prio {
