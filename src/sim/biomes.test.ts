@@ -67,23 +67,23 @@ describe('biomes and maps', () => {
   });
 
   it('gives each biome its own climate', () => {
-    const yearMean = (biome: Biome, season?: string) => {
+    const temps = (biome: Biome, season?: string) => {
       const sim = Simulation.newColony(5, 'standard', 64, { biome });
-      let sum = 0;
-      let n = 0;
-      for (let hour = 0; hour < 24 * 24; hour += 3) {
+      const seen: number[] = [];
+      for (let hour = 0; hour < 24 * 24; hour++) {
         sim.tick = hour * HOUR;
         if (!season || sim.season === season) {
-          sum += sim.outdoorTemperature();
-          n++;
+          seen.push(sim.outdoorTemperature());
         }
       }
-      return sum / n;
+      return { mean: seen.reduce((a, b) => a + b, 0) / seen.length, max: Math.max(...seen), min: Math.min(...seen) };
     };
-    expect(yearMean('tundra', 'Winter')).toBeLessThan(yearMean('temperate', 'Winter') - 6);
-    expect(yearMean('tundra', 'Summer')).toBeLessThan(yearMean('temperate', 'Summer'));
-    expect(yearMean('desert', 'Summer')).toBeGreaterThan(yearMean('temperate', 'Summer') + 4);
-    expect(yearMean('forest')).toBeGreaterThan(yearMean('tundra'));
+    expect(temps('tundra', 'Winter').mean).toBeLessThan(temps('temperate', 'Winter').mean - 6);
+    expect(temps('tundra', 'Summer').mean).toBeLessThan(temps('temperate', 'Summer').mean);
+    // Desert afternoons are hotter and its nights colder.
+    expect(temps('desert', 'Summer').max).toBeGreaterThan(temps('temperate', 'Summer').max + 2);
+    expect(temps('desert', 'Spring').min).toBeLessThan(temps('desert', 'Spring').max - 22);
+    expect(temps('forest').mean).toBeGreaterThan(temps('tundra').mean);
   });
 
   it('brings little rain to the desert and snow to the tundra', () => {

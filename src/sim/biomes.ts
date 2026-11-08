@@ -90,9 +90,9 @@ export const BIOMES: Record<Biome, BiomeDef> = {
     key: 'desert',
     label: 'Desert',
     description: 'Hot summers, cold nights, little water or wood. Crops grow slowly in the sand.',
-    mean: 5,
+    mean: 2,
     swing: 9,
-    daily: 11,
+    daily: 10,
     weather: {
       Spring: { clear: 0.75, rain: 0.1, storm: 0.05, fog: 0.1 },
       Summer: { clear: 0.62, rain: 0.04, storm: 0.06, drought: 0.28 },
