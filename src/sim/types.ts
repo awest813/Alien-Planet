@@ -488,6 +488,9 @@ export interface Stats {
   // Breaches from below, through deep mine shafts.
   breaches?: number;
   greatBeastSlain?: number;
+  // Sieges the colony saw off (beaten or waited out without being overrun), and raids allies came to.
+  siegesSeenOff?: number;
+  alliesCame?: number;
   // Every death, by cause (the log only keeps the latest).
   deaths?: Record<string, number>;
   requestsFailed?: number;

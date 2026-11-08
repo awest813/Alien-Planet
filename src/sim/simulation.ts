@@ -161,7 +161,7 @@ import {
 } from './gatherings';
 import { BeaconState, TRANSMIT_HOURS, chooseToStay, depart, freshBeacon, updateBeacon } from './beacon';
 import { FEED_BELOW, PRISONER_BED, TALK_TICKS, release, talk, updateCaptives, visitDue } from './prisoners';
-import { CARER_HUNGER, DRAFT_AGE, agePace, canWork, rollPast, updateLifespans } from './lifespans';
+import { ADULT, CARER_HUNGER, DRAFT_AGE, ELDER, agePace, canWork, rollPast, updateLifespans } from './lifespans';
 import { inHospitalBed, isInfected, scarMove, scarWork } from './body';
 import {
   Village,
@@ -7181,14 +7181,14 @@ const NUMBER_WORDS: Record<number, string> = { 3: 'Three', 4: 'Four', 5: 'Five',
 export interface ObjectiveDef {
   id: string;
   label: string;
-  phase: 1 | 2 | 3 | 4 | 5 | 6;
+  phase: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   check: (sim: Simulation) => boolean;
   progress?: (sim: Simulation) => string;
   // Left out entirely in some games (no raids on peaceful).
   hidden?: (sim: Simulation) => boolean;
 }
 
-export const PHASE_NAMES = ['Shelter', 'Living', 'Story', 'Seasons', 'Prosperity', 'Legacy'];
+export const PHASE_NAMES = ['Shelter', 'Living', 'Story', 'Seasons', 'Prosperity', 'Legacy', 'Generations'];
 
 const produced = (s: Simulation, key: string) => s.stats.produced[key] ?? 0;
 // Kinds of recreation the colony's buildings offer (walks don't count).
@@ -7546,5 +7546,60 @@ export const OBJECTIVES: ObjectiveDef[] = [
     label: 'Meet the ship: board it, or stay',
     phase: 6,
     check: (s) => s.beacon.choice !== undefined,
+  },
+  // Generations: the long game, goals the colony's own story brings.
+  {
+    id: 'grownUp',
+    label: 'Raise a child born in the colony to adulthood',
+    phase: 7,
+    check: (s) => s.colonists.some((c) => c.parents.length > 0 && c.age >= ADULT),
+  },
+  {
+    id: 'thirdGeneration',
+    label: 'See a third generation born',
+    phase: 7,
+    check: (s) => s.colonists.some((c) => c.parents.some((p) => (s.colonists[p]?.parents.length ?? 0) > 0)),
+  },
+  {
+    id: 'elder',
+    label: 'See a colonist live to 65',
+    phase: 7,
+    check: (s) => s.colonists.some((c) => c.age >= ELDER),
+    progress: (s) => `oldest ${Math.floor(Math.max(0, ...s.living().map((c) => c.age)))}`,
+  },
+  {
+    id: 'siegeSeenOff',
+    label: 'See off a siege',
+    phase: 7,
+    check: (s) => (s.stats.siegesSeenOff ?? 0) > 0,
+    hidden: (s) => s.story.difficulty === 'peaceful',
+  },
+  {
+    id: 'beastSlain',
+    label: 'Bring down the great beast',
+    phase: 7,
+    check: (s) => (s.stats.greatBeastSlain ?? 0) > 0,
+    hidden: (s) => s.story.difficulty === 'peaceful',
+  },
+  {
+    id: 'allies',
+    label: 'Fight alongside the Meadow Kin',
+    phase: 7,
+    check: (s) => (s.stats.alliesCame ?? 0) > 0,
+    hidden: (s) => s.story.difficulty === 'peaceful',
+  },
+  {
+    id: 'cavern',
+    label: 'Break into a cavern deep below',
+    phase: 7,
+    check: (s) => (s.stats.breaches ?? 0) > 0,
+    hidden: (s) => s.story.difficulty === 'peaceful',
+  },
+  {
+    id: 'decade',
+    label: 'Keep the colony going for ten years',
+    phase: 7,
+    check: (s) => yearOf(s.totalHours) > 10,
+    progress: (s) => `year ${Math.min(10, yearOf(s.totalHours))}/10`,
   },
 ];

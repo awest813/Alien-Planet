@@ -227,6 +227,17 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     how: 'Five days of power without a break in the signal… and raiders will come for it. Keep the generators fed.',
   },
   shipChoice: { how: 'When the ship lands, decide: board it and end the story here, or stay.', screen: 'ship' },
+  grownUp: { how: 'Couples who love each other have children; keep them fed, warm and safe until they are 18.' },
+  thirdGeneration: { how: 'A child born here, grown up and with a family of their own.' },
+  elder: { how: 'Colonists age a little faster than the years go by: keep someone alive into old age.' },
+  siegeSeenOff: { how: 'When raiders camp nearby, break the camp or fortify and beat them when they come.' },
+  beastSlain: { how: 'The great beast wakes once a year from the second: draft everyone and bring it down.' },
+  allies: {
+    how: 'The Meadow Kin sometimes send fighters to a raid, or hire them (goodwill 30 or more).',
+    screen: 'factions',
+  },
+  cavern: { how: 'Dig a mine shaft (Deep mining research) deep enough, and be ready for what comes up.' },
+  decade: { how: 'Keep going: ten years of the valley.' },
   instrument: {
     how: 'Build a drum, flute or lute (Furniture). Colonists play it for fun, and everyone nearby enjoys the music.',
     tool: 'lute',
@@ -743,7 +754,7 @@ export interface ObjectiveView {
   // A line on how to get it done, and the tool or screen that does it.
   how: string;
   tool?: string;
-  screen?: 'work' | 'production' | 'research' | 'schedule' | 'ship';
+  screen?: 'work' | 'production' | 'research' | 'schedule' | 'ship' | 'factions';
   // The order is given (trees marked, blueprints or a field laid out) and colonists are on it.
   underway?: boolean;
 }

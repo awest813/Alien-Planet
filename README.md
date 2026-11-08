@@ -58,6 +58,9 @@ Objectives:
   while raiders, drawn by the signal, come for it. A ship answers and lands beside the beacon. Board it and the
   colony's story ends on your terms, with a summary of what it made of its time; or stay, and signal again
   whenever you like.
+- **Phase 7 – Generations:** goals the colony's own story brings, for those who stay: raise a child born here to
+  adulthood, see a third generation, a colonist reach 65, a siege seen off, the great beast brought down, the
+  Meadow Kin fighting alongside, a cavern broken into below, and ten years in the valley.
 
 How the living simulation works:
 

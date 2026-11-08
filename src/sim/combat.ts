@@ -733,6 +733,9 @@ export function updateEnemies(sim: Simulation): void {
     const standing = sim.living().filter((c) => !c.health.downed);
     // Every raider fell without the raid breaking first: that's a win too.
     const outcome = raid.outcome ?? (standing.length > 0 ? 'repelled' : 'overrun');
+    if (raid.siege && outcome !== 'overrun') {
+      sim.stats.siegesSeenOff = (sim.stats.siegesSeenOff ?? 0) + 1;
+    }
     if (outcome === 'withdrew') {
       sim.addLog('The raiders have gone. Colonists stand down.', 'info', true);
     } else if (outcome === 'repelled') {
@@ -1029,6 +1032,7 @@ function alliesArrive(sim: Simulation, count: number): void {
       repathAt: 0,
     });
   }
+  sim.stats.alliesCame = (sim.stats.alliesCame ?? 0) + 1;
   sim.addLog(`${FACTIONS[friend].name} have sent ${count} fighters to help drive off the raiders!`, 'good', true);
 }
 

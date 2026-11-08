@@ -15,7 +15,8 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   day 51. Seven years with nothing to study.
   - Close it with a deeper tree, gated by materials and buildings as well as time: smelting and steel; glass
     and greenhouses; medicine (surgery, prosthetics; see body.ts); late defences; a longer path to the beacon.
-- **Goals stop at 41–46 of 50 by year 4.** The rest are niche: sandbags, cold storage, taming, iron, fine art,
+- **Goals stop at 41–46 of 50 by year 4** (partly closed: a seventh phase, Generations, of eight goals from the
+  colony's story: children grown, a third generation, an elder, a siege, the beast, allies, a cavern, a decade). The rest are niche: sandbags, cold storage, taming, iron, fine art,
   feasts, parkas, recruiting. After that there's no direction.
   - Close it with later goal phases (generations, legends, a great work), or goals that come from the story,
     such as "survive the siege" or "raise a child to adulthood".
