@@ -304,6 +304,7 @@ function play(seed: number): Result {
   const fell = new Set<number>();
   let beaconPlaced = false;
   let shaftPlaced = false;
+  let poplarsPlanted = false;
   let shipsLanded = 0;
   let bannerPlaced = false;
   let labTile = -1;
@@ -433,6 +434,19 @@ function play(seed: number): Result {
       const next = RESEARCH_ORDER.find((key) => !sim.research.done.includes(key));
       if (next) {
         sim.apply({ type: 'research', project: next });
+      }
+    }
+    // The forest running out: plant a grove of poplars for firewood.
+    if (!poplarsPlanted && Math.floor(sim.hour) === 8 && sim.countFeature((f) => f === featureId('tree')) < 60) {
+      poplarsPlanted = true;
+      const grove = findSite(sim, 6, 5, avoid);
+      if (grove) {
+        claim(avoid, sim, grove.x, grove.y, 6, 5);
+        sim.apply({
+          type: 'zone',
+          rect: { x0: grove.x, y0: grove.y, x1: grove.x + 5, y1: grove.y + 4 },
+          zone: crop('poplarPlant'),
+        });
       }
     }
     // Deep mining researched: sink a shaft (it's marked for digging once built).

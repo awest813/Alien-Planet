@@ -1104,6 +1104,20 @@
     }
   },
   {
+    "key": "poplarPlant",
+    "name": "Poplar",
+    "passable": true,
+    "moveCost": 1.4,
+    "crop": {
+      "item": "wood",
+      "count": 14,
+      "growDays": 6,
+      "sowWork": 50,
+      "harvestWork": 120,
+      "hardy": true
+    }
+  },
+  {
     "key": "clayBank",
     "name": "Clay bank",
     "natural": true,

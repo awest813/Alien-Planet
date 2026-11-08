@@ -28,6 +28,8 @@ export interface StoryState {
   coldSnapUntil: number;
   // A manhunter pack is on the loose (colonists stand down once it's dealt with).
   manhuntersActive?: boolean;
+  // When the last "has collapsed" notification went out (they come in bursts; one card is enough).
+  lastCollapseCard?: number;
   // Ticks when a heat wave, an eclipse and an aurora end (0 or past: none on).
   heatWaveUntil?: number;
   eclipseUntil?: number;

@@ -721,6 +721,19 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
   an infestation from below (Phase L).
 - First slice: the chronicle and engravings. Success: a 120-day run reads like a history.
 
+### Audits after Phase L
+
+- Downed colonists starved because only doctors on doctor work fed them: a starving patient is now urgent, and
+  anyone feeds them when no doctor is on their feet.
+- The first night: colonists land with 50 salvaged wood, and the welcome suggests a 5×5 hut.
+- Deforestation: in 96-day runs the test colony cut the map bare by day 24, lived off its stockpile, and froze in
+  its fourth winter when generators for the beacon burned the last wood. Trees only spread beside trees, so a
+  bare map never recovered. Now seed blows in (likelier the barer the map), poplars can be grown for wood, the
+  fires come before generators when cold and short, and an alert counts the days of firewood left. Harsh 96-day
+  runs went from 22 of 35 surviving (one colony frozen) to 29 of 32.
+- Notifications: "has collapsed" cards are at most one in two hours (and none during fights), and recoveries and
+  re-elections are log lines, not cards: about 4.7 cards a day, from 5.2.
+
 ### What to measure
 
 - Extend the balance harness for each phase (food days with preservation, generation size, break kinds,

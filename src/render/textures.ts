@@ -522,6 +522,7 @@ function drawFeature(c: Ctx, key: string): void {
     case 'grainPlant':
     case 'cottonPlant':
     case 'healrootPlant':
+    case 'poplarPlant':
       drawCrop(c, key, 2);
       break;
     case 'stove':
@@ -1181,6 +1182,19 @@ function drawFeature(c: Ctx, key: string): void {
 }
 
 function drawCrop(c: Ctx, key: string, stage: number): void {
+  if (key === 'poplarPlant') {
+    // Young poplars in rows: whips at first, slim trees by the time they're ready to cut.
+    c.fillStyle = 'rgba(70, 45, 25, 0.5)';
+    c.fillRect(1, 2, 14, 12);
+    for (const x of [3, 8, 13]) {
+      const h = 3 + stage * 3;
+      c.fillStyle = '#6a4626';
+      c.fillRect(x, 14 - h, 1, h);
+      c.fillStyle = stage === 2 ? '#3f7a34' : '#5a9a44';
+      c.fillRect(x - 1, 14 - h - 1, 3, Math.max(2, h - 2));
+    }
+    return;
+  }
   const leaf =
     key === 'potatoPlant'
       ? '#4f9a3a'

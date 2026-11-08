@@ -363,6 +363,14 @@ export const TOOLS: ToolDef[] = [
     hint: 'Drag over soil or grass to plant cotton (for cloth)',
   },
   {
+    id: 'growPoplars',
+    label: 'Grow poplars',
+    hotkey: '',
+    tool: { kind: 'zone', zone: GROW_ZONE + featureId('poplarPlant') },
+    group: 'zones',
+    hint: 'Drag over soil or grass to plant poplars: fast-growing trees cut for wood, frost or no frost',
+  },
+  {
     id: 'growHealroot',
     label: 'Grow healroot',
     hotkey: 'y',
@@ -1931,6 +1939,21 @@ export class GameController {
         tone: hours <= 24 ? 'warn' : 'calm',
         tile: quarry?.tile,
       });
+    }
+    // Firewood: say so before the fires go out, not after.
+    const burn = sim.firewoodPerDay();
+    const wood = sim.stockOf(itemId('wood'));
+    const winterNear = sim.season === 'Winter' || daysUntilWinter(sim.totalHours) <= 6;
+    if (burn > 0 && winterNear && wood < burn * 4) {
+      const trees = sim.countFeature((f) => featureDef(f).key === 'tree');
+      const days = Math.floor(wood / burn);
+      alerts.push({
+        text: `Firewood running low: ${wood} wood, ${days < 1 ? 'under a day' : `about ${days} day${days > 1 ? 's' : ''}`} of fires. ${trees < 20 ? 'Few trees are left: grow poplars (Zones)' : 'Chop trees (C)'}`,
+        tone: days < 2 ? 'danger' : 'warn',
+      });
+    }
+    if (sim.woodForFiresOnly() && sim.countFeature((f) => !!featureDef(f).power?.fuel) > 0) {
+      alerts.push({ text: 'Wood is short: the generators go without, to keep the fires lit', tone: 'warn' });
     }
     const untilWinter = daysUntilWinter(sim.totalHours);
     // Winter kills a colony with nowhere warm to go: say so plainly, before and during.

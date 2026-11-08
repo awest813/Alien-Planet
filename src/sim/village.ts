@@ -121,7 +121,8 @@ export function elect(sim: Simulation): Colonist | null {
       ? `${winner.c.name} has been chosen to lead the colony again (${winner.n} of ${voters.length} votes).`
       : `The colony has chosen ${winner.c.name} as its leader (${winner.n} of ${voters.length} votes).`,
     'good',
-    true,
+    // A new leader is news; the same one again isn't worth a card.
+    !again,
   );
   return winner.c;
 }

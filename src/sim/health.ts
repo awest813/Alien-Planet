@@ -225,7 +225,7 @@ export function updateHealth(sim: Simulation, c: Colonist, hours: number): void 
     h.disease.severity += def.severityPerHour * (tended ? 0.45 : 1) * hours;
     h.disease.immunity += def.immunityPerHour * restBonus * hours;
     if (h.disease.immunity >= 1 && h.disease.severity < 1) {
-      sim.addLog(`${c.name} has recovered from ${h.disease.label.toLowerCase()}.`, 'good', true);
+      sim.addLog(`${c.name} has recovered from ${h.disease.label.toLowerCase()}.`, 'good');
       h.disease = null;
     }
   }
@@ -263,7 +263,16 @@ export function checkHealth(sim: Simulation, c: Colonist): void {
     sim.endJob(c);
     sim.dropCarried(c);
     // In a raid, collapses go to the log only; the raid's own card covers it.
-    sim.addLog(`${c.name} has collapsed and needs a doctor.`, 'danger', !sim.raid);
+    // A card for the first in a while, outside a fight (the fight has its own alert, and the side panel
+    // lists everyone who's down).
+    const card =
+      !sim.raid &&
+      !sim.story.manhuntersActive &&
+      sim.tick - (sim.story.lastCollapseCard ?? -Infinity) > TICKS_PER_HOUR * 2;
+    if (card) {
+      sim.story.lastCollapseCard = sim.tick;
+    }
+    sim.addLog(`${c.name} has collapsed and needs a doctor.`, 'danger', card);
     if (!sim.raid) {
       sim.events.push('collapse');
     }

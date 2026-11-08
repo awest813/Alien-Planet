@@ -134,7 +134,15 @@ export interface FeatureDef {
   shaft: boolean;
   joy?: JoySpec;
   harvest?: { work: WorkType; amount: number; item: number; count: number };
-  crop?: { item: number; count: number; growDays: number; sowWork: number; harvestWork: number };
+  crop?: {
+    item: number;
+    count: number;
+    growDays: number;
+    sowWork: number;
+    harvestWork: number;
+    // Shrugs off frost (young trees).
+    hardy?: boolean;
+  };
   build?: { cost: Cost[]; work: number };
   // Floors and roofs sit in their own layer, under or over whatever else is on the tile.
   layer?: 'floor' | 'roof';
@@ -223,7 +231,7 @@ interface RawFeature {
     instrument?: boolean;
   };
   harvest?: { work: string; amount: number; item: string; count: number };
-  crop?: { item: string; count: number; growDays: number; sowWork: number; harvestWork: number };
+  crop?: { item: string; count: number; growDays: number; sowWork: number; harvestWork: number; hardy?: boolean };
   build?: { cost: { item: string; count: number }[]; work: number };
   shaft?: boolean;
   layer?: 'floor' | 'roof';

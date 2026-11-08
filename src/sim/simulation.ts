@@ -252,6 +252,10 @@ const TRACK_DIRT_WET = 0.12;
 const CRAWL_HUNGRY = 0.15;
 // A downed patient this hungry is fed before wounds that aren't bleeding are tended.
 const STARVING_PATIENT = 0.1;
+// Below this outdoor temperature the fires matter; then wood for this many days of them is kept back from
+// the generators.
+const COLD_FOR_FIRES = 8;
+const FIREWOOD_RESERVE_DAYS = 3;
 // Wood the colonists land with.
 const SALVAGED_WOOD = 50;
 const CRAWL_RANGE = 25;
@@ -370,6 +374,7 @@ const WORK_JOBS = new Set<JobType>([
 ]);
 const TEND_TICKS = 80;
 const MEDICINE = itemId('herbalMedicine');
+const WOOD = itemId('wood');
 // A stored weapon must be this much better (by weaponScore) before someone swaps theirs for it.
 const WEAPON_UPGRADE = 1.15;
 // A different kind of weapon (a longbow over a recurve) only needs to be somewhat better.
@@ -1736,7 +1741,7 @@ export class Simulation {
       const temp = this.temperatureAt(i);
       // Hard frost kills crops left in the field.
       // Hashed rather than drawn from the rng, so which crops die doesn't depend on list order.
-      if (temp < FROST && hash2(i, this.tick, this.seed) < 0.05) {
+      if (temp < FROST && !crop.hardy && hash2(i, this.tick, this.seed) < 0.05) {
         w.setFeature(i, NONE);
         frosted++;
         continue;
@@ -4085,6 +4090,24 @@ export class Simulation {
   }
 
   // Keeps fuelled generators and fires topped up.
+  // Wood the colony's fires burn in a day (kilns and smelters only burn while worked, so they don't count).
+  public firewoodPerDay(): number {
+    this.refreshGrid();
+    const w = this.world;
+    return this.fireTiles.reduce((sum, i) => {
+      const def = featureDef(w.feature[i]);
+      return sum + (def.burns && !def.workbench && def.burns.item === WOOD ? def.burns.perDay : 0);
+    }, 0);
+  }
+
+  // Cold out and wood short: what's left is kept for the fires, not burned in generators.
+  public woodForFiresOnly(): boolean {
+    return (
+      this.outdoorTemperature() < COLD_FOR_FIRES &&
+      this.stockOf(WOOD) < Math.max(20, this.firewoodPerDay() * FIREWOOD_RESERVE_DAYS)
+    );
+  }
+
   private generatorRunningLow(): boolean {
     const w = this.world;
     this.refreshGrid();
@@ -4097,6 +4120,7 @@ export class Simulation {
   private tryRefuel(c: Colonist, urgentOnly = false): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
+    const keepWood = this.woodForFiresOnly();
     const fuelAt = (i: number) => (w.feature[i] !== NONE ? fuelOf(featureDef(w.feature[i])) : undefined);
     const generator = this.nearestIn(
       'buildings',
@@ -4105,6 +4129,8 @@ export class Simulation {
         const fuel = fuelAt(i);
         return (
           !!fuel &&
+          // In the cold, the fires come first: a generator only gets wood they can spare.
+          !(featureDef(w.feature[i]).power && fuel.item === WOOD && keepWood) &&
           w.fuel[i] < fuel.capacity * (urgentOnly ? 0.2 : 0.5) &&
           !this.isReserved(`f${i}`, c) &&
           this.hasWorkSpot(i, false, region)

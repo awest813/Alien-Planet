@@ -204,9 +204,11 @@ How the storytelling layer works:
   longest moves on, predators with nothing left to hunt leave, and a maddened pack whose fury is spent goes
   back where it came from. A hunted-out valley slowly refills: while wildlife is under half the room there is, a
   few grazers sometimes wander in at dawn (most often in spring, rarely in winter). Wounded animals mend slowly.
-- **Wild plants:** outside winter, trees and berry bushes slowly spread onto open grass and soil beside their own
-  kind (not in zones, under roofs or floors, on items or plans, or near the colony), until they cover about as
-  much of the map as at the start. A forest cut down comes back over seasons, not days.
+- **Wild plants and firewood:** outside winter, trees and berry bushes slowly spread onto open grass and soil
+  beside their own kind, back towards how wooded the valley started; and seed blows in, so even a valley cut bare
+  greens again in time. For wood you can count on, plant poplars in a growing zone: they take six days, shrug off
+  frost and are cut for 14 wood a tile. When it's cold and wood runs short, the fires are fed before the
+  generators, and an alert says how many days of firewood are left.
 - **Weapons, armor and defenses:** one set of weapons for everyone, each with its own reach, rate, accuracy,
   drop-off and armor piercing: fists, knife, club, spear, short bow, recurve bow, longbow (Longbows research) and
   crossbow (Crossbows research). Leather and scale armor (Armor and Scale armor research) turn aside a share of
