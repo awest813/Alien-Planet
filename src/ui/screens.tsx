@@ -1006,7 +1006,11 @@ function History({ history }: { history: UiState['history'] }) {
     <div className="history-grid">
       <HistoryChart title="Colonists" points={series(1)} format={(v) => String(v)} />
       <HistoryChart title="Average mood" points={series(2)} format={(v) => String(v)} />
-      <HistoryChart title="Wealth" points={series(3)} format={(v) => `${(v / 1000).toFixed(1)}k silver`} />
+      <HistoryChart
+        title="Wealth"
+        points={series(3)}
+        format={(v) => (v < 1000 ? `${v} silver` : `${(v / 1000).toFixed(1)}k silver`)}
+      />
       <HistoryChart title="Food" points={series(4)} format={(v) => `${v.toFixed(1)} days`} />
     </div>
   );
