@@ -258,7 +258,7 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
   },
   cavern: { how: 'Dig a mine shaft (Deep mining research) deep enough, and be ready for what comes up.' },
   winterHarvest: {
-    how: 'Research Glassmaking (it needs a kiln), roof a field inside a heated room, and harvest it in winter.',
+    how: 'Research Glassmaking (it needs a kiln), wall a field in as a room, heat it, and harvest it in winter.',
     screen: 'research',
   },
   steel: {

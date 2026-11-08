@@ -38,6 +38,8 @@ export interface RaidState {
   siege?: SiegeState;
   // They've had to tunnel through rock to get in (said once).
   sapped?: boolean;
+  // How many colonists were here when it began (to tell a raid seen off with nobody lost or down).
+  colonists?: number;
   // Thieves after the stores rather than a fight; what they got away with.
   thieves?: boolean;
   stolen?: number;
@@ -279,7 +281,14 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
         ...(thieves ? { thief: true } : {}),
       });
     }
-    sim.raid = { faction, initial: count, killed: 0, startedTick: sim.tick, ...(thieves ? { thieves: true } : {}) };
+    sim.raid = {
+      faction,
+      initial: count,
+      killed: 0,
+      startedTick: sim.tick,
+      colonists: sim.living().length,
+      ...(thieves ? { thieves: true } : {}),
+    };
     // The signal draws them; while it's on the air a third of them go straight for the beacon.
     const wreckers = !siege && !thieves && transmitting(sim) ? Math.ceil(count / 3) : 0;
     for (const e of sim.enemies.slice(-count).slice(0, wreckers)) {
@@ -405,12 +414,17 @@ function breach(sim: Simulation, e: Enemy): boolean {
 
 // Walls and doors; and, for raiders with no other way in, the rock itself (sappers dig, slowly: rock takes as
 // many blows as it takes a miner's work).
+// (Built: anything in the way, a fence or a trough as much as a wall.)
 const breakable = (w: World, i: number) => {
-  if (w.feature[i] === NONE || !w.blocksRoom(i)) {
+  if (w.feature[i] === NONE) {
     return false;
   }
   const def = featureDef(w.feature[i]);
-  return !!def.build || (!!def.natural && def.harvest?.work === 'mine');
+  return def.build ? w.blocksRoom(i) || !w.isPassable(i) : diggable(w, i);
+};
+const diggable = (w: World, i: number) => {
+  const def = featureDef(w.feature[i]);
+  return !!def.natural && def.harvest?.work === 'mine' && w.blocksRoom(i);
 };
 const toughness = (sim: Simulation, i: number) => {
   const def = featureDef(sim.world.feature[i]);
@@ -433,9 +447,25 @@ function breachWall(
   const w = sim.world;
   let best: number | undefined;
   let bestScore = Infinity;
+  // Rock worth digging: joined to the colonists' side through rock, near them. (Digging a face that only
+  // leads into more of the hillside wastes the whole raid.)
+  const leadsIn = new Uint8Array(w.size);
+  const queue = [goalTile];
+  leadsIn[goalTile] = 1;
+  for (let q = 0; q < queue.length; q++) {
+    for (const n of w.neighbors(queue[q], false)) {
+      if (
+        !leadsIn[n] &&
+        w.distance(n, goalTile) <= SAP_REACH &&
+        ((w.isPassable(n) && sim.regionOf(n) === goalRegion) || (w.feature[n] !== NONE && diggable(w, n)))
+      ) {
+        leadsIn[n] = 1;
+        queue.push(n);
+      }
+    }
+  }
   for (let i = 0; i < w.size; i++) {
-    // (Rock only near the colonists: far off, tunnelling leads nowhere useful.)
-    if (!breakable(w, i) || (featureDef(w.feature[i]).natural && w.distance(i, goalTile) > SAP_REACH)) {
+    if (!breakable(w, i) || (featureDef(w.feature[i]).natural && !leadsIn[i])) {
       continue;
     }
     const sides = w.neighbors(i, false);
@@ -597,7 +627,11 @@ function flee(sim: Simulation, e: Enemy, ally = false): void {
     );
     e.path = sim.pathfinder.find(e.tile, exits) ?? [];
     if (e.path.length === 0) {
-      // Nowhere to run: vanish rather than linger forever.
+      // Nowhere to run: vanish rather than linger forever (a thief leaving what they took).
+      if (e.loot) {
+        sim.world.dropItemNear(e.tile, e.loot.item, e.loot.count);
+        e.loot = undefined;
+      }
       e.hp = 0;
       return;
     }
@@ -886,8 +920,10 @@ export function updateEnemies(sim: Simulation): void {
       raid.arrivedTick !== undefined
         ? sim.tick - raid.arrivedTick > RAID_TIMEOUT
         : sim.tick - raid.startedTick > RAID_TIMEOUT * 2;
-    // Broken once most of them are down or running.
-    const broken = fighting.length <= raid.initial * (1 - MORALE_BREAK);
+    // Broken once most of them are down or running. (A thief running off with the goods hasn't been beaten:
+    // they count as still in it, or one getting away would send the rest home empty-handed.)
+    const away = raid.thieves ? sim.enemies.filter((e) => e.hp > 0 && e.loot).length : 0;
+    const broken = fighting.length + away <= raid.initial * (1 - MORALE_BREAK);
     if (fighting.length > 0 && (broken || timedOut)) {
       for (const e of fighting) {
         e.fleeing = true;
@@ -896,7 +932,9 @@ export function updateEnemies(sim: Simulation): void {
       raid.outcome ??= broken ? 'repelled' : 'withdrew';
       sim.addLog(
         broken
-          ? 'The raiders are fleeing!'
+          ? raid.thieves
+            ? 'The thieves are running for it!'
+            : 'The raiders are fleeing!'
           : raid.arrivedTick === undefined
             ? 'The raiders turned back before reaching the colony.'
             : 'The raiders are giving up and leaving.',
@@ -935,7 +973,8 @@ export function updateEnemies(sim: Simulation): void {
       for (const c of standing) {
         sim.addThought(c, 'repelledRaid');
       }
-      if (standing.length === sim.living().length) {
+      // (Everyone who was here still on their feet: nobody downed, and nobody killed outright.)
+      if (raid.colonists !== undefined && standing.length >= raid.colonists) {
         sim.stats.cleanDefences = (sim.stats.cleanDefences ?? 0) + 1;
       }
     } else if (sim.living().length > 0) {

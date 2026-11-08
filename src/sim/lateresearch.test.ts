@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { scarAim, scarWork } from './body';
 import { featureId, itemId, researchDef } from './defs';
 import { Simulation } from './simulation';
-import { HOUR, clearAround, run } from './test-helpers';
+import { HOUR, clearAround, outline, run } from './test-helpers';
 import { WORK_TYPES } from './types';
 import { STOCKPILE_ZONE } from './world';
 
@@ -90,7 +90,7 @@ describe('late research', () => {
     expect(scarAim(c, true)).toBeCloseTo(scarAim(c) / 2);
   });
 
-  it('glass roofs let a warm greenhouse grow through winter', () => {
+  it('glass lets a warm greenhouse, a field walled in as a room, grow through winter', () => {
     const grown = (glass: boolean) => {
       const sim = Simulation.newColony(5);
       const w = sim.world;
@@ -100,7 +100,11 @@ describe('late research', () => {
       }
       const tile = w.idx(x + 3, y + 3);
       w.setFeature(tile, featureId('potatoPlant'));
-      w.setLayer('roof', tile, featureId('roof'));
+      // Walled in as a room (crops can't go under a roof).
+      for (const i of outline(w, x + 1, y + 1, x + 5, y + 5)) {
+        w.setFeature(i, featureId('woodWall'));
+      }
+      expect(sim.isIndoors(tile)).toBe(true);
       // Midwinter day, and warm where the crop stands.
       sim.tick = (18 * 24 + 12) * HOUR;
       sim.syncClock();

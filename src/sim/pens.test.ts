@@ -150,4 +150,17 @@ describe('troughs', () => {
     }
     expect(w.fuel[trough]).toBeGreaterThan(0);
   });
+
+  it('a field too big to be a pen is no pen, however many gates it has', () => {
+    const sim = Simulation.newColony(31, 'standard', 96);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 24);
+    // 30 by 23 inside: about 690 tiles, over the limit.
+    for (const i of outline(w, x - 16, y - 12, x + 15, y + 12)) {
+      w.setFeature(i, featureId('fence'));
+    }
+    w.setFeature(w.idx(x - 16, y), featureId('gate'));
+    w.setFeature(w.idx(x + 15, y), featureId('gate'));
+    expect(penMap(sim).pens).toHaveLength(0);
+  });
 });

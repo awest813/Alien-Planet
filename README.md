@@ -78,8 +78,8 @@ How the living simulation works:
   goes straight for it. Vermin spoil food left on the stockpile floor, mostly in winter (shelves, iceboxes and
   frozen stores are safe).
 - **Late research:** later projects need a building standing to study (a smelter for steel, a kiln for glass)
-  and materials from storage to finish: steelmaking, glassmaking (daylight through the roof, so a warm
-  greenhouse grows in winter), double glazing, reinforced walls, barbed traps, antiseptics, plant breeding,
+  and materials from storage to finish: steelmaking, glassmaking (daylight for a field walled in as a room, so
+  a warm greenhouse grows in winter), double glazing, reinforced walls, barbed traps, antiseptics, plant breeding,
   prosthetics and precision tools. The beacon needs engineering first.
 - **More disease:** marsh fever, the winter cough, the grey flu (winter, catching, can kill) and the rare
   shaking sickness (passes by touch, deadly untended). Every illness is harder on the old.

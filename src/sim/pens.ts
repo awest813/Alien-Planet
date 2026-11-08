@@ -58,7 +58,8 @@ export function penMap(sim: Simulation): PenMap {
   const gates = [...w.tilesWith('features')].filter((i) => w.feature[i] === GATE);
   const troughs = [...w.tilesWith('features')].filter((i) => !!troughFeed(sim, i));
   for (const gate of gates) {
-    for (const start of w.neighbors(gate)) {
+    // (Straight through the gate: nobody walks into a pen across a fence corner.)
+    for (const start of w.neighbors(gate, false)) {
       if (seen[start] || !w.isPassable(start) || isGate(sim, start)) {
         continue;
       }
@@ -71,17 +72,17 @@ export function penMap(sim: Simulation): PenMap {
         const x = w.xOf(i);
         const y = w.yOf(i);
         const f = w.feature[i];
+        // Too big, open to the map edge, or somewhere people sleep (a house): no pen. The flood carries on to
+        // the end all the same, so another gate into the same ground can't find a pen in what's left of it.
         if (
           tiles.length > MAX_PEN ||
           x === 0 ||
           y === 0 ||
           x === w.width - 1 ||
           y === w.height - 1 ||
-          // Somewhere people sleep is a house, not a pen.
           (f !== NONE && featureDef(f).bed)
         ) {
           open = true;
-          break;
         }
         for (const n of w.neighbors(i, false)) {
           if (!seen[n] && w.isPassable(n) && !isGate(sim, n)) {

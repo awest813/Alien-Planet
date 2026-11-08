@@ -1995,9 +1995,9 @@ export class Simulation {
         frosted++;
         continue;
       }
-      // Sun lamps let crops grow at night and through winter; under a roof they're the only light, unless the
-      // roof is glass (then a warm greenhouse grows by day, winter or not).
-      const sunlit = (growing && w.roof[i] === NONE) || (glassDay && w.roof[i] !== NONE);
+      // Sun lamps let crops grow at night and through winter; under a roof they're the only light. Glass
+      // (glassmaking) lights a field walled in as a room by day, winter or not: a warm greenhouse.
+      const sunlit = (growing && w.roof[i] === NONE) || (glassDay && w.roof[i] === NONE && this.isIndoors(i));
       if ((!sunlit && !lit[i]) || w.growth[i] >= 1 || temp < CROP_MIN_TEMP) {
         continue;
       }
@@ -4548,6 +4548,21 @@ export class Simulation {
     const region = this.regionOf(c.tile);
     const keepWood = this.woodForFiresOnly();
     const fuelAt = (i: number) => (w.feature[i] !== NONE ? fuelOf(featureDef(w.feature[i])) : undefined);
+    // Only somewhere whose fuel is to be had: an empty trough with no potatoes about mustn't keep the hauler
+    // from the fires. (Looked up once per kind of fuel.)
+    const onHand = new Map<number, boolean>();
+    const toHand = (item: number) => {
+      if (!onHand.has(item)) {
+        const found = this.nearestIn(
+          'items',
+          c.tile,
+          (i) => w.itemType[i] === item && this.regions.region[i] === region && !this.itemTaken(i, c),
+          1,
+        );
+        onHand.set(item, found.length > 0);
+      }
+      return onHand.get(item)!;
+    };
     const generator = this.nearestIn(
       'buildings',
       c.tile,
@@ -4561,7 +4576,8 @@ export class Simulation {
           !(featureDef(w.feature[i]).feeds && foodDays(this) < TROUGH_FOOD_DAYS) &&
           w.fuel[i] < fuel.capacity * (urgentOnly ? 0.2 : 0.5) &&
           !this.isReserved(`f${i}`, c) &&
-          this.hasWorkSpot(i, false, region)
+          this.hasWorkSpot(i, false, region) &&
+          toHand(fuel.item)
         );
       },
       1,

@@ -56,4 +56,54 @@ describe('sappers', () => {
     // Rock isn't rebuilt like a wall would be.
     expect([...w.tilesWith('blueprints')].some((i) => w.blueprint[i] === featureId('rock'))).toBe(false);
   });
+
+  it('break through fences too, rather than dig rock that leads nowhere', () => {
+    const sim = Simulation.newColony(22);
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 14);
+    for (const c of sim.colonists) {
+      c.tile = w.idx(x, y);
+      c.path = [];
+    }
+    // A ring of fences, no gate; and a lump of rock outside it that leads nowhere.
+    for (let dy = -4; dy <= 4; dy++) {
+      for (let dx = -4; dx <= 4; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) === 4) {
+          w.setFeature(w.idx(x + dx, y + dy), featureId('fence'));
+        }
+      }
+    }
+    w.setFeature(w.idx(x + 7, y + 1), featureId('rock'));
+    const raider: Enemy = {
+      id: sim.nextEnemyId++,
+      name: 'Breaker',
+      faction: 0,
+      tile: w.idx(x + 8, y),
+      path: [],
+      moveProgress: 0,
+      hp: 1,
+      weapon: 'club',
+      armor: 0,
+      skill: 4,
+      speed: 0.9,
+      suppression: 0,
+      cooldown: 0,
+      fleeing: false,
+      repathAt: 0,
+    };
+    sim.enemies.push(raider);
+    sim.raid = { faction: 0, initial: 1, killed: 0, startedTick: sim.tick, arrivedTick: sim.tick };
+    const inside = () => sim.regionOf(raider.tile) === sim.regionOf(sim.colonists[0].tile);
+    for (let t = 0; t < 6 * TICKS_PER_HOUR && !inside(); t++) {
+      for (const c of sim.colonists) {
+        c.needs.food = c.needs.rest = c.needs.joy = 1;
+      }
+      raider.hp = 1;
+      sim.step();
+    }
+    expect(inside()).toBe(true);
+    expect(w.feature[w.idx(x + 7, y + 1)]).toBe(featureId('rock'));
+    expect(sim.raid?.sapped).toBeFalsy();
+  });
 });

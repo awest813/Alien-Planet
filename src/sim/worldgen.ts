@@ -123,10 +123,13 @@ export function generateWorld(
   if (nearbyRock < 40) {
     const dry = (x: number, y: number) =>
       world.inBounds(x, y) && world.terrain[world.idx(x, y)] !== DEEP && world.terrain[world.idx(x, y)] !== SHALLOW;
-    for (let k = 0; k < 16; k++) {
-      const angle = (k / 16) * Math.PI * 2 + hash2(seed, 7, seed);
-      const ox = Math.round(sx + Math.cos(angle) * 10);
-      const oy = Math.round(sy + Math.sin(angle) * 10);
+    // Ten tiles out if there's dry ground for it, else nearer (a small island may have no room that far).
+    let raised = false;
+    for (let k = 0; k < 48 && !raised; k++) {
+      const reach = [10, 8, 6][Math.floor(k / 16)];
+      const angle = ((k % 16) / 16) * Math.PI * 2 + hash2(seed, 7, seed);
+      const ox = Math.round(sx + Math.cos(angle) * reach);
+      const oy = Math.round(sy + Math.sin(angle) * reach);
       let fits = true;
       for (let y = oy - 3; y <= oy + 3 && fits; y++) {
         for (let x = ox - 3; x <= ox + 3; x++) {
@@ -148,7 +151,7 @@ export function generateWorld(
           }
         }
       }
-      break;
+      raised = true;
     }
   }
 
