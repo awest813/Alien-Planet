@@ -35,6 +35,30 @@ describe('alerts', () => {
     expect(texts().some((t) => t.startsWith('Nobody can get to the beds'))).toBe(true);
   });
 
+  it('say when nobody can get to a blueprint, or a colonist is shut in', () => {
+    const { sim, w, x, y } = colony('1');
+    sim.tick = HOUR * 30;
+    // The same hut, with a bed still to build inside.
+    for (const i of outline(w, x + 2, y - 3, x + 6, y + 1)) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    w.setFeature(w.idx(x + 4, y + 1), featureId('door'));
+    sim.apply({ type: 'build', feature: featureId('bed'), tiles: [w.idx(x + 4, y - 1)] });
+    const reachBlueprint = () => texts().some((t) => t.startsWith('Nobody can get to a blueprint'));
+    const shutIn = () => texts().some((t) => t.includes('is cut off from the colony'));
+    expect(reachBlueprint()).toBe(false);
+    w.setFeature(w.idx(x + 4, y + 2), featureId('rock'));
+    expect(reachBlueprint()).toBe(true);
+    expect(shutIn()).toBe(false);
+    // One colonist inside with the bed: now they're the one cut off, and the blueprint isn't.
+    const [inside] = sim.living();
+    inside.tile = w.idx(x + 3, y - 1);
+    expect(texts().filter((t) => t.includes('is cut off from the colony'))).toEqual([
+      `${inside.name} is cut off from the colony: there's no way through to the others`,
+    ]);
+    expect(reachBlueprint()).toBe(false);
+  });
+
   it('warn plainly when winter is coming and there is nowhere warm', () => {
     const { sim, w, x, y } = colony('2');
     // A few days before winter.

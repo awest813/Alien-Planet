@@ -70,7 +70,43 @@ interface Report {
   deaths: string[];
 }
 
-function findSite(sim: Simulation, w: number, h: number, avoid: Set<number>): { x: number; y: number } | null {
+// Whether a door at (x, y) leads out into open country rather than a pocket closed off by rock, without
+// going through the building it belongs to (the rectangle `inside`).
+function leadsOut(
+  sim: Simulation,
+  x: number,
+  y: number,
+  inside: { x: number; y: number; w: number; h: number },
+): boolean {
+  const world = sim.world;
+  const within = (i: number) => {
+    const tx = world.xOf(i);
+    const ty = world.yOf(i);
+    return tx >= inside.x && tx < inside.x + inside.w && ty >= inside.y && ty < inside.y + inside.h;
+  };
+  const start = world.idx(x, y);
+  const seen = new Set([start]);
+  const queue = [start];
+  for (let q = 0; q < queue.length && seen.size < 150; q++) {
+    for (const n of world.neighbors(queue[q], false)) {
+      if (!seen.has(n) && !within(n) && world.isPassable(n)) {
+        seen.add(n);
+        queue.push(n);
+      }
+    }
+  }
+  return seen.size >= 150;
+}
+
+// The nearest clear site of w×h tiles; with `door` (a tile relative to the site, in its last row), one
+// whose door leads out once the walls (the rows above it) are up.
+function findSite(
+  sim: Simulation,
+  w: number,
+  h: number,
+  avoid: Set<number>,
+  door?: { dx: number; dy: number },
+): { x: number; y: number } | null {
   const world = sim.world;
   const anchor = (sim.living()[0] ?? sim.colonists[0]).tile;
   const cx = world.xOf(anchor);
@@ -95,6 +131,9 @@ function findSite(sim: Simulation, w: number, h: number, avoid: Set<number>): { 
             (f === NONE || !!FEATURES[f - 1].harvest) &&
             world.blueprint[i] === NONE;
         }
+      }
+      if (ok && door && !leadsOut(sim, x + door.dx, y + door.dy, { x, y, w, h: door.dy })) {
+        ok = false;
       }
       if (ok) {
         best = { x, y, d };
@@ -123,7 +162,7 @@ function basics(sim: Simulation, avoid: Set<number>, rect: (x0: number, y0: numb
   sim.apply({ type: 'designate', rect: { x0: cx - 14, y0: cy - 14, x1: cx + 14, y1: cy + 14 }, kind: 'chop' });
   sim.apply({ type: 'designate', rect: { x0: cx - 18, y0: cy - 18, x1: cx + 18, y1: cy + 18 }, kind: 'forage' });
   // Seven rows of hut and one clear row in front of the door.
-  const hut = findSite(sim, 9, 8, avoid);
+  const hut = findSite(sim, 9, 8, avoid, { dx: 4, dy: 7 });
   if (hut) {
     claim(avoid, sim, hut.x, hut.y, 9, 8);
     const walls: number[] = [];

@@ -2212,6 +2212,44 @@ export class GameController {
         });
       }
     }
+    // Blueprints nobody can get to (a builder works from the tile or one beside it): the same trouble,
+    // before the beds are even built.
+    const able = new Set(
+      sim
+        .living()
+        .filter((c) => !c.health.downed)
+        .map((c) => sim.regionOf(c.tile)),
+    );
+    if (able.size > 0) {
+      const cutOff = [...w.tilesWith('blueprints')].filter(
+        (i) => !able.has(sim.regionOf(i)) && !w.neighbors(i).some((n) => able.has(sim.regionOf(n))),
+      );
+      if (cutOff.length > 0) {
+        alerts.push({
+          text: `Nobody can get to ${cutOff.length === 1 ? 'a blueprint' : `${cutOff.length} blueprints`}: check the way in (is the door blocked, or the room walled in?)`,
+          tone: 'warn',
+          tile: cutOff[0],
+        });
+      }
+    }
+    // A colonist walled off from everyone else (shut in a room, or left on an island when the ice
+    // thawed) can't fetch food or help.
+    const byRegion = new Map<number, number>();
+    for (const c of sim.living()) {
+      byRegion.set(sim.regionOf(c.tile), (byRegion.get(sim.regionOf(c.tile)) ?? 0) + 1);
+    }
+    const [mainRegion, mainCount] = [...byRegion].sort((a, b) => b[1] - a[1])[0] ?? [-1, 0];
+    if (mainCount >= 2) {
+      for (const c of sim.living()) {
+        if (sim.regionOf(c.tile) !== mainRegion && sim.regionOf(c.tile) >= 0 && !c.health.downed) {
+          alerts.push({
+            text: `${c.name} is cut off from the colony: there's no way through to the others`,
+            tone: 'danger',
+            colonist: c.id,
+          });
+        }
+      }
+    }
     // Shelves, iceboxes and drying racks are storage too.
     const anyStorage =
       sim.world.zone.some(isStockpileZone) || [...sim.world.tilesWith('features')].some((i) => sim.isStockpile(i));
