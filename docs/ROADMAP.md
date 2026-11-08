@@ -731,7 +731,8 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
     for five days) and the chronicle remembers.
   - The winter cough: a catching illness in autumn and winter that spreads to anyone within three tiles,
     hardest on elders and small children.
-  - Ten later research projects, 2,600–4,000 each, with requirements, so research runs past the first year:
+  - Ten later research projects, 10,000–16,000 each (three to six days for a dedicated researcher), with
+    requirements, so research runs into the third year:
     - Masonry: building +20%.
     - Irrigation: harvests +25%.
     - Preserving: spoilage −⅓.

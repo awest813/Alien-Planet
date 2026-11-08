@@ -10,9 +10,9 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 
 ## 1. The long game runs out of things to do
 
-- **Research is done in the first year** (partly closed: ten later projects, 2,600–4,000 each, now run
-  research into the second and third years). All 18 projects the test colony researches (25 exist) are finished by
-  day 24 in every run. Nine years with nothing to study.
+- **Research is done by the third year** (partly closed: ten later projects of 10,000–16,000 points). The test
+  colony, with a dedicated researcher, finishes the first 18 projects by day 16 and all 30 it studies by about
+  day 51. Seven years with nothing to study.
   - Close it with a deeper tree, gated by materials and buildings as well as time: smelting and steel; glass
     and greenhouses; medicine (surgery, prosthetics; see body.ts); late defences; a longer path to the beacon.
 - **Goals stop at 41–46 of 50 by year 4.** The rest are niche: sandbags, cold storage, taming, iron, fine art,

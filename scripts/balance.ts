@@ -19,10 +19,12 @@ import {
   featureId,
   itemDef,
   itemId,
+  researchDef,
   terrainDef,
   weaponDef,
 } from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
+import { isAvailable } from '../src/sim/research';
 import { colonyStock, goodwillOf } from '../src/sim/trade';
 import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { mutualOpinion } from '../src/sim/social';
@@ -80,6 +82,7 @@ const RESEARCH_ORDER = [
   'prospecting',
   'fineArts',
   'civics',
+  'longbows',
   'tactics',
   'surgery',
 ];
@@ -443,7 +446,7 @@ function play(seed: number): Result {
     }
     // Keep research going, in a sensible order, and use what it unlocks.
     if (!sim.research.current) {
-      const next = RESEARCH_ORDER.find((key) => !sim.research.done.includes(key));
+      const next = RESEARCH_ORDER.find((key) => isAvailable(sim.research, researchDef(key)!));
       if (next) {
         sim.apply({ type: 'research', project: next });
       }

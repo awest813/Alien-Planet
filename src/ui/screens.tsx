@@ -730,8 +730,13 @@ const CHRONICLE_ICONS: Record<ChronicleKind, string> = {
 };
 
 // The colony's history by year, newest year open; discoveries can be hidden to read the story itself.
+// Only open years render their entries (a long game has thousands).
 function Chronicle({ years }: { years: ChronicleYear[] }) {
   const [discoveries, setDiscoveries] = useState(false);
+  const [open, setOpen] = useState<Record<number, boolean>>({});
+  const shown = years
+    .map((y) => ({ year: y.year, entries: y.entries.filter((e) => discoveries || e.kind !== 'discovery') }))
+    .filter((y) => y.entries.length > 0);
   if (years.length === 0) {
     return <p className="muted">Nothing worth remembering yet.</p>;
   }
@@ -741,26 +746,41 @@ function Chronicle({ years }: { years: ChronicleYear[] }) {
         <span>Include discoveries (research)</span>
         <input type="checkbox" checked={discoveries} onChange={(e) => setDiscoveries(e.target.checked)} />
       </label>
-      {years.map((y, k) => {
-        const entries = y.entries.filter((e) => discoveries || e.kind !== 'discovery');
+      {shown.length === 0 && <p className="muted">Only discoveries so far.</p>}
+      {shown.map((y, k) => {
+        const isOpen = open[y.year] ?? k === 0;
         return (
-          <details key={y.year} open={k === 0}>
+          <details
+            key={y.year}
+            open={isOpen}
+            onToggle={(e) => {
+              const now = (e.currentTarget as HTMLDetailsElement).open;
+              if (now !== isOpen) {
+                setOpen((o) => ({ ...o, [y.year]: now }));
+              }
+            }}
+          >
             <summary>
-              Year {y.year} <span className="muted small">· {entries.length} entries</span>
+              Year {y.year}{' '}
+              <span className="muted small">
+                · {y.entries.length} {y.entries.length === 1 ? 'entry' : 'entries'}
+              </span>
             </summary>
-            <ul className="chronicle-list">
-              {entries.map((e, i) => (
-                <li key={i} className={`chronicle-${e.kind}`}>
-                  <span className="chronicle-icon" aria-hidden="true">
-                    {CHRONICLE_ICONS[e.kind]}
-                  </span>
-                  <span className="muted small chronicle-when">
-                    {e.season}, day {e.day}
-                  </span>{' '}
-                  {e.text}
-                </li>
-              ))}
-            </ul>
+            {isOpen && (
+              <ul className="chronicle-list">
+                {y.entries.map((e, i) => (
+                  <li key={i} className={`chronicle-${e.kind}`}>
+                    <span className="chronicle-icon" aria-hidden="true">
+                      {CHRONICLE_ICONS[e.kind]}
+                    </span>
+                    <span className="muted small chronicle-when">
+                      {e.season}, day {e.day}
+                    </span>{' '}
+                    {e.text}
+                  </li>
+                ))}
+              </ul>
+            )}
           </details>
         );
       })}

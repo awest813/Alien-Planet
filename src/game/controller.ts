@@ -2255,16 +2255,19 @@ export class GameController {
     return waiting.filter(([work, has]) => has && !staffed(work)).map(([work]) => WORK_NAMES[work] ?? work);
   }
 
-  // Rebuilt only when the chronicle grows (it can run to thousands of entries).
-  private chronicleCache: { length: number; sim: Simulation | null; years: ChronicleYear[] } = {
-    length: -1,
-    sim: null,
-    years: [],
-  };
+  // Rebuilt only when the chronicle changes (it can run to thousands of entries). Once it's full its
+  // length stays the same, so the newest entry is compared too.
+  private chronicleCache: {
+    length: number;
+    last: unknown;
+    sim: Simulation | null;
+    years: ChronicleYear[];
+  } = { length: -1, last: null, sim: null, years: [] };
   private chronicleView(): ChronicleYear[] {
     const sim = this.sim;
     const cache = this.chronicleCache;
-    if (cache.sim === sim && cache.length === sim.chronicle.length) {
+    const last = sim.chronicle[sim.chronicle.length - 1] ?? null;
+    if (cache.sim === sim && cache.length === sim.chronicle.length && cache.last === last) {
       return cache.years;
     }
     const years = new Map<number, ChronicleYear>();
@@ -2278,7 +2281,7 @@ export class GameController {
       }
       y.entries.push({ day: e.day, season: seasonOf(hours), kind: e.kind, text: e.text });
     }
-    this.chronicleCache = { length: sim.chronicle.length, sim, years: [...years.values()].reverse() };
+    this.chronicleCache = { length: sim.chronicle.length, last, sim, years: [...years.values()].reverse() };
     return this.chronicleCache.years;
   }
 
