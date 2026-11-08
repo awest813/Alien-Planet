@@ -1,9 +1,9 @@
 // Headless balance harness: an "autoplayer" runs a sensible colony on many seeds and prints
 // survival, combat, health, mood and social statistics.
 //
-//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K] [nohunt] [flow]
+//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive|defend] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K] [nohunt] [flow]
 //
-// "passive" never drafts during raids, to measure the worst case; "peaceful" and "harsh" pick the
+// "passive" never drafts during raids, to measure the worst case; "defend" holds a sandbag line; "peaceful" and "harsh" pick the
 // storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies;
 // "size=96" or "size=128" plays on a bigger map; "seed=N" replays one colony; "start=K" skips the
 // first K seeds; "nohunt" leaves the wildlife alone. With DEBUG=1 in the environment, a trace also
@@ -25,7 +25,7 @@ import {
 } from '../src/sim/defs';
 import { painOf } from '../src/sim/health';
 import { isAvailable } from '../src/sim/research';
-import { colonyStock, goodwillOf } from '../src/sim/trade';
+import { applyTrade, colonyStock, goodwillOf, tradeOpen } from '../src/sim/trade';
 import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { mutualOpinion } from '../src/sim/social';
 import { Difficulty } from '../src/sim/storyteller';
@@ -34,6 +34,9 @@ import { GROW_ZONE, STOCKPILE_ZONE } from '../src/sim/world';
 const days = Number(process.argv[2] ?? 20);
 const seeds = Number(process.argv[3] ?? 8);
 const passive = process.argv.includes('passive');
+// "defend" fights from cover: a ring of sandbags round the hut once fortifications are known, and in a
+// raid colonists hold just inside it on the side facing the raiders instead of advancing.
+const defend = process.argv.includes('defend');
 const trace = process.argv.includes('trace');
 const noHunt = process.argv.includes('nohunt');
 // "flow" prints a day-by-day table of food, materials and wildlife, averaged over the seeds.
@@ -86,6 +89,12 @@ const RESEARCH_ORDER = [
   'tactics',
   'surgery',
 ];
+
+// A defending colony learns longbows (which outrange raiders' bows) straight after fortifications.
+const researchOrder = defend
+  ? RESEARCH_ORDER.filter((k) => k !== 'longbows').flatMap((k) => (k === 'fortifications' ? [k, 'longbows'] : [k]))
+  : RESEARCH_ORDER;
+const ARMS = ['crossbow', 'recurveBow', 'scaleArmor', 'leather'];
 
 // Finds the nearest w×h rectangle to the colonists where every tile can take a blueprint.
 function findSite(sim: Simulation, w: number, h: number, avoid: Set<number>): { x: number; y: number } | null {
@@ -274,8 +283,26 @@ function play(seed: number): Result {
   // Up to twelve beds in two rows, clear of the door, fire and armchair.
   const bedSlots = [...[1, 2, 3, 4, 5, 6, 7].map((k) => [k, 1]), ...[1, 2, 3, 4, 5].map((k) => [k, 2])];
   let bedsBuilt = 0;
+  // The sandbag ring two tiles out from the hut, and the line just inside it where defenders stand.
+  const ring = (offset: number) => {
+    const tiles: number[] = [];
+    if (hut) {
+      const [x0, y0, x1, y1] = [hut.x - offset, hut.y - offset, hut.x + 8 + offset, hut.y + 6 + offset];
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          if ((x === x0 || x === x1 || y === y0 || y === y1) && w.inBounds(x, y)) {
+            tiles.push(at(x, y));
+          }
+        }
+      }
+    }
+    return tiles;
+  };
+  const sandbagRing = ring(2);
+  const holdLine = ring(1);
+  let sandbagsPlaced = false;
   if (hut) {
-    claim(avoid, sim, hut.x, hut.y, 9, 7);
+    claim(avoid, sim, hut.x - (defend ? 2 : 0), hut.y - (defend ? 2 : 0), defend ? 13 : 9, defend ? 11 : 7);
     const walls: number[] = [];
     for (let y = hut.y; y < hut.y + 7; y++) {
       for (let x = hut.x; x < hut.x + 9; x++) {
@@ -354,7 +381,21 @@ function play(seed: number): Result {
           // (drafted colonists walking to a spot don't stop to shoot on the way).
           const target = sim.enemies.find((e) => !e.fleeing);
           const reach = weaponDef(c.weapon).range - 1;
-          if (c.drafted && target && c.path.length === 0 && !colonistTarget(sim, c)) {
+          if (defend && sandbagsPlaced && target && c.drafted && c.path.length === 0 && !colonistTarget(sim, c)) {
+            // Hold the line: the free spot just inside the sandbags nearest the raiders.
+            const taken = new Set(
+              sim
+                .living()
+                .filter((o) => o !== c)
+                .map((o) => o.path[o.path.length - 1] ?? o.tile),
+            );
+            const spot = holdLine
+              .filter((i) => w.isPassable(i) && !taken.has(i))
+              .sort((a, b) => w.distance(a, target.tile) - w.distance(b, target.tile))[0];
+            if (spot !== undefined && spot !== c.tile) {
+              sim.apply({ type: 'move', colonist: c.id, tile: spot });
+            }
+          } else if (c.drafted && target && c.path.length === 0 && !colonistTarget(sim, c)) {
             const route = sim.pathfinder.find(c.tile, [target.tile]) ?? [];
             const spot = route.find((i) => w.distance(i, target.tile) <= reach && lineOfSight(w, i, target.tile));
             if (spot !== undefined) {
@@ -446,7 +487,7 @@ function play(seed: number): Result {
     }
     // Keep research going, in a sensible order, and use what it unlocks.
     if (!sim.research.current) {
-      const next = RESEARCH_ORDER.find((key) => isAvailable(sim.research, researchDef(key)!));
+      const next = researchOrder.find((key) => isAvailable(sim.research, researchDef(key)!));
       if (next) {
         sim.apply({ type: 'research', project: next });
       }
@@ -468,6 +509,11 @@ function play(seed: number): Result {
           zone: crop('poplarPlant'),
         });
       }
+    }
+    // Fortifications known: sandbags round the hut (the ring was kept clear for them).
+    if (defend && !sandbagsPlaced && hut && sim.isResearched('fortifications')) {
+      sandbagsPlaced = true;
+      sim.apply({ type: 'build', feature: featureId('sandbags'), tiles: sandbagRing });
     }
     // Deep mining researched: sink a shaft (it's marked for digging once built).
     if (!shaftPlaced && sim.isResearched('deepMining')) {
@@ -655,6 +701,21 @@ function play(seed: number): Result {
       sim.apply({ type: 'bill', recipe: blocks.id, target: wanted });
     }
     // A parka for everyone before winter.
+    if (defend) {
+      // A longbow for everyone once they're known, and the caravans' bows, armour and leather bought.
+      const longbow = RECIPES.find((r) => r.key === 'makeLongbow')!;
+      if (sim.isResearched('longbows') && sim.bills[longbow.id].target !== sim.living().length) {
+        sim.apply({ type: 'bill', recipe: longbow.id, target: sim.living().length });
+      }
+      if (sim.caravan && tradeOpen(sim)) {
+        for (const key of ARMS) {
+          const have = sim.caravan.stock.find((st) => st.item === itemId(key))?.count ?? 0;
+          for (let n = have; n > 0 && applyTrade(sim, [[itemId(key), n]], []) !== null; n--) {
+            // Fewer, until it's affordable.
+          }
+        }
+      }
+    }
     const parka = RECIPES.find((r) => r.key === 'tailorParka')!;
     if (sim.bills[parka.id].target !== sim.living().length) {
       sim.apply({ type: 'bill', recipe: parka.id, target: sim.living().length });

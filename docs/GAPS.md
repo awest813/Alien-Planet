@@ -26,7 +26,21 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 - **Wealth grows from about 8k to 40–54k and changes little.** Raids now gain up to 4 raiders above 15k, but
   nothing else responds to a rich colony.
 
-## 2. The late game is too safe
+## 2. Raids are lost, but cheaply
+
+- **From about day 25, raids knock out the whole colony almost every time** (also true before this branch). With
+  6 colonists against the cap of 9 raiders (11 on Harsh), the test colony is overrun in 88–100% of raids;
+  fighting from a sandbag ring with longbows and bought arms (`defend`) still loses 45–75%. Raiders leave the
+  downed alone, so few die: a raid costs stolen goods and a few days of healing, never the colony. That is why
+  deaths are rare late (below), and losing every fight isn't tense either.
+  - Most of the harm is close combat: raiders with clubs, knives and spears charge the line, and a colonist
+    goes down after two or three blows while a raider takes four or five arrows. Arrows at colonists in cover
+    land only about 14% of the time.
+  - Close it by deciding what a raid should be: smaller raids scaled to the colony's fighters (not a flat cap),
+    raiders who break sooner, wounds that knock raiders down as they do colonists, traps and embrasures the
+    defence can build early, or allies who come to help.
+
+## 3. The late game is too safe
 
 - **Ten-year Standard colonies lose about 2 people to raids across 184 raids.** Harsh loses 10 in 251. After the
   first winters the colony is walled, armed and well fed, and raids are the same walk-in-and-shoot every time.
@@ -43,7 +57,7 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   - Close it with variety: a winter flu, a plague that spreads by contact, wound infection already exists;
     illness that weighs on the old.
 
-## 3. Factions and the wider world are one-dimensional
+## 4. Factions and the wider world are one-dimensional
 
 - **There is one friendly faction and two hostile ones**, and the hostile ones have no goodwill at all.
   Capturing, releasing, starving or recruiting their people changes nothing with them. Tribute is the only
@@ -54,7 +68,7 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
     allied help in raids, and costs to refusing an ally (roadmap Phase K).
 - **There are no expeditions or wider world.** Nothing happens off the map.
 
-## 4. Relationships and families are thin in places
+## 5. Relationships and families are thin in places
 
 - **There are no fights, arguments or divorces.** Rivals only cost mood, and marriages never end except by death.
 - **Children learn only by watching.** There is no schooling, play between children, or childhood memories
@@ -63,7 +77,7 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 - **The kin check covers two generations.** That's enough for ten years, but a longer game could reach a
   fourth.
 
-## 5. Animals and the land
+## 6. Animals and the land
 
 - **Wildlife can be wiped out.** The test colony hunts everything on sight, and wildlife sits at zero from year
   one on every map. Migration refills only up to half the cap, and every newcomer is hunted.
@@ -75,17 +89,18 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   deliberate challenges.
 - **Food is too easy on Peaceful.** Peaceful colonies stockpile 35–60 days of food; Standard holds 4–8 days.
 
-## 6. Interface and flow
+## 7. Interface and flow
 
 - **There is no history screen** (partly closed: the chronicle on the Story screen). There are no graphs (population, wealth, mood over time) and no chronicle; the
   story log keeps only the latest 200 entries (Phase M's chronicle).
 - **There is no colonist overview.** No table of everyone's needs, skills and moods; the colonist bar and Work
   screen cover part of it.
-- **Phone polish is basic.** The top bar is compact now, but long tables (Work, Schedule) still need sideways
-  scrolling, and there's no long-press to stand in for right-click on the Work grid.
-- **A raised name label can overlap the "!" over a colonist who is down or in a break**, when both show at once.
+- **Phone polish is basic in places** (partly closed: full-width cards, the goals drawer below the top bar, Work
+  and Schedule tables that scroll on their own with names kept in view, painting the schedule by finger, moving
+  drafted colonists by tap). There's no long-press to stand in for right-click on the Work grid, tap targets
+  are small (speed buttons 34×22), and a phone on its side leaves little map between the bars.
 
-## 7. Testing
+## 8. Testing
 
 - **There's no continuous integration.** Tests, lint and the build run only by hand (`.github/workflows` is
   empty).
@@ -95,9 +110,10 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   60 ms budget, by hand.
 - **Playtest personas never reach late content in 16 days.** No deep mining, breaches, elders or generations.
   Run some players for 120+ days regularly (`days=120 players=...`).
-- **The balance harness plays one way.** It hunts everything, gifts silver daily, never trades, never sets
-  policies or pays tribute, and builds no kiln or smelter. Its results say little about those systems.
-  - Close it with harness variants (`policy=` exists): a trader, a diplomat, a craftsman.
+- **The balance harness plays one way.** It hunts everything, gifts silver daily, never sets policies or pays
+  tribute, and builds no kiln or smelter. Its results say little about those systems.
+  - `defend` now fights from cover: sandbags round the hut, longbows early, and bows, armour and leather bought
+    from caravans. `policy=` sets the village policies. Still missing: a diplomat and a craftsman.
 
 ## Fixed in the recent passes (for reference)
 

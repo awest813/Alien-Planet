@@ -89,6 +89,11 @@ export function coverFactor(w: World, shooter: number, target: number): number {
 
 const inCover = (w: World, from: number, at: number) => coverFactor(w, from, at) < 1;
 
+// Standing on something that gives cover (sandbags are passable).
+const coverAt = (w: World, i: number) => w.feature[i] !== NONE && featureDef(w.feature[i]).cover < 1;
+// How much less often a blow lands across (or from on top of) a barricade.
+const MELEE_OVER_COVER = 0.6;
+
 // Bresenham line between tile centres; walls, rock, and other solid tiles block it (embrasures
 // don't).
 export function lineOfSight(w: World, a: number, b: number): boolean {
@@ -145,7 +150,9 @@ function hitChance(
 ): number {
   const w = sim.world;
   if (weapon.range <= 1) {
-    return Math.min(0.95, weapon.accuracy + (skill - 5) * 0.015 + bonus);
+    // Fighting across a barricade, or clambering over one, is awkward going.
+    const over = coverFactor(w, from, to) < 1 || coverAt(w, from) ? MELEE_OVER_COVER : 1;
+    return Math.min(0.95, weapon.accuracy + (skill - 5) * 0.015 + bonus) * over;
   }
   const base = weapon.accuracy + (skill - 5) * 0.03 + bonus - w.distance(from, to) * weapon.falloff;
   return (

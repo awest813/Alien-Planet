@@ -224,7 +224,8 @@ How the storytelling layer works:
   crossbow (Crossbows research). Leather and scale armor (Armor and Scale armor research) turn aside a share of
   every blow, wear down as they do it, and scale armor slows its wearer. Colonists pick up clearly better weapons
   and armor from storage, and fallen raiders drop some of their kit. Sandbags and embrasures (stone wall slots you
-  can shoot through but not walk through) cut the chance of being hit from the side they face; spike traps
+  can shoot through but not walk through) cut the chance of being hit from the side they face, and blows struck
+  across them (or by someone clambering over sandbags) land less often; spike traps
   (Traps research) wound the first raider to step on them and go back on the build list.
 - **Seasons:** a year is four six-day seasons, starting in early spring. Temperatures follow the year (warm
   summers, freezing winter nights). Crops don't grow in winter and hard frost kills anything left in the field,
