@@ -58,13 +58,20 @@ export function chooseBreak(sim: Simulation, c: Colonist): BreakKind {
 
 export const breakLog = (c: Colonist, kind: BreakKind): string => `${c.name} ${BREAK_LOGS[kind]}`;
 
-// What a tantrum may smash: furniture and the like, never walls, doors, art, graves or the beacon.
+// Below this outside, even a rage spares the fires that keep everyone alive.
+const SPARE_FIRES_BELOW = 5;
+
+// What a tantrum may smash: furniture and the like, never walls, doors, art, graves or the beacon, and not a
+// heater on a cold night (one smashed in a cold snap, with everyone asleep, can freeze the whole colony).
 export function smashable(sim: Simulation, i: number): boolean {
   const f = sim.world.feature[i];
   if (f === 0) {
     return false;
   }
   const def = featureDef(f);
+  if (def.heater > 0 && sim.outdoorTemperature() < SPARE_FIRES_BELOW) {
+    return false;
+  }
   return (
     !!def.build &&
     !def.natural &&

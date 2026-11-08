@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { featureId, itemId } from './defs';
-import { LEGEND, LEGEND_QUALITY, OBSESSION_DAYS, chooseBreak, inspire, startObsession } from './minds';
+import { LEGEND, LEGEND_QUALITY, OBSESSION_DAYS, chooseBreak, inspire, smashable, startObsession } from './minds';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
 import { HOUR, clearAround, outline, run } from './test-helpers';
@@ -186,5 +186,23 @@ describe('obsessions', () => {
     expect(w.blueprint[tile]).not.toBe(LEGEND);
     expect(artist.thoughts.some((t) => t.key === 'obsessionFailed')).toBe(true);
     expect(sim.storyLog.some((e) => e.text.includes('came to nothing'))).toBe(true);
+  });
+});
+
+describe('a rage on a cold night', () => {
+  it('spares the fires', () => {
+    const sim = Simulation.newColony(41);
+    const w = sim.world;
+    const t = sim.colonists[0].tile;
+    w.setFeature(t + 2, featureId('campfire'));
+    w.setFeature(t + 3, featureId('chessTable'));
+    expect(smashable(sim, t + 3)).toBe(true);
+    // Whatever the weather now, below 5°C outside the fire is spared.
+    sim.weather = { kind: 'clear', until: Number.MAX_SAFE_INTEGER };
+    sim.tick = 20 * 24 * 200;
+    sim.syncClock();
+    expect(sim.outdoorTemperature()).toBeLessThan(5);
+    expect(smashable(sim, t + 2)).toBe(false);
+    expect(smashable(sim, t + 3)).toBe(true);
   });
 });

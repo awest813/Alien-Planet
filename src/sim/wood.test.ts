@@ -120,3 +120,29 @@ describe('a fire in the open', () => {
     expect(sim.temperatureAt(w.idx(x + 5, y + 4))).toBeCloseTo(out);
   });
 });
+
+describe('a fire indoors', () => {
+  it('warms the room, and the tiles right beside it more', () => {
+    const { sim, w, x, y } = camp(22);
+    // A closed 5×5 room with a campfire in the middle.
+    const walls: number[] = [];
+    for (let dy = 0; dy < 7; dy++) {
+      for (let dx = 0; dx < 7; dx++) {
+        if (dx === 0 || dy === 0 || dx === 6 || dy === 6) {
+          walls.push(w.idx(x + 3 + dx, y + 3 + dy));
+        }
+      }
+    }
+    for (const i of walls) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    const fire = w.idx(x + 6, y + 6);
+    w.setFeature(fire, featureId('campfire'));
+    w.fuel[fire] = 20;
+    const beside = sim.temperatureAt(w.idx(x + 7, y + 6));
+    const corner = sim.temperatureAt(w.idx(x + 4, y + 4));
+    expect(beside).toBeCloseTo(corner + 6);
+    // Not through the wall.
+    expect(sim.temperatureAt(w.idx(x + 10, y + 6))).toBeCloseTo(sim.outdoorTemperature());
+  });
+});

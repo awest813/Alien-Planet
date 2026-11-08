@@ -1360,9 +1360,10 @@ export class Simulation {
   public temperatureAt(i: number): number {
     this.ensureRegions();
     const room = this.doorway(i) ?? this.rooms.room[i];
-    return room >= 0 && this.rooms.enclosed[room]
-      ? this.roomTemps[room]
-      : this.outdoorTemperature() + (this.fireWarmth().get(i) ?? 0);
+    return (
+      (room >= 0 && this.rooms.enclosed[room] ? this.roomTemps[room] : this.outdoorTemperature()) +
+      (this.fireWarmth().get(i) ?? 0)
+    );
   }
 
   // A fire burning in the open warms the ground right around it (its full heat beside it, half two
@@ -1384,20 +1385,34 @@ export class Simulation {
     const warmth = new Map<number, number>();
     for (const f of this.fireTiles) {
       const def = featureDef(w.feature[f]);
-      if (w.fuel[f] <= 0 || def.workbench || !(def.heater > 0) || this.isIndoors(f)) {
+      if (w.fuel[f] <= 0 || def.workbench || !(def.heater > 0)) {
         continue;
       }
+      // Indoors the fire already warms the room; right beside it is warmer still, by half its heat, so
+      // there's somewhere to huddle when the room can't keep up. Out in the open it's all there is: its full
+      // heat beside it, half two tiles off.
+      const indoors = this.isIndoors(f);
+      const room = this.rooms.room[f];
+      const reach = indoors ? 1 : 2;
       const x0 = w.xOf(f);
       const y0 = w.yOf(f);
-      for (let dy = -2; dy <= 2; dy++) {
-        for (let dx = -2; dx <= 2; dx++) {
+      for (let dy = -reach; dy <= reach; dy++) {
+        for (let dx = -reach; dx <= reach; dx++) {
           const x = x0 + dx;
           const y = y0 + dy;
           if (x < 0 || y < 0 || x >= w.width || y >= w.height) {
             continue;
           }
           const i = w.idx(x, y);
-          const heat = Math.max(Math.abs(dx), Math.abs(dy)) <= 1 ? def.heater : def.heater / 2;
+          // (Not through a wall: only its own room, or only outside.)
+          if (indoors ? this.rooms.room[i] !== room : this.isIndoors(i)) {
+            continue;
+          }
+          const heat = indoors
+            ? def.heater / 2
+            : Math.max(Math.abs(dx), Math.abs(dy)) <= 1
+              ? def.heater
+              : def.heater / 2;
           warmth.set(i, Math.max(warmth.get(i) ?? 0, heat));
         }
       }
