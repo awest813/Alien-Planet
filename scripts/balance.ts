@@ -880,7 +880,8 @@ function play(seed: number): Result {
     lovers: count(/fallen in love/),
     starvingHours,
     starvingByDay,
-    objectives: Object.values(sim.objectivesDone).filter(Boolean).length,
+    // (Goals only, not the phase:N markers.)
+    objectives: OBJECTIVES.filter((o) => sim.objectivesDone[o.id]).length,
     research: sim.research.done.length,
     tailoringDay: tailoringDays.get(sim) ?? -1,
     frost: story.filter((s) => s.startsWith('Frost killed')).length,

@@ -7578,7 +7578,9 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'thirdGeneration',
     label: 'See a third generation born',
     phase: 7,
-    check: (s) => s.colonists.some((c) => c.parents.some((p) => (s.colonists[p]?.parents.length ?? 0) > 0)),
+    // (Babies count from birth: they're kept apart from the colonists until they can walk.)
+    check: (s) =>
+      [...s.colonists, ...s.infants].some((c) => c.parents.some((p) => (s.colonists[p]?.parents.length ?? 0) > 0)),
   },
   {
     id: 'elder',
@@ -7619,7 +7621,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'decade',
     label: 'Keep the colony going for ten years',
     phase: 7,
-    check: (s) => yearOf(s.totalHours) > 10,
-    progress: (s) => `year ${Math.min(10, yearOf(s.totalHours))}/10`,
+    check: (s) => s.totalHours / 24 >= 10 * DAYS_PER_YEAR,
+    progress: (s) => `${Math.min(10, Math.floor(s.totalHours / 24 / DAYS_PER_YEAR))}/10 years`,
   },
 ];

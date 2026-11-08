@@ -927,10 +927,15 @@ function HistoryChart({
   points: [number, number][];
   format: (value: number) => string;
 }) {
-  const [hover, setHover] = useState<number | null>(null);
+  // The day under the pointer (or chosen with the arrow keys): a day, not a position in the list, which is
+  // thinned out as the history grows while the screen is open.
+  const [hoverDay, setHoverDay] = useState<number | null>(null);
   const max = Math.max(1, ...points.map(([, v]) => v));
   const first = points[0][0];
   const last = points[points.length - 1][0];
+  const nearest = (day: number) =>
+    points.reduce((best, p, k) => (Math.abs(p[0] - day) < Math.abs(points[best][0] - day) ? k : best), 0);
+  const hover = hoverDay === null ? null : nearest(hoverDay);
   const x = (day: number) => ((day - first) / Math.max(1, last - first)) * CHART_W;
   const y = (v: number) => CHART_H - (v / max) * (CHART_H - 6);
   const path = points.map(([d, v], k) => `${k === 0 ? 'M' : 'L'}${x(d).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
@@ -956,18 +961,26 @@ function HistoryChart({
           preserveAspectRatio="none"
           role="img"
           aria-label={`${title}, day ${first} to ${last}: from ${format(points[0][1])} to ${format(points[points.length - 1][1])}`}
-          onMouseMove={(e) => {
+          tabIndex={0}
+          onPointerMove={(e) => {
             const box = e.currentTarget.getBoundingClientRect();
-            const day = first + ((e.clientX - box.left) / box.width) * (last - first);
-            let best = 0;
-            points.forEach(([d], k) => {
-              if (Math.abs(d - day) < Math.abs(points[best][0] - day)) {
-                best = k;
-              }
-            });
-            setHover(best);
+            setHoverDay(first + ((e.clientX - box.left) / box.width) * (last - first));
           }}
-          onMouseLeave={() => setHover(null)}
+          onPointerDown={(e) => {
+            const box = e.currentTarget.getBoundingClientRect();
+            setHoverDay(first + ((e.clientX - box.left) / box.width) * (last - first));
+          }}
+          onPointerLeave={(e) => e.pointerType === 'mouse' && setHoverDay(null)}
+          onBlur={() => setHoverDay(null)}
+          onKeyDown={(e) => {
+            // Arrow keys step through the days.
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+              e.preventDefault();
+              const at = hover ?? points.length - 1;
+              const next = Math.max(0, Math.min(points.length - 1, at + (e.key === 'ArrowLeft' ? -1 : 1)));
+              setHoverDay(points[next][0]);
+            }
+          }}
         >
           <line className="history-base" x1={0} x2={CHART_W} y1={CHART_H} y2={CHART_H} />
           <path className="history-line" d={path} vectorEffect="non-scaling-stroke" />

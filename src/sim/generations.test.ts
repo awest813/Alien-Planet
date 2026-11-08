@@ -33,9 +33,23 @@ describe('the Generations goals', () => {
     expect(goal('thirdGeneration').check(sim)).toBe(true);
   });
 
+  it('count a grandchild from birth, while still a baby', () => {
+    const sim = Simulation.newColony(8);
+    const [a, b] = sim.colonists;
+    b.parents = [a.id];
+    expect(goal('thirdGeneration').check(sim)).toBe(false);
+    sim.infants.push({ id: 99, name: 'Wren', age: 0, parents: [b.id], carer: b.id });
+    expect(goal('thirdGeneration').check(sim)).toBe(true);
+  });
+
   it('count a decade, and leave the fighting goals out on peaceful', () => {
     const sim = Simulation.newColony(6, 'peaceful');
     expect(goal('decade').check(sim)).toBe(false);
+    // Not a day short of it.
+    sim.tick = (24 * 10 - 1) * 24 * 200;
+    sim.syncClock();
+    expect(goal('decade').check(sim)).toBe(false);
+    expect(goal('decade').progress!(sim)).toBe('9/10 years');
     sim.tick = 24 * 10 * 24 * 200;
     sim.syncClock();
     expect(goal('decade').check(sim)).toBe(true);
