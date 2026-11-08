@@ -34,6 +34,8 @@ export interface StoryState {
   // Ticks of the colony's recent kills in the hunt, and until when the herds are wary of the valley.
   recentHunts?: number[];
   waryUntil?: number;
+  // When the Meadow Kin last complained of the colony's hunting.
+  kinMindedAt?: number;
   // The great beast of the hills, once it has woken.
   beast?: BeastState;
   // When the last "has collapsed" notification went out (they come in bursts; one card is enough).

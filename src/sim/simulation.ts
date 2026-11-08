@@ -37,7 +37,14 @@ import {
   type JoyKind,
   type JoySpec,
 } from './defs';
-import { animalName, animalsAtDawn, populateWildlife, updateAnimals } from './animals';
+import {
+  animalName,
+  animalsAtDawn,
+  keepBreedingPairs,
+  populateWildlife,
+  spareForBreeding,
+  updateAnimals,
+} from './animals';
 import {
   apparelScore,
   comfortRange,
@@ -1200,6 +1207,12 @@ export class Simulation {
           this.village.restDays = cmd.restDays;
           updateRest(this);
         }
+        if (cmd.hunting) {
+          this.village.hunting = cmd.hunting;
+          if (cmd.hunting === 'surplus') {
+            keepBreedingPairs(this);
+          }
+        }
         break;
       case 'sellArt': {
         const why = sellArt(this, cmd.tile);
@@ -1314,6 +1327,9 @@ export class Simulation {
             // won't be tamed.
             a.taming = cmd.add && !a.tame && !a.quarry && a.kind !== 'greatBeast';
           }
+        }
+        if (cmd.type === 'hunt' && cmd.add) {
+          keepBreedingPairs(this);
         }
         break;
       }
@@ -5869,7 +5885,14 @@ export class Simulation {
     }
     const region = this.regionOf(c.tile);
     const prey = this.animals
-      .filter((a) => a.hunted && a.hp > 0 && this.regions.region[a.tile] === region && !this.isReserved(`h${a.id}`, c))
+      .filter(
+        (a) =>
+          a.hunted &&
+          a.hp > 0 &&
+          this.regions.region[a.tile] === region &&
+          !this.isReserved(`h${a.id}`, c) &&
+          !spareForBreeding(this, a),
+      )
       .sort((a, b) => w.distance(c.tile, a.tile) - w.distance(c.tile, b.tile))[0];
     if (!prey) {
       return false;
@@ -5882,7 +5905,8 @@ export class Simulation {
   private stepHunt(c: Colonist, job: Job): void {
     const w = this.world;
     const prey = this.animals.find((a) => a.id === job.patient);
-    if (!prey || prey.hp <= 0 || !prey.hunted) {
+    // (Another hunter's kill may have left it one of the last pair.)
+    if (!prey || prey.hp <= 0 || !prey.hunted || spareForBreeding(this, prey)) {
       this.endJob(c);
       return;
     }

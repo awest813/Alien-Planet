@@ -39,7 +39,7 @@ import { DOWNED_TICKS, persuasion, roomToJoin } from '../sim/prisoners';
 import { DRAFT_AGE, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans';
 import { LEGEND } from '../sim/minds';
 import { PART_LABELS, SCAR_LABELS, isInfected, scarsOf } from '../sim/body';
-import { Hours, Rations, tally } from '../sim/village';
+import { Hours, Hunting, Rations, tally } from '../sim/village';
 import {
   applyTrade,
   colonyStock,
@@ -301,7 +301,7 @@ export const TOOLS: ToolDef[] = [
     hotkey: 'v',
     tool: { kind: 'hunt' },
     group: 'orders',
-    hint: 'Drag over animals to hunt them for meat and leather (boars fight back)',
+    hint: 'Drag over animals to hunt them for meat and leather (boars fight back). The Village screen can keep a breeding pair of each kind',
   },
   {
     id: 'tame',
@@ -845,6 +845,7 @@ export interface UiState {
     rations: Rations;
     hours: Hours;
     restDays: boolean;
+    hunting: Hunting;
   };
   raid: RaidView | null;
   hover: TileView | null;
@@ -2411,6 +2412,7 @@ export class GameController {
       rations: v.rations,
       hours: v.hours,
       restDays: v.restDays,
+      hunting: v.hunting ?? 'all',
     };
   }
 

@@ -455,6 +455,7 @@ export type Command =
       rations?: 'frugal' | 'normal' | 'generous';
       hours?: 'short' | 'normal' | 'long';
       restDays?: boolean;
+      hunting?: 'all' | 'surplus';
     }
   // When the ship has landed: board it (the colony's story ends) or stay.
   | { type: 'shipChoice'; board: boolean }

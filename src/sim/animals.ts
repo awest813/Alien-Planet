@@ -8,6 +8,7 @@ import { Animal, Colonist } from './types';
 import { Filth } from './world';
 import { beastLeaves, beastSlain } from './beast';
 import { animalWeight } from './biomes';
+import { changeGoodwill, friendly, onGoodTerms } from './diplomacy';
 
 // Wild animals on the standard 64×64 map; bigger maps hold proportionally more.
 export const MAX_ANIMALS = 14;
@@ -403,10 +404,18 @@ const WARY_WINDOW = TICKS_PER_HOUR * 24 * 5;
 const WARY_DAYS = 10;
 export const herdsWary = (sim: Simulation): boolean => (sim.story.waryUntil ?? 0) > sim.tick;
 
-function huntedOne(sim: Simulation): void {
+// The Meadow Kin live off the same valley and mind how it's hunted: emptying it of game costs the colony
+// their goodwill, the last of a kind more than a busy few days.
+const WARY_GOODWILL = -5;
+const LAST_OF_KIND_GOODWILL = -4;
+const KIN_PATIENCE = TICKS_PER_HOUR * 24 * 3;
+
+function huntedOne(sim: Simulation, a: Animal): void {
   const recent = (sim.story.recentHunts ?? []).filter((t) => t > sim.tick - WARY_WINDOW);
   recent.push(sim.tick);
   sim.story.recentHunts = recent;
+  const kin = friendly().filter((f) => onGoodTerms(sim, f.id));
+  const kinName = kin[0]?.name;
   if (recent.length > WARY_KILLS && !herdsWary(sim)) {
     sim.story.waryUntil = sim.tick + WARY_DAYS * TICKS_PER_HOUR * 24;
     sim.addLog(
@@ -414,6 +423,78 @@ function huntedOne(sim: Simulation): void {
       'warn',
       true,
     );
+    if (kinName) {
+      sim.story.kinMindedAt = sim.tick;
+      kin.forEach((f) => changeGoodwill(sim, f.id, WARY_GOODWILL));
+      sim.addLog(`${kinName} are displeased: "You hunt the valley as if nothing will be left for anyone."`, 'warn');
+    }
+  }
+  // (Once in a while: a lone hare wandering in and shot isn't a fresh grievance each time.)
+  const lastComplaint = sim.story.kinMindedAt;
+  if (
+    !a.quarry &&
+    ANIMALS[a.kind].weight > 0 &&
+    wildOfKind(sim, a.kind) === 0 &&
+    kinName &&
+    (lastComplaint === undefined || sim.tick - lastComplaint >= KIN_PATIENCE)
+  ) {
+    sim.story.kinMindedAt = sim.tick;
+    kin.forEach((f) => changeGoodwill(sim, f.id, LAST_OF_KIND_GOODWILL));
+    sim.addLog(
+      `${kinName} are troubled: "That was the last ${ANIMALS[a.kind].name.toLowerCase()} in the valley. Leave a pair next time, and the herds come back."`,
+      'warn',
+    );
+  }
+}
+
+// Under the "surplus only" hunting policy, hunters leave this many of each kind in the valley.
+export const BREEDING_PAIR = 2;
+
+// Wild animals of a kind that live in the valley (not just passing through or maddened).
+function wildOfKind(sim: Simulation, kind: string): number {
+  return sim.animals.filter((a) => a.kind === kind && a.hp > 0 && !a.tame && !a.leaving && !a.manhunter && !a.quarry)
+    .length;
+}
+
+// Whether hunters leave this animal be, as one of the last breeding pair of its kind. Only under the
+// "surplus only" policy, and never for the great boar the neighbours asked for or a maddened beast.
+export function spareForBreeding(sim: Simulation, a: Animal): boolean {
+  return (
+    sim.village.hunting === 'surplus' &&
+    !a.tame &&
+    !a.quarry &&
+    !a.manhunter &&
+    a.revengeOn < 0 &&
+    ANIMALS[a.kind].weight > 0 &&
+    wildOfKind(sim, a.kind) <= BREEDING_PAIR
+  );
+}
+
+// Under the "surplus only" policy, takes the hunting mark off enough animals of each kind that a
+// breeding pair is left unmarked (the ones furthest from the colony, which are the hardest to reach).
+export function keepBreedingPairs(sim: Simulation): void {
+  if (sim.village.hunting !== 'surplus') {
+    return;
+  }
+  const home = sim.homeTile() ?? sim.living()[0]?.tile ?? 0;
+  for (const kind of new Set(sim.animals.map((a) => a.kind))) {
+    const herd = sim.animals.filter(
+      (a) => a.kind === kind && a.hp > 0 && !a.tame && !a.leaving && !a.manhunter && !a.quarry,
+    );
+    if (ANIMALS[kind].weight === 0) {
+      continue;
+    }
+    let unmarked = herd.filter((a) => !a.hunted).length;
+    const marked = herd
+      .filter((a) => a.hunted && a.revengeOn < 0)
+      .sort((x, y) => sim.world.distance(y.tile, home) - sim.world.distance(x.tile, home));
+    for (const a of marked) {
+      if (unmarked >= BREEDING_PAIR) {
+        break;
+      }
+      a.hunted = false;
+      unmarked++;
+    }
   }
 }
 
@@ -659,7 +740,7 @@ export function hurtAnimal(sim: Simulation, a: Animal, amount: number, attacker:
     // Slaughtering livestock, or fending off an angry animal, isn't hunting.
     if (!a.tame && a.hunted) {
       sim.stats.hunted++;
-      huntedOne(sim);
+      huntedOne(sim, a);
     }
     if (a.kind === 'greatBeast') {
       beastSlain(sim, a, attacker);

@@ -1,7 +1,7 @@
 // Headless balance harness: an "autoplayer" runs a sensible colony on many seeds and prints
 // survival, combat, health, mood and social statistics.
 //
-//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive|defend] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K] [nohunt] [flow]
+//   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive|defend] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K] [nohunt] [surplus] [flow]
 //     [biome=tundra|desert|forest] [map=river|island]
 //
 // "passive" never drafts during raids, to measure the worst case; "defend" holds a sandbag line; "peaceful" and "harsh" pick the
@@ -42,6 +42,8 @@ const passive = process.argv.includes('passive');
 const defend = process.argv.includes('defend');
 const trace = process.argv.includes('trace');
 const noHunt = process.argv.includes('nohunt');
+// "surplus" sets the hunting policy to leave a breeding pair of each kind.
+const surplus = process.argv.includes('surplus');
 // "flow" prints a day-by-day table of food, materials and wildlife, averaged over the seeds.
 const flow = process.argv.includes('flow');
 // Nutrition a colonist eats in a day (as the top bar's "days of food" counts it).
@@ -269,6 +271,7 @@ function play(seed: number): Result {
     rations: policy.includes('frugal') ? 'frugal' : policy.includes('generous') ? 'generous' : 'normal',
     hours: policy.includes('long') ? 'long' : policy.includes('short') ? 'short' : 'normal',
     restDays: policy.includes('rest'),
+    hunting: surplus ? 'surplus' : 'all',
   });
   const w = sim.world;
   const avoid = new Set<number>();

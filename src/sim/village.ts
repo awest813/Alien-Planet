@@ -10,6 +10,7 @@ import { Colonist } from './types';
 
 export type Rations = 'frugal' | 'normal' | 'generous';
 export type Hours = 'short' | 'normal' | 'long';
+export type Hunting = 'all' | 'surplus';
 
 export interface Village {
   // The leader's colonist id (-1: none).
@@ -20,6 +21,9 @@ export interface Village {
   hours: Hours;
   // One day in six, nobody works.
   restDays: boolean;
+  // Hunters take whatever is marked, or only the surplus, leaving a breeding pair of each kind
+  // (older saves: all).
+  hunting?: Hunting;
   // Whether today is a day of rest after all (called off when the stores are nearly empty), and the
   // day that was decided.
   resting: boolean;
@@ -46,6 +50,10 @@ export const POLICY_TEXT = {
     short: 'Short hours: work goes 10% slower, and everyone is glad of it (the lazy most)',
     normal: 'Normal hours: work goes at its usual pace, and no one minds',
     long: "Long hours: work goes 10% faster, and everyone resents it (hard workers don't mind)",
+  },
+  hunting: {
+    all: 'Hunt all: hunters take every animal marked, down to the last',
+    surplus: 'Surplus only: hunters leave a breeding pair of each kind, so the herds recover. The Meadow Kin approve',
   },
 } as const;
 
