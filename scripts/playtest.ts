@@ -17,7 +17,7 @@ import { FACTIONS, FEATURES, NONE, RECIPES, featureDef, featureId, terrainDef } 
 import { deserialize, serialize } from '../src/sim/serialize';
 import { Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { Difficulty } from '../src/sim/storyteller';
-import { Command, DesignationKind, ScheduleSlot, Stance, WORK_TYPES } from '../src/sim/types';
+import { Command, DesignationKind, ScheduleSlot, Stance, WORK_TYPES, WorldAction } from '../src/sim/types';
 import { GROW_ZONE, STOCKPILE_ZONE } from '../src/sim/world';
 import { Rng } from '../src/sim/rng';
 import { driedFrom, fuelOf, itemDef, itemId } from '../src/sim/defs';
@@ -177,7 +177,8 @@ function check(sim: Simulation, problems: Map<string, number>, hourly: boolean):
   const w = sim.world;
   const note = (p: string) => problems.set(p, (problems.get(p) ?? 0) + 1);
   for (const c of sim.colonists) {
-    if (c.health.dead) {
+    // (Away on an expedition: not on the map, so where they left from doesn't matter.)
+    if (c.health.dead || c.away === 'gone') {
       continue;
     }
     if (!w.inBounds(w.xOf(c.tile), w.yOf(c.tile)) || c.tile < 0 || c.tile >= w.size) {
@@ -465,7 +466,7 @@ function play(player: number): Report {
       // Most players answer the neighbours: send what's asked when they have it, and hunt the boar.
       const request = sim.diplomacy.request;
       if (request && persona !== 'neglectful' && persona !== 'chaos' && persona !== 'demolisher') {
-        if (request.kind === 'deliver') {
+        if (request.kind !== 'hunt') {
           sim.apply({ type: 'fulfilRequest' });
         } else {
           const beast = sim.animals.find((a) => a.id === request.quarry);
@@ -474,6 +475,33 @@ function play(player: number): Report {
             const by = w().yOf(beast.tile);
             sim.apply({ type: 'hunt', rect: { x0: bx, y0: by, x1: bx, y1: by }, add: true });
           }
+        }
+      }
+      // And the wider world: take a side, answer envoys and allies, send a party off now and then.
+      if (persona !== 'neglectful' && persona !== 'chaos' && persona !== 'demolisher') {
+        const d = sim.diplomacy;
+        if (d.dispute && rng.chance(0.2)) {
+          sim.apply({ type: 'world', action: { kind: 'dispute', side: rng.pick([d.dispute.a, d.dispute.b, null]) } });
+        }
+        if (d.envoy && rng.chance(0.2)) {
+          sim.apply({ type: 'world', action: { kind: 'envoy', accept: rng.chance(0.6) } });
+        }
+        if (d.call && rng.chance(0.2)) {
+          const free = sim.living().filter((c) => c.age >= 16 && !c.health.downed && !c.drafted);
+          const answer = rng.chance(0.5) ? 'goods' : free.length > 3 ? rng.pick(free).id : 'refuse';
+          sim.apply({ type: 'world', action: { kind: 'call', answer } });
+        }
+        if (hour % 120 === 50 && sim.living().length >= 4) {
+          const party = sim
+            .living()
+            .filter((c) => c.age >= 16 && !c.drafted)
+            .slice(0, rng.int(1, 2))
+            .map((c) => c.id);
+          const to = rng.pick([-1, ...FACTIONS.filter((f) => !f.hostile).map((f) => f.id)]);
+          sim.apply({
+            type: 'world',
+            action: { kind: 'expedition', to, purpose: to < 0 ? 'salvage' : 'trade', colonists: party },
+          });
         }
       }
       switch (persona) {
@@ -503,12 +531,18 @@ function play(player: number): Report {
           if (sim.captives.some((p) => p.state === 'downed' && !p.capture)) {
             sim.apply({ type: 'capture', rect: { x0: 0, y0: 0, x1: w().width - 1, y1: w().height - 1 }, add: true });
           }
-          // Now and then, a change of heart.
+          // Now and then, a change of heart (or a price agreed).
           if (rng.chance(0.01)) {
             const held = sim.captives.filter((p) => p.state === 'prisoner');
             if (held.length > 0) {
               sim.apply({ type: 'release', captive: rng.pick(held).id });
             }
+          }
+          if (rng.chance(0.01) && sim.captives.length > 0) {
+            sim.apply({ type: 'world', action: { kind: 'ransom', captive: rng.pick(sim.captives).id } });
+          }
+          if (rng.chance(0.02)) {
+            sim.apply({ type: 'world', action: { kind: 'truce', faction: rng.int(0, FACTIONS.length - 1) } });
           }
           break;
         case 'micromanager':
@@ -725,7 +759,11 @@ function play(player: number): Report {
         );
       }
 
-      // Who's stuck: the same job on the same tile for a whole day (sleep and rest excepted).
+      // Who's stuck: the same job on the same tile for a whole day (sleep and rest excepted). (Time away on an
+      // expedition doesn't count: they come back in where they left.)
+      for (const c of sim.colonists.filter((o) => o.away)) {
+        sameSince.delete(c.id);
+      }
       for (const c of sim.living()) {
         report.colonistHours++;
         if (!c.job && !c.drafted && !c.health.downed) {
@@ -772,7 +810,8 @@ function play(player: number): Report {
   report.deaths = sim.storyLog
     .filter((e) => / has died of /.test(e.text))
     .map((e) => `d${e.day} ${e.text.replace(/^.* has died of /, '').replace(/\.$/, '')}`);
-  report.alive = sim.living().length;
+  // (Away on an expedition counts.)
+  report.alive = sim.headcount();
   report.total = sim.colonists.length;
   return report;
 
@@ -828,6 +867,26 @@ function play(player: number): Report {
       () => ({ type: 'festivals', on: rng.chance(0.7) }),
       () => ({ type: 'fulfilRequest' }),
       () => ({ type: 'declineRequest' }),
+      () => ({
+        type: 'world',
+        action: rng.pick<WorldAction>([
+          { kind: 'truce', faction: rng.int(0, FACTIONS.length - 1) },
+          { kind: 'ransom', captive: sim.captives[0]?.id ?? -1 },
+          { kind: 'settler', faction: rng.int(0, FACTIONS.length - 1) },
+          { kind: 'dispute', side: rng.chance(0.3) ? null : rng.int(0, FACTIONS.length - 1) },
+          { kind: 'envoy', accept: rng.chance(0.5) },
+          {
+            kind: 'call',
+            answer: rng.pick<'goods' | 'refuse' | number>(['goods', 'refuse', rng.pick(sim.colonists).id]),
+          },
+          {
+            kind: 'expedition',
+            to: rng.int(-1, FACTIONS.length - 1),
+            purpose: rng.pick(['trade', 'salvage'] as const),
+            colonists: Array.from({ length: rng.int(0, 4) }, () => rng.pick(sim.colonists).id),
+          },
+        ]),
+      }),
       () => ({ type: 'gift', faction: rng.int(0, FACTIONS.length - 1), silver: rng.pick([25, 50, 100, 1000]) }),
       () => ({ type: 'tribute', faction: rng.int(0, FACTIONS.length - 1) }),
       () => ({

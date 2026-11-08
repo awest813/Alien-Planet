@@ -44,6 +44,8 @@ function snapshot(sim: Simulation): string {
   const wealth = totals.reduce((sum, r) => sum + r.total * itemDef(r.item).value, 0);
   const nutrition = totals.reduce((sum, r) => sum + r.total * itemDef(r.item).nutrition, 0);
   const kin = FACTIONS.find((f) => !f.hostile)!.id;
+  const hills = FACTIONS.find((f) => f.key === 'hollowstone')!.id;
+  const raiders = FACTIONS.filter((f) => f.hostile).map((f) => goodwillOf(sim, f.id));
   const now = performance.now();
   const line =
     `Y${Math.round((sim.day - 1) / 24)} pop ${living.length}/${sim.colonists.length} kids ${ages.filter((a) => a < 18).length} ` +
@@ -53,7 +55,8 @@ function snapshot(sim: Simulation): string {
     `food ${(nutrition / Math.max(1, living.length) / 1.4).toFixed(1)}d wood ${sim.stockOf(itemId('wood'))} ` +
     `trees ${sim.countFeature((f) => f === featureId('tree'))} silver ${sim.stockOf(itemId('silver'))} ` +
     `wealth ${Math.round(wealth / 1000)}k wild ${sim.animals.filter((a) => !a.tame).length} tame ${sim.animals.filter((a) => a.tame).length} ` +
-    `kin ${goodwillOf(sim, kin)} raids ${t.raids} research ${sim.research.done.length} ` +
+    `kin ${goodwillOf(sim, kin)} hills ${goodwillOf(sim, hills)} raiders ${raiders.join('/')} away ${sim.headcount() - living.length} ` +
+    `raids ${t.raids} research ${sim.research.done.length} ` +
     `goals ${OBJECTIVES.filter((o) => sim.objectivesDone[o.id]).length}/${OBJECTIVES.length} ` +
     `deaths ${JSON.stringify(sim.stats.deaths ?? {})} births ${sim.stats.births ?? 0} ` +
     `save ${Math.round(JSON.stringify(serialize(sim)).length / 1024)}KB ${((now - t.started) / 1000).toFixed(0)}s`;
