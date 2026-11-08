@@ -1365,6 +1365,26 @@ function createAnimalTextures(scene: Phaser.Scene): void {
     c.fillRect(7, 12, 1, 2);
     c.fillRect(9, 12, 1, 2);
   });
+  draw('greatBeast', (c) => {
+    // A hulking, shaggy thing with a ridge of horn down its back and pale tusks.
+    c.fillStyle = '#3a2f2a';
+    c.fillRect(1, 5, 12, 7);
+    c.fillRect(11, 6, 4, 5);
+    c.fillStyle = '#5a4a40';
+    c.fillRect(2, 6, 9, 2);
+    c.fillStyle = '#8c8070';
+    for (const x of [3, 5, 7, 9]) {
+      c.fillRect(x, 3, 1, 2);
+    }
+    c.fillStyle = '#2a201c';
+    c.fillRect(2, 12, 2, 3);
+    c.fillRect(9, 12, 2, 3);
+    c.fillStyle = '#f0e8d0';
+    c.fillRect(14, 10, 1, 2);
+    c.fillRect(12, 10, 1, 1);
+    c.fillStyle = '#ff7a3c';
+    c.fillRect(13, 7, 1, 1);
+  });
   draw('crawler', (c) => {
     // Pale, segmented and many-legged.
     c.fillStyle = '#3a3440';

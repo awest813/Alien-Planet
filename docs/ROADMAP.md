@@ -720,6 +720,33 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
 - Great threats with names and histories: a vast beast that wakes once a year, a siege that camps and builds,
   an infestation from below (Phase L).
 - First slice: the chronicle and engravings. Success: a 120-day run reads like a history.
+- **Done, a first slice** (`src/sim/chronicle.ts`, `src/sim/beast.ts`), with a deeper research tree:
+  - The chronicle: births, deaths, marriages, battles, great threats, newcomers, great works, discoveries,
+    leaders and milestones, kept for the whole game (up to 3,000 entries; discoveries go first when full,
+    the founding never). It's at the top of the Story screen, by year with the season and day, newest
+    year open; discoveries can be hidden. Older saves start one from their story log.
+  - The great beast: from day 36, once a year, a named beast (Old Thornhide, the Grey Ravager, Ashjaw…)
+    comes down from the hills, drawn larger than life, and hunts colonists until its fury is spent. Driven
+    off, it returns the next year a third tougher; slain, it's gone for good, the colony takes heart (+8
+    for five days) and the chronicle remembers.
+  - The winter cough: a catching illness in autumn and winter that spreads to anyone within three tiles,
+    hardest on elders and small children.
+  - Ten later research projects, 2,600–4,000 each, with requirements, so research runs past the first year:
+    - Masonry: building +20%.
+    - Irrigation: harvests +25%.
+    - Preserving: spoilage −⅓.
+    - Animal husbandry: easier taming, double breeding.
+    - Herbalism: infections −55%.
+    - Engineering: generators burn ⅓ less.
+    - Prospecting: shaft ore +⅓.
+    - Civics: being well led counts double.
+    - Tactics: better aim.
+    - Surgery: lasting marks halved.
+  - Balance: the first beast was far too strong at first (five deaths in twelve colonies by day 48). It now
+    starts gentler and later. 48 days: Standard 72/73, Harsh 71/74, with about one death from the beast in
+    each. Ten years, Standard: 7 deaths from wounds (from 2), which is the later danger the gap list asked
+    for.
+  - Not done: wall engravings, sieges, sappers, and infestations.
 
 ### Audits after Phase L
 

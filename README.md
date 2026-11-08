@@ -132,6 +132,11 @@ How the living simulation works:
   pleases some and annoys others (gluttons hate frugal rations, the lazy hate long hours, hard workers don't mind).
   On a day of rest the sick are still tended, prisoners fed and fires kept going, and when the stores are nearly
   empty the day off is called off.
+- **Great threats and the chronicle:** from the second year, the great beast of the hills wakes once a year,
+  named and larger than life, and comes for the colony; drive it off and it returns bigger, bring it down
+  and it's gone for good. In the cold months a catching cough spreads to anyone close by. The Story screen
+  keeps the colony's chronicle: births and deaths, marriages, battles, great works, leaders and
+  milestones, year by year, for as long as the colony lasts.
 - **Into the rock:** research Deep mining (after Smelting) and sink a mine shaft. Miners with nothing else to do
   dig it deeper, a stretch at a time, for stone, iron ore and silver; the deeper it goes the richer the rock and
   the harder the digging. Past twenty metres something may break through from below: cave crawlers pour up out

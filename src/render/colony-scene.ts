@@ -841,7 +841,8 @@ export class ColonyScene extends Phaser.Scene {
   }
 
   private createAnimal(a: Animal): Phaser.GameObjects.Container {
-    const body = this.add.image(0, 0, `animal-${a.kind}`);
+    // The great beast is drawn larger than life.
+    const body = this.add.image(0, 0, `animal-${a.kind}`).setScale(a.kind === 'greatBeast' ? 1.8 : 1);
     // A red crosshair over animals marked for hunting.
     const marker = this.add.graphics();
     marker.lineStyle(1, 0xff5c5c, 0.9).strokeCircle(0, -9, 3);

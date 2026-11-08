@@ -2,6 +2,7 @@ import type { Obsession } from './minds';
 import { Village, freshVillage } from './village';
 import { Diplomacy, freshDiplomacy } from './diplomacy';
 import { Shaft } from './depths';
+import { ChronicleEntry, chronicleFromStory } from './chronicle';
 import type { BeaconState } from './beacon';
 import { NONE, featureDef } from './defs';
 import type { JoyKind } from './defs';
@@ -156,6 +157,7 @@ export interface SaveData {
   village?: Village;
   diplomacy?: Diplomacy;
   shafts?: Record<number, Shaft>;
+  chronicle?: ChronicleEntry[];
   nextInfantId?: number;
   animals: Animal[];
   nextAnimalId: number;
@@ -280,6 +282,7 @@ export function serialize(sim: Simulation): SaveData {
     village: { ...sim.village },
     diplomacy: structuredClone(sim.diplomacy),
     shafts: structuredClone(sim.shafts),
+    chronicle: structuredClone(sim.chronicle),
     nextInfantId: sim.nextInfantId,
     animals: structuredClone(sim.animals),
     caravan: structuredClone(sim.caravan),
@@ -393,6 +396,8 @@ export function deserialize(data: SaveData): Simulation {
   sim.village = { ...freshVillage(), ...data.village };
   sim.diplomacy = { ...freshDiplomacy(), ...structuredClone(data.diplomacy) };
   sim.shafts = structuredClone(data.shafts ?? {});
+  // Older saves have no chronicle: start one from what the story log still holds.
+  sim.chronicle = structuredClone(data.chronicle ?? chronicleFromStory(sim.storyLog));
   sim.nextInfantId = data.nextInfantId ?? 0;
   sim.animals = structuredClone(data.animals);
   sim.caravan = structuredClone(data.caravan);

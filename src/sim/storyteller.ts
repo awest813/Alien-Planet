@@ -7,6 +7,7 @@ import { damage, infect } from './health';
 import { caravanArrives, goodwillOf } from './trade';
 import { atPeace, onGoodTerms } from './diplomacy';
 import { breach, breachWeight } from './depths';
+import { BeastState, beastWakes, beastWeight } from './beast';
 import { ignite } from './weather';
 import { Season } from './seasons';
 import { DRAFT_AGE } from './lifespans';
@@ -28,6 +29,8 @@ export interface StoryState {
   coldSnapUntil: number;
   // A manhunter pack is on the loose (colonists stand down once it's dealt with).
   manhuntersActive?: boolean;
+  // The great beast of the hills, once it has woken.
+  beast?: BeastState;
   // When the last "has collapsed" notification went out (they come in bursts; one card is enough).
   lastCollapseCard?: number;
   // Ticks when a heat wave, an eclipse and an aurora end (0 or past: none on).
@@ -148,6 +151,37 @@ const EVENTS: EventDef[] = [
       const count = Math.max(2, Math.round(Math.min(cap, size) * threatScale(sim)));
       const factions = raiders(sim);
       return factions.length > 0 && spawnRaid(sim, sim.rng.pick(factions).id, count);
+    },
+  },
+  {
+    // Once a year from the second, the great beast of the hills comes down.
+    key: 'greatBeast',
+    minDay: 36,
+    cooldownDays: 10,
+    threat: true,
+    weight: (sim) => beastWeight(sim),
+    run: (sim) => beastWakes(sim),
+  },
+  {
+    // A catching cough in the cold months: one falls ill, and it spreads to whoever is close.
+    key: 'winterCough',
+    minDay: 20,
+    cooldownDays: 12,
+    threat: true,
+    weight: (sim) => (sim.season === 'Winter' ? 1.2 : sim.season === 'Autumn' ? 0.3 : 0),
+    run: (sim) => {
+      const healthy = sim.living().filter((c) => !c.health.disease);
+      if (healthy.length < 2) {
+        return false;
+      }
+      const first = sim.rng.pick(healthy);
+      infect(sim, first, 'winterCough');
+      sim.addLog(
+        `${first.name} has come down with a winter cough. It's catching: keep the sick in bed, and apart if you can.`,
+        'warn',
+        true,
+      );
+      return true;
     },
   },
   {

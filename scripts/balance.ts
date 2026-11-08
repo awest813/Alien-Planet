@@ -71,6 +71,17 @@ const RESEARCH_ORDER = [
   'pottery',
   'smelting',
   'deepMining',
+  'masonry',
+  'irrigation',
+  'preserving',
+  'husbandry',
+  'herbalism',
+  'engineering',
+  'prospecting',
+  'fineArts',
+  'civics',
+  'tactics',
+  'surgery',
 ];
 
 // Finds the nearest w×h rectangle to the colonists where every tile can take a blueprint.

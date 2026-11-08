@@ -182,7 +182,7 @@ export function villageThoughts(sim: Simulation, c: Colonist): string[] {
   const leader = sim.colonists[v.leader];
   if (leader && !leader.health.dead && leader !== c && c.age >= ADULT) {
     if (leader.mood >= GOOD_LEADER_MOOD) {
-      keys.push('wellLed');
+      keys.push(sim.isResearched('civics') ? 'wellLedCivic' : 'wellLed');
     } else if (leader.mood < POOR_LEADER_MOOD) {
       keys.push('poorlyLed');
     }

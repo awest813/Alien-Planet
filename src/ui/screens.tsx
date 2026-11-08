@@ -1,6 +1,7 @@
 import { TOUCH } from './touch';
 import { useEffect, useRef, useState } from 'react';
-import { UiState, controller } from '../game/controller';
+import { ChronicleYear, UiState, controller } from '../game/controller';
+import { ChronicleKind } from '../sim/chronicle';
 import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey } from '../sim/types';
 import { Bar, SLOT_LABELS, WORK_LABELS } from './common';
 import { ADULT, TEEN, TEEN_WORK } from '../sim/lifespans';
@@ -714,9 +715,64 @@ export function PrisonersScreen({ state, onClose }: { state: UiState; onClose: (
   );
 }
 
+const CHRONICLE_ICONS: Record<ChronicleKind, string> = {
+  founding: '⚑',
+  birth: '✿',
+  death: '✝',
+  marriage: '♥',
+  battle: '⚔',
+  threat: '☠',
+  newcomer: '➜',
+  work: '★',
+  discovery: '✎',
+  leader: '♛',
+  milestone: '◆',
+};
+
+// The colony's history by year, newest year open; discoveries can be hidden to read the story itself.
+function Chronicle({ years }: { years: ChronicleYear[] }) {
+  const [discoveries, setDiscoveries] = useState(false);
+  if (years.length === 0) {
+    return <p className="muted">Nothing worth remembering yet.</p>;
+  }
+  return (
+    <div className="chronicle">
+      <label className="setting">
+        <span>Include discoveries (research)</span>
+        <input type="checkbox" checked={discoveries} onChange={(e) => setDiscoveries(e.target.checked)} />
+      </label>
+      {years.map((y, k) => {
+        const entries = y.entries.filter((e) => discoveries || e.kind !== 'discovery');
+        return (
+          <details key={y.year} open={k === 0}>
+            <summary>
+              Year {y.year} <span className="muted small">· {entries.length} entries</span>
+            </summary>
+            <ul className="chronicle-list">
+              {entries.map((e, i) => (
+                <li key={i} className={`chronicle-${e.kind}`}>
+                  <span className="chronicle-icon" aria-hidden="true">
+                    {CHRONICLE_ICONS[e.kind]}
+                  </span>
+                  <span className="muted small chronicle-when">
+                    {e.season}, day {e.day}
+                  </span>{' '}
+                  {e.text}
+                </li>
+              ))}
+            </ul>
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
 export function StoryScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
   return (
     <Modal title="The story so far" onClose={onClose}>
+      <h3>Chronicle</h3>
+      <Chronicle years={state.chronicle} />
       <h3>Festivals</h3>
       <label className="setting">
         <span>Keep the seasonal festivals (Planting Day, the harvest festival, the midwinter bonfire)</span>

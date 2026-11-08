@@ -83,6 +83,7 @@ import {
   tend,
   updateExposure,
   updateHealth,
+  spreadDisease,
 } from './health';
 import { Pathfinder } from './pathfinding';
 import { PowerState, freshPower, updatePower } from './power';
@@ -172,6 +173,8 @@ import {
   updateVillage,
   villageThoughts,
 } from './village';
+import { updateGreatBeast } from './beast';
+import { ChronicleEntry, addToChronicle, chronicleKind, chronicleText } from './chronicle';
 import { Shaft, digDeeper, digWork, shaftAt } from './depths';
 import { Diplomacy, decline, freshDiplomacy, fulfil, gift, payTribute, updateDiplomacy } from './diplomacy';
 import {
@@ -258,6 +261,10 @@ const STARVING_PATIENT = 0.1;
 // Walls and doors count as this many tiles nearer than other blueprints.
 const ENCLOSURE_FIRST = 15;
 const OBJECTIVE_TICKS = 40;
+// What the later research does.
+const MASONRY_SPEED = 1.2;
+const IRRIGATION_YIELD = 1.25;
+const PRESERVING_RATE = 2 / 3;
 // The first days, when colonists expect little.
 const LOW_EXPECTATION_DAYS = 12;
 const COLD_FOR_FIRES = 8;
@@ -575,6 +582,8 @@ export class Simulation {
   };
   public log: LogEntry[] = [];
   public storyLog: StoryEntry[] = [];
+  // The colony's history, kept for good.
+  public chronicle: ChronicleEntry[] = [];
   // The signal beacon's progress towards a ship, and whether the colony has boarded it (the end).
   public beacon: BeaconState = freshBeacon();
   public departed = false;
@@ -971,6 +980,8 @@ export class Simulation {
       updateLifespans(this);
       updateObsession(this);
       updateVillage(this);
+      spreadDisease(this);
+      updateGreatBeast(this);
       updateDiplomacy(this);
       this.weatherFilth();
     }
@@ -1606,6 +1617,11 @@ export class Simulation {
         this.storyLog.shift();
       }
     }
+    // History worth keeping goes into the chronicle too (whether or not it made a card).
+    const kind = chronicleKind(text);
+    if (kind) {
+      addToChronicle(this.chronicle, { day: this.day, kind, text: chronicleText(kind, text) });
+    }
   }
 
   // ---- Internals: regions, rooms, climate ----
@@ -1881,6 +1897,7 @@ export class Simulation {
   // or in a running icebox. Stacks that run out rot away.
   private updateSpoilage(hours: number): void {
     const w = this.world;
+    const preserving = this.isResearched('preserving');
     this.coldStores = this.storageTiles().filter((i) => this.isColdStore(i)).length;
     // Copied, because rotting food is removed from the list as it goes.
     for (const i of [...w.tilesWith('items')]) {
@@ -1905,7 +1922,7 @@ export class Simulation {
         continue;
       }
       const temp = this.temperatureAt(i);
-      const rate = temp <= 0 ? 0 : temp <= 10 ? 0.5 : 1;
+      const rate = (temp <= 0 ? 0 : temp <= 10 ? 0.5 : 1) * (preserving ? PRESERVING_RATE : 1);
       w.fresh[i] -= (rate * hours) / 24;
       if (w.fresh[i] <= 0) {
         this.rotted += w.itemCount[i];
@@ -3616,7 +3633,8 @@ export class Simulation {
       inspired *
       agePace(c).work *
       scarWork(c) *
-      hoursSpeed(this.village)
+      hoursSpeed(this.village) *
+      (type === 'construct' && this.isResearched('masonry') ? MASONRY_SPEED : 1)
     );
   }
 
@@ -3718,8 +3736,9 @@ export class Simulation {
           (i) => w.zone[i] < GROW_ZONE && w.canHoldItem(i, crop.item) && this.regions.region[i] === region,
           1,
         )[0];
-        w.dropItemNear(offField ?? t, crop.item, crop.count);
-        this.produce(crop.item, crop.count);
+        const yieldCount = this.isResearched('irrigation') ? Math.round(crop.count * IRRIGATION_YIELD) : crop.count;
+        w.dropItemNear(offField ?? t, crop.item, yieldCount);
+        this.produce(crop.item, yieldCount);
         c.workStreak++;
         break;
       }
@@ -5916,7 +5935,10 @@ export class Simulation {
       return;
     }
     const def = ANIMALS[animal.kind];
-    const chance = Math.max(0.05, Math.min(0.85, 0.2 + c.skills.animals * 0.035 - def.wildness));
+    const chance = Math.max(
+      0.05,
+      Math.min(0.85, 0.2 + c.skills.animals * 0.035 - def.wildness + (this.isResearched('husbandry') ? 0.15 : 0)),
+    );
     if (useInspiration(this, c, 'tamingInspiration') || this.rng.chance(chance)) {
       animal.tame = true;
       animal.taming = false;

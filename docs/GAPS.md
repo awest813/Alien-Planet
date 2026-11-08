@@ -10,7 +10,8 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 
 ## 1. The long game runs out of things to do
 
-- **Research is done in the first year.** All 18 projects the test colony researches (25 exist) are finished by
+- **Research is done in the first year** (partly closed: ten later projects, 2,600–4,000 each, now run
+  research into the second and third years). All 18 projects the test colony researches (25 exist) are finished by
   day 24 in every run. Nine years with nothing to study.
   - Close it with a deeper tree, gated by materials and buildings as well as time: smelting and steel; glass
     and greenhouses; medicine (surgery, prosthetics; see body.ts); late defences; a longer path to the beacon.
@@ -29,6 +30,7 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 
 - **Ten-year Standard colonies lose about 2 people to raids across 184 raids.** Harsh loses 10 in 251. After the
   first winters the colony is walled, armed and well fed, and raids are the same walk-in-and-shoot every time.
+  - Partly closed: the great beast wakes once a year from the second, and returns bigger until slain.
   - Close it with threat variety (Phase M): sieges that camp and build; sappers that dig through rock; raids
     that target the stores or the beacon; a named great beast; infestations from deep shafts; winter famine
     events.
@@ -36,7 +38,7 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
   years tense.
   - Close it with needs that grow: room expectations by status, the leader's demands, ageing pains, grief that
     lasts.
-- **Disease is toothless.** There is one disease (marsh fever), with 36–56 cases a colony a decade and no
+- **Disease is toothless** (partly closed: a catching winter cough). There is one disease (marsh fever), with 36–56 cases a colony a decade and no
   deaths.
   - Close it with variety: a winter flu, a plague that spreads by contact, wound infection already exists;
     illness that weighs on the old.
@@ -75,7 +77,7 @@ Tools: `scripts/balance.ts` (seeded colonies, summary), `scripts/years.ts` (the 
 
 ## 6. Interface and flow
 
-- **There is no history screen.** There are no graphs (population, wealth, mood over time) and no chronicle; the
+- **There is no history screen** (partly closed: the chronicle on the Story screen). There are no graphs (population, wealth, mood over time) and no chronicle; the
   story log keeps only the latest 200 entries (Phase M's chronicle).
 - **There is no colonist overview.** No table of everyone's needs, skills and moods; the colonist bar and Work
   screen cover part of it.

@@ -161,5 +161,74 @@
     "cost": 1000,
     "requires": ["smelting"],
     "description": "Unlocks the mine shaft: miners dig down for stone, iron ore and silver, richer the deeper they go. Dig deep enough and something may dig back."
+  },
+  {
+    "key": "masonry",
+    "name": "Masonry",
+    "cost": 2600,
+    "description": "Builders know their trade: all construction goes a fifth faster.",
+    "requires": ["pottery"]
+  },
+  {
+    "key": "irrigation",
+    "name": "Irrigation",
+    "cost": 3000,
+    "description": "Channels and ditches: every harvest brings in a quarter more.",
+    "requires": ["cropRotation"]
+  },
+  {
+    "key": "preserving",
+    "name": "Preserving",
+    "cost": 2800,
+    "description": "Salting, smoking and sealing: food spoils a third slower.",
+    "requires": ["milling"]
+  },
+  {
+    "key": "husbandry",
+    "name": "Animal husbandry",
+    "cost": 2600,
+    "description": "Taming comes easier, and tame animals breed twice as often."
+  },
+  {
+    "key": "herbalism",
+    "name": "Herbalism",
+    "cost": 2800,
+    "description": "Clean dressings and poultices: wounds turn infected less than half as often.",
+    "requires": ["fieldMedicine"]
+  },
+  {
+    "key": "engineering",
+    "name": "Engineering",
+    "cost": 3200,
+    "description": "Better boilers: generators burn a third less wood.",
+    "requires": ["electricity"]
+  },
+  {
+    "key": "prospecting",
+    "name": "Prospecting",
+    "cost": 3000,
+    "description": "Miners follow the richest seams: mine shafts bring up a third more ore.",
+    "requires": ["deepMining"]
+  },
+  {
+    "key": "civics",
+    "name": "Civics",
+    "cost": 3000,
+    "description": "A village that knows how to govern itself: being well led lifts everyone twice as much.",
+    "requires": ["fineArts"]
+  },
+  {
+    "key": "tactics",
+    "name": "Tactics",
+    "cost": 3600,
+    "description": "Drill and discipline: colonists shoot straighter in a fight.",
+    "requires": ["fortifications", "longbows"]
+  },
+  {
+    "key": "surgery",
+    "name": "Surgery",
+    "cost": 4000,
+    "description": "Iron instruments and a steady hand: bad wounds are half as likely to leave a lasting mark.",
+    "requires": ["herbalism", "smelting"]
   }
 ]

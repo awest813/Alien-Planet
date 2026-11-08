@@ -94,7 +94,7 @@ export function infectionStep(sim: Simulation, c: Colonist, injury: Injury, hour
   const open = injury.label === 'Cut' || injury.label === 'Arrow wound';
   if (open && (injury.infection ?? 0) === 0 && injury.severity >= INFECTION_MIN_SEVERITY) {
     const risk = injury.tended === 0 ? INFECTION_UNTENDED : injury.dirty ? INFECTION_DIRTY : INFECTION_CLEAN;
-    if (sim.rng.next() < risk * hours * (hospital ? 0.5 : 1)) {
+    if (sim.rng.next() < risk * hours * (hospital ? 0.5 : 1) * (sim.isResearched('herbalism') ? 0.45 : 1)) {
       injury.infection = 0.01;
       injury.treated = false;
       sim.stats.infections = (sim.stats.infections ?? 0) + 1;
@@ -118,7 +118,9 @@ export function healed(sim: Simulation, c: Colonist, injury: Injury): void {
   if (peak < LASTING_FROM || !injury.part) {
     return;
   }
-  const chance = (peak - LASTING_FROM + 0.1) * 1.2 * (1 - injury.tended * 0.6) + (injury.wasInfected ? 0.25 : 0);
+  const chance =
+    ((peak - LASTING_FROM + 0.1) * 1.2 * (1 - injury.tended * 0.6) + (injury.wasInfected ? 0.25 : 0)) *
+    (sim.isResearched('surgery') ? 0.5 : 1);
   if (sim.rng.next() >= chance) {
     return;
   }

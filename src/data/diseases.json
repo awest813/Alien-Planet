@@ -4,5 +4,12 @@
     "description": "Fatal if it outpaces immunity. Bed rest and tending slow it down.",
     "severityPerHour": 0.04,
     "immunityPerHour": 0.032
+  },
+  "winterCough": {
+    "label": "Winter cough",
+    "description": "Catching: it spreads to anyone close by. Hardest on the old and the very young. Bed rest and tending see most through it.",
+    "severityPerHour": 0.03,
+    "immunityPerHour": 0.026,
+    "contagious": 0.02
   }
 }

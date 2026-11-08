@@ -134,5 +134,21 @@
     "breedChance": 0,
     "plural": "cave crawlers",
     "group": [2, 4]
+  },
+  "greatBeast": {
+    "name": "Great beast",
+    "hp": 4.5,
+    "speed": 1.0,
+    "meat": 60,
+    "leather": 25,
+    "fleeRange": 0,
+    "weight": 0,
+    "revengeChance": 1,
+    "bite": [0.12, 0.22],
+    "description": "Something huge from the hills. Wakes once a year, hungry.",
+    "wildness": 1,
+    "breedChance": 0,
+    "plural": "great beasts",
+    "group": [1, 1]
   }
 }

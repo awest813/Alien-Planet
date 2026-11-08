@@ -477,5 +477,14 @@
   "veryHighExpectations": {
     "label": "Long settled: high expectations",
     "mood": -6
+  },
+  "wellLedCivic": {
+    "label": "In good hands (a well-run village)",
+    "mood": 4
+  },
+  "slewGreatBeast": {
+    "label": "We slew the great beast",
+    "mood": 8,
+    "hours": 120
   }
 }

@@ -6,6 +6,7 @@ import type { Season } from './seasons';
 import type { Simulation } from './simulation';
 import { Animal, Colonist } from './types';
 import { Filth } from './world';
+import { beastSlain } from './beast';
 
 // Wild animals on the standard 64×64 map; bigger maps hold proportionally more.
 export const MAX_ANIMALS = 14;
@@ -205,7 +206,7 @@ function nearestPrey(sim: Simulation, a: Animal): Colonist | undefined {
 // A beast a neighbour wants dealt with: a great boar, far tougher than most, that roams the valley
 // (and never leaves) until it's hunted down or the request lapses.
 export const QUARRY_TOUGHNESS = 2.5;
-export const maxHp = (a: Animal): number => ANIMALS[a.kind].hp * (a.quarry ? QUARRY_TOUGHNESS : 1);
+export const maxHp = (a: Animal): number => ANIMALS[a.kind].hp * (a.toughness ?? (a.quarry ? QUARRY_TOUGHNESS : 1));
 export function addQuarry(sim: Simulation): Animal | null {
   const region = sim.outsideRegion();
   const w = sim.world;
@@ -332,7 +333,10 @@ export function animalsAtDawn(sim: Simulation): void {
   for (const kind of Object.keys(ANIMALS)) {
     const herd = tame.filter((a) => a.kind === kind);
     for (let pair = 0; pair < Math.floor(herd.length / 2); pair++) {
-      if (sim.animals.filter((a) => a.tame).length >= MAX_TAME || !sim.rng.chance(ANIMALS[kind].breedChance)) {
+      if (
+        sim.animals.filter((a) => a.tame).length >= MAX_TAME ||
+        !sim.rng.chance(ANIMALS[kind].breedChance * (sim.isResearched('husbandry') ? 2 : 1))
+      ) {
         continue;
       }
       const young = addAnimal(sim, herd[pair * 2].tile, kind);
@@ -598,6 +602,10 @@ export function hurtAnimal(sim: Simulation, a: Animal, amount: number, attacker:
     if (!a.tame && a.hunted) {
       sim.stats.hunted++;
     }
+    if (a.kind === 'greatBeast') {
+      beastSlain(sim, a, attacker);
+      return;
+    }
     sim.addLog(`${attacker.name} brought down a ${animalName(a).toLowerCase()}.`, 'good');
     return;
   }
@@ -628,5 +636,5 @@ function homeward(sim: Simulation, a: Animal, home: number): number | undefined 
 }
 
 export function animalName(a: Animal): string {
-  return a.quarry ? 'Great boar' : ANIMALS[a.kind].name;
+  return a.name ? a.name[0].toUpperCase() + a.name.slice(1) : a.quarry ? 'Great boar' : ANIMALS[a.kind].name;
 }

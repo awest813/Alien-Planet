@@ -69,7 +69,7 @@ export function updatePower(sim: Simulation, tiles: number[], hours: number): vo
     const fuel = featureDef(w.feature[i]).power!.fuel!;
     if (needed && w.fuel[i] > 0) {
       supply += featureDef(w.feature[i]).power!.output;
-      w.fuel[i] = Math.max(0, w.fuel[i] - (fuel.perDay / 24) * hours);
+      w.fuel[i] = Math.max(0, w.fuel[i] - (fuel.perDay / 24) * hours * (sim.isResearched('engineering') ? 2 / 3 : 1));
     }
   }
   state.supply = supply;

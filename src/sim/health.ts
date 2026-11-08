@@ -16,6 +16,7 @@ import {
 } from './body';
 import type { Simulation } from './simulation';
 import { Filth } from './world';
+import { ELDER, TODDLER } from './lifespans';
 import { Colonist, Health } from './types';
 
 interface DiseaseDef {
@@ -23,6 +24,33 @@ interface DiseaseDef {
   description: string;
   severityPerHour: number;
   immunityPerHour: number;
+  // Chance per hour it passes to each colonist close by (none: it doesn't spread).
+  contagious?: number;
+}
+
+// How close someone has to be to catch a catching disease.
+const CONTAGION_RANGE = 3;
+
+// Called every in-game hour: catching diseases pass to whoever is close to the sick.
+export function spreadDisease(sim: Simulation): void {
+  const living = sim.living();
+  for (const sick of living) {
+    const chance = sick.health.disease ? (DISEASES[sick.health.disease.key].contagious ?? 0) : 0;
+    if (chance <= 0) {
+      continue;
+    }
+    for (const other of living) {
+      if (
+        other !== sick &&
+        !other.health.disease &&
+        sim.world.distance(sick.tile, other.tile) <= CONTAGION_RANGE &&
+        sim.rng.chance(chance)
+      ) {
+        infect(sim, other, sick.health.disease!.key);
+        sim.addLog(`${other.name} has caught ${sick.health.disease!.label.toLowerCase()} from ${sick.name}.`, 'warn');
+      }
+    }
+  }
 }
 
 export const DISEASES: Record<string, DiseaseDef> = diseasesJson;
@@ -222,7 +250,9 @@ export function updateHealth(sim: Simulation, c: Colonist, hours: number): void 
   if (h.disease) {
     const def = DISEASES[h.disease.key];
     const tended = h.disease.tendedUntil > sim.tick;
-    h.disease.severity += def.severityPerHour * (tended ? 0.45 : 1) * hours;
+    // A catching illness is hardest on the old and the very young.
+    const frail = def.contagious && (c.age >= ELDER || c.age < TODDLER * 2) ? 1.4 : 1;
+    h.disease.severity += def.severityPerHour * (tended ? 0.45 : 1) * frail * hours;
     h.disease.immunity += def.immunityPerHour * restBonus * hours;
     if (h.disease.immunity >= 1 && h.disease.severity < 1) {
       sim.addLog(`${c.name} has recovered from ${h.disease.label.toLowerCase()}.`, 'good');

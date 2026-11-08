@@ -1639,3 +1639,47 @@ button.big {
   color: var(--muted, #888);
   opacity: 0.5;
 }
+
+/* ---------- Chronicle (Story screen) ---------- */
+.chronicle details {
+  margin: 4px 0;
+}
+
+.chronicle summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.chronicle-list {
+  list-style: none;
+  margin: 4px 0 8px;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.chronicle-list li {
+  padding: 2px 0;
+  font-size: 13px;
+}
+
+.chronicle-icon {
+  display: inline-block;
+  width: 1.4em;
+  text-align: center;
+}
+
+.chronicle-when {
+  margin-right: 4px;
+}
+
+.chronicle-death .chronicle-icon,
+.chronicle-threat .chronicle-icon {
+  color: var(--danger);
+}
+
+.chronicle-birth .chronicle-icon,
+.chronicle-marriage .chronicle-icon,
+.chronicle-work .chronicle-icon {
+  color: var(--accent);
+}

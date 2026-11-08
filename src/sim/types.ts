@@ -264,6 +264,11 @@ export interface Animal {
   huntAgainAt?: number;
   // The beast a neighbouring faction asked the colony to hunt down: tougher, and stays until it's dead.
   quarry?: boolean;
+  // A named animal (the great beast), how many times tougher than its kind, and whether its leaving was
+  // told.
+  name?: string;
+  toughness?: number;
+  told?: boolean;
 }
 
 export interface Injury {
@@ -479,6 +484,7 @@ export interface Stats {
   requestsDone?: number;
   // Breaches from below, through deep mine shafts.
   breaches?: number;
+  greatBeastSlain?: number;
   // Every death, by cause (the log only keeps the latest).
   deaths?: Record<string, number>;
   requestsFailed?: number;

@@ -23,7 +23,8 @@ import {
   type JoyKind,
 } from '../sim/defs';
 import { availableProjects, isAvailable } from '../sim/research';
-import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, yearOf } from '../sim/seasons';
+import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, seasonOf, yearOf } from '../sim/seasons';
+import { ChronicleKind } from '../sim/chronicle';
 import { animalName } from '../sim/animals';
 import { armorOf } from '../sim/combat';
 import { POISONING_HOURS, bleedingOf, needsBedRest } from '../sim/health';
@@ -735,6 +736,11 @@ export interface ObjectiveView {
   screen?: 'work' | 'production' | 'research' | 'schedule' | 'ship';
 }
 
+export interface ChronicleYear {
+  year: number;
+  entries: { day: number; season: string; kind: ChronicleKind; text: string }[];
+}
+
 export interface FactionView {
   id: number;
   name: string;
@@ -848,6 +854,8 @@ export interface UiState {
   // Raiders lying wounded, and prisoners.
   captives: CaptiveView[];
   factions: FactionView[];
+  // The colony's history, year by year (newest first), each year's entries in order.
+  chronicle: ChronicleYear[];
   // A favour the neighbours have asked, and what the colony can pay with.
   diplomacy: DiplomacyView;
   // Current weather, e.g. { label: 'Rain', icon: '🌧' } (no icon when clear).
@@ -1755,6 +1763,7 @@ export class GameController {
           : 0,
       })),
       diplomacy: this.diplomacyView(),
+      chronicle: this.chronicleView(),
       fires: sim.burning.size,
       stats: {
         raidsRepelled: sim.stats.raidsRepelled,
@@ -2035,9 +2044,11 @@ export class GameController {
     const manhunters = sim.animals.filter((a) => a.manhunter && a.hp > 0 && a.revengeOn >= 0);
     if (manhunters.length > 0) {
       alerts.push({
-        text: manhunters.every((a) => a.kind === 'crawler')
-          ? `${manhunters.length} cave crawler${manhunters.length > 1 ? 's are' : ' is'} hunting colonists: draft and fight (Q)`
-          : `${manhunters.length} maddened animal${manhunters.length > 1 ? 's are' : ' is'} hunting colonists: draft and fight (Q)`,
+        text: manhunters.some((a) => a.kind === 'greatBeast')
+          ? `${animalName(manhunters.find((a) => a.kind === 'greatBeast')!)} is attacking the colony: draft everyone and bring it down (Q)`
+          : manhunters.every((a) => a.kind === 'crawler')
+            ? `${manhunters.length} cave crawler${manhunters.length > 1 ? 's are' : ' is'} hunting colonists: draft and fight (Q)`
+            : `${manhunters.length} maddened animal${manhunters.length > 1 ? 's are' : ' is'} hunting colonists: draft and fight (Q)`,
         tone: 'danger',
         tile: manhunters[0].tile,
       });
@@ -2242,6 +2253,33 @@ export class GameController {
       ['handling', sim.animals.some((a) => a.taming)],
     ];
     return waiting.filter(([work, has]) => has && !staffed(work)).map(([work]) => WORK_NAMES[work] ?? work);
+  }
+
+  // Rebuilt only when the chronicle grows (it can run to thousands of entries).
+  private chronicleCache: { length: number; sim: Simulation | null; years: ChronicleYear[] } = {
+    length: -1,
+    sim: null,
+    years: [],
+  };
+  private chronicleView(): ChronicleYear[] {
+    const sim = this.sim;
+    const cache = this.chronicleCache;
+    if (cache.sim === sim && cache.length === sim.chronicle.length) {
+      return cache.years;
+    }
+    const years = new Map<number, ChronicleYear>();
+    for (const e of sim.chronicle) {
+      const hours = (e.day - 1) * 24 + 12;
+      const year = yearOf(hours);
+      let y = years.get(year);
+      if (!y) {
+        y = { year, entries: [] };
+        years.set(year, y);
+      }
+      y.entries.push({ day: e.day, season: seasonOf(hours), kind: e.kind, text: e.text });
+    }
+    this.chronicleCache = { length: sim.chronicle.length, sim, years: [...years.values()].reverse() };
+    return this.chronicleCache.years;
   }
 
   private diplomacyView(): DiplomacyView {

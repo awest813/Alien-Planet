@@ -704,12 +704,22 @@ export function updateEnemies(sim: Simulation): void {
 
 // ---- Colonists fighting back ----
 
+// Tactics (research): a little better aim for every colonist.
+const TACTICS_AIM = 0.08;
+
 // One colonist attack at `target`; returns the damage dealt before armor (0 on a miss).
 function colonistAttack(sim: Simulation, c: Colonist, target: number, weapon: WeaponDef): number {
   const ranged = weapon.range > 1;
   const hit =
     sim.rng.next() <
-    hitChance(sim, weapon, c.skills.combat, c.tile, target, ranged ? (traitValue(c, 'accuracy') ?? 0) + scarAim(c) : 0);
+    hitChance(
+      sim,
+      weapon,
+      c.skills.combat,
+      c.tile,
+      target,
+      (ranged ? (traitValue(c, 'accuracy') ?? 0) + scarAim(c) : 0) + (sim.isResearched('tactics') ? TACTICS_AIM : 0),
+    );
   recordShot(sim, c.tile, target, hit, ranged);
   c.cooldown = weapon.cooldown;
   learn(sim, c, 'combat', COMBAT_XP);

@@ -66,7 +66,8 @@ export function digDeeper(sim: Simulation, c: Colonist, tile: number): void {
   const w = sim.world;
   const shaft = shaftAt(sim, tile);
   const { iron, silver } = oreChances(shaft);
-  const rich = shaft.cavern ? CAVERN_BONUS : 1;
+  // (Prospecting brings up a third more of whatever ore there is.)
+  const rich = (shaft.cavern ? CAVERN_BONUS : 1) * (sim.isResearched('prospecting') ? 4 / 3 : 1);
   const found: [string, number][] = [['stone', 6 + Math.min(4, Math.floor(shaft.depth / 4))]];
   if (sim.rng.next() < iron) {
     found.push(['ironOre', Math.round(Math.min(6, 2 + Math.floor(shaft.depth / 5)) * rich)]);
