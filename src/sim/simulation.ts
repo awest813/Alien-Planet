@@ -1270,8 +1270,9 @@ export class Simulation {
           if (cmd.type === 'hunt') {
             a.hunted = cmd.add && !(spareTame && a.tame);
           } else {
-            // Already-tame animals have nothing left to tame, and the great boar won't be tamed.
-            a.taming = cmd.add && !a.tame && !a.quarry;
+            // Already-tame animals have nothing left to tame, and the great boar and the great beast
+            // won't be tamed.
+            a.taming = cmd.add && !a.tame && !a.quarry && a.kind !== 'greatBeast';
           }
         }
         break;
@@ -3736,7 +3737,9 @@ export class Simulation {
           (i) => w.zone[i] < GROW_ZONE && w.canHoldItem(i, crop.item) && this.regions.region[i] === region,
           1,
         )[0];
-        const yieldCount = this.isResearched('irrigation') ? Math.round(crop.count * IRRIGATION_YIELD) : crop.count;
+        // (Irrigation's quarter more, as an extra unit a quarter of the time on small harvests.)
+        const more = this.isResearched('irrigation') ? crop.count * IRRIGATION_YIELD : crop.count;
+        const yieldCount = Math.floor(more) + (more % 1 > 0 && this.rng.next() < more % 1 ? 1 : 0);
         w.dropItemNear(offField ?? t, crop.item, yieldCount);
         this.produce(crop.item, yieldCount);
         c.workStreak++;

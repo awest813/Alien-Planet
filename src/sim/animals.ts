@@ -6,7 +6,7 @@ import type { Season } from './seasons';
 import type { Simulation } from './simulation';
 import { Animal, Colonist } from './types';
 import { Filth } from './world';
-import { beastSlain } from './beast';
+import { beastLeaves, beastSlain } from './beast';
 
 // Wild animals on the standard 64×64 map; bigger maps hold proportionally more.
 export const MAX_ANIMALS = 14;
@@ -105,7 +105,12 @@ function standDownAfterPack(sim: Simulation): void {
     return;
   }
   sim.story.manhuntersActive = false;
-  sim.addLog('The maddened animals are dealt with. Colonists stand down.', 'good', true);
+  if (sim.story.beastHunt) {
+    sim.story.beastHunt = false;
+    sim.addLog('Colonists stand down.', 'info');
+  } else {
+    sim.addLog('The maddened animals are dealt with. Colonists stand down.', 'good', true);
+  }
   if (!sim.raid) {
     for (const c of sim.living()) {
       if (c.drafted) {
@@ -418,6 +423,9 @@ function moveOn(sim: Simulation): void {
 function leave(sim: Simulation, a: Animal): void {
   if (onEdge(sim, a.tile)) {
     // Gone: removed with the fallen at the end of the update, but leaving nothing behind.
+    if (a.kind === 'greatBeast') {
+      beastLeaves(sim, a);
+    }
     a.hp = 0;
     return;
   }

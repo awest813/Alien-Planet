@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { hurtAnimal } from './animals';
-import { beastWeight } from './beast';
+import { beastWeight, updateGreatBeast } from './beast';
 import { infect, spreadDisease } from './health';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
@@ -48,6 +48,31 @@ describe('the great beast', () => {
     expect(beastWeight(sim)).toBe(0);
   });
 
+  it("can't be tamed, and once its fury is spent it goes (saying so once) and can come back", () => {
+    const sim = Simulation.newColony(5);
+    later(sim, 37);
+    triggerEvent(sim, 'greatBeast');
+    const beast = sim.animals.find((a) => a.kind === 'greatBeast')!;
+    const x = sim.world.xOf(beast.tile);
+    const y = sim.world.yOf(beast.tile);
+    sim.apply({ type: 'tame', add: true, rect: { x0: x, y0: y, x1: x, y1: y } });
+    expect(beast.taming).toBeFalsy();
+    // Calm, hemmed in and marked for hunting: it still goes once its fury is spent.
+    beast.manhunter = false;
+    beast.revengeOn = -1;
+    beast.hunted = true;
+    updateGreatBeast(sim);
+    expect(beast.hp).toBeGreaterThan(0);
+    sim.tick = beast.revengeUntil + 1;
+    updateGreatBeast(sim);
+    updateGreatBeast(sim);
+    expect(beast.hp).toBe(0);
+    expect(sim.storyLog.filter((e) => e.text.includes('gone back into the hills'))).toHaveLength(1);
+    sim.animals = sim.animals.filter((a) => a.hp > 0);
+    later(sim, 55);
+    expect(beastWeight(sim)).toBeGreaterThan(0);
+  });
+
   it('never comes on peaceful', () => {
     const sim = Simulation.newColony(3, 'peaceful');
     later(sim, 40);
@@ -56,14 +81,33 @@ describe('the great beast', () => {
 });
 
 describe('the winter cough', () => {
-  it('spreads to whoever is close to the sick', () => {
+  it('spreads to whoever is close to the sick in autumn and winter', () => {
     const sim = Simulation.newColony(4);
+    later(sim, 18);
     const [sick, near] = sim.colonists;
     near.tile = sick.tile + 1;
     infect(sim, sick, 'winterCough');
     for (let h = 0; h < 200 && !near.health.disease; h++) {
       spreadDisease(sim);
     }
+    expect(near.health.disease?.key).toBe('winterCough');
+  });
+
+  it("doesn't spread in summer, and the recovered can't catch it again for a while", () => {
+    const sim = Simulation.newColony(6);
+    later(sim, 6);
+    const [sick, near] = sim.colonists;
+    near.tile = sick.tile + 1;
+    infect(sim, sick, 'winterCough');
+    for (let h = 0; h < 200; h++) {
+      spreadDisease(sim);
+    }
+    expect(near.health.disease).toBeNull();
+    near.health.recovered = { key: 'winterCough', until: sim.tick + 1000 };
+    infect(sim, near, 'winterCough');
+    expect(near.health.disease).toBeNull();
+    sim.tick += 1001;
+    infect(sim, near, 'winterCough');
     expect(near.health.disease?.key).toBe('winterCough');
   });
 });

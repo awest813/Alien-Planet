@@ -718,7 +718,7 @@ function colonistAttack(sim: Simulation, c: Colonist, target: number, weapon: We
       c.skills.combat,
       c.tile,
       target,
-      (ranged ? (traitValue(c, 'accuracy') ?? 0) + scarAim(c) : 0) + (sim.isResearched('tactics') ? TACTICS_AIM : 0),
+      ranged ? (traitValue(c, 'accuracy') ?? 0) + scarAim(c) + (sim.isResearched('tactics') ? TACTICS_AIM : 0) : 0,
     );
   recordShot(sim, c.tile, target, hit, ranged);
   c.cooldown = weapon.cooldown;

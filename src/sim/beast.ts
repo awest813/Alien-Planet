@@ -1,5 +1,6 @@
 import { manhuntersArrive } from './animals';
 import { TICKS_PER_HOUR } from './constants';
+import { yearOf } from './seasons';
 import type { Simulation } from './simulation';
 import { Animal, Colonist } from './types';
 
@@ -22,7 +23,8 @@ const FIRST_DAY = 36;
 const GROWTH = 0.35;
 const FURY_HOURS = 20;
 
-const year = (sim: Simulation) => Math.floor((sim.day - 1) / 24);
+// The calendar year (as the chronicle and the top bar count them).
+const year = (sim: Simulation) => yearOf(sim.totalHours);
 const present = (sim: Simulation) => sim.animals.find((a) => a.kind === 'greatBeast' && a.hp > 0);
 
 // The storyteller's weight for the beast waking: once a year, not on peaceful, never once slain.
@@ -56,17 +58,28 @@ export function beastWakes(sim: Simulation): boolean {
     true,
   );
   sim.events.push('manhunters');
+  sim.story.beastHunt = !sim.story.manhuntersActive;
   sim.story.manhuntersActive = true;
   return true;
 }
 
-// Called every in-game hour: once its fury is spent, it goes back into the hills (and says so once).
+// It has gone back into the hills (walked off the map, or slipped away): said once.
+export function beastLeaves(sim: Simulation, a: Animal): void {
+  if (a.told) {
+    return;
+  }
+  a.told = true;
+  const Name = a.name ? a.name[0].toUpperCase() + a.name.slice(1) : 'The great beast';
+  sim.addLog(`${Name} has gone back into the hills. It will be back next year, bigger.`, 'warn', true);
+}
+
+// Called every in-game hour: once its fury is spent and it's calm, it doesn't linger (even hemmed in or
+// marked for hunting), so it can come back next year.
 export function updateGreatBeast(sim: Simulation): void {
   const a = present(sim);
-  if (a && !a.manhunter && a.leaving && !a.told) {
-    a.told = true;
-    const Name = a.name ? a.name[0].toUpperCase() + a.name.slice(1) : 'The great beast';
-    sim.addLog(`${Name} has gone back into the hills. It will be back next year, bigger.`, 'warn', true);
+  if (a && !a.manhunter && a.revengeOn < 0 && !(a.revengeUntil > sim.tick)) {
+    beastLeaves(sim, a);
+    a.hp = 0;
   }
 }
 

@@ -306,6 +306,8 @@ export interface Health {
   injuries: Injury[];
   bloodLoss: number;
   disease: Disease | null;
+  // Got over this illness, and can't catch it again until this tick.
+  recovered?: { key: string; until: number };
   // Collapsed from pain or blood loss: can't move or work until it eases.
   downed: boolean;
   dead: boolean;

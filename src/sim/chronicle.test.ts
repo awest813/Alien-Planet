@@ -46,3 +46,12 @@ describe('the chronicle', () => {
     expect(deserialize(data).chronicle.map((e) => e.kind)).toContain('death');
   });
 });
+
+describe('the chronicle rules', () => {
+  it('records the last goal and the end of the beast once', () => {
+    expect(chronicleKind('Every goal is complete. The colony is thriving: play on for as long as you like.')).toBe(
+      'milestone',
+    );
+    expect(chronicleKind('Colonists stand down.')).toBeNull();
+  });
+});

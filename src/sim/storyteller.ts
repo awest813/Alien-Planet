@@ -29,6 +29,8 @@ export interface StoryState {
   coldSnapUntil: number;
   // A manhunter pack is on the loose (colonists stand down once it's dealt with).
   manhuntersActive?: boolean;
+  // ...and it's the great beast alone (whose leaving or death says enough).
+  beastHunt?: boolean;
   // The great beast of the hills, once it has woken.
   beast?: BeastState;
   // When the last "has collapsed" notification went out (they come in bursts; one card is enough).
@@ -398,6 +400,7 @@ const EVENTS: EventDef[] = [
       );
       sim.events.push('manhunters');
       sim.story.manhuntersActive = true;
+      sim.story.beastHunt = false;
       return true;
     },
   },
@@ -418,6 +421,7 @@ const EVENTS: EventDef[] = [
       }
       sim.events.push('manhunters');
       sim.story.manhuntersActive = true;
+      sim.story.beastHunt = false;
       return true;
     },
   },

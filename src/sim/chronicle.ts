@@ -40,7 +40,10 @@ const RULES: [RegExp, ChronicleKind][] = [
   [/legendary sculpture|has finished their vision/, 'work'],
   [/^Research complete: /, 'discovery'],
   [/has chosen .* as its leader/, 'leader'],
-  [/goals complete\.|The ship has landed|chosen to stay|reached bedrock|made it through the winter/, 'milestone'],
+  [
+    /goals complete\.|Every goal is complete|The ship has landed|chosen to stay|reached bedrock|made it through the winter/,
+    'milestone',
+  ],
 ];
 
 export function chronicleKind(text: string): ChronicleKind | null {

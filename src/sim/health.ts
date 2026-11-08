@@ -15,6 +15,7 @@ import {
   scarPain,
 } from './body';
 import type { Simulation } from './simulation';
+import { seasonOf } from './seasons';
 import { Filth } from './world';
 import { ELDER, TODDLER } from './lifespans';
 import { Colonist, Health } from './types';
@@ -26,7 +27,12 @@ interface DiseaseDef {
   immunityPerHour: number;
   // Chance per hour it passes to each colonist close by (none: it doesn't spread).
   contagious?: number;
+  // The seasons it spreads in (none: all year).
+  seasons?: string[];
 }
+
+// After getting over an illness, how long someone can't catch it again.
+const IMMUNE_DAYS = 12;
 
 // How close someone has to be to catch a catching disease.
 const CONTAGION_RANGE = 3;
@@ -34,8 +40,10 @@ const CONTAGION_RANGE = 3;
 // Called every in-game hour: catching diseases pass to whoever is close to the sick.
 export function spreadDisease(sim: Simulation): void {
   const living = sim.living();
+  const season = seasonOf(sim.totalHours);
   for (const sick of living) {
-    const chance = sick.health.disease ? (DISEASES[sick.health.disease.key].contagious ?? 0) : 0;
+    const def = sick.health.disease ? DISEASES[sick.health.disease.key] : undefined;
+    const chance = def && (!def.seasons || def.seasons.includes(season)) ? (def.contagious ?? 0) : 0;
     if (chance <= 0) {
       continue;
     }
@@ -43,6 +51,7 @@ export function spreadDisease(sim: Simulation): void {
       if (
         other !== sick &&
         !other.health.disease &&
+        !immune(sim, other, sick.health.disease!.key) &&
         sim.world.distance(sick.tile, other.tile) <= CONTAGION_RANGE &&
         sim.rng.chance(chance)
       ) {
@@ -165,8 +174,12 @@ export function damage(sim: Simulation, c: Colonist, amount: number, kind: Damag
   checkHealth(sim, c);
 }
 
+// Just over this illness: it can't be caught again for a while.
+const immune = (sim: Simulation, c: Colonist, key: string): boolean =>
+  c.health.recovered?.key === key && c.health.recovered.until > sim.tick;
+
 export function infect(sim: Simulation, c: Colonist, key: string): void {
-  if (c.health.dead || c.health.disease) {
+  if (c.health.dead || c.health.disease || immune(sim, c, key)) {
     return;
   }
   c.health.disease = { key, label: DISEASES[key].label, severity: 0.05, immunity: 0, tendedUntil: 0 };
@@ -256,6 +269,7 @@ export function updateHealth(sim: Simulation, c: Colonist, hours: number): void 
     h.disease.immunity += def.immunityPerHour * restBonus * hours;
     if (h.disease.immunity >= 1 && h.disease.severity < 1) {
       sim.addLog(`${c.name} has recovered from ${h.disease.label.toLowerCase()}.`, 'good');
+      h.recovered = { key: h.disease.key, until: sim.tick + IMMUNE_DAYS * 24 * TICKS_PER_HOUR };
       h.disease = null;
     }
   }
