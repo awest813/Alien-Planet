@@ -206,3 +206,25 @@ describe('a rage on a cold night', () => {
     expect(smashable(sim, t + 3)).toBe(true);
   });
 });
+
+describe('a sulk', () => {
+  it('in a freezing bed gives up for somewhere warm rather than freezing to death', () => {
+    const { sim, bed } = village(3);
+    const c = sim.colonists[0];
+    // The bed (and only the bed) is bitterly cold.
+    const warm = sim.temperatureAt.bind(sim);
+    sim.temperatureAt = (i: number) => (i === bed ? -40 : Math.max(18, warm(i)));
+    sim.startBreak(c, 'sulk', 8);
+    let worst = 0;
+    let leftBed = false;
+    for (let t = 0; t < HOUR * 8; t++) {
+      sim.step();
+      c.needs.food = 1;
+      worst = Math.max(worst, c.health.hypothermia);
+      leftBed ||= worst > 0.5 && c.tile !== bed;
+    }
+    expect(c.health.dead).toBe(false);
+    expect(leftBed).toBe(true);
+    expect(worst).toBeLessThan(0.9);
+  });
+});

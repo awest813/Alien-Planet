@@ -55,6 +55,22 @@ describe('stories by the fire', () => {
     expect(sim.story.storiesAt).toBeGreaterThan(sim.tick + 24 * HOUR);
   });
 
+  it('told late in the evening run on past bedtime to the end', () => {
+    const { sim, elder, child } = evening(61);
+    // A quarter to nine: the latest a circle starts, so it runs past ten o'clock bedtime.
+    sim.tick += 2 * HOUR + 45 * (HOUR / 60);
+    sim.syncClock();
+    for (let t = 0; t < HOUR && !sim.storyCircle; t++) {
+      sim.step();
+    }
+    expect(sim.storyCircle).not.toBeNull();
+    run(sim, HOUR * 2);
+    expect(sim.storyCircle).toBeNull();
+    expect(elder.thoughts.some((t) => t.key === 'toldStories')).toBe(true);
+    expect(child.thoughts.some((t) => t.key === 'heardStories')).toBe(true);
+    expect(sim.stats.storyNights).toBe(1);
+  });
+
   it('are not broken up by a concert', () => {
     const { sim, w, fire, other } = evening(61);
     for (let t = 0; t < HOUR * 3 && !sim.storyCircle; t++) {

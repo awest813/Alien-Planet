@@ -2941,7 +2941,13 @@ export class Simulation {
       // Caught within reach of the camp with nothing to do: get clear.
     } else if (this.inMentalBreak(c)) {
       const allowed = c.job && ['wander', 'warmUp', 'shelter', ...(c.breakKind === 'binge' ? ['eat'] : [])];
-      if (c.job && !allowed!.includes(c.job.type)) {
+      // A sulk lasts the whole break: one in a freezing (or sweltering) bed gives up for somewhere bearable,
+      // as a daze does, if there's anywhere to go.
+      const exposedSulk =
+        c.job?.stage === SULK_STAGE &&
+        (c.health.hypothermia > 0.5 || c.health.heatstroke > 0.5) &&
+        (this.nextWarmSearch.get(c.id) ?? 0) <= this.tick;
+      if ((c.job && !allowed!.includes(c.job.type)) || exposedSulk) {
         this.endJob(c);
       }
     } else {
@@ -2954,6 +2960,8 @@ export class Simulation {
         c.job?.type !== 'feed' &&
         c.job?.type !== 'eat' &&
         c.priorities.doctor > 0 &&
+        // (Not the retired, nor a child: they don't doctor, so mustn't be pulled out of bed for it.)
+        canWork(c, 'doctor') &&
         c.health.hypothermia <= 0.5 &&
         c.health.heatstroke <= 0.5 &&
         this.urgentPatient(c)
@@ -3043,7 +3051,9 @@ export class Simulation {
           this.endJob(c);
         }
       } else if (
-        ((slot === 'S' && c.needs.rest < 0.98) || c.needs.rest < 0.1) &&
+        // An evening party, concert or story circle runs on past bedtime to its end (an hour or so); only
+        // exhaustion breaks it up. (Cut off at bedtime, nobody got anything from it.)
+        ((slot === 'S' && c.needs.rest < 0.98 && !this.inEveningCompany(c)) || c.needs.rest < 0.1) &&
         job !== 'rest' &&
         job !== 'tend' &&
         job !== 'warmUp' &&
@@ -3191,7 +3201,12 @@ export class Simulation {
     }
     if (needsBedRest(c)) {
       // The walking wounded patch up others (or, failing that, themselves) before lying down.
-      if (c.priorities.doctor > 0 && (this.urgentPatient(c) || needsTending(this, c)) && this.tryTend(c)) {
+      if (
+        c.priorities.doctor > 0 &&
+        canWork(c, 'doctor') &&
+        (this.urgentPatient(c) || needsTending(this, c)) &&
+        this.tryTend(c)
+      ) {
         return;
       }
       this.startRest(c);
@@ -5690,6 +5705,12 @@ export class Simulation {
     return true;
   }
 
+  // At a party, concert or story circle (giving or listening).
+  private inEveningCompany(c: Colonist): boolean {
+    const j = c.job;
+    return !!j && (!!j.gathering || !!j.listening || !!j.telling || !!j.hearing || this.concert?.player === c.id);
+  }
+
   private finishConcert(c: Colonist): void {
     this.concert = null;
     this.stats.concerts = (this.stats.concerts ?? 0) + 1;
@@ -7716,7 +7737,7 @@ export class Simulation {
         p.health.easedUntil === undefined &&
         !p.health.downed &&
         !needsTending(this, p) &&
-        !this.isReserved(`s${p.id}`, c) &&
+        !this.isReserved(`so${p.id}`, c) &&
         this.regions.region[p.tile] === region,
     );
     if (!patient) {
@@ -7733,7 +7754,7 @@ export class Simulation {
       return false;
     }
     this.dropCarried(c);
-    this.reserve(c, `s${patient.id}`);
+    this.reserve(c, `so${patient.id}`);
     this.reserve(c, `i${medicine}`);
     this.assign(c, this.makeJob('soothe', -1, { source: medicine, item: MEDICINE, patient: patient.id }), path);
     return true;

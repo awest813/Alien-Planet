@@ -46,6 +46,6 @@ export const WEDDING_OPINION = 60;
 export const FUNERAL_FROM = 8;
 export const FUNERAL_UNTIL = 19;
 // Thoughts of grief that a funeral or a memorial eases.
-export const GRIEF = ['friendDied', 'loverDied', 'colonistDied'];
+export const GRIEF = ['friendDied', 'loverDied', 'colonistDied', 'childDied', 'parentDied', 'siblingDied', 'kinDied'];
 // "One of us lies unburied" lasts this long after a death, if nobody is buried.
 export const UNBURIED_DAYS = 4;

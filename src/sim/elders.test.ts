@@ -3,7 +3,7 @@ import { RETIRE_AGE, ailmentsOf, elderBirthday, needsCare } from './ageing';
 import { scarMove, scarWork } from './body';
 import { itemId } from './defs';
 import { griefMood, updateGrief } from './grief';
-import { painOf } from './health';
+import { damage, painOf } from './health';
 import { canWork } from './lifespans';
 import { DAYS_PER_YEAR } from './seasons';
 import { Simulation } from './simulation';
@@ -216,5 +216,43 @@ describe('the leader and the old', () => {
     expect(leaderBar(sim)).toBeGreaterThan(4);
     expect(villageThoughts(sim, voter)).not.toContain('wellLed');
     expect(villageThoughts(sim, leader)).toContain('weightOfOffice');
+  });
+});
+
+describe('audit fixes', () => {
+  it("a retired elder isn't pulled out of bed to doctor", () => {
+    const sim = colony(47, 4);
+    const [old, hurt, ...rest] = sim.colonists;
+    old.age = 75;
+    old.retired = true;
+    old.priorities.doctor = 3;
+    for (const o of rest) {
+      o.priorities.doctor = 0;
+    }
+    hurt.tile = sim.world.neighbors(old.tile).find((n) => sim.world.isPassable(n))!;
+    for (let k = 0; k < 4; k++) {
+      damage(sim, hurt, 0.3, 'cut');
+    }
+    sim.step();
+    expect(hurt.health.downed).toBe(true);
+    for (let t = 0; t < HOUR * 2; t++) {
+      sim.step();
+      expect(['tend', 'rescue']).not.toContain(old.job?.type);
+    }
+  });
+
+  it("a funeral eases grief for one's family as well as friends", () => {
+    const sim = colony(48, 3);
+    const c = sim.colonists[0];
+    for (const key of ['childDied', 'parentDied', 'siblingDied', 'kinDied', 'friendDied']) {
+      sim.addThought(c, key);
+    }
+    const left = () => Object.fromEntries(c.thoughts.map((t) => [t.key, t.expires - sim.tick]));
+    const before = left();
+    (sim as unknown as { easeGrief(c: unknown): void }).easeGrief(c);
+    const after = left();
+    for (const key of ['childDied', 'parentDied', 'siblingDied', 'kinDied', 'friendDied']) {
+      expect(after[key]).toBeLessThan(before[key]);
+    }
   });
 });
