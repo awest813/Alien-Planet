@@ -15,6 +15,8 @@ export interface BeaconState {
   landed?: boolean;
   // What the colony chose when the last ship landed.
   choice?: 'stay' | 'depart';
+  // Quiet after the colony chose to stay, until the player signals again (older saves: never quiet).
+  silent?: boolean;
 }
 
 // Transmitting this long brings an answer.
@@ -54,13 +56,13 @@ export function updateBeacon(sim: Simulation): void {
     return;
   }
   if (b.answeredAt === undefined) {
-    if (beaconTile(sim) === undefined || !sim.power.powered || sim.living().length === 0) {
+    if (b.silent || beaconTile(sim) === undefined || !sim.power.powered || sim.living().length === 0) {
       return;
     }
     b.hours++;
     if (b.hours === 1) {
       sim.addLog(
-        'The signal beacon is transmitting. Keep it powered for five days, and expect company: raiders will hear it too.',
+        'The signal beacon is transmitting. Keep it powered for five days, and be ready: raiders may hear it too.',
         'warn',
         true,
       );

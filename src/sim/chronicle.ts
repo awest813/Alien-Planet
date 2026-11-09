@@ -36,7 +36,7 @@ const RULES: [RegExp, ChronicleKind][] = [
     'battle',
   ],
   [
-    /maddened animals are dealt with|broken into (a|another) cavern|great beast|has slain|woken again|back into the hills/,
+    /maddened animals are dealt with|maddened .* is coming for the colony|broken into (a|another) cavern|great beast|has slain|woken again|back into the hills/,
     'threat',
   ],
   [/has asked to join|has come to join|who joins the colony|staggered into the colony/, 'newcomer'],
@@ -44,7 +44,7 @@ const RULES: [RegExp, ChronicleKind][] = [
   [/^Research complete: /, 'discovery'],
   [/has chosen .* as its leader/, 'leader'],
   [
-    /goals complete\.|Every goal is complete|The ship has landed|chosen to stay|reached bedrock|made it through the winter/,
+    /goals complete\.|Every goal is complete|The ship has landed|chosen to stay|boarded the ship|reached bedrock|made it through the winter/,
     'milestone',
   ],
 ];
@@ -63,7 +63,12 @@ export function chronicleText(kind: ChronicleKind, text: string): string {
   if (kind === 'discovery') {
     return text.replace(/^Research complete: ([^.]+)\..*$/, 'The colony learned $1.');
   }
-  return text.replace(/ Draft (your )?colonists.*$| Colonists stand down\.$/, '');
+  // (As history, not instructions: "break the camp first...", "and will be on it within the hour! Draft...".)
+  return text
+    .replace(/ Draft (your )?colonists.*$| Colonists stand down\.$/, '')
+    .replace(/: break the camp first, or fortify and wait\.?$/, '.')
+    .replace(/, and will be on it [^!]*!/, '.')
+    .replace(/ They'll dig in and attack in about \d+ hours\.?/, '');
 }
 
 export function addToChronicle(chronicle: ChronicleEntry[], entry: ChronicleEntry): void {

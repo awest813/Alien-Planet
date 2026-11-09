@@ -2,7 +2,7 @@ import { creaturesEmerge } from './animals';
 import { featureDef, itemDef, itemId } from './defs';
 import type { Simulation } from './simulation';
 import { Colonist } from './types';
-import { Filth } from './world';
+import { Designation, Filth } from './world';
 
 // Mine shafts: miners dig down again and again, and each time the shaft goes deeper and the rock gives up
 // more: stone always, iron ore and silver more often the deeper it goes. Dig deep enough and the miners
@@ -114,8 +114,12 @@ export function digDeeper(sim: Simulation, c: Colonist, tile: number): void {
 
 // How likely a breach is (the storyteller's weight): nothing until a shaft is deep enough, then more the
 // deeper it goes. After a breach the shaft stays quiet for a while, then the danger starts again.
+// Only a shaft that's being dug can break through: one the player has stopped (Cancel), at bedrock or not, stays
+// quiet. (Breaches went on for years from a shaft nobody touched, and nothing would stop them.)
+const digging = (sim: Simulation, tile: number): boolean => sim.world.designation[tile] === Designation.MINE;
+
 export function breachWeight(sim: Simulation): number {
-  const ready = shafts(sim).filter((s) => s.shaft.depth >= breachFrom(s.shaft));
+  const ready = shafts(sim).filter((s) => s.shaft.depth >= breachFrom(s.shaft) && digging(sim, s.tile));
   if (ready.length === 0) {
     return 0;
   }
@@ -126,7 +130,7 @@ export function breachWeight(sim: Simulation): number {
 // The miners break through: cave crawlers pour out of the deepest shaft, and the cavern beyond is open to
 // the miners from then on. Returns whether anything came up.
 export function breach(sim: Simulation, count: number): boolean {
-  const deepest = shafts(sim).find((s) => s.shaft.depth >= breachFrom(s.shaft));
+  const deepest = shafts(sim).find((s) => s.shaft.depth >= breachFrom(s.shaft) && digging(sim, s.tile));
   if (!deepest) {
     return false;
   }

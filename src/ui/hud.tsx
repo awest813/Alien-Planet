@@ -49,7 +49,9 @@ const formatPower = (watts: number) => (Math.abs(watts) >= 1000 ? `${(watts / 10
 // How tight the top bar must be to keep to one row: it measures itself after each render and steps down (compact,
 // tight, squeeze) while its last item has wrapped below the first; a window resize, a new interface size or a
 // new day start it over. On a phone it's laid out in rows on purpose, and kept compact.
-const FIT_LEVELS = ['', 'compact', 'compact tight', 'compact tight squeeze'];
+// (The last: squeezed and still on two rows, it goes back to merely compact and lets them be two, rather than
+// lose the title, the weather and the resources for nothing.)
+const FIT_LEVELS = ['', 'compact', 'compact tight', 'compact tight squeeze', 'compact'];
 function useTopBarFit(state: UiState): { ref: React.RefObject<HTMLElement | null>; className: string } {
   const ref = useRef<HTMLElement>(null);
   const phone = () => window.innerWidth <= 720;
@@ -59,8 +61,16 @@ function useTopBarFit(state: UiState): { ref: React.RefObject<HTMLElement | null
     window.addEventListener('resize', reset);
     return () => window.removeEventListener('resize', reset);
   }, []);
-  // (Once a day it tries roomier again: a raid's extra buttons are gone by then.)
-  useEffect(() => setLevel(phone() ? 2 : 0), [state.settings.uiScale, state.day]);
+  // It tries roomier again when what's in it changes (a raid's or a trader's buttons come and go, the rain stops),
+  // and once a day.
+  const content = [
+    !!state.raid || state.animalsAttacking,
+    !!state.trade,
+    state.captives.length > 0,
+    !!(state.diplomacy.request || state.diplomacy.call || state.diplomacy.dispute || state.diplomacy.envoy),
+    state.weather.icon,
+  ].join();
+  useEffect(() => setLevel(phone() ? 2 : 0), [state.settings.uiScale, state.day, content]);
   useLayoutEffect(() => {
     const bar = ref.current;
     if (!bar || phone() || level >= FIT_LEVELS.length - 1) {
@@ -127,7 +137,7 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
         {state.resources
           .filter((r) => r.total > 0 && KEY_RESOURCES.includes(r.name))
           .map((r) => (
-            <span key={r.name} className="res" title={`${r.name}: ${r.stored} stored, ${r.total} in total`}>
+            <span key={r.name} className="res res-item" title={`${r.name}: ${r.stored} stored, ${r.total} in total`}>
               <i className="icon" style={itemIconStyle(r.item)} aria-hidden />
               <span className="sr-only">{r.name}: </span>
               <b>{r.total}</b>
@@ -298,40 +308,44 @@ function statusIcons(c: ColonistView): { icon: string; title: string }[] {
 export function ColonistBar({ state, onOpen }: { state: UiState; onOpen: (screen: Screen) => void }) {
   return (
     <div className="colonist-bar" role="toolbar" aria-label="Colonists">
-      {state.colonists.map((c) => {
-        const selected = state.selectedColonist === c.id;
-        return (
-          <button
-            key={c.id}
-            className={`chip ${selected ? 'selected' : ''} ${c.dead ? 'dead' : ''}`}
-            aria-pressed={selected}
-            onClick={() => controller.selectColonist(selected ? null : c.id, !selected)}
-            title={`${c.name}: ${c.activity}`}
-            // (The mood bar and the status icons only show; a screen reader gets them in words.)
-            aria-label={[
-              c.name,
-              c.dead ? 'dead' : `mood ${c.mood}`,
-              ...statusIcons(c).map((s) => s.title),
-              c.dead ? '' : c.activity,
-            ]
-              .filter(Boolean)
-              .join(', ')}
-          >
-            <span className="swatch" style={{ background: c.color }} />
-            <span className="chip-name">{c.name}</span>
-            {!c.dead && (
-              <span className="chip-mood" title={`Mood ${c.mood}`}>
-                <span style={{ width: `${c.mood}%`, background: moodColor(c.mood) }} />
-              </span>
-            )}
-            {statusIcons(c).map((s) => (
-              <span key={s.icon} className="chip-icon" title={s.title}>
-                {s.icon}
-              </span>
-            ))}
-          </button>
-        );
-      })}
+      {/* (Not the dead: they kept full chips among the living, and a big colony's bar ran to two rows. The
+          Colonists screen remembers them.) */}
+      {state.colonists
+        .filter((c) => !c.dead)
+        .map((c) => {
+          const selected = state.selectedColonist === c.id;
+          return (
+            <button
+              key={c.id}
+              className={`chip ${selected ? 'selected' : ''} ${c.dead ? 'dead' : ''}`}
+              aria-pressed={selected}
+              onClick={() => controller.selectColonist(selected ? null : c.id, !selected)}
+              title={`${c.name}: ${c.activity}`}
+              // (The mood bar and the status icons only show; a screen reader gets them in words.)
+              aria-label={[
+                c.name,
+                c.dead ? 'dead' : `mood ${c.mood}`,
+                ...statusIcons(c).map((s) => s.title),
+                c.dead ? '' : c.activity,
+              ]
+                .filter(Boolean)
+                .join(', ')}
+            >
+              <span className="swatch" style={{ background: c.color }} />
+              <span className="chip-name">{c.name}</span>
+              {!c.dead && (
+                <span className="chip-mood" title={`Mood ${c.mood}`}>
+                  <span style={{ width: `${c.mood}%`, background: moodColor(c.mood) }} />
+                </span>
+              )}
+              {statusIcons(c).map((s) => (
+                <span key={s.icon} className="chip-icon" title={s.title}>
+                  {s.icon}
+                </span>
+              ))}
+            </button>
+          );
+        })}
       <button
         className="chip"
         onClick={() => onOpen('colonists')}
@@ -669,6 +683,13 @@ function TileCard({ t, onClose }: { t: TileView; onClose?: () => void }) {
         </div>
       ))}
       {onClose && t.stockpile && <StockpileSettings s={t.stockpile} />}
+      {onClose && t.beaconSilent && (
+        <div className="row">
+          <button onClick={() => controller.command({ type: 'signal' })} title="Raiders will hear it too">
+            Signal again
+          </button>
+        </div>
+      )}
       {onClose && t.door && (
         <div className="row">
           <button

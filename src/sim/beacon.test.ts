@@ -49,20 +49,25 @@ describe('the signal beacon', () => {
     sim.apply({ type: 'shipChoice', board: true });
     expect(sim.departed).toBe(true);
     expect(sim.beacon.choice).toBe('depart');
-    expect(sim.storyLog.at(-1)!.text).toContain('boarded the ship');
+    expect(sim.storyLog.some((e) => e.text.includes('boarded the ship'))).toBe(true);
+    // ...and the last goal's ticked off on the way out.
+    expect(sim.objectivesDone.shipChoice).toBe(true);
     expect(sim.living().length).toBe(aboard);
     // Saved with the colony.
     const copy = deserialize(structuredClone(serialize(sim)));
     expect(copy.departed).toBe(true);
   });
 
-  it('can be refused: the colony stays, and the beacon can call again', () => {
+  it('can be refused: the colony stays, the beacon falls quiet, and it can call again', () => {
     const { sim, hours } = signal(3);
     hours(TRANSMIT_HOURS + LANDING_TICKS / HOUR);
     sim.apply({ type: 'shipChoice', board: false });
     expect(sim.departed).toBe(false);
     expect(sim.beacon.choice).toBe('stay');
     expect(sim.beacon.hours).toBe(0);
+    hours(5);
+    expect(sim.beacon.hours).toBe(0);
+    sim.apply({ type: 'signal' });
     hours(5);
     expect(sim.beacon.hours).toBe(5);
   });

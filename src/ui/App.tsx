@@ -55,6 +55,7 @@ export function App() {
     onPlay: () => setScreen(helpSeen() ? null : 'help'),
     onSettings: openFromMenu('settings'),
     onHelp: openFromMenu('help'),
+    onStory: () => setScreen('story'),
     // The menu stays open (and the game paused) until the autosave is written.
     onTitle: async () => {
       if (await controller.quitToTitle()) {
@@ -64,13 +65,14 @@ export function App() {
     },
   };
 
-  // When the ship lands, the choice comes up by itself (once).
+  // When the ship lands, the choice comes up by itself (once), and again when a game saved with the ship waiting
+  // is loaded (it didn't, and the clock ran down its wait with no way to choose in sight).
   const landed = state.ship === 'landed';
   useEffect(() => {
-    if (landed) {
+    if (landed && !onTitle) {
       setScreen('ship');
     }
-  }, [landed]);
+  }, [landed, onTitle]);
   const departed = state.ship === 'departed';
   // Boarding ends the story: whatever screen was open closes behind the ending.
   useEffect(() => {

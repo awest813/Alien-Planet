@@ -489,6 +489,8 @@ export type Command =
   | { type: 'execute'; captive: number }
   // Lock (or unlock) a door: nobody passes a locked door, though raiders can break it down.
   | { type: 'lock'; tile: number; locked: boolean }
+  // Sets a quiet signal beacon transmitting again.
+  | { type: 'signal' }
   // Forbid (or allow) the items in a rectangle: colonists leave forbidden items alone.
   | { type: 'forbid'; rect: Rect; on: boolean }
   | { type: 'research'; project: string | null }

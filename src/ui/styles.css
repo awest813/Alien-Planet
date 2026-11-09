@@ -390,13 +390,13 @@ kbd {
   padding-right: 5px;
 }
 
-.topbar.tight .tb-resources > span.res:nth-of-type(n + 5) {
+.topbar.tight .tb-resources > .res-item:nth-child(n + 4 of .res-item) {
   display: none;
 }
 
 /* ...and at the last, two resources. (Narrower than that, the screen buttons take a second row: scrolled
    sideways instead, the Menu went out of sight.) */
-.topbar.squeeze .tb-resources > span.res:nth-of-type(n + 4) {
+.topbar.squeeze .tb-resources > .res-item:nth-child(n + 3 of .res-item) {
   display: none;
 }
 
@@ -635,6 +635,8 @@ kbd {
 .side-body {
   overflow-y: auto;
   min-height: 0;
+  /* The goals below give way before the alerts do (shrinking together, an alert was sliced in half). */
+  flex: 1 1 0;
 }
 
 .side-toggle {
@@ -657,8 +659,7 @@ kbd {
      (it never shrank, and on a small screen the goal and the tabs were pushed out of the panel). */
   max-height: min(220px, 40%);
   overflow-y: auto;
-  flex-shrink: 1;
-  min-height: 0;
+  flex-shrink: 0;
 }
 
 .alerts li {
@@ -818,8 +819,9 @@ kbd {
 }
 
 .modal {
-  /* Solid, so the map's sprites and names don't show through the tables. */
+  /* Solid, so the map's sprites and names don't show through the tables; never a sideways scroll of its own. */
   background: #10141c;
+  overflow-x: hidden;
   width: 520px;
   max-width: calc(100% - 32px);
   /* Of the (possibly scaled) interface, not the window. */
@@ -858,7 +860,7 @@ kbd {
   position: sticky;
   left: 0;
   z-index: 1;
-  background: #141922;
+  background: #10141c;
 }
 
 /* Dragging across the schedule paints it (rather than scrolling the page). */
@@ -1176,7 +1178,8 @@ button.brush.active {
     z-index: 7;
   }
 
-  .notices > .notification:nth-last-child(n + 3) {
+  /* (Never an urgent one: a raid's card was the one hidden behind two calm ones.) */
+  .notices > .notification:not(.danger):nth-last-child(n + 3) {
     display: none;
   }
 
@@ -1809,6 +1812,20 @@ details summary {
   max-width: 180px;
 }
 
+/* Back, the seed and Start in one row: the seed gives way (on a phone they took two or three rows). */
+.start-row {
+  flex-wrap: nowrap;
+}
+
+.start-row input {
+  flex: 1 1 6em;
+  min-width: 0;
+}
+
+.start-row button {
+  flex: none;
+}
+
 button.big {
   padding: 8px 22px;
   font-size: 14px;
@@ -2121,22 +2138,26 @@ input[type='checkbox'] {
 
 /* The narrowest phones: Production's and the saves' buttons wrap rather than run off the edge, and the top bar
    keeps food and two resources. */
-@media (max-width: 400px) {
+@media (max-width: 720px) {
   .saves td:last-child {
     white-space: normal;
   }
+}
 
+@media (max-width: 400px) {
   .target {
     min-width: 44px;
   }
 
-  .tb-resources > span.res:nth-of-type(n + 4) {
+  .tb-resources > .res-item:nth-child(n + 3 of .res-item) {
     display: none;
   }
 }
 
 .confirm-labels {
   display: inline-grid;
+  align-items: center;
+  justify-items: center;
 }
 
 .confirm-labels > span {

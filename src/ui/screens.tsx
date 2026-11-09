@@ -213,6 +213,7 @@ export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => 
                         ({c.stage}, {c.age})
                       </span>
                     )}
+                    {c.retired && <span className="muted small"> (retired, {c.age})</span>}
                   </td>
                   {WORK_TYPES.map((work) => {
                     const value = c.priorities[work];
@@ -1438,11 +1439,14 @@ export function ConfirmButton({
   onConfirm,
   disabled,
   grave,
+  className,
 }: {
   label: string;
   confirm: string;
   onConfirm: () => void;
   disabled?: boolean;
+  // Extra classes (Start colony stays a big primary button).
+  className?: string;
   // Drawn in the danger colour before it's even armed (an execution, not a quiet "set free").
   grave?: boolean;
 }) {
@@ -1457,7 +1461,7 @@ export function ConfirmButton({
   }, [armed]);
   return (
     <button
-      className={armed ? 'active danger' : grave ? 'danger' : ''}
+      className={`${armed ? 'active danger' : grave ? 'danger' : ''} ${className ?? ''}`}
       disabled={disabled}
       onClick={() => {
         if (armed) {
@@ -1468,12 +1472,19 @@ export function ConfirmButton({
         }
       }}
     >
-      {/* Both labels take the same place, the other hidden, so arming it doesn't change its width and shove its
-          neighbours ("Save" to "Overwrite?"). */}
-      <span className="confirm-labels">
-        <span className={armed ? 'off' : ''}>{label}</span>
-        <span className={armed ? '' : 'off'}>{confirm}</span>
-      </span>
+      {/* A short confirm ("Save" to "Overwrite?") takes the same place as the label, the other hidden, so arming
+          it doesn't shove its neighbours; a long one ("Put them to death? ...") only widens it once armed (sized
+          for it all along, the button was a two-line box). */}
+      {confirm.length <= label.length + 8 ? (
+        <span className="confirm-labels">
+          <span className={armed ? 'off' : ''}>{label}</span>
+          <span className={armed ? '' : 'off'}>{confirm}</span>
+        </span>
+      ) : armed ? (
+        confirm
+      ) : (
+        label
+      )}
     </button>
   );
 }

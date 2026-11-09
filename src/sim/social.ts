@@ -3,6 +3,7 @@ import { Rng, hash2 } from './rng';
 import { ADULT, TEEN, canRomance } from './lifespans';
 import { damage, painOf } from './health';
 import type { Simulation } from './simulation';
+import { TICKS_PER_HOUR } from './constants';
 import { Colonist } from './types';
 
 export const FRIEND_OPINION = 30;
@@ -264,10 +265,30 @@ function interact(sim: Simulation, a: Colonist, b: Colonist, insults = 1): void 
   }
   const after = relationLabel(a, b);
   if (after !== before && after === 'Friend') {
-    sim.addLog(`${a.name} and ${b.name} have become friends.`, 'good', true);
+    sayOnce(sim, `${a.name} and ${b.name} have become friends.`, 'good', true);
   } else if (after !== before && after === 'Rival') {
-    sim.addLog(`${a.name} and ${b.name} have become rivals.`, 'warn', true);
+    sayOnce(sim, `${a.name} and ${b.name} have become rivals.`, 'warn', true);
   }
+}
+
+// A pair hovering at the line between friends (or rivals) and not crossed it back and forth, and each crossing was
+// news: the same pair "became friends" five times in fifty days. Said once in RESAY_DAYS. (The log is saved, so this
+// is the same after a load.)
+const RESAY_DAYS = 10;
+function sayOnce(sim: Simulation, text: string, tone: 'good' | 'warn' | 'info', story = false): void {
+  const since = sim.tick - RESAY_DAYS * 24 * TICKS_PER_HOUR;
+  for (let k = sim.log.length - 1; k >= 0 && sim.log[k].tick >= since; k--) {
+    if (sim.log[k].text === text) {
+      return;
+    }
+  }
+  // (The log keeps only its last few dozen lines; the story keeps more.)
+  for (let k = sim.storyLog.length - 1; k >= 0 && sim.storyLog[k].day >= sim.day - RESAY_DAYS; k--) {
+    if (sim.storyLog[k].text === text) {
+      return;
+    }
+  }
+  sim.addLog(text, tone, story);
 }
 
 // Each morning, feelings fade a little towards indifference: a friendship needs keeping up, and a
@@ -295,9 +316,9 @@ export function fadeOpinions(sim: Simulation): void {
       const was = before.get(`${i}:${j}`);
       const now = relationLabel(a, b);
       if (was === 'Rival' && now !== 'Rival') {
-        sim.addLog(`${a.name} and ${b.name} have let their quarrel go.`, 'good');
+        sayOnce(sim, `${a.name} and ${b.name} have let their quarrel go.`, 'good');
       } else if (was === 'Friend' && now !== 'Friend' && now !== 'Lover') {
-        sim.addLog(`${a.name} and ${b.name} have drifted apart.`, 'info');
+        sayOnce(sim, `${a.name} and ${b.name} have drifted apart.`, 'info');
       }
     }
   }

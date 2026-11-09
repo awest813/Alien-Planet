@@ -136,6 +136,7 @@ describe('breaches', () => {
   it('only threaten a deep shaft, and bring crawlers up out of it', () => {
     const { sim, w, tile } = mine(3);
     w.setFeature(tile, featureId('mineShaft'));
+    w.designation[tile] = Designation.MINE;
     shaftAt(sim, tile).depth = BREACH_DEPTH - 1;
     expect(breachWeight(sim)).toBe(0);
     expect(triggerEvent(sim, 'breach')).toBe(false);
@@ -158,6 +159,7 @@ describe('breaches', () => {
   it('bring nothing up where nobody could be reached, and maddened beasts with no one to chase go home', () => {
     const { sim, w, tile } = mine(9);
     w.setFeature(tile, featureId('mineShaft'));
+    w.designation[tile] = Designation.MINE;
     shaftAt(sim, tile).depth = BREACH_DEPTH + 2;
     // Walled in on every side.
     for (const n of w.neighbors(tile, true)) {
@@ -200,6 +202,7 @@ describe('a shaft at bedrock', () => {
     const tile = w.idx(x + 3, y);
     w.setFeature(tile, featureId('mineShaft'));
     const shaft = shaftAt(sim, tile);
+    w.designation[tile] = Designation.MINE;
     shaft.depth = MAX_DEPTH - 1;
     shaft.quietTo = MAX_DEPTH;
     const before = sim.log.length;
@@ -215,5 +218,18 @@ describe('a shaft at bedrock', () => {
     shaft.quietTo = undefined;
     breach(sim, 2);
     expect(shaft.quietTo).toBeLessThanOrEqual(MAX_DEPTH);
+  });
+});
+
+describe('a shaft left alone', () => {
+  it('stays quiet: only one being dug can break through', () => {
+    const { sim, w, tile } = mine(4);
+    w.setFeature(tile, featureId('mineShaft'));
+    shaftAt(sim, tile).depth = BREACH_DEPTH + 10;
+    w.designation[tile] = Designation.NONE;
+    expect(breachWeight(sim)).toBe(0);
+    expect(breach(sim, 3)).toBe(false);
+    w.designation[tile] = Designation.MINE;
+    expect(breachWeight(sim)).toBeGreaterThan(0);
   });
 });

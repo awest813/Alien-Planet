@@ -27,6 +27,8 @@ export interface MenuActions {
   onSettings: () => void;
   onHelp: () => void;
   onTitle: () => void | Promise<void>;
+  // The colony's story (the Chronicle and graphs), from the ending.
+  onStory?: () => void;
 }
 
 const saveDetails = (meta: SaveMeta) =>
@@ -141,7 +143,7 @@ function NewColonyForm({
           onChange={(e) => setSeed(e.target.value)}
         />
         {confirm ? (
-          <ConfirmButton label="Start colony" confirm={confirm} onConfirm={start} />
+          <ConfirmButton label="Start colony" confirm={confirm} onConfirm={start} className="primary big" />
         ) : (
           <button className="primary big" onClick={start}>
             Start colony
@@ -435,8 +437,8 @@ export function ShipScreen({ state, onClose }: { state: UiState; onClose: () => 
     <Modal title="The ship has landed" onClose={onClose}>
       <p>
         It waits beside the beacon for a day. There's room for everyone: {aboard.join(', ')}. Board it and the colony's
-        story ends here, on your terms. Stay, and the ship leaves without you; you can always signal again. Close this
-        to decide later.
+        story ends here, on your terms. Stay, and the ship leaves without you; the beacon falls quiet, and you can
+        signal again from it whenever you like. Close this to decide later.
       </p>
       {away.length > 0 && (
         <p className="warn-text">
@@ -502,6 +504,7 @@ export function DepartedScreen({ state, actions }: { state: UiState; actions: Me
           <button className="primary" autoFocus onClick={() => setView('new')}>
             New colony
           </button>
+          {actions.onStory && <button onClick={actions.onStory}>Read the colony's story</button>}
           <button onClick={actions.onTitle}>Title screen</button>
         </div>
       )}

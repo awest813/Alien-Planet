@@ -56,7 +56,7 @@ import {
   tradeOpen,
   artForSale,
 } from '../sim/trade';
-import { METRES_PER_LEVEL, breachFrom, oreChances } from '../sim/depths';
+import { MAX_DEPTH, METRES_PER_LEVEL, breachFrom, oreChances } from '../sim/depths';
 import {
   GIFT_SIZES,
   HIRE_DAYS,
@@ -174,6 +174,26 @@ const build = (key: string, label: string, hotkey: string, group: ToolDef['group
     hint: cost ? `${hint} · costs ${cost}` : hint,
   };
 };
+
+// Family first (a wife listed as a "lover", a daughter with no label at all), and how they get on beside it when
+// it's a friendship or a quarrel.
+function kinLabel(c: Colonist, o: Colonist): string | null {
+  const kin =
+    c.spouse === o.id
+      ? 'Spouse'
+      : c.parents.includes(o.id)
+        ? 'Parent'
+        : o.parents.includes(c.id)
+          ? 'Child'
+          : c.parents.some((p) => o.parents.includes(p))
+            ? 'Sibling'
+            : null;
+  const feeling = relationLabel(c, o);
+  if (!kin) {
+    return feeling;
+  }
+  return feeling === 'Friend' || feeling === 'Rival' ? `${kin}, ${feeling.toLowerCase()}` : kin;
+}
 
 // How the colony stands with a faction, in a word.
 function relationOf(sim: Simulation, faction: number): string {
@@ -659,7 +679,7 @@ export const TOOLS: ToolDef[] = [
     'Signal beacon',
     '',
     'power',
-    'Draws 400 W. Transmit for five days and a ship may answer; raiders will hear it too',
+    'Draws 400 W. Transmit for five days and a ship may answer; raiders may hear it too',
   ),
   build('campfire', 'Campfire', 'f', 'climate', 'Heats the room it is in; burns wood, which haulers bring'),
   build('hearth', 'Stone hearth', '', 'climate', 'A strong heater for cold winters; burns wood'),
@@ -805,6 +825,8 @@ export interface TileView {
   stockpile: { tile: number; refused: number; priority: StockpilePriority } | null;
   // On a door: whether it's locked, for the lock button.
   door: { tile: number; locked: boolean } | null;
+  // On the signal beacon: quiet (after the colony chose to stay), for the "Signal again" button.
+  beaconSilent: boolean | null;
 }
 
 export interface CaptiveView {
@@ -1412,7 +1434,12 @@ export class GameController {
       } else if (event === 'raid' && this.settings.pauseOnRaid) {
         // Give the player a moment to react.
         this.setSpeed(0);
-        this.notify('Game paused. Press Q to draft your colonists.');
+        // A siege camps for most of a day first: drafted that early, colonists go hungry waiting.
+        this.notify(
+          this.sim.raid?.siege
+            ? 'Game paused: a siege party is coming to make camp. Draft colonists (Q) to break the camp, or when they march.'
+            : 'Game paused. Press Q to draft your colonists.',
+        );
       } else if (
         (event === 'death' || event === 'collapse') &&
         this.settings.pauseOnEmergency &&
@@ -2025,7 +2052,7 @@ export class GameController {
         },
         relations: sim.colonists
           .filter((o) => o !== c && !o.health.dead)
-          .map((o) => ({ name: o.name, opinion: Math.round(c.opinions[o.id] ?? 0), label: relationLabel(c, o) }))
+          .map((o) => ({ name: o.name, opinion: Math.round(c.opinions[o.id] ?? 0), label: kinLabel(c, o) }))
           .sort((a, b) => b.opinion - a.opinion),
         drafted: c.drafted,
         dead: c.health.dead,
@@ -2212,7 +2239,8 @@ export class GameController {
     } else if (sim.beacon.landed) {
       alerts.push({
         text: 'The ship is waiting beside the beacon: board it, or stay (Legacy goal)',
-        tone: 'calm',
+        // (Not calm: it waits only so long, and a calm alert sorted under "more".)
+        tone: 'warn',
         tile: beacon,
       });
     } else if (sim.beacon.answeredAt !== undefined && sim.beacon.landsAt !== undefined) {
@@ -2226,7 +2254,7 @@ export class GameController {
       alerts.push({ text: 'The signal beacon has no power: it isn’t transmitting', tone: 'warn', tile: beacon });
     } else if (beacon !== undefined && sim.beacon.hours > 0) {
       alerts.push({
-        text: `Signal beacon transmitting: ${sim.beacon.hours}/${TRANSMIT_HOURS} hours. Raiders are drawn to it.`,
+        text: `Signal beacon transmitting: ${sim.beacon.hours}/${TRANSMIT_HOURS} hours. Raiders may be drawn to it.`,
         tone: 'calm',
         tile: beacon,
       });
@@ -3218,13 +3246,19 @@ export class GameController {
       );
       details.push(
         w.designation[i] === Designation.MINE
-          ? 'Miners dig it deeper when they have nothing else to do (Cancel to stop them)'
+          ? shaft.depth >= MAX_DEPTH
+            ? 'At bedrock: miners keep bringing up what it gives (Cancel to stop them; left alone, it stays quiet)'
+            : 'Miners dig it deeper when they have nothing else to do (Cancel to stop them; left alone, it stays quiet)'
           : w.designation[i] === Designation.DECONSTRUCT
             ? 'To be taken down'
             : 'Not being dug: drag Mine over it to start',
       );
-      if (shaft.depth >= breachFrom(shaft) && sim.story.difficulty !== 'peaceful') {
-        details.push('Deep enough that something below may break through');
+      if (
+        shaft.depth >= breachFrom(shaft) &&
+        sim.story.difficulty !== 'peaceful' &&
+        w.designation[i] === Designation.MINE
+      ) {
+        details.push('Deep enough that something below may break through while it is dug');
       }
     }
     if (art && def) {
@@ -3289,6 +3323,19 @@ export class GameController {
     }
     if (def && def.heater > 0) {
       details.push(def.power?.draw && !sim.power.powered ? 'Unpowered' : 'Heats its room towards 21°C');
+    }
+    // The beacon: how its call is going (the card only said what it drew).
+    if (def?.key === 'signalBeacon') {
+      const b = sim.beacon;
+      details.push(
+        b.landed
+          ? 'A ship waits beside it'
+          : b.answeredAt !== undefined
+            ? 'Answered: a ship is on its way'
+            : b.silent
+              ? 'Quiet since the colony chose to stay'
+              : `Transmitting: ${b.hours} of ${TRANSMIT_HOURS} hours (it needs power)`,
+      );
     }
     if (def?.fishing) {
       details.push(
@@ -3374,6 +3421,7 @@ export class GameController {
       animal,
       details,
       door: def?.door ? { tile: i, locked: w.locked[i] === 1 } : null,
+      beaconSilent: def?.key === 'signalBeacon' ? !!sim.beacon.silent : null,
       stockpile: isStockpileZone(w.zone[i])
         ? { tile: i, refused: refusedGroups(w.zone[i]), priority: stockpilePriority(w.zone[i]) }
         : null,

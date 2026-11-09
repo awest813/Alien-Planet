@@ -1399,11 +1399,19 @@ export class Simulation {
       case 'shipChoice':
         if (this.beacon.landed && !this.departed) {
           if (cmd.board) {
-            depart(this);
+            // (Goals stop being checked once the colony has gone: "Meet the ship" is ticked off on the way out.)
+            if (depart(this)) {
+              this.checkObjectives();
+            }
           } else {
             chooseToStay(this);
+            // The beacon falls quiet until the player signals again (it started over at once, raiders and all).
+            this.beacon.silent = true;
           }
         }
+        break;
+      case 'signal':
+        this.beacon.silent = false;
         break;
       case 'build':
         for (const i of cmd.tiles) {
