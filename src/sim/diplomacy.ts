@@ -54,6 +54,8 @@ export interface Diplomacy {
   lastAsked?: number;
   // No settler for sale before this day.
   settlerDay?: number;
+  // No food to be asked of friends before this day.
+  aidDay?: number;
   // The two friendly factions quarrelling, an envoy waiting on an answer, an alliance and its call for help
   // (see alliances.ts).
   dispute?: Dispute | null;
@@ -595,6 +597,48 @@ export function pickRaider(sim: Simulation, factions: { id: number }[]): number 
 // ---- Settlers ----
 // The Meadow Kin will send a willing settler to a colony they like, for silver to set them up: one every
 // so often, while the valley has room.
+
+// Friends will send food in hard times, once in a while, for some of the goodwill the colony has built up: three
+// days' food for everyone, as potatoes and dried meat.
+export const AID_GOODWILL = 50;
+export const AID_COST = 20;
+const AID_GAP_DAYS = 10;
+const AID_DAYS_OF_FOOD = 3;
+// Nutrition a colonist eats in a day.
+const DAILY_FOOD = 1.4;
+export const aidDays = (sim: Simulation): number => Math.max(0, (sim.diplomacy.aidDay ?? 0) - sim.day);
+
+export function askForFood(sim: Simulation, faction: number): string | null {
+  const f = FACTIONS[faction];
+  if (!f || f.hostile) {
+    return 'They would never help.';
+  }
+  if (goodwillOf(sim, faction) < AID_GOODWILL) {
+    return `${f.name} would help a closer friend (goodwill ${AID_GOODWILL} needed).`;
+  }
+  if (aidDays(sim) > 0) {
+    return `They sent food not long ago (again in ${aidDays(sim)} days).`;
+  }
+  const home = sim.homeTile();
+  if (home === undefined) {
+    return 'There is nowhere to bring it.';
+  }
+  // Half of it as potatoes, half as dried meat, by nutrition.
+  const need = sim.living().length * AID_DAYS_OF_FOOD * DAILY_FOOD;
+  const potatoes = Math.ceil(need / 2 / itemDef(itemId('potatoes')).nutrition);
+  const meat = Math.ceil(need / 2 / itemDef(itemId('driedMeat')).nutrition);
+  sim.world.dropItemNear(home, itemId('potatoes'), potatoes);
+  sim.world.dropItemNear(home, itemId('driedMeat'), meat);
+  changeGoodwill(sim, faction, -AID_COST);
+  sim.diplomacy.aidDay = sim.day + AID_GAP_DAYS;
+  sim.stats.aid = (sim.stats.aid ?? 0) + 1;
+  sim.addLog(
+    `${f.name} sent food to tide the colony over: ${potatoes} potatoes and ${meat} dried meat (goodwill −${AID_COST}).`,
+    'good',
+    true,
+  );
+  return null;
+}
 
 export const SETTLER_GOODWILL = 30;
 const SETTLER_GAP_DAYS = 8;

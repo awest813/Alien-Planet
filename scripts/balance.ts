@@ -1096,6 +1096,15 @@ function play(seed: number): Result {
       if (Math.floor(sim.hour) === 7) {
         const v = sim.village;
         const food = foodDays(sim);
+        // Down to the last day's food: ask good friends for some.
+        if (food < 1) {
+          const friend = FACTIONS.filter((f) => !f.hostile).sort(
+            (a, b) => (sim.goodwill[b.id] ?? 0) - (sim.goodwill[a.id] ?? 0),
+          )[0];
+          if (friend) {
+            sim.apply({ type: 'world', action: { kind: 'food', faction: friend.id } });
+          }
+        }
         const living = sim.living();
         const mood = living.reduce((n, c) => n + c.mood, 0) / Math.max(1, living.length);
         const rations =
@@ -1214,6 +1223,7 @@ function play(seed: number): Result {
     concerts: sim.stats.concerts ?? 0,
     storyNights: sim.stats.storyNights ?? 0,
     ravaged: sim.stats.ravaged ?? 0,
+    foodAid: sim.stats.aid ?? 0,
     parties: sim.stats.parties ?? 0,
     feasts: sim.stats.feasts ?? 0,
     festivals: count(/^(It's Planting Day|The harvest festival is tonight|The midwinter bonfire will be lit)/),

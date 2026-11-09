@@ -26,7 +26,8 @@ with esbuild for speed (see ROADMAP).
   within ten years (one of two ten-year runs had one or two elders from year 1 and three deaths of old age; the
   other's oldest reached 63).
 - **Some dealings are thin:** the harness seldom buys settlers (its population is at the cap), and Meadow Kin
-  goodwill still ends at 100 in some runs. (Envoys walk in, wait about the colony, and walk off home with the
+  goodwill still ends at 100 in some runs (though high goodwill can now be spent: friends send three days' food
+  for 20 goodwill when asked). (Envoys walk in, wait about the colony, and walk off home with the
   answer; a returning expedition is seen on the road two hours out.)
 - **Islands and the tundra run hungry:** in a 48-day sweep of every land and layout (five seeds each, Tiny and
   Medium) no colony is lost, but islands starve 3–8 times as many colonist-hours as valleys (little room to

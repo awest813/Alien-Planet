@@ -521,6 +521,7 @@ export type WorldAction =
   | { kind: 'truce'; faction: number }
   | { kind: 'ransom'; captive: number }
   | { kind: 'settler'; faction: number }
+  | { kind: 'food'; faction: number }
   | { kind: 'dispute'; side: number | null }
   | { kind: 'envoy'; accept: boolean }
   | { kind: 'call'; answer: 'goods' | 'refuse' | number }
@@ -596,6 +597,8 @@ export interface Stats {
   concerts?: number;
   // Evenings an elder told the old stories by the fire.
   storyNights?: number;
+  // Times friends sent food when asked.
+  aid?: number;
   // Crops trampled and livestock killed by raiders laying waste outside the walls.
   ravaged?: number;
   parties?: number;

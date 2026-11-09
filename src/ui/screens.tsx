@@ -763,6 +763,19 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
                           Gift {s} silver
                         </button>
                       ))}
+                      <button
+                        disabled={(f.goodwill ?? 0) < d.aid.goodwill || d.aid.waitDays > 0}
+                        onClick={() => controller.command({ type: 'world', action: { kind: 'food', faction: f.id } })}
+                        title={
+                          (f.goodwill ?? 0) < d.aid.goodwill
+                            ? `They'd help a closer friend (goodwill ${d.aid.goodwill} needed)`
+                            : d.aid.waitDays > 0
+                              ? `Friends sent food not long ago (again in ${d.aid.waitDays} days)`
+                              : `Three days' food for everyone, for ${d.aid.cost} goodwill`
+                        }
+                      >
+                        Ask for food (−{d.aid.cost} goodwill)
+                      </button>
                     </div>
                     {f.id === d.settler.faction && (
                       <div className="row">

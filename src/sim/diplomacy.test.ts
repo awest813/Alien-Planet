@@ -229,3 +229,25 @@ describe('hiring fighters', () => {
     expect(fightersHired(sim)).toBe(false);
   });
 });
+
+describe('asking friends for food', () => {
+  it('brings three days of food for some goodwill, not too often, and only from good friends', () => {
+    const { sim } = colony(21);
+    sim.goodwill[KIN] = 30;
+    sim.apply({ type: 'world', action: { kind: 'food', faction: KIN } });
+    expect(sim.stats.aid ?? 0).toBe(0);
+    sim.goodwill[KIN] = 70;
+    const potatoes = sim.stockOf(itemId('potatoes'));
+    const meat = sim.stockOf(itemId('driedMeat'));
+    sim.apply({ type: 'world', action: { kind: 'food', faction: KIN } });
+    expect(sim.stats.aid).toBe(1);
+    expect(goodwillOf(sim, KIN)).toBe(50);
+    expect(sim.stockOf(itemId('potatoes'))).toBeGreaterThan(potatoes);
+    expect(sim.stockOf(itemId('driedMeat'))).toBeGreaterThan(meat);
+    // Not again for a while.
+    sim.goodwill[KIN] = 70;
+    sim.apply({ type: 'world', action: { kind: 'food', faction: KIN } });
+    expect(sim.stats.aid).toBe(1);
+    expect(deserialize(structuredClone(serialize(sim))).diplomacy.aidDay).toBe(sim.diplomacy.aidDay);
+  });
+});

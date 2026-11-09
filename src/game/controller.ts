@@ -60,7 +60,10 @@ import {
   GIFT_SIZES,
   HIRE_DAYS,
   HIRE_GOODWILL,
+  AID_COST,
+  AID_GOODWILL,
   SETTLER_GOODWILL,
+  aidDays,
   TRUCE_GOODWILL,
   atPeace,
   describeRequest,
@@ -887,6 +890,8 @@ export interface DiplomacyView {
   call: { faction: string; goods: string; have: number; count: number; hoursLeft: number } | null;
   // A settler from the Meadow Kin: their price, the goodwill and wait, whether there's room.
   settler: { faction: number; cost: number; goodwill: number; waitDays: number; room: boolean };
+  // Asking friends for food: the goodwill it takes, what it costs, and how long until they'd send more.
+  aid: { goodwill: number; cost: number; waitDays: number };
   // Parties away, and what a new one could do.
   expeditions: { where: string; who: string; daysLeft: number; leaving: boolean }[];
   destinations: { to: number; purpose: 'trade' | 'salvage'; label: string; days: number; open: boolean }[];
@@ -2736,6 +2741,7 @@ export class GameController {
         waitDays: settlerDays(sim),
         room: roomToJoin(sim),
       },
+      aid: { goodwill: AID_GOODWILL, cost: AID_COST, waitDays: aidDays(sim) },
       expeditions: expeditions(sim).map((e) => ({
         where: destinationName(e.to),
         who: e.members.map((id) => sim.colonists[id].name).join(', '),

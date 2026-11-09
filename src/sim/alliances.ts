@@ -1,6 +1,6 @@
 import { TICKS_PER_HOUR } from './constants';
 import { FACTIONS, itemId, quantity } from './defs';
-import { buySettler, changeGoodwill, fightersHired, friendly, proposeTruce } from './diplomacy';
+import { askForFood, buySettler, changeGoodwill, fightersHired, friendly, proposeTruce } from './diplomacy';
 import { cannotGo, sendExpedition } from './expeditions';
 import { ransom } from './prisoners';
 import type { Simulation } from './simulation';
@@ -299,6 +299,8 @@ export function worldAction(sim: Simulation, action: WorldAction): string | null
       return ransom(sim, action.captive);
     case 'settler':
       return buySettler(sim, action.faction);
+    case 'food':
+      return askForFood(sim, action.faction);
     case 'dispute':
       return settleDispute(sim, action.side);
     case 'envoy':
