@@ -82,6 +82,8 @@ describe('grain and bread', () => {
     expect(sim.stats.produced.grain ?? 0).toBeGreaterThan(0);
     expect(sim.stats.produced.flour ?? 0).toBeGreaterThan(0);
     expect(sim.stats.produced.bread ?? 0).toBeGreaterThan(0);
+    // The stalks come in as hay for the troughs, two thirds of the grain.
+    expect(sim.stats.produced.hay ?? 0).toBe(((sim.stats.produced.grain ?? 0) / 12) * 8);
   });
 });
 

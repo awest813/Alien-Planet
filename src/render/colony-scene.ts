@@ -8,7 +8,7 @@ import { ADULT, TEEN } from '../sim/lifespans';
 import { NIGHT_END, NIGHT_START } from '../sim/simulation';
 import { Animal, Colonist, Enemy } from '../sim/types';
 import { Designation, GROW_ZONE, World } from '../sim/world';
-import { Frames, TILE, TILESET_KEY, createTextures } from './textures';
+import { Frames, TILE, TILESET_FAR_KEY, TILESET_KEY, createTextures } from './textures';
 import { LightBuffer, LitTile, litTiles } from './lighting';
 import { auroraOn, eclipseOn } from '../sim/storyteller';
 
@@ -29,6 +29,8 @@ interface Layers {
   zone: Phaser.Tilemaps.TilemapLayer;
   indoor: Phaser.Tilemaps.TilemapLayer;
   feature: Phaser.Tilemaps.TilemapLayer;
+  // The same features drawn by the GPU in one go, shown in place of `feature` when zoomed far out.
+  featureFar: Phaser.Tilemaps.TilemapGPULayer;
   items: Phaser.Tilemaps.TilemapLayer;
   roof: Phaser.Tilemaps.TilemapLayer;
   blueprint: Phaser.Tilemaps.TilemapLayer;
@@ -141,6 +143,10 @@ export class ColonyScene extends Phaser.Scene {
   private terrainSeason = 1;
   // A ground tile changed this frame: the ground's texture of tile indexes is remade once, after them all.
   private groundChanged = false;
+  // The far feature layer is behind the map, and when it was last brought up to date.
+  private featuresChanged = false;
+  private featuresSyncedAt = 0;
+  private featuresFar = false;
   // Light after dark, one pixel a tile, stretched smoothly over the map (see lighting.ts).
   private light: Phaser.GameObjects.Image | undefined;
   private lightTexture: Phaser.Textures.CanvasTexture | undefined;
@@ -199,7 +205,7 @@ export class ColonyScene extends Phaser.Scene {
     this.setupKeyboard();
   }
 
-  public update(_time: number, delta: number): void {
+  public update(time: number, delta: number): void {
     controller.frame();
     if (controller.simVersion !== this.builtFor) {
       this.buildWorld();
@@ -216,6 +222,17 @@ export class ColonyScene extends Phaser.Scene {
     if (this.groundChanged) {
       this.groundChanged = false;
       this.layers.terrain.generateLayerDataTexture();
+    }
+    const far = this.cameras.main.zoom < MARKER_ZOOM;
+    if (far && this.featuresChanged && (!this.featuresFar || time - this.featuresSyncedAt > 1000)) {
+      this.featuresChanged = false;
+      this.featuresSyncedAt = time;
+      this.layers.featureFar.generateLayerDataTexture();
+    }
+    if (far !== this.featuresFar) {
+      this.featuresFar = far;
+      this.layers.featureFar.setVisible(far);
+      this.layers.feature.setVisible(!far);
     }
     if (world.structureVersion !== this.roomsVersion) {
       this.roomsVersion = world.structureVersion;
@@ -455,6 +472,15 @@ export class ColonyScene extends Phaser.Scene {
     map.createBlankLayer('terrain', tileset)!.destroy(false);
     const ground = new Phaser.Tilemaps.TilemapGPULayer(this, map, map.getLayerIndex('terrain')!, tileset);
     this.add.existing(ground.setDepth(0));
+    // Zoomed far out, every tree and rock on the map is in view, and drawing them tile by tile was the
+    // biggest part of a frame on a slow machine. Out there the GPU draws a copy of the layer instead (without
+    // the seasonal tints, too small to see), brought up to date at most once a second.
+    // (From its own copy of the art: see TILESET_FAR_KEY.)
+    const farTiles = map.addTilesetImage(TILESET_FAR_KEY, TILESET_FAR_KEY, TILE, TILE, 0, 0, 0)!;
+    map.createBlankLayer('featureFar', farTiles)!.destroy(false);
+    const featureFar = new Phaser.Tilemaps.TilemapGPULayer(this, map, map.getLayerIndex('featureFar')!, farTiles);
+    this.add.existing(featureFar.setDepth(3).setVisible(false));
+    this.featuresFar = false;
     this.layers = {
       terrain: ground,
       floor: layer('floor', 0.6),
@@ -464,6 +490,7 @@ export class ColonyScene extends Phaser.Scene {
       zone: layer('zone', 1),
       indoor: layer('indoor', 2),
       feature: layer('feature', 3),
+      featureFar,
       items: layer('items', 4),
       roof: layer('roof', 4.6),
       blueprint: layer('blueprint', 5).setAlpha(0.55),
@@ -670,6 +697,15 @@ export class ColonyScene extends Phaser.Scene {
     const f = world.feature[i];
     const featureFrame = f === NONE ? -1 : featureDef(f).crop ? Frames.crop(f, world.growth[i]) : Frames.feature(f);
     const featureTile = this.put(L.feature, x, y, featureFrame);
+    const far = L.featureFar.getTileAt(x, y, true);
+    if ((far?.index ?? -1) !== featureFrame) {
+      if (featureFrame < 0) {
+        L.featureFar.removeTileAt(x, y, false, false);
+      } else {
+        L.featureFar.putTileAt(featureFrame, x, y, false);
+      }
+      this.featuresChanged = true;
+    }
     if (featureTile) {
       featureTile.tint = this.featureTint(world, i);
     }

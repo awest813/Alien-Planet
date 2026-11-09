@@ -311,6 +311,7 @@ const SIEGE_DANGER = 14;
 const SIEGE_EXEMPT = new Set<string>(['shelter', 'rescue', 'tend', 'feed', 'eat', 'wander']);
 // What the later research does.
 const MASONRY_SPEED = 1.2;
+const HAY = itemId('hay');
 const IRRIGATION_YIELD = 1.25;
 // Steel tools (steelmaking) for miners and woodcutters; seed from the best plants (plant breeding).
 const STEEL_SPEED = 1.25;
@@ -4179,6 +4180,11 @@ export class Simulation {
         const yieldCount = Math.floor(more) + (more % 1 > 0 && this.rng.next() < more % 1 ? 1 : 0);
         w.dropItemNear(offField ?? t, crop.item, yieldCount);
         this.produce(crop.item, yieldCount);
+        // The stalks of a grain field, bundled into hay for the troughs.
+        if (crop.straw) {
+          w.dropItemNear(offField ?? t, HAY, crop.straw);
+          this.produce(HAY, crop.straw);
+        }
         if (this.season === 'Winter') {
           this.stats.winterHarvests = (this.stats.winterHarvests ?? 0) + 1;
         }
@@ -4623,13 +4629,22 @@ export class Simulation {
     // (A trough takes more than one kind of feed.)
     const takes = (fuel: { item: number; also?: number[] }, item: number) =>
       item === fuel.item || !!fuel.also?.includes(item);
-    const sourceFor = (fuel: { item: number; also?: number[] }) =>
+    const find = (test: (item: number) => boolean) =>
       this.nearestIn(
         'items',
         c.tile,
-        (i) => takes(fuel, w.itemType[i]) && this.regions.region[i] === region && !this.itemTaken(i, c),
+        (i) => test(w.itemType[i]) && this.regions.region[i] === region && !this.itemTaken(i, c),
         1,
       )[0];
+    // A trough gets hay first, so the animals don't eat what people could; while the colony's own food is
+    // short, hay or nothing (people eat before the animals do).
+    const foodShort = foodDays(this) < TROUGH_FOOD_DAYS;
+    const sourceFor = (fuel: { item: number; also?: number[] }) => {
+      if (!takes(fuel, HAY)) {
+        return find((item) => takes(fuel, item));
+      }
+      return find((item) => item === HAY) ?? (foodShort ? undefined : find((item) => takes(fuel, item)));
+    };
     const toHand = (fuel: { item: number; also?: number[] }) => {
       if (!onHand.has(fuel.item)) {
         onHand.set(fuel.item, sourceFor(fuel) !== undefined);
@@ -4645,8 +4660,6 @@ export class Simulation {
           !!fuel &&
           // In the cold, the fires come first: a generator only gets wood they can spare.
           !(featureDef(w.feature[i]).power && fuel.item === WOOD && keepWood) &&
-          // And people eat before the animals do.
-          !(featureDef(w.feature[i]).feeds && foodDays(this) < TROUGH_FOOD_DAYS) &&
           w.fuel[i] < fuel.capacity * (urgentOnly ? 0.2 : 0.5) &&
           !this.isReserved(`f${i}`, c) &&
           this.hasWorkSpot(i, false, region) &&

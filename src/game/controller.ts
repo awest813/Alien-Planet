@@ -584,7 +584,7 @@ export const TOOLS: ToolDef[] = [
     'Feeding trough',
     '',
     'production',
-    'Build on the edge of a pen; haulers fill it with potatoes, and fed animals in the pen breed in any season',
+    'Build on the edge of a pen; haulers fill it with hay (from grain fields), or potatoes, berries or grain, and fed animals in the pen breed in any season',
   ),
   build('icebox', 'Icebox', '', 'production', 'Food storage that keeps food fresh while powered (50 W)'),
   build('shelf', 'Shelf', '', 'production', 'Storage for three stacks of one kind of item on a single tile'),

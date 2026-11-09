@@ -316,5 +316,11 @@
       "protection": 0.55,
       "speed": 0.9
     }
+  },
+  {
+    "key": "hay",
+    "name": "Hay",
+    "stackLimit": 75,
+    "value": 0
   }
 ]

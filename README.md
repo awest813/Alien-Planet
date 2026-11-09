@@ -100,7 +100,7 @@ How the living simulation works:
   they ask for a colonist or goods, and refusing ends the alliance. Send one to three colonists on an expedition
   to a neighbour's settlement (to trade) or the ruins (to salvage); they come back days later with goods,
   maybe a recruit, maybe hurt. Silver buys expedition supplies and settlers from the Meadow Kin.
-- **Pens and hunting:** fence a pen with a gate, put in a feeding trough (haulers fill it with potatoes, berries or grain), and
+- **Pens and hunting:** fence a pen with a gate, put in a feeding trough (haulers fill it with hay from the grain fields first, then potatoes, berries or grain), and
   tame animals stay there; fed pairs breed in any season. A village policy can limit hunting to the surplus,
   leaving a breeding pair of each kind, and the Meadow Kin take it badly if the valley is hunted out.
 

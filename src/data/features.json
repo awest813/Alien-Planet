@@ -1098,6 +1098,7 @@
     "crop": {
       "item": "grain",
       "count": 12,
+      "straw": 8,
       "growDays": 2.5,
       "sowWork": 40,
       "harvestWork": 60
@@ -1386,7 +1387,7 @@
     "feeds": {
       "item": "potatoes",
       "capacity": 40,
-      "also": ["berries", "grain"]
+      "also": ["hay", "berries", "grain"]
     },
     "build": {
       "cost": [

@@ -145,6 +145,8 @@ export interface FeatureDef {
     harvestWork: number;
     // Shrugs off frost (young trees).
     hardy?: boolean;
+    // Hay left from the stalks (grain): fodder for the troughs.
+    straw?: number;
   };
   build?: { cost: Cost[]; work: number };
   // Floors and roofs sit in their own layer, under or over whatever else is on the tile.
@@ -235,7 +237,15 @@ interface RawFeature {
     instrument?: boolean;
   };
   harvest?: { work: string; amount: number; item: string; count: number };
-  crop?: { item: string; count: number; growDays: number; sowWork: number; harvestWork: number; hardy?: boolean };
+  crop?: {
+    item: string;
+    count: number;
+    growDays: number;
+    sowWork: number;
+    harvestWork: number;
+    hardy?: boolean;
+    straw?: number;
+  };
   build?: { cost: { item: string; count: number }[]; work: number };
   shaft?: boolean;
   layer?: 'floor' | 'roof';

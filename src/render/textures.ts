@@ -13,6 +13,7 @@ import {
 
 export { Frames, TILE } from './tileset-layout';
 export const TILESET_KEY = 'tiles';
+export const TILESET_FAR_KEY = 'tiles-far';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -123,6 +124,12 @@ export function createTextures(scene: Phaser.Scene): void {
     c.fillRect(0, 0, TILE, TILE);
   });
   texture.refresh();
+  // A copy for the GPU's far feature layer, whose shader draws an empty tile with the tileset's top-left
+  // pixel: cleared here, so empty tiles show the ground beneath instead of a blue square.
+  const far = scene.textures.createCanvas(TILESET_FAR_KEY, COLUMNS * TILE, ROWS * TILE)!;
+  far.getContext().drawImage(texture.canvas, 0, 0);
+  far.getContext().clearRect(0, 0, 1, 1);
+  far.refresh();
   // The UI cuts item icons from the same art.
   setTilesetImage(texture.canvas.toDataURL());
 
@@ -1619,6 +1626,18 @@ function drawItem(c: Ctx, key: string): void {
       c.fillRect(9, 3, 3, 4);
       c.fillStyle = '#7a5434';
       c.fillRect(4, 10, 7, 1);
+      break;
+    case 'hay':
+      // A pale, loose bale tied round the middle.
+      c.fillStyle = '#c7b06a';
+      c.fillRect(3, 6, 10, 7);
+      c.fillStyle = '#e0cd8a';
+      c.fillRect(4, 5, 8, 2);
+      c.fillRect(3, 8, 1, 1);
+      c.fillRect(12, 10, 1, 1);
+      c.fillStyle = '#9c8446';
+      c.fillRect(7, 6, 2, 7);
+      c.fillRect(4, 12, 8, 1);
       break;
     case 'flour':
       // A tied sack, dusted white.

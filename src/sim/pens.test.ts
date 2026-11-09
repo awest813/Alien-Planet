@@ -166,6 +166,23 @@ describe('troughs', () => {
     expect(w.fuel[trough]).toBeGreaterThan(0);
   });
 
+  it('take hay first, and only hay while the colony is short of food', () => {
+    const { sim, w, x, y, trough } = withPen(59);
+    sim.apply({ type: 'zone', rect: { x0: x - 6, y0: y - 6, x1: x - 3, y1: y - 3 }, zone: STOCKPILE_ZONE });
+    // Little to eat: a few potatoes, nearer than the hay.
+    w.addItem(w.idx(x - 3, y - 3), itemId('potatoes'), 6);
+    w.addItem(w.idx(x - 6, y - 6), itemId('hay'), 30);
+    for (const c of sim.colonists) {
+      c.priorities.hauling = 1;
+      c.needs.food = 1;
+    }
+    for (let hour = 0; hour < 6 && w.fuel[trough] === 0; hour++) {
+      run(sim, HOUR);
+    }
+    expect(w.fuel[trough]).toBeGreaterThan(0);
+    expect(sim.stockOf(itemId('potatoes'))).toBe(6);
+  });
+
   it('a field too big to be a pen is no pen, however many gates it has', () => {
     const sim = Simulation.newColony(31, 'standard', 96);
     const w = sim.world;
