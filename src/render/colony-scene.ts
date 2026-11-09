@@ -1664,6 +1664,23 @@ export class ColonyScene extends Phaser.Scene {
     }
   }
 
+  // The tile of a raider drawn under the pointer (as they're drawn, mid-step and all), so a tap or right-click on one
+  // focuses fire on them: one drawn most of the way into the next tile used to count as the ground beside.
+  private pickRaiderTile(pointer: Phaser.Input.Pointer): number | null {
+    const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    let best: number | null = null;
+    let bestDist = TILE * 0.75;
+    for (const [id, raider] of this.raiders) {
+      const d = Math.hypot(raider.x - point.x, raider.y - point.y);
+      const e = controller.sim.enemies.find((o) => o.id === id && o.hp > 0);
+      if (e && d < bestDist) {
+        bestDist = d;
+        best = e.tile;
+      }
+    }
+    return best;
+  }
+
   private pickColonist(pointer: Phaser.Input.Pointer): number | null {
     const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     let best: number | null = null;
@@ -1788,9 +1805,10 @@ export class ColonyScene extends Phaser.Scene {
         if (!this.pan.moved) {
           const colonist = this.pickColonist(pointer);
           const tile = this.tileAt(pointer);
+          const raider = this.pickRaiderTile(pointer);
           if (colonist !== null) {
             controller.selectColonist(colonist);
-          } else if (tile === null || controller.tool.kind !== 'select' || !controller.orderMove(tile)) {
+          } else if (tile === null || controller.tool.kind !== 'select' || !controller.orderMove(raider ?? tile)) {
             controller.selectTile(tile);
           }
         }
@@ -1801,7 +1819,7 @@ export class ColonyScene extends Phaser.Scene {
         // A right click without dragging drops the current tool.
         if (!this.pan.moved && this.pan.button === 2) {
           // Right-click sends a selected drafted colonist there; otherwise it drops the tool.
-          const tile = this.tileAt(pointer);
+          const tile = this.pickRaiderTile(pointer) ?? this.tileAt(pointer);
           if (controller.tool.kind !== 'select' || tile === null || !controller.orderMove(tile)) {
             this.drag = null;
             controller.setTool({ kind: 'select' });
@@ -1951,13 +1969,23 @@ export class ColonyScene extends Phaser.Scene {
     return Math.min(MIN_ZOOM, cam.width / ((world.width + 4) * TILE), cam.height / ((world.height + 4) * TILE));
   }
 
+  // The world point in the middle of the view, and the view's size, as of last frame.
+  private lastView = { w: 0, h: 0, x: 0, y: 0 };
+
   private updateCamera(delta: number): void {
     const cam = this.cameras.main;
+    // A resize (a phone turned on its side) keeps the same spot in the middle: the scroll is kept from the top-left
+    // corner otherwise, and the colony went off the edge of the screen.
+    if (this.lastView.w > 0 && (cam.width !== this.lastView.w || cam.height !== this.lastView.h)) {
+      cam.centerOn(this.lastView.x, this.lastView.y);
+    }
     if (controller.focusRequest !== null) {
       const world = controller.sim.world;
       const i = controller.focusRequest;
       controller.focusRequest = null;
-      cam.centerOn((world.xOf(i) + 0.5) * TILE, (world.yOf(i) + 0.5) * TILE);
+      // On a phone a colonist's card covers the top of the map: put them in the lower part of the view, clear of it.
+      const below = window.innerWidth <= 720 && controller.selectedColonist !== null ? cam.height * 0.22 : 0;
+      cam.centerOn((world.xOf(i) + 0.5) * TILE, (world.yOf(i) + 0.5) * TILE - below / cam.zoom);
     }
     // A new map, a load or a bigger window can raise the farthest zoom out: keep to it (otherwise the map sits
     // small in an empty screen until the next scroll of the wheel).
@@ -1968,6 +1996,7 @@ export class ColonyScene extends Phaser.Scene {
     // What's actually on screen, in tiles (for the minimap's box and the sound), not the drawing margin.
     const world = controller.sim.world;
     const view = cam.worldView;
+    this.lastView = { w: cam.width, h: cam.height, x: cam.scrollX + cam.width / 2, y: cam.scrollY + cam.height / 2 };
     controller.cameraView = {
       x0: Math.max(0, view.x / TILE),
       y0: Math.max(0, view.y / TILE),

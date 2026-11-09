@@ -1829,7 +1829,14 @@ export class GameController {
       }
       this.replaceSim(deserialize(data));
       this.inPlay = true;
-      this.notify(`Loaded ${slotLabel(slot).toLowerCase()}.`);
+      // A loaded game waits for the player, as a new one does: it ran on at the old speed, a raid two hours off
+      // and all, with the card that had paused it gone.
+      if (this.heldSpeed !== null) {
+        this.heldSpeed = 0;
+      } else {
+        this.setSpeed(0);
+      }
+      this.notify(`Loaded ${slotLabel(slot).toLowerCase()}. Paused: carry on when you're ready.`);
       return true;
     } catch (error) {
       console.error(error);
@@ -2511,6 +2518,19 @@ export class GameController {
         tone: 'danger',
         tile: manhunters[0].tile,
       });
+    } else {
+      // On the way (or gathering at the edge): something to tap to find them while there's time to get ready.
+      const coming = sim.animals.filter((a) => a.manhunter && a.hp > 0);
+      if (coming.length > 0) {
+        const due = coming.find((a) => a.musterUntil !== undefined && a.musterUntil > sim.tick)?.musterUntil;
+        alerts.push({
+          text: `${coming.length} maddened animal${coming.length > 1 ? 's are' : ' is'} coming${
+            due !== undefined ? `, gathering at the edge (${inAbout(due - sim.tick)})` : ''
+          }: draft colonists somewhere they can fight (Q)`,
+          tone: 'warn',
+          tile: coming[0].tile,
+        });
+      }
     }
     // Cold indoors: a warm room is the only answer, and this one isn't warm enough. Said as soon as it's
     // colder than their clothes can take, not once they're dying of it.

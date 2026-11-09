@@ -335,6 +335,7 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
         ))}
         <span className="muted">
           Pick a brush, then {TOUCH ? 'tap' : 'click'} or drag across hours. The Everyone row sets the whole colony.
+          {TOUCH && ' To scroll the grid, drag the row of hours or the names (a drag on the hours paints them).'}
         </span>
       </div>
       <div className="table-scroll">

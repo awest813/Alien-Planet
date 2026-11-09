@@ -1146,6 +1146,17 @@ button.brush.active {
     grid-template-columns: minmax(0, 1fr) 0 0;
   }
 
+  /* The card keeps to the top half of the map, so there's ground to tap below it (it covered 60% of the screen,
+     and the colonist it was about with it); drafted, it's only the head: name, Draft, stances. */
+  .left-column .inspector {
+    max-height: 48%;
+  }
+
+  .inspector.drafted > .tabs,
+  .inspector.drafted > .card-body {
+    display: none;
+  }
+
   .left-column {
     max-width: 360px;
     /* A colonist's or tile's card sits over the alerts tab rather than under it: the tab covered the card's
@@ -1166,6 +1177,16 @@ button.brush.active {
   }
 
   .notices > .notification:nth-last-child(n + 3) {
+    display: none;
+  }
+
+  /* With a dialog open, the message it gives (a gift's thanks, why a button is off) shows over it: the notices'
+     own layer had kept them under every dialog. The other notices wait. */
+  .ui:has(.modal-backdrop) .notices {
+    z-index: 11;
+  }
+
+  .ui:has(.modal-backdrop) .notices > :not(.toast) {
     display: none;
   }
 
@@ -1316,6 +1337,15 @@ button.link:focus-visible {
     scrollbar-width: none;
     /* The row scrolls sideways (Village, Factions and the Menu are past the edge): a fade says there's more. */
     mask-image: linear-gradient(to right, #000 85%, transparent);
+  }
+
+  /* Draft all stays at the row's start however it's scrolled: a raid's notice says to tap it, and it had been
+     scrolled out of sight. */
+  .screens .draft-all {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--panel-solid, #10141c);
   }
 
   .screens button {
@@ -1928,6 +1958,16 @@ button.big {
     display: none;
   }
 
+  /* A phone on its side: the card takes the map's full height (half of it left the card's body no room at all),
+     and its body keeps a few lines whatever. */
+  .left-column .inspector {
+    max-height: 100%;
+  }
+
+  .inspector .card-body {
+    min-height: 72px;
+  }
+
   .arch-tabs {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -2070,6 +2110,8 @@ input[type='checkbox'] {
 @media (max-width: 800px) {
   .table-scroll {
     mask-image: linear-gradient(to right, #000 92%, transparent);
+    /* Room past the last column, so scrolled to the end it isn't under the fade. */
+    padding-right: 24px;
   }
 
   .work-grid .priority {
@@ -2103,4 +2145,20 @@ input[type='checkbox'] {
 
 .confirm-labels > .off {
   visibility: hidden;
+}
+
+/* Touch: a checkbox's label (an expedition's party) is a target big enough to tap, not just the box. */
+@media (pointer: coarse) {
+  .modal label:has(> input[type='checkbox']) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 0 6px;
+  }
+
+  .modal input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+  }
 }

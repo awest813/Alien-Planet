@@ -154,7 +154,7 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
       <nav className="screens">
         {(state.raid || state.animalsAttacking) && (
           <button
-            className="danger"
+            className="danger draft-all"
             onClick={() => controller.toggleDraftAll()}
             title="Draft or stand down everyone (Q)"
           >
@@ -366,7 +366,7 @@ function ColonistCard({ c }: { c: ColonistView }) {
     { key: 'skills', label: 'Skills' },
   ];
   return (
-    <section className="panel inspector" aria-label={`${c.name} details`}>
+    <section className={`panel inspector ${c.drafted ? 'drafted' : ''}`} aria-label={`${c.name} details`}>
       <div className="card-head">
         <span className="swatch" style={{ background: c.color }} />
         <b className="card-title">{c.name}</b>
@@ -822,7 +822,7 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
       {alerts.length > 0 && (
         <ul className="alerts" aria-label="Alerts">
           {shown.map((alert, index) => (
-            <AlertLine key={`${index}-${alert.text}`} alert={alert} />
+            <AlertLine key={`${index}-${alert.text}`} alert={alert} onJump={foldOnPhone} />
           ))}
           {alerts.length > ALERTS_SHOWN && (
             <li className="more">
@@ -913,7 +913,7 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
                               >
                                 <span className="check">{o.failed ? '✖' : '○'}</span>
                                 <span className="goal-text">
-                                  {o.label}
+                                  {forTouch(o.label)}
                                   {o.progress && <span className="muted"> {o.progress}</span>}
                                   {o.underway && <span className="muted small"> · under way</span>}
                                 </span>
@@ -960,12 +960,20 @@ function ToneMark({ tone }: { tone: string }) {
 }
 
 // An alert; the ones about someone or somewhere take the camera there when clicked.
-function AlertLine({ alert }: { alert: Alert }) {
+function AlertLine({ alert, onJump }: { alert: Alert; onJump?: () => void }) {
   const target = alert.colonist !== undefined || alert.tile !== undefined;
   return (
     <li className={alert.tone}>
       {target ? (
-        <button className="alert-jump" onClick={() => controller.focusAlert(alert)} title="Show me">
+        <button
+          className="alert-jump"
+          onClick={() => {
+            controller.focusAlert(alert);
+            // (On a phone the panel folds away, or it covers what the alert just jumped to.)
+            onJump?.();
+          }}
+          title="Show me"
+        >
           <ToneMark tone={alert.tone} />
           {forTouch(alert.text)} <span className="go">›</span>
         </button>
@@ -1003,7 +1011,7 @@ function NextGoal({
   return (
     <div className="next-goal">
       <div className="next-label">Next goal</div>
-      <b>{goal.label}</b>
+      <b>{forTouch(goal.label)}</b>
       {goal.progress && <span className="muted"> {goal.progress}</span>}
       {goal.how && <p>{forTouch(goal.how)}</p>}
       {(tool || goal.screen) && (

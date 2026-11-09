@@ -460,3 +460,15 @@ describe('a hut with a gap in its walls', () => {
     expect(controller.getState().objectives.find((o) => o.id === 'shelter')?.how).toMatch(/gap/);
   });
 });
+
+describe('a maddened pack on its way', () => {
+  it('has an alert to find it by before it attacks', () => {
+    const { sim } = colony('pack-coming');
+    const a = sim.animals[0];
+    a.manhunter = true;
+    a.revengeOn = -1;
+    a.musterUntil = sim.tick + 2 * HOUR;
+    const line = texts().find((t) => t.includes('maddened animal'));
+    expect(line).toMatch(/coming, gathering at the edge/);
+  });
+});
