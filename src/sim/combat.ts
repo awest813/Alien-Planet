@@ -298,9 +298,11 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
     for (const e of sim.enemies.slice(-count).slice(0, wreckers)) {
       e.wrecker = true;
     }
-    // From the second year, against a colony behind wooden walls, some bring fire.
+    // From the second year, against a colony behind wooden walls, some bring fire; not in winter or wet weather,
+    // when frozen or soaked timber won't catch (a hut burned open in midwinter froze whole colonies).
+    const dry = sim.season !== 'Winter' && !['rain', 'storm', 'snow'].includes(sim.weather.kind);
     const firebrands =
-      !thieves && sim.day >= FIREBRANDS_FROM_DAY && woodenDefences(sim) ? Math.min(2, Math.floor(count / 4)) : 0;
+      !thieves && dry && sim.day >= FIREBRANDS_FROM_DAY && woodenDefences(sim) ? Math.min(2, Math.floor(count / 4)) : 0;
     for (const e of sim.enemies.slice(-count).slice(wreckers, wreckers + firebrands)) {
       e.firebrand = true;
     }

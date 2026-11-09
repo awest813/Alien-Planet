@@ -20,7 +20,7 @@ with esbuild for speed (see ROADMAP).
 - **Goals reach 53–55 of 65 by year 10** in the test colony; the rest are niche or need a player's choices
   (masterwork crafts, winter greenhouses, all research).
 - **A walled, armed colony still rarely loses anyone to raids.** From the second year, raids against wooden
-  walls bring firebrands who set them alight (stone doesn't burn), on top of sappers, thieves and wreckers; but in
+  walls bring firebrands who set them alight once each, though not in winter or wet weather (stone doesn't burn), on top of sappers, thieves and wreckers; but in
   ten-year runs the test colony, which now buys truces, sees only 19–25 raids and loses nobody to them.
 - **Separations are rare** (one in six ten-year runs). Mood is lower late (yearly average about 47–52, from
   52–56); breaks no longer come in bursts after a death (no new break within a day of the last: seed 7919 went
@@ -32,8 +32,9 @@ with esbuild for speed (see ROADMAP).
   simply appear at the map edge; the harness seldom buys settlers (its population is at the cap). Meadow Kin
   goodwill still ends at 100 in some runs. (Envoys now walk in, wait about the colony, and walk off home with the
   answer.)
-- **The desert's heat** was killing colonists in summer heat waves; in a 20-colony desert sample over two
-  summers there's now one heatstroke death (a demolisher's colony).
+- **The desert's wood:** heat waves are survivable now (one heatstroke death in a 20-colony desert sample over two
+  summers), but wood is scarce, and a desert colony that doesn't plant a grove can burn the last of it and freeze in
+  a later winter (one of the 120-day playtest colonies, in year 5).
 - **Pens:** troughs take potatoes, berries or grain, but nothing else (no hay). Fences that make no pen, and pens
   with no trough, get an alert.
 - **Tundra is hard on a slow start:** trees are scarce, and a farming-first colony that hasn't finished its hut
