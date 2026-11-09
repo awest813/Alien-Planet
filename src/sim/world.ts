@@ -78,6 +78,15 @@ export const DIRS: readonly [number, number][] = [
 
 // The tile grid. Every layer is a flat typed array indexed by `y * width + x`,
 // which keeps the world cheap to copy, save, and (later) hand to a Web Worker.
+// Storage buildings: what makes a tile storage besides a stockpile zone.
+const storing = (f: number): boolean => {
+  if (f === NONE) {
+    return false;
+  }
+  const def = featureDef(f);
+  return !!def.icebox || !!def.dries || def.shelf > 0;
+};
+
 // Features that decide where pens are, besides the fences themselves (which are walls to the map).
 const pennish = (f: number): boolean => {
   if (f === NONE) {
@@ -144,6 +153,10 @@ export class World {
   public structureVersion = 0;
   // Bumped when a gate, trough or bed comes or goes: what makes ground a pen (see pens.ts).
   public penVersion = 0;
+  // Bumped when a shelf, icebox or drying rack comes or goes: storage buildings (zones are counted apart).
+  public storageVersion = 0;
+  // Bumped when anything not natural (a building, a crop) comes or goes: not trees or rock.
+  public builtVersion = 0;
   // Bumped whenever any feature changes (furniture affects room stats).
   public featureVersion = 0;
 
@@ -358,6 +371,12 @@ export class World {
     this.featureVersion++;
     if (pennish(old) || pennish(f)) {
       this.penVersion++;
+    }
+    if (storing(old) || storing(f)) {
+      this.storageVersion++;
+    }
+    if ((old !== NONE && !featureDef(old).natural) || (f !== NONE && !featureDef(f).natural)) {
+      this.builtVersion++;
     }
     if (before !== this.isPassable(i) || roomBefore !== this.blocksRoom(i)) {
       this.structureVersion++;

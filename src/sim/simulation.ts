@@ -313,6 +313,8 @@ const MASONRY_SPEED = 1.2;
 const IRRIGATION_YIELD = 1.25;
 // Steel tools (steelmaking) for miners and woodcutters; seed from the best plants (plant breeding).
 const STEEL_SPEED = 1.25;
+// Weapons and armour, for a quick look at whether any are lying about before searching for them.
+const GEAR_ITEMS = ITEMS.filter((i) => i.weapon || i.armor).map((i) => i.id);
 // Each round of further study (up to ten) speeds all work a little.
 const FURTHER_STUDY_SPEED = 0.03;
 const FURTHER_STUDY_ROUNDS = 10;
@@ -996,8 +998,9 @@ export class Simulation {
   // are any. Lightning and firefighting centre on it.
   public homeTile(): number | undefined {
     const w = this.world;
-    if (this.homeVersion !== w.featureVersion) {
-      this.homeVersion = w.featureVersion;
+    // (Buildings and crops change it; felling a tree or mining a rock doesn't.)
+    if (this.homeVersion !== w.builtVersion) {
+      this.homeVersion = w.builtVersion;
       let sx = 0;
       let sy = 0;
       let n = 0;
@@ -4060,7 +4063,11 @@ export class Simulation {
   // Someone who does physical work and has no tool kit fetches one from storage.
   private tryTakeTool(c: Colonist): boolean {
     const p = c.priorities;
-    if (c.tool || (p.mining <= 0 && p.construction <= 0 && p.growing <= 0 && p.plantCutting <= 0)) {
+    if (
+      c.tool ||
+      (p.mining <= 0 && p.construction <= 0 && p.growing <= 0 && p.plantCutting <= 0) ||
+      this.resourceTotals()[TOOL_KIT - 1].total === 0
+    ) {
       return false;
     }
     const w = this.world;
@@ -4408,7 +4415,8 @@ export class Simulation {
   // Every stockpile tile and storage building (cached until buildings or zones change).
   public storageTiles(): number[] {
     const w = this.world;
-    const key = `${w.featureVersion}/${this.zoneVersion}`;
+    // (Only storage buildings and zones change it, not every tree felled or rock mined.)
+    const key = `${w.storageVersion}/${this.zoneVersion}`;
     if (key === this.storageKey) {
       return this.storageCache;
     }
@@ -4428,8 +4436,8 @@ export class Simulation {
   // wading through every tree and rock on the map. Kept until a building changes.
   private buildingTiles(): number[] {
     const w = this.world;
-    if (this.buildingVersion !== w.featureVersion) {
-      this.buildingVersion = w.featureVersion;
+    if (this.buildingVersion !== w.builtVersion) {
+      this.buildingVersion = w.builtVersion;
       this.buildingCache = [...w.tilesWith('features')].filter((i) => !featureDef(w.feature[i]).natural);
     }
     return this.buildingCache;
@@ -6459,6 +6467,11 @@ export class Simulation {
   // Weapons and armor in storage: a colonist takes a clearly better weapon than the one in hand
   // (melee weapons appeal to those told to charge), and armor if theirs is missing or clearly worse.
   private tryEquip(c: Colonist): boolean {
+    // (Most of the time there's no spare weapon or armour anywhere: no need to look through every item.)
+    const totals = this.resourceTotals();
+    if (!GEAR_ITEMS.some((item) => totals[item - 1].total > 0)) {
+      return false;
+    }
     const w = this.world;
     const region = this.regionOf(c.tile);
     const melee = c.stance === 'charge';
