@@ -292,6 +292,12 @@ function comeHome(sim: Simulation, e: Expedition): void {
     }
     sim.addThought(c, 'backFromJourney');
   }
+  // (Anyone old age caught up with on the road isn't back.)
+  const back = members.filter((c) => !c.health.dead);
+  if (back.length === 0) {
+    return;
+  }
+  members.splice(0, members.length, ...back);
   const names = members
     .map((c) => c.name)
     .join(', ')

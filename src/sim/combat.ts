@@ -39,8 +39,8 @@ export interface RaidState {
   siege?: SiegeState;
   // They've had to tunnel through rock to get in (said once).
   sapped?: boolean;
-  // How many colonists were here when it began (to tell a raid seen off with nobody lost or down).
-  colonists?: number;
+  // Who was standing when it began (to tell a raid seen off with nobody lost or down).
+  standing?: number[];
   // Thieves after the stores rather than a fight; what they got away with.
   thieves?: boolean;
   stolen?: number;
@@ -287,7 +287,10 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
       initial: count,
       killed: 0,
       startedTick: sim.tick,
-      colonists: sim.living().length,
+      standing: sim
+        .living()
+        .filter((c) => !c.health.downed)
+        .map((c) => c.id),
       ...(thieves ? { thieves: true } : {}),
     };
     // The signal draws them; while it's on the air a third of them go straight for the beacon.
@@ -421,13 +424,13 @@ function breach(sim: Simulation, e: Enemy): boolean {
 
 // Walls and doors; and, for raiders with no other way in, the rock itself (sappers dig, slowly: rock takes as
 // many blows as it takes a miner's work).
-// (Built: anything in the way, a fence or a trough as much as a wall.)
+// (Built: walls and doors, and the fences and troughs that pen ground in; not stoves, benches or sculptures.)
 const breakable = (w: World, i: number) => {
   if (w.feature[i] === NONE) {
     return false;
   }
   const def = featureDef(w.feature[i]);
-  return def.build ? w.blocksRoom(i) || !w.isPassable(i) : diggable(w, i);
+  return def.build ? w.blocksRoom(i) || def.key === 'fence' || !!def.feeds : diggable(w, i);
 };
 const diggable = (w: World, i: number) => {
   const def = featureDef(w.feature[i]);
@@ -464,7 +467,7 @@ function breachWall(
       if (
         !leadsIn[n] &&
         w.distance(n, goalTile) <= SAP_REACH &&
-        ((w.isPassable(n) && sim.regionOf(n) === goalRegion) || (w.feature[n] !== NONE && diggable(w, n)))
+        ((w.isPassable(n) && sim.regionOf(n) === goalRegion) || breakable(w, n))
       ) {
         leadsIn[n] = 1;
         queue.push(n);
@@ -680,7 +683,14 @@ function throwFire(sim: Simulation, e: Enemy): void {
         continue;
       }
       const i = w.idx(x, y);
-      if (w.feature[i] !== NONE && featureDef(w.feature[i]).build && burnTime(sim, i) > 0 && ignite(sim, i)) {
+      // (Only what they can see to throw at: not through a wall into the room behind it.)
+      if (
+        w.feature[i] !== NONE &&
+        featureDef(w.feature[i]).build &&
+        burnTime(sim, i) > 0 &&
+        lineOfSight(w, e.tile, i) &&
+        ignite(sim, i)
+      ) {
         e.throwAt = sim.tick + THROW_EVERY;
         sim.addLog(`${e.name} set the ${featureDef(w.feature[i]).name.toLowerCase()} alight!`, 'danger');
         sim.events.push('fire');
@@ -1028,7 +1038,10 @@ export function updateEnemies(sim: Simulation): void {
         sim.addThought(c, 'repelledRaid');
       }
       // (Everyone who was here still on their feet: nobody downed, and nobody killed outright.)
-      if (raid.colonists !== undefined && standing.length >= raid.colonists) {
+      if (
+        raid.standing !== undefined &&
+        raid.standing.every((id) => !sim.colonists[id]?.health.dead && !sim.colonists[id]?.health.downed)
+      ) {
         sim.stats.cleanDefences = (sim.stats.cleanDefences ?? 0) + 1;
       }
     } else if (sim.living().length > 0) {

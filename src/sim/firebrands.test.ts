@@ -42,4 +42,23 @@ describe('firebrands', () => {
     spawnRaid(sim, 0, 8);
     expect(sim.enemies.some((e) => e.firebrand)).toBe(false);
   });
+
+  it("can't throw through a wall at what's inside", () => {
+    const { sim, w, x, y } = walled(5, 'stoneWall');
+    // A wooden door makes them bring fire, and a bed stands just inside the east wall.
+    w.setFeature(w.idx(x, y + 4), featureId('door'));
+    const bed = w.idx(x + 3, y);
+    w.setFeature(bed, featureId('bed'));
+    spawnRaid(sim, 0, 8);
+    const brand = sim.enemies.find((e) => e.firebrand)!;
+    sim.enemies = [brand];
+    sim.raid!.initial = 1;
+    brand.tile = w.idx(x + 6, y);
+    brand.speed = 0;
+    for (let t = 0; t < 30; t++) {
+      brand.hp = 1;
+      sim.step();
+    }
+    expect(sim.burning.has(bed)).toBe(false);
+  });
 });

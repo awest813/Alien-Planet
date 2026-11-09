@@ -44,7 +44,7 @@ import {
 } from '../src/sim/diplomacy';
 import { RUINS, cannotGo, supplyCost } from '../src/sim/expeditions';
 import { PRISONER_BED, roomToJoin } from '../src/sim/prisoners';
-import { isAvailable } from '../src/sim/research';
+import { isAvailable, researchCost } from '../src/sim/research';
 import { applyTrade, colonyStock, goodwillOf, tradeOpen } from '../src/sim/trade';
 import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { mutualOpinion } from '../src/sim/social';
@@ -622,12 +622,18 @@ function play(seed: number): Result {
     const held = (key: string) => {
       const hold = sim.researchHold(key);
       return (
-        !!hold.building || (hold.short.length > 0 && (sim.research.progress[key] ?? 0) >= researchDef(key)!.cost - 1)
+        !!hold.building ||
+        (hold.short.length > 0 &&
+          (sim.research.progress[key] ?? 0) >= researchCost(sim.research, researchDef(key)!) - 1)
       );
     };
-    if (!sim.research.current || held(sim.research.current)) {
+    // (Further study never ends: it's taken up only while nothing else can be, and looked past every time.)
+    const current = sim.research.current ? researchDef(sim.research.current) : undefined;
+    if (!current || held(current.key) || current.repeatable) {
       const ready = (key: string) => isAvailable(sim.research, researchDef(key)!) && !held(key);
-      const next = researchOrder.find(ready) ?? RESEARCH.map((r) => r.key).find(ready);
+      const once = (key: string) => ready(key) && !researchDef(key)!.repeatable;
+      const next =
+        researchOrder.find(once) ?? RESEARCH.map((r) => r.key).find(once) ?? RESEARCH.map((r) => r.key).find(ready);
       if (next && next !== sim.research.current) {
         sim.apply({ type: 'research', project: next });
       }

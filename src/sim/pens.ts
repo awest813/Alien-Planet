@@ -50,6 +50,8 @@ export function penMap(sim: Simulation): PenMap {
   const pens: Pen[] = [];
   // Tiles already looked at from some gate (a pen, or open country that's no pen).
   const seen = new Uint8Array(w.size);
+  // Ground already found to be no pen (too big or open to the edge).
+  const openGround = new Uint8Array(w.size);
   const gates = [...w.tilesWith('features')].filter((i) => w.feature[i] === GATE);
   const troughs = [...w.tilesWith('features')].filter((i) => !!troughFeed(sim, i));
   for (const gate of gates) {
@@ -62,13 +64,13 @@ export function penMap(sim: Simulation): PenMap {
       const tiles = [start];
       seen[start] = 1;
       let open = false;
-      for (let q = 0; q < tiles.length; q++) {
+      for (let q = 0; q < tiles.length && !open; q++) {
         const i = tiles[q];
         const x = w.xOf(i);
         const y = w.yOf(i);
         const f = w.feature[i];
-        // Too big, open to the map edge, or somewhere people sleep (a house): no pen. The flood carries on to
-        // the end all the same, so another gate into the same ground can't find a pen in what's left of it.
+        // Too big, open to the map edge, or somewhere people sleep (a house): no pen. What it covered is marked
+        // open, and a flood from another gate that runs into it is open too (no pen in what's left of a field).
         if (
           tiles.length > MAX_PEN ||
           x === 0 ||
@@ -80,13 +82,18 @@ export function penMap(sim: Simulation): PenMap {
           open = true;
         }
         for (const n of w.neighbors(i, false)) {
-          if (!seen[n] && w.isPassable(n) && !isGate(sim, n)) {
+          if (openGround[n]) {
+            open = true;
+          } else if (!seen[n] && w.isPassable(n) && !isGate(sim, n)) {
             seen[n] = 1;
             tiles.push(n);
           }
         }
       }
       if (open) {
+        for (const i of tiles) {
+          openGround[i] = 1;
+        }
         continue;
       }
       const id = pens.length;
