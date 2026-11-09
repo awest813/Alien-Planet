@@ -59,7 +59,8 @@ browser at 1280×800).
 ### 2. Saving (needed)
 
 - Autosave in parts across frames: serialize the arrays in one frame and write in the next. Or skip
-  unchanged layers (terrain changes rarely; save it only when `waterVersion` or a mined tile moves).
+  unchanged layers (terrain changes rarely: give it a counter bumped by every `setTerrain`, ice included, rather than
+  `waterVersion`, which deliberately ignores freezing and thawing).
 - **Gate:** no autosave frame over 100 ms on a desktop at day 40 on XL.
 
 ### 3. Drawing zoomed out (needed for phones)

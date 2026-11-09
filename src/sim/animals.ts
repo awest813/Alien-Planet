@@ -563,7 +563,8 @@ function moveOn(sim: Simulation): void {
     a.hp > 0 &&
     !a.tame &&
     !a.taming &&
-    !a.hunted &&
+    // (Marked game out of hunting range isn't waiting on a hunter: it may move on like any other.)
+    !sim.huntable(a) &&
     !a.leaving &&
     !a.manhunter &&
     !a.quarry &&
@@ -740,7 +741,7 @@ export function updateAnimals(sim: Simulation): void {
       }
     } else if (a.tame && guard(sim, a)) {
       continue;
-    } else if (a.leaving && !a.tame && !a.taming && !a.hunted) {
+    } else if (a.leaving && !a.tame && !a.taming && !sim.huntable(a)) {
       leave(sim, a);
       continue;
     } else if (def.preys && !a.tame && !a.taming && stalk(sim, a)) {

@@ -4,7 +4,7 @@
 // stuck for a day, and a save that loads into exactly the same game.
 //
 //   npx tsx scripts/playtest.ts [days=16] [from=0] [to=100] [only=persona] [players=3,40]
-//     [biome=tundra|desert|forest] [map=river|island] [lands]
+//     [biome=tundra|desert|forest] [map=river|island] [lands] [size=192]
 //
 // "lands" gives each player a different biome and map (otherwise temperate valleys, or as asked).
 //   npm run playtest:long [-- from=0 to=100]   (120 days, players 40–49: each persona once, Standard, Medium)
@@ -39,6 +39,8 @@ const ONLY = process.argv.findLast((a) => a.startsWith('only='))?.slice(5);
 const BIOME = (process.argv.findLast((a) => a.startsWith('biome='))?.slice(6) ?? 'temperate') as Biome;
 const MAP_KIND = (process.argv.findLast((a) => a.startsWith('map='))?.slice(4) ?? 'valley') as MapKind;
 const MIXED_LANDS = process.argv.includes('lands');
+// "size=192" plays every colony on one map size (otherwise they rotate through the sizes).
+const SIZE = process.argv.findLast((a) => a.startsWith('size='))?.slice(5);
 // "players=3,20,40" plays just those.
 const PLAYERS = process.argv
   .findLast((a) => a.startsWith('players='))
@@ -384,7 +386,7 @@ function play(player: number): Report {
   const persona = PERSONAS[player % PERSONAS.length];
   const seed = 1000 + player * 7717;
   const difficulty = DIFFICULTIES[Math.floor(player / PERSONAS.length) % 3];
-  const size = MAP_SIZES[Math.floor(player / (PERSONAS.length * 3)) % MAP_SIZES.length].size;
+  const size = SIZE ? Number(SIZE) : MAP_SIZES[Math.floor(player / (PERSONAS.length * 3)) % MAP_SIZES.length].size;
   const land = MIXED_LANDS
     ? {
         biome: BIOME_LIST[player % BIOME_LIST.length].key,

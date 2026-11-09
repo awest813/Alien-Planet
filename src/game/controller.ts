@@ -3067,7 +3067,7 @@ export class GameController {
     const room = sim.roomAt(i);
     const beast = sim.animals.find((a) => a.tile === i);
     const animal = beast
-      ? `${beast.tame ? 'Tame ' + animalName(beast).toLowerCase() : animalName(beast)}${beast.taming ? ' · to be tamed' : ''}${beast.hunted ? ' · marked for hunting' : ''}${beast.revengeOn >= 0 ? ' · enraged' : ''}${beast.leaving && !beast.hunted && !beast.taming ? ' · moving on' : ''}`
+      ? `${beast.tame ? 'Tame ' + animalName(beast).toLowerCase() : animalName(beast)}${beast.taming ? ' · to be tamed' : ''}${beast.hunted ? (sim.huntable(beast) ? ' · marked for hunting' : ' · marked, but out of hunting range') : ''}${beast.revengeOn >= 0 ? ' · enraged' : ''}${beast.leaving && !sim.huntable(beast) && !beast.taming ? ' · moving on' : ''}`
       : null;
     return {
       x: w.xOf(i),

@@ -1025,6 +1025,21 @@ export class Simulation {
   private home: number | undefined;
   private homeVersion = -1;
 
+  // Whether hunters will go after game at `tile`: within HUNT_RANGE of the colony's centre (before anything
+  // is built, of the middle of the map, where colonies land, rather than of whoever happens to be first).
+  public inHuntRange(tile: number, slack = 0): boolean {
+    this.homeTile();
+    const w = this.world;
+    const anchor = this.home ?? w.idx(w.width >> 1, w.height >> 1);
+    return w.distance(anchor, tile) <= HUNT_RANGE + slack;
+  }
+
+  // Whether a hunter will come for this marked animal: in range, or worth the trek (the neighbours' quarry,
+  // or livestock, which isn't the danger the range guards against).
+  public huntable(a: Animal): boolean {
+    return a.hunted && (a.quarry || a.tame || this.inHuntRange(a.tile));
+  }
+
   // ---- Main loop ----
 
   public step(): void {
@@ -6247,15 +6262,12 @@ export class Simulation {
       return false;
     }
     const region = this.regionOf(c.tile);
-    const home = this.homeTile() ?? c.tile;
     const prey = this.animals
       .filter(
         (a) =>
-          a.hunted &&
           a.hp > 0 &&
+          this.huntable(a) &&
           this.regions.region[a.tile] === region &&
-          // (The neighbours' quarry is worth the trek.)
-          (a.quarry || w.distance(home, a.tile) <= HUNT_RANGE) &&
           !this.isReserved(`h${a.id}`, c) &&
           !spareForBreeding(this, a),
       )
@@ -6277,8 +6289,7 @@ export class Simulation {
       return;
     }
     // Prey that runs well out of range is let go (a wounded one may come back).
-    const home = this.homeTile() ?? c.tile;
-    if (!prey.quarry && w.distance(home, prey.tile) > HUNT_RANGE + 12) {
+    if (!prey.quarry && !prey.tame && !this.inHuntRange(prey.tile, 12)) {
       this.endJob(c);
       return;
     }

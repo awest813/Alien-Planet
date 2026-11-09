@@ -164,3 +164,32 @@ describe('hunting range', () => {
     expect(sim.stats.hunted).toBe(1);
   });
 });
+
+describe('marked game out of range', () => {
+  it('is free to move on, and the range is measured from the colony, not a wandering colonist', () => {
+    const sim = Simulation.newColony(44, 'standard', 192);
+    const w = sim.world;
+    sim.animals = [];
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    // Nothing built yet: the range is measured from the middle of the map, where the colony landed.
+    const centre = w.idx(96, 96);
+    expect(sim.inHuntRange(centre)).toBe(true);
+    expect(sim.inHuntRange(w.idx(96, 96 + HUNT_RANGE + 5))).toBe(false);
+    sim.colonists[0].tile = w.idx(5, 5);
+    expect(sim.inHuntRange(w.idx(8, 8))).toBe(false);
+    // A deer marked far off, and moving on: it heads off rather than waiting for a hunter who won't come.
+    let far = -1;
+    for (let i = 0; i < w.size && far < 0; i++) {
+      if (w.isPassable(i) && !sim.inHuntRange(i, 20) && sim.regionOf(i) === sim.outsideRegion()) {
+        far = i;
+      }
+    }
+    const deer = place(sim, 'deer', far, { hunted: true, leaving: true });
+    expect(sim.huntable(deer)).toBe(false);
+    run(sim, HOUR * 2);
+    expect(deer.tile === far && sim.animals.includes(deer)).toBe(false);
+    // Livestock in a far pen can still be marked for slaughter.
+    const cow = place(sim, 'muskox', far, { hunted: true, tame: true });
+    expect(sim.huntable(cow)).toBe(true);
+  });
+});
