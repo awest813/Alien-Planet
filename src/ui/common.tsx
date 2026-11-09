@@ -32,3 +32,22 @@ export function Bar({ value, color, label }: { value: number; color: string; lab
 }
 
 export const moodColor = (mood: number) => (mood < 25 ? 'var(--warn)' : mood < 45 ? 'var(--accent)' : 'var(--good)');
+
+// Arrow keys along a row of tabs (or a group of choices): Left/Right (and Home/End) move to the neighbouring one
+// and pick it, as a tab list does.
+export function arrowKeys(e: React.KeyboardEvent<HTMLElement>, selector = '[role=tab]'): void {
+  const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+  const items = [...e.currentTarget.querySelectorAll<HTMLElement>(selector)];
+  const at = items.indexOf(document.activeElement as HTMLElement);
+  if (at < 0 || items.length === 0) {
+    return;
+  }
+  const next =
+    e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : step ? (at + step + items.length) % items.length : -1;
+  if (next < 0) {
+    return;
+  }
+  e.preventDefault();
+  items[next].focus();
+  items[next].click();
+}

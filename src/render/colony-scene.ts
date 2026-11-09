@@ -116,6 +116,12 @@ const PAN_SPEED = 700;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 5;
 
+// The system's "reduce motion" preference (looked at each frame, so changing it takes effect at once).
+const REDUCED_MOTION: MediaQueryList | undefined =
+  typeof window !== 'undefined' && window.matchMedia
+    ? window.matchMedia('(prefers-reduced-motion: reduce)')
+    : undefined;
+
 // Dead and buried: no longer lying on the map.
 const buried = (c: Colonist): boolean => c.health.dead && !controller.sim.unburied.some((f) => f.id === c.id);
 
@@ -347,14 +353,15 @@ export class ColonyScene extends Phaser.Scene {
     g.clear();
     const sim = controller.sim;
     const kind = sim.weather.kind;
+    // For anyone whose system asks for less motion, the rain, snow and aurora hold still.
+    const now = REDUCED_MOTION?.matches ? 0 : this.time.now;
     if (kind === 'clear') {
-      this.drawAurora(g, this.cameras.main.worldView, this.time.now);
+      this.drawAurora(g, this.cameras.main.worldView, now);
       return;
     }
     const cam = this.cameras.main;
     const v = cam.worldView;
     const s = 1 / cam.zoom;
-    const now = this.time.now;
     const frac = (n: number) => n - Math.floor(n);
     if (kind === 'rain' || kind === 'storm') {
       if (kind === 'storm') {
@@ -1346,9 +1353,16 @@ export class ColonyScene extends Phaser.Scene {
   // rosy dawn. An eclipse brings dusk in the middle of the day.
   private updateNight(): void {
     const sim = controller.sim;
-    // Over the whole view, whatever its size (a fixed rectangle fell short of a wide screen zoomed out).
-    const view = this.cameras.main.worldView;
-    this.night.setPosition(view.x - TILE * 2, view.y - TILE * 2).setSize(view.width + TILE * 4, view.height + TILE * 4);
+    // Over the whole view, whatever its size (a fixed rectangle fell short of a wide screen zoomed out). Worked out
+    // from the camera as it is now: its worldView is only brought up to date as the frame is drawn, so after a jump
+    // or a zoom it still showed last frame's view, and the night flickered off at the edges.
+    const cam = this.cameras.main;
+    const w = cam.width / cam.zoom;
+    const h = cam.height / cam.zoom;
+    const margin = TILE * 8;
+    this.night
+      .setPosition(cam.scrollX + cam.width / 2 - w / 2 - margin, cam.scrollY + cam.height / 2 - h / 2 - margin)
+      .setSize(w + margin * 2, h + margin * 2);
     if (!controller.settings.dayNightLighting) {
       this.night.setFillStyle(0x0a1230, 0);
       this.drawGlow(0);
@@ -1801,6 +1815,24 @@ export class ColonyScene extends Phaser.Scene {
       const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
       // Escape is handled by the interface (close screens, drop the tool, open the menu).
       if (key === 'Escape') {
+        return;
+      }
+      // A button (or tab, or menu) with keyboard focus keeps the keys that work it: Space and Enter press it,
+      // and arrows move about. (Space used to pause the game instead of pressing the focused button.)
+      const control = (event.target as HTMLElement | null)?.closest?.(
+        'button,[role=button],[role=tab],[role=radio],summary,select,a',
+      );
+      if (control && (key === ' ' || key === 'Enter' || key.startsWith('Arrow'))) {
+        return;
+      }
+      // F6 takes keyboard focus to the top bar, and Shift+Tab into the interface, as the browser does: from
+      // there Tab reaches every button. (Tab alone, with nothing focused, is "next colonist".)
+      if (key === 'F6') {
+        event.preventDefault();
+        document.querySelector<HTMLElement>('.topbar button')?.focus();
+        return;
+      }
+      if (key === 'Tab' && event.shiftKey) {
         return;
       }
       this.held.add(key);

@@ -253,7 +253,11 @@ export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => 
                               ? `${c.name}: ${skill.label} ${skill.level}${skill.passion === 2 ? ', burning passion' : skill.passion === 1 ? ', interested' : ''}`
                               : `${c.name}: ${WORK_LABELS[work]}`
                           }
-                          aria-label={`${c.name}, ${WORK_LABELS[work]}: ${value === 0 ? 'off' : `priority ${value}`}`}
+                          aria-label={`${c.name}, ${WORK_LABELS[work]}: ${value === 0 ? 'off' : `priority ${value}`}${
+                            skill
+                              ? `; ${skill.label} ${skill.level}${skill.passion === 2 ? ', burning passion' : skill.passion === 1 ? ', interested' : ''}`
+                              : ''
+                          }`}
                           {...press(
                             () => set(forward(value)),
                             () => set(back(value)),
@@ -323,6 +327,7 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
           <button
             key={slot}
             className={`brush slot-${slot} ${brush === slot ? 'active' : ''}`}
+            aria-pressed={brush === slot}
             onClick={() => setBrush(slot)}
           >
             {SLOT_LABELS[slot]}
@@ -389,7 +394,10 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
                     role="button"
                     aria-label={`${c.name}, ${hour}:00: ${SLOT_LABELS[slot]}`}
                     onKeyDown={(e) => onCellKey(e, () => paint(c.id, hour))}
-                  />
+                  >
+                    {/* A letter as well as the colour (W, R, S; Anything is left blank). */}
+                    {slot !== 'A' && <span aria-hidden>{SLOT_LABELS[slot][0]}</span>}
+                  </td>
                 ))}
               </tr>
             ))}
@@ -435,9 +443,19 @@ export function ProductionScreen({ state, onClose }: { state: UiState; onClose: 
                 </td>
               ) : (
                 <td>
-                  <button onClick={() => set(bill.recipe, bill.target - bill.step)}>−{bill.step}</button>
+                  <button
+                    onClick={() => set(bill.recipe, bill.target - bill.step)}
+                    aria-label={`Keep ${bill.step} fewer ${bill.name}`}
+                  >
+                    −{bill.step}
+                  </button>
                   <span className="target">Keep {bill.target}</span>
-                  <button onClick={() => set(bill.recipe, bill.target + bill.step)}>+{bill.step}</button>
+                  <button
+                    onClick={() => set(bill.recipe, bill.target + bill.step)}
+                    aria-label={`Keep ${bill.step} more ${bill.name}`}
+                  >
+                    +{bill.step}
+                  </button>
                 </td>
               )}
             </tr>

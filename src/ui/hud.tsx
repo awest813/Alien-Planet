@@ -16,7 +16,7 @@ import { PHASE_NAMES } from '../sim/simulation';
 import type { Stance } from '../sim/types';
 import { STORAGE_GROUPS, StockpilePriority } from '../sim/world';
 import { DRAFT_AGE } from '../sim/lifespans';
-import { Bar, moodColor } from './common';
+import { Bar, arrowKeys, moodColor } from './common';
 
 // The always-on game HUD: top bar, colonist bar, inspector, side panel, and architect menu.
 
@@ -93,7 +93,8 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
           .filter((r) => r.total > 0 && KEY_RESOURCES.includes(r.name))
           .map((r) => (
             <span key={r.name} className="res" title={`${r.name}: ${r.stored} stored, ${r.total} in total`}>
-              <i className="icon" style={itemIconStyle(r.item)} />
+              <i className="icon" style={itemIconStyle(r.item)} aria-hidden />
+              <span className="sr-only">{r.name}: </span>
               <b>{r.total}</b>
             </span>
           ))}
@@ -172,7 +173,8 @@ function FoodDays({ days }: { days: number }) {
   const tone = days < 1 ? 'bad' : days < 3 ? 'low' : '';
   return (
     <span className={`res food ${tone}`} title="How long the colony's food would last at the current headcount">
-      🍲 <b>{shown}</b> days<span className="wide-only"> of food</span>
+      <span aria-hidden>🍲</span> <span className="sr-only">Food: </span>
+      <b>{shown}</b> days<span className="wide-only"> of food</span>
     </span>
   );
 }
@@ -267,8 +269,18 @@ export function ColonistBar({ state, onOpen }: { state: UiState; onOpen: (screen
           <button
             key={c.id}
             className={`chip ${selected ? 'selected' : ''} ${c.dead ? 'dead' : ''}`}
+            aria-pressed={selected}
             onClick={() => controller.selectColonist(selected ? null : c.id, !selected)}
             title={`${c.name}: ${c.activity}`}
+            // (The mood bar and the status icons only show; a screen reader gets them in words.)
+            aria-label={[
+              c.name,
+              c.dead ? 'dead' : `mood ${c.mood}`,
+              ...statusIcons(c).map((s) => s.title),
+              c.dead ? '' : c.activity,
+            ]
+              .filter(Boolean)
+              .join(', ')}
           >
             <span className="swatch" style={{ background: c.color }} />
             <span className="chip-name">{c.name}</span>
@@ -371,6 +383,7 @@ function ColonistCard({ c }: { c: ColonistView }) {
             <button
               key={s.key}
               className={c.stance === s.key ? 'active' : ''}
+              aria-pressed={c.stance === s.key}
               title={s.hint}
               onClick={() => controller.setStance(c.id, s.key)}
             >
@@ -388,7 +401,7 @@ function ColonistCard({ c }: { c: ColonistView }) {
           )}
         </div>
       )}
-      <div className="tabs" role="tablist">
+      <div className="tabs" role="tablist" onKeyDown={(e) => arrowKeys(e)}>
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -780,7 +793,7 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
           )}
         </ul>
       )}
-      <div className="tabs" role="tablist">
+      <div className="tabs" role="tablist" onKeyDown={(e) => arrowKeys(e)}>
         <button
           role="tab"
           aria-selected={tab === 'goals'}
@@ -889,6 +902,21 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
   );
 }
 
+// How urgent an alert or notice is, not by colour alone: a mark on the urgent ones, and words for a screen reader.
+function ToneMark({ tone }: { tone: string }) {
+  if (tone === 'danger') {
+    return (
+      <>
+        <span className="tone-mark" aria-hidden>
+          ⚠{' '}
+        </span>
+        <span className="sr-only">Urgent: </span>
+      </>
+    );
+  }
+  return tone === 'warn' ? <span className="sr-only">Warning: </span> : null;
+}
+
 // An alert; the ones about someone or somewhere take the camera there when clicked.
 function AlertLine({ alert }: { alert: Alert }) {
   const target = alert.colonist !== undefined || alert.tile !== undefined;
@@ -896,10 +924,14 @@ function AlertLine({ alert }: { alert: Alert }) {
     <li className={alert.tone}>
       {target ? (
         <button className="alert-jump" onClick={() => controller.focusAlert(alert)} title="Show me">
+          <ToneMark tone={alert.tone} />
           {alert.text} <span className="go">›</span>
         </button>
       ) : (
-        alert.text
+        <>
+          <ToneMark tone={alert.tone} />
+          {alert.text}
+        </>
       )}
     </li>
   );
@@ -979,24 +1011,28 @@ export function Architect({ state }: { state: UiState }) {
   const tools = TOOLS.filter((t) => t.group === group);
   return (
     <section className="panel architect" aria-label="Architect">
-      <div className="arch-tabs" role="tablist">
-        {TOOL_GROUPS.map((g) => (
-          <button
-            key={g.key}
-            role="tab"
-            aria-selected={group === g.key}
-            className={group === g.key ? 'active' : ''}
-            onClick={() => switchTab(g.key)}
-          >
-            {g.label}
-          </button>
-        ))}
+      <div className="arch-tabs">
+        {/* (Only the groups are tabs: the two buttons after them aren't.) */}
+        <div role="tablist" aria-label="Build menu" style={{ display: 'contents' }} onKeyDown={(e) => arrowKeys(e)}>
+          {TOOL_GROUPS.map((g) => (
+            <button
+              key={g.key}
+              role="tab"
+              aria-selected={group === g.key}
+              className={group === g.key ? 'active' : ''}
+              onClick={() => switchTab(g.key)}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
         <span className="spacer" />
         <button onClick={() => controller.focusHome()} title="Back to the colony (H)">
           ⌂ Colony
         </button>
         <button
           className={state.overlay === 'temperature' ? 'active' : ''}
+          aria-pressed={state.overlay === 'temperature'}
           onClick={() => controller.setOverlay(state.overlay === 'temperature' ? 'none' : 'temperature')}
           title="Show temperatures on the map"
         >
@@ -1010,6 +1046,8 @@ export function Architect({ state }: { state: UiState }) {
             <button
               key={t.id}
               className={`${state.toolId === t.id ? 'active' : ''} ${locked ? 'locked' : ''}`}
+              aria-pressed={state.toolId === t.id}
+              aria-keyshortcuts={t.hotkey && t.hotkey !== 'Escape' ? t.hotkey.toUpperCase() : undefined}
               onClick={() => controller.setTool(t.tool)}
               onMouseEnter={() => setHovered(t.id)}
               onMouseLeave={() => setHovered(null)}
@@ -1018,7 +1056,7 @@ export function Architect({ state }: { state: UiState }) {
             >
               {locked && '🔒 '}
               {t.label}
-              {!TOUCH && t.hotkey && <kbd>{t.hotkey === 'Escape' ? 'Esc' : t.hotkey.toUpperCase()}</kbd>}
+              {!TOUCH && t.hotkey && <kbd aria-hidden>{t.hotkey === 'Escape' ? 'Esc' : t.hotkey.toUpperCase()}</kbd>}
             </button>
           );
         })}
@@ -1064,6 +1102,7 @@ export function Notices({ state, paused = false }: { state: UiState; paused?: bo
           onClick={() => controller.dismissNotification(n.id)}
           title="Dismiss"
         >
+          <ToneMark tone={n.tone} />
           {n.text}
         </button>
       ))}

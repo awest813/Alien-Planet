@@ -216,6 +216,12 @@ kbd {
   font-family: inherit;
 }
 
+/* On a lit (yellow) button the dimmed key was too faint to read. */
+.active kbd,
+.primary kbd {
+  opacity: 0.85;
+}
+
 .muted {
   color: var(--muted);
 }
@@ -912,6 +918,20 @@ button.brush {
   color: var(--text);
 }
 
+/* Dark text on the yellow Work brush (light text on it was hard to read). */
+button.brush.slot-W {
+  color: var(--accent-ink);
+}
+
+/* The schedule's letters (W, R, S), so a slot doesn't rest on its colour alone. */
+.schedule .hour {
+  font-size: 9px;
+  line-height: 1;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.6);
+  font-weight: 700;
+}
+
 button.brush.active {
   outline: 2px solid var(--text);
   outline-offset: 1px;
@@ -1005,9 +1025,13 @@ button.brush.active {
   margin-top: 2px;
 }
 
-.research li.done,
-.research li.locked {
+.research li.done {
   opacity: 0.55;
+}
+
+/* What a locked project needs is worth reading: dimmed less than a finished one. */
+.research li.locked {
+  opacity: 0.8;
 }
 
 .research-head {
@@ -1951,4 +1975,28 @@ button.big {
 .history-axis {
   display: flex;
   justify-content: space-between;
+}
+
+/* Read out by screen readers, not shown. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Touch: schedule hours and the small "?" button big enough to tap (the table scrolls sideways). */
+@media (pointer: coarse) {
+  .schedule .hour {
+    min-width: 24px;
+  }
+
+  .topbar .screens button {
+    min-width: 32px;
+  }
 }

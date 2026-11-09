@@ -131,7 +131,12 @@ export function App() {
       } else if (controller.tool.kind !== 'select') {
         controller.setTool({ kind: 'select' });
         // The tool's button keeps focus otherwise, and its focus ring looks like a tool still in hand.
-        if (document.activeElement instanceof HTMLElement && document.activeElement.closest('.architect')) {
+        // (Not for someone working the keyboard, whose focus mustn't drop back to the page.)
+        if (
+          document.activeElement instanceof HTMLElement &&
+          document.activeElement.closest('.architect') &&
+          !document.activeElement.matches(':focus-visible')
+        ) {
           document.activeElement.blur();
         }
       } else if (controller.selectedColonist !== null || controller.selectedTile !== null) {

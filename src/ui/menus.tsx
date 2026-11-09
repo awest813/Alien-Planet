@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SAVE_SLOTS, UiState, controller, slotLabel, TradeLine } from '../game/controller';
 import { SaveMeta } from '../game/save-store';
 import { DEFAULT_SETTINGS, NOTICE_TIMES, PAN_SPEEDS, Settings, UI_SCALES, forgetHelp } from '../game/settings';
@@ -16,6 +16,7 @@ function priceLabel(line: TradeLine): string {
   return hi - lo < 0.05 ? lo.toFixed(1) : `${lo.toFixed(1)}–${hi.toFixed(1)} (worst first)`;
 }
 import { ConfirmButton, Modal } from './screens';
+import { arrowKeys } from './common';
 
 // What a menu can ask the app to do.
 export interface MenuActions {
@@ -61,7 +62,12 @@ function NewColonyForm({ confirm, onStarted }: { confirm: string | null; onStart
       <h3>Difficulty</h3>
       <div className="difficulties">
         {DIFFICULTIES.map((d) => (
-          <button key={d.key} className={difficulty === d.key ? 'active' : ''} onClick={() => setDifficulty(d.key)}>
+          <button
+            key={d.key}
+            className={difficulty === d.key ? 'active' : ''}
+            aria-pressed={difficulty === d.key}
+            onClick={() => setDifficulty(d.key)}
+          >
             <b>{d.label}</b>
             <span>{d.description}</span>
           </button>
@@ -71,7 +77,12 @@ function NewColonyForm({ confirm, onStarted }: { confirm: string | null; onStart
       <h3>Map size</h3>
       <div className="difficulties four">
         {MAP_SIZES.map((m) => (
-          <button key={m.size} className={mapSize === m.size ? 'active' : ''} onClick={() => setMapSize(m.size)}>
+          <button
+            key={m.size}
+            className={mapSize === m.size ? 'active' : ''}
+            aria-pressed={mapSize === m.size}
+            onClick={() => setMapSize(m.size)}
+          >
             <b>{m.label} map</b>
             <span>{m.description}</span>
           </button>
@@ -81,7 +92,12 @@ function NewColonyForm({ confirm, onStarted }: { confirm: string | null; onStart
       <h3>Land</h3>
       <div className="difficulties four">
         {BIOME_LIST.map((b) => (
-          <button key={b.key} className={biome === b.key ? 'active' : ''} onClick={() => setBiome(b.key)}>
+          <button
+            key={b.key}
+            className={biome === b.key ? 'active' : ''}
+            aria-pressed={biome === b.key}
+            onClick={() => setBiome(b.key)}
+          >
             <b>{b.label}</b>
             <span>{b.description}</span>
           </button>
@@ -91,7 +107,12 @@ function NewColonyForm({ confirm, onStarted }: { confirm: string | null; onStart
       <h3>Lie of the land</h3>
       <div className="difficulties">
         {MAP_KINDS.map((m) => (
-          <button key={m.key} className={mapKind === m.key ? 'active' : ''} onClick={() => setMapKind(m.key)}>
+          <button
+            key={m.key}
+            className={mapKind === m.key ? 'active' : ''}
+            aria-pressed={mapKind === m.key}
+            onClick={() => setMapKind(m.key)}
+          >
             <b>{m.label}</b>
             <span>{m.description}</span>
           </button>
@@ -171,9 +192,41 @@ function SaveSlots({ state, manage, onLoaded }: { state: UiState; manage: boolea
   );
 }
 
+// A menu's views (the main one, and New colony, Load and the like): Esc goes back to the main view, as Back does
+// (before the game's own Esc sees it), and keyboard focus moves to the new view's first control rather than
+// dropping to the page when the button that was pressed goes.
+function useMenuView<V extends string>(): [V | 'main', (view: V | 'main') => void] {
+  const [view, setView] = useState<V | 'main'>('main');
+  useEffect(() => {
+    if (view === 'main') {
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.repeat && !(e.target instanceof HTMLInputElement && e.target.type === 'text')) {
+        e.stopPropagation();
+        setView('main');
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [view]);
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    const root = [...document.querySelectorAll<HTMLElement>('.title-panel, .modal')].pop();
+    root
+      ?.querySelector<HTMLElement>('button:not(:disabled):not(.modal-x), select:not(:disabled), input:not(:disabled)')
+      ?.focus();
+  }, [view]);
+  return [view, setView];
+}
+
 // The first thing a player sees: carry on, start fresh, or load.
 export function TitleScreen({ state, actions }: { state: UiState; actions: MenuActions }) {
-  const [view, setView] = useState<'main' | 'new' | 'load'>('main');
+  const [view, setView] = useMenuView<'new' | 'load'>();
   const latest = state.latestSave;
   return (
     <div className="title-screen">
@@ -235,22 +288,8 @@ export function TitleScreen({ state, actions }: { state: UiState; actions: MenuA
 
 // Esc or the Menu button: the game is paused behind it.
 export function PauseMenu({ state, onClose, actions }: { state: UiState; onClose: () => void; actions: MenuActions }) {
-  const [view, setView] = useState<'main' | 'saves' | 'new'>('main');
+  const [view, setView] = useMenuView<'saves' | 'new'>();
   const current = DIFFICULTIES.find((d) => d.key === state.difficulty);
-  // Esc from saves or a new colony goes back to the menu, as Back does (before the game's own Esc closes it).
-  useEffect(() => {
-    if (view === 'main') {
-      return;
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.repeat && !(e.target instanceof HTMLInputElement && e.target.type === 'text')) {
-        e.stopPropagation();
-        setView('main');
-      }
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [view]);
   return (
     <Modal
       title="Paused"
@@ -297,7 +336,7 @@ export function PauseMenu({ state, onClose, actions }: { state: UiState; onClose
 
 // Everyone has died: how it went, and where to go next.
 export function FallenScreen({ state, actions }: { state: UiState; actions: MenuActions }) {
-  const [view, setView] = useState<'main' | 'new' | 'load'>('main');
+  const [view, setView] = useMenuView<'new' | 'load'>();
   const goals = state.objectives.filter((o) => o.done).length;
   const stats = [
     ['Days survived', state.day],
@@ -429,7 +468,7 @@ export function ShipScreen({ state, onClose }: { state: UiState; onClose: () => 
 
 // The end of a colony's story, by its own choice.
 export function DepartedScreen({ state, actions }: { state: UiState; actions: MenuActions }) {
-  const [view, setView] = useState<'main' | 'new'>('main');
+  const [view, setView] = useMenuView<'new'>();
   return (
     <Modal title="The colony's story ends" onClose={() => undefined} closable={false}>
       <p>The colonists boarded the ship and left the valley behind. Here is what they made of their time there.</p>
@@ -475,12 +514,14 @@ function Choice<T extends number>({
   return (
     <div className="setting">
       <span>{label}</span>
-      <div className="segmented" role="radiogroup" aria-label={label}>
+      <div className="segmented" role="radiogroup" aria-label={label} onKeyDown={(e) => arrowKeys(e, '[role=radio]')}>
         {options.map((o) => (
           <button
             key={o.value}
             role="radio"
             aria-checked={value === o.value}
+            // One stop for the group, as radios are: the chosen one; arrows move between them.
+            tabIndex={value === o.value ? 0 : -1}
             className={value === o.value ? 'active' : ''}
             onClick={() => onChange(o.value)}
           >
@@ -539,6 +580,7 @@ const CONTROLS: [string, string][] = [
   ['W A S D / arrows', 'Move the view (or drag with the right mouse button)'],
   ['Mouse wheel', 'Zoom'],
   ['Tab', 'Jump to the next colonist'],
+  ['F6 / Shift+Tab', 'Move keyboard focus into the interface (then Tab between buttons)'],
   ['H', 'Back to the colony'],
   ['Q', 'Draft the selected colonist, or everyone'],
   ['Right-click', 'Move a drafted colonist, or drop the current tool'],
