@@ -44,10 +44,12 @@ with esbuild for speed (see ROADMAP).
   layer. (Rebuilding the interface's state, 5 times a second, is down to about 2 ms on a busy Large map; the
   alerts were 2.2 ms of it and are now 0.5 ms.)
 - **A busy colony's simulation gets slower as items pile up.** On a Large map `scripts/perf.ts` gives about 49 ms per
-  1,000 ticks at day 8 (budget 60), but a busy colony that mines hard reaches about 100–110 ms per 1,000 ticks in
-  days 31–40, with over a thousand items lying about: the hauling searches over them are most of it. (Region and
-  room recounts after each mined tile are now 1.2 ms, from 2.4.) At top speed that is still only about 8 ms of
-  each second.
+  1,000 ticks at day 8 (budget 60), but a busy colony that mines hard reaches about 95–100 ms per 1,000 ticks in
+  days 31–40, with over a thousand items lying about. What's left is spread thin: pathfinding, colonists choosing
+  work, animals and room measuring. (Region and room recounts after each mined tile are now 1.2 ms, from 2.4;
+  storage, the colony's centre and the list of buildings no longer rebuild when a tree is felled or rock mined;
+  and gear searches are skipped when there's no spare gear. Two 41-day Large balance colonies run in 16.9 s, from
+  20.5 s.) At top speed even 100 ms per 1,000 ticks is only about 8 ms of each second.
 - **Testing:** the browser tests haven't run on GitHub yet, and the long-press hasn't been tried on a real
   iPhone. Performance is still checked by hand (`scripts/perf.ts`); it's too noisy for CI. Saves from before
   version 16 can't be loaded (the game says so).
