@@ -234,7 +234,9 @@ How the storytelling layer works:
   hurt raiders may break and run; the raid flees once nearly half of them are down or running. Now and then the
   Meadow Kin send a few fighters to help (more likely the better they think of the colony): they come in from the
   edge, timed to arrive with the raiders, go after them and head home when it's over. Undrafted colonists run indoors when raiders come close, and fight back only
-  when cornered. Walling yourself in doesn't stop them: raiders who can't reach anyone smash through the nearest
+  when cornered. From day 12 about one raider in four is a ravager, who lays waste to what's
+  left outside the walls (tramples crops in the fields, attacks livestock) and fights only if someone comes close.
+  Walling yourself in doesn't stop them: raiders who can't reach anyone smash through the nearest
   wall or door (clubs and spears break walls faster than bows).
 - **Sieges:** from the second year a war party may come to stay instead: they make camp 20–28 tiles from the
   colony, dig in behind sandbags round a fire, shoot anyone who comes within reach, and attack half a day or so

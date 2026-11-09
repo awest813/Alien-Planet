@@ -400,3 +400,38 @@ describe('colonist tactics', () => {
     expect(copy.enemies[0]).toEqual(e);
   });
 });
+
+describe('ravagers', () => {
+  it("lay waste to fields and livestock out of the colonists' reach, and fight anyone who comes close", () => {
+    const { sim, w, x, y } = field(71);
+    sim.story.lastEventTick = forever;
+    sim.animals = [];
+    // Everyone shut away in a walled hut at one side; a potato field and a tame goat across the clearing.
+    for (const c of sim.colonists) {
+      c.tile = w.idx(x - 10, y);
+      c.path = [];
+      c.drafted = true;
+    }
+    for (const i of outline(w, x - 13, y - 3, x - 7, y + 3)) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    const potato = featureId('potatoPlant');
+    for (let k = 0; k < 4; k++) {
+      w.setFeature(w.idx(x + 6 + k, y + 4), potato);
+    }
+    const crops = () => w.feature.filter((f) => f === potato).length;
+    const e = raider(sim, w.idx(x + 8, y - 3), 'club', { ravager: true });
+    for (let t = 0; t < HOUR && crops() === 4; t++) {
+      sim.step();
+    }
+    expect(crops()).toBeLessThan(4);
+    expect(sim.stats.ravaged).toBeGreaterThan(0);
+    expect(sim.log.some((l) => l.text.startsWith('Raiders are laying waste to the fields'))).toBe(true);
+    // A colonist comes out to meet them: the ravager turns to fight.
+    const c = sim.colonists[0];
+    c.tile = w.neighbors(e.tile).find((i) => w.isPassable(i))!;
+    const left = crops();
+    run(sim, 30);
+    expect(e.ravageAt === undefined || crops() === left).toBe(true);
+  });
+});

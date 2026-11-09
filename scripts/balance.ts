@@ -1213,6 +1213,7 @@ function play(seed: number): Result {
     lightning: count(/^Lightning struck/),
     concerts: sim.stats.concerts ?? 0,
     storyNights: sim.stats.storyNights ?? 0,
+    ravaged: sim.stats.ravaged ?? 0,
     parties: sim.stats.parties ?? 0,
     feasts: sim.stats.feasts ?? 0,
     festivals: count(/^(It's Planting Day|The harvest festival is tonight|The midwinter bonfire will be lit)/),

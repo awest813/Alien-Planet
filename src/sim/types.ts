@@ -394,6 +394,10 @@ export interface Enemy {
   wrecker?: boolean;
   // Carries fire: sets wooden walls and buildings alight (and when they may throw again).
   firebrand?: boolean;
+  // Lays waste to what's left outside the walls (crops in the fields, livestock) rather than fight its
+  // way in; the tile it's after.
+  ravager?: boolean;
+  ravageAt?: number;
   throwAt?: number;
 }
 
@@ -592,6 +596,8 @@ export interface Stats {
   concerts?: number;
   // Evenings an elder told the old stories by the fire.
   storyNights?: number;
+  // Crops trampled and livestock killed by raiders laying waste outside the walls.
+  ravaged?: number;
   parties?: number;
   feasts?: number;
   weddings?: number;

@@ -1,4 +1,4 @@
-import { hurtAnimal } from './animals';
+import { animalName, hurtAnimal } from './animals';
 import { scarAim } from './body';
 import { beaconTile, transmitting } from './beacon';
 import { qualityFactor } from './apparel';
@@ -48,6 +48,8 @@ export interface RaidState {
   musterUntil?: number;
   // When they're expected to reach the colony (for friends who mean to arrive at the same time).
   contactAt?: number;
+  // Ravagers have set about the fields or the animals (said once).
+  ravaging?: boolean;
   stolen?: number;
 }
 
@@ -310,6 +312,12 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
       !thieves && dry && sim.day >= FIREBRANDS_FROM_DAY && woodenDefences(sim) ? Math.min(2, Math.floor(count / 4)) : 0;
     for (const e of sim.enemies.slice(-count).slice(wreckers, wreckers + firebrands)) {
       e.firebrand = true;
+    }
+    // Some lay waste to whatever's outside the walls: fields and livestock. (Behind walls a colony was safe from
+    // everything but the time it took to break in; now what it leaves out in the open pays.)
+    const ravagers = !thieves && !siege && sim.day >= RAVAGERS_FROM_DAY ? Math.floor(count / 4) : 0;
+    for (const e of sim.enemies.slice(-count).slice(wreckers + firebrands, wreckers + firebrands + ravagers)) {
+      e.ravager = true;
     }
     // How long until they reach the colony: the walk, and on a small map a wait at the edge first. (A siege
     // party's camp keeps its own time.)
@@ -671,6 +679,11 @@ function flee(sim: Simulation, e: Enemy, ally = false): void {
 const BEACON_FRAGILE = 4;
 
 const FIREBRANDS_FROM_DAY = 40;
+const RAVAGERS_FROM_DAY = 12;
+// A ravager turns to fight anyone who comes this close.
+const RAVAGER_ALERT = 10;
+// Blows to trample a crop.
+const TRAMPLE_TICKS = 40;
 const THROW_RANGE = 4;
 // Whether the colony has wooden walls or doors a firebrand could set alight.
 function woodenDefences(sim: Simulation): boolean {
@@ -771,6 +784,80 @@ function wreckBeacon(sim: Simulation, e: Enemy): boolean {
 // A thief makes for the richest stack in the stores they can reach, grabs what they can carry and runs. Returns
 // false when there's nothing to steal (they then fight their way out like any raider).
 const THIEF_CARRIES = 150;
+// A ravager's turn: unless a colonist comes close (then it fights like the rest), it makes for the nearest
+// crop in a field or animal of the colony's it can reach, and tramples the crop or attacks the animal.
+function ravage(sim: Simulation, e: Enemy): boolean {
+  const w = sim.world;
+  if (sim.living().some((c) => !c.health.downed && w.distance(c.tile, e.tile) <= RAVAGER_ALERT)) {
+    return false;
+  }
+  const region = sim.regionOf(e.tile);
+  const valid = (i: number | undefined): i is number => {
+    if (i === undefined || sim.regionOf(i) !== region) {
+      return false;
+    }
+    const f = w.feature[i];
+    return (f !== NONE && !!featureDef(f).crop) || sim.animals.some((a) => a.tame && a.hp > 0 && a.tile === i);
+  };
+  if (
+    !valid(e.ravageAt) ||
+    (e.path.length === 0 && !w.neighbors(e.ravageAt!, true).includes(e.tile) && e.tile !== e.ravageAt)
+  ) {
+    // The nearest crop or tame animal it can get at.
+    const crops = sim.buildingTiles().filter((i) => !!featureDef(w.feature[i]).crop && sim.regionOf(i) === region);
+    const herd = sim.animals.filter((a) => a.tame && a.hp > 0 && sim.regionOf(a.tile) === region).map((a) => a.tile);
+    const targets = [...crops, ...herd].sort((a, b) => w.distance(e.tile, a) - w.distance(e.tile, b) || a - b);
+    e.ravageAt = targets[0];
+    if (e.ravageAt === undefined) {
+      return false;
+    }
+    e.path = sim.pathfinder.find(e.tile, [e.ravageAt, ...w.neighbors(e.ravageAt)]) ?? [];
+    if (e.path.length === 0 && e.tile !== e.ravageAt && !w.neighbors(e.ravageAt).includes(e.tile)) {
+      e.ravageAt = undefined;
+      return false;
+    }
+  }
+  const at = e.ravageAt!;
+  if (e.path.length > 0) {
+    moveEnemy(sim, e);
+    return true;
+  }
+  if (e.cooldown > 0) {
+    return true;
+  }
+  const animal = sim.animals.find((a) => a.tame && a.hp > 0 && a.tile === at);
+  if (animal) {
+    e.cooldown = weaponDef(e.weapon).cooldown;
+    hurtLivestock(sim, animal, e);
+    return true;
+  }
+  // Trampling and torching a crop takes a little while.
+  e.cooldown = TRAMPLE_TICKS;
+  const crop = featureDef(w.feature[at]).name.toLowerCase();
+  w.setFeature(at, NONE);
+  sim.stats.ravaged = (sim.stats.ravaged ?? 0) + 1;
+  if (sim.raid && !sim.raid.ravaging) {
+    sim.raid.ravaging = true;
+    sim.addLog(`Raiders are laying waste to the fields: ${e.name} is trampling the ${crop}!`, 'danger', true);
+  }
+  e.ravageAt = undefined;
+  return true;
+}
+
+// A ravager's blow at the colony's livestock.
+function hurtLivestock(sim: Simulation, a: Animal, e: Enemy): void {
+  const w = weaponDef(e.weapon);
+  a.hp -= roll(sim, w.damage);
+  if (a.hp <= 0) {
+    sim.addLog(`Raiders killed the colony's ${animalName(a).toLowerCase()}.`, 'danger');
+    sim.stats.ravaged = (sim.stats.ravaged ?? 0) + 1;
+  }
+  if (sim.raid && !sim.raid.ravaging) {
+    sim.raid.ravaging = true;
+    sim.addLog(`Raiders are going after the colony's animals!`, 'danger', true);
+  }
+}
+
 function thiefTurn(sim: Simulation, e: Enemy): boolean {
   const w = sim.world;
   if (e.loot) {
@@ -940,6 +1027,9 @@ export function updateEnemies(sim: Simulation): void {
       continue;
     }
     if (e.wrecker && wreckBeacon(sim, e)) {
+      continue;
+    }
+    if (e.ravager && ravage(sim, e)) {
       continue;
     }
     if (e.firebrand && !e.fleeing) {

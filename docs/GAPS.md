@@ -16,7 +16,9 @@ with esbuild for speed (see ROADMAP).
   (masterwork crafts, winter greenhouses, all research).
 - **A walled, armed colony still rarely loses anyone to raids.** From the second year, raids against wooden
   walls bring firebrands who set them alight once each, though not in winter or wet weather (stone doesn't burn), on top of sappers, thieves and wreckers; but in
-  ten-year runs the test colony, which now buys truces, sees only 19–25 raids and loses nobody to them.
+  ten-year runs the test colony, which now buys truces, sees only 19–25 raids and loses nobody to them. Since this pass, about one raider in four (from day 12) is a ravager who lays waste to
+  fields and livestock outside the walls instead of fighting its way in: about 1.5 crops or animals lost a raid
+  in the test colony, so walls cost something, though still no lives.
 - **Separations are rare** (one in six ten-year runs). Mood is lower late (yearly average about 47–52, from
   52–56); breaks no longer come in bursts after a death (no new break within a day of the last: seed 7919 went
   from 9 breaks in ten years to 2, mean mood 48.8).
