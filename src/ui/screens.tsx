@@ -486,7 +486,7 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
         <li>
           <b>Drag on the map</b> to give orders: chop trees, mark a stockpile, outline walls.{' '}
           {TOUCH
-            ? 'Two fingers move the map (and pinch to zoom); tap Select to put the tool down.'
+            ? 'Two fingers move the map (and pinch to zoom); tap ✕ Done (or Select, in Orders) to put the tool down.'
             : 'Right-click drops the tool.'}
         </li>
         <li>
@@ -567,8 +567,8 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
         <summary>Food, seasons and the rest</summary>
         <ul className="help-steps">
           <li>
-            Winter comes every 24 days: crops stop, so stock food. Cold storage (research refrigeration) keeps it from
-            rotting; parkas (tailoring) and hearths keep colonists warm.
+            Winter comes every 24 days: crops stop, so stock food. Cold storage (research Refrigeration) keeps it from
+            rotting; parkas (Tailoring) and hearths keep colonists warm.
           </li>
           <li>
             Grow <b>healroot</b> for medicine, hunt and fish for meat and leather, forage berries for quick food.
@@ -587,7 +587,7 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             friends send food when you're short: ask on the same screen.
           </li>
           <li>
-            After Deep mining, a <b>mine shaft</b> gives miners endless digging for stone, iron ore and silver, richer
+            After Deep mining, a <b>mine shaft</b> gives miners endless digging for granite, iron ore and silver, richer
             the deeper it goes. Dig past twenty metres and something may come up out of it: have fighters ready.
           </li>
           <li>
@@ -642,7 +642,7 @@ export function ResearchScreen({ state, onClose }: { state: UiState; onClose: ()
     <Modal title="Research" onClose={onClose}>
       <p className="muted">
         {state.researchBench
-          ? 'Pick a project; colonists with the Research work type study it at the research bench, a few hundred points an hour each.'
+          ? 'Pick a project; colonists with Research work study it at the research bench, a few hundred points an hour each.'
           : 'Build a research bench (the Production tab of the build bar at the bottom) first, then pick a project.'}{' '}
         {state.research.filter((p) => p.done).length} of {state.research.length} projects learned.
       </p>
@@ -1556,7 +1556,7 @@ export function ColonistsScreen({ state, onClose }: { state: UiState; onClose: (
               {heading('mood', 'Mood')}
               {heading('food', 'Food')}
               {heading('rest', 'Rest')}
-              {heading('joy', 'Fun')}
+              {heading('joy', 'Recreation')}
               {heading('health', 'Health')}
               <th>Doing</th>
               <th>Best at</th>

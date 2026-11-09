@@ -197,7 +197,7 @@ export function settleDispute(sim: Simulation, side: number | null): string | nu
   changeGoodwill(sim, side, SIDE_GAIN);
   changeGoodwill(sim, other, -SIDE_LOSS);
   sim.addLog(
-    `The colony backed ${name(side)} over ${q.about} (goodwill +${SIDE_GAIN}). ${name(other)} are offended (goodwill -${SIDE_LOSS}).`,
+    `The colony backed ${name(side)} over ${q.about} (goodwill +${SIDE_GAIN}). ${name(other)} are offended (goodwill −${SIDE_LOSS}).`,
     'info',
     true,
   );
@@ -271,7 +271,7 @@ export function answerCall(sim: Simulation, answer: 'goods' | 'refuse' | number)
     sim.stats.callsRefused = (sim.stats.callsRefused ?? 0) + 1;
     d.alliance = null;
     sim.addLog(
-      `The colony didn't help ${name(call.faction)} when they were attacked. They've broken off the alliance (goodwill -${REFUSE_LOSS}).`,
+      `The colony didn't help ${name(call.faction)} when they were attacked. They've broken off the alliance (goodwill −${REFUSE_LOSS}).`,
       'danger',
       true,
     );

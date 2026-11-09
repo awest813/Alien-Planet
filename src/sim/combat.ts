@@ -603,7 +603,7 @@ export function woundEnemy(sim: Simulation, e: Enemy, amount: number, by: string
   const wounded = fallWounded(sim, e, inPain);
   sim.addLog(
     wounded
-      ? `${by} brought down ${e.name}, who lies wounded: mark them with Capture to take them prisoner.`
+      ? `${by} brought down ${e.name}, who lies wounded: drag Capture over them to take them prisoner.`
       : `${by} brought down ${e.name}.`,
     'good',
   );

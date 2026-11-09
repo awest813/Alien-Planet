@@ -891,7 +891,7 @@ export class Simulation {
     populateWildlife(sim, Math.round((8 * world.size) / (MAP_SIZE * MAP_SIZE)), spawn);
     sim.wildCover = wildPlantCover(sim);
     sim.addLog(
-      `${NUMBER_WORDS[landing] ?? landing} colonists have landed with a few days of rations and some salvaged timber. Designate work and they will get to it.`,
+      `${NUMBER_WORDS[landing] ?? landing} colonists have landed with a few days of rations and some salvaged timber. Give orders from the build bar (Chop, Mine, Stockpile) and they will get to it.`,
       'info',
       true,
     );
@@ -2563,7 +2563,7 @@ export class Simulation {
         this.addLog(
           last
             ? 'Every goal is complete. The colony is thriving: play on for as long as you like.'
-            : `${name} goals complete. Next: ${PHASE_NAMES[index + 1].toLowerCase()}.`,
+            : `${name} goals complete. Next: ${PHASE_NAMES[index + 1]} goals.`,
           'good',
           true,
         );
@@ -8157,7 +8157,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
   },
   {
     id: 'stockpile',
-    label: 'Designate a stockpile zone',
+    label: 'Mark out a stockpile zone',
     phase: 1,
     check: (s) => anyZone(s, (z) => z < GROW_ZONE),
   },
@@ -8282,19 +8282,19 @@ export const OBJECTIVES: ObjectiveDef[] = [
   },
   {
     id: 'hearth',
-    label: 'Research hearths and build a stone hearth',
+    label: 'Research Hearths and build a stone hearth',
     phase: 4,
     check: (s) => s.countBuilt((f) => FEATURES[f - 1].key === 'hearth') > 0,
   },
   {
     id: 'bow',
-    label: 'Research archery, then craft and equip a recurve bow (or better)',
+    label: 'Research Archery, then craft and equip a recurve bow (or better)',
     phase: 4,
     check: (s) => s.living().some((c) => weaponScore(c.weapon, c.weaponQuality) >= weaponScore('recurveBow', 4)),
   },
   {
     id: 'sandbags',
-    label: 'Research fortifications and build sandbags',
+    label: 'Research Fortifications and build sandbags',
     phase: 4,
     // (The colony's own: not a siege party's.)
     check: (s) =>
@@ -8317,7 +8317,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
   },
   {
     id: 'power',
-    label: 'Research electricity and build a generator',
+    label: 'Research Electricity and build a generator',
     phase: 5,
     check: (s) => s.countBuilt((f) => !!featureDef(f).power && featureDef(f).power!.output > 0) > 0,
   },
@@ -8336,14 +8336,14 @@ export const OBJECTIVES: ObjectiveDef[] = [
   },
   {
     id: 'fineMeals',
-    label: 'Cook 5 fine meals (needs a cook with skill 6)',
+    label: 'Cook 5 fine meals (needs Cooking 6)',
     phase: 5,
     check: (s) => produced(s, 'fineMeal') >= 5,
     progress: (s) => `${Math.min(5, produced(s, 'fineMeal'))}/5`,
   },
   {
     id: 'parkas',
-    label: 'Dress everyone in a parka (research tailoring)',
+    label: 'Dress everyone in a parka (research Tailoring)',
     phase: 5,
     // On the tundra everyone lands in one: nothing to do.
     hidden: (s) => s.biome === 'tundra',
@@ -8544,7 +8544,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
   },
   {
     id: 'steel',
-    label: 'Learn steelmaking',
+    label: 'Learn Steelmaking',
     phase: 8,
     check: (s) => s.isResearched('steelmaking'),
   },

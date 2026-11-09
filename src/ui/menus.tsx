@@ -186,7 +186,7 @@ function SaveSlots({ state, manage, onLoaded }: { state: UiState; manage: boolea
                 {manage ? (
                   <ConfirmButton
                     label="Load"
-                    confirm="Lose current?"
+                    confirm="Lose this colony?"
                     disabled={!meta || outdated}
                     onConfirm={() => load(slot)}
                   />
@@ -346,7 +346,7 @@ export function PauseMenu({ state, onClose, actions }: { state: UiState; onClose
           </p>
         </>
       )}
-      {view === 'new' && <NewColonyForm confirm="Lose current?" onStarted={actions.onPlay} />}
+      {view === 'new' && <NewColonyForm confirm="Lose this colony?" onStarted={actions.onPlay} />}
     </Modal>
   );
 }
@@ -384,7 +384,7 @@ export function FallenScreen({ state, actions }: { state: UiState; actions: Menu
           <button className="primary" autoFocus onClick={() => setView('new')}>
             New colony
           </button>
-          <button onClick={() => setView('load')}>Load a save</button>
+          <button onClick={() => setView('load')}>Load game</button>
           <button onClick={actions.onTitle}>Title screen</button>
         </div>
       )}
@@ -726,7 +726,7 @@ export function TradeScreen({ state, onClose }: { state: UiState; onClose: () =>
         <p className="muted">
           {side === 'buy'
             ? 'They have nothing left to sell.'
-            : 'Nothing in your stockpiles yet: only goods (and silver) in a stockpile zone can be traded.'}
+            : 'Nothing in storage yet: only goods and silver in a stockpile, on a shelf, in an icebox or on a drying rack can be traded.'}
         </p>
       );
     }

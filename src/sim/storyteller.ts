@@ -628,7 +628,7 @@ const EVENTS: EventDef[] = [
         burning = ignite(sim, n) || burning;
       }
       sim.addLog(
-        `A meteorite crashed near the colony${burning ? ' and started a fire' : ''}. Silver and stone lie scattered around the crater.`,
+        `A meteorite crashed near the colony${burning ? ' and started a fire' : ''}. Silver and granite chunks lie scattered around the crater.`,
         burning ? 'warn' : 'good',
         true,
       );

@@ -166,7 +166,7 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
           <button
             className="danger draft-all"
             onClick={() => controller.toggleDraftAll()}
-            title="Draft or stand down everyone (Q)"
+            title="Draft or stand down everyone (Q, with no colonist selected)"
           >
             {anyFree ? 'Draft all' : 'Stand down all'}
           </button>
@@ -409,7 +409,9 @@ function ColonistCard({ c }: { c: ColonistView }) {
                 ? `${c.name} is too young to fight`
                 : c.inBreak && !c.drafted
                   ? `${c.name} is in no state to fight until the break passes`
-                  : `Draft for combat (Q). ${TOUCH ? 'Tap' : 'Right-click'} the map to move.`
+                  : c.drafted
+                    ? `Stand down (Q). ${TOUCH ? 'Tap' : 'Right-click'} the map to move them.`
+                    : `Draft for combat (Q). ${TOUCH ? 'Tap' : 'Right-click'} the map to move them.`
             }
           >
             {c.drafted ? 'Drafted' : 'Draft'}
@@ -1082,7 +1084,7 @@ export function Architect({ state }: { state: UiState }) {
   };
   const tools = TOOLS.filter((t) => t.group === group);
   return (
-    <section className="panel architect" aria-label="Architect">
+    <section className="panel architect" aria-label="Build bar">
       <div className="arch-tabs">
         {/* (Only the groups are tabs: the two buttons after them aren't.) */}
         <div role="tablist" aria-label="Build menu" style={{ display: 'contents' }} onKeyDown={(e) => arrowKeys(e)}>

@@ -267,7 +267,7 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     how: 'Lovers who marry may start a family: keep them happy, fed and safe, with room in the colony to grow.',
   },
   bread: {
-    how: 'Research Milling, grow grain (Zones), build a millstone and a stove, and set bills to mill flour and bake bread.',
+    how: 'Research Milling, grow grain (Zones), build a millstone and a stove, then set targets for flour and bread in Production.',
     tool: 'growGrain',
   },
   iron: {
@@ -317,7 +317,7 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     screen: 'research',
   },
   beaconBuilt: {
-    how: 'Build the signal beacon (Power tab) and keep the grid running: it draws a lot of power.',
+    how: 'Build the signal beacon (Power) and keep the grid running: it draws a lot of power.',
     tool: 'signalBeacon',
   },
   beaconSignal: {
@@ -652,7 +652,7 @@ export const TOOLS: ToolDef[] = [
     'Mine shaft',
     '',
     'production',
-    'Drag Mine over it and miners dig it deeper for stone, iron ore and silver; dig too deep and something may come up (Deep mining)',
+    'Drag Mine over it and miners dig it deeper for granite, iron ore and silver; dig too deep and something may come up (Deep mining)',
   ),
   build(
     'fishingSpot',
@@ -730,12 +730,13 @@ function ingredientName(ing: Ingredient): string {
   return (ing.category ?? '').replace(/([A-Z])/g, ' $1').toLowerCase();
 }
 
+// (As the Work screen's columns name them.)
 const WORK_NAMES: Partial<Record<keyof Priorities, string>> = {
-  mining: 'mining',
-  plantCutting: 'cutting plants',
-  construction: 'construction',
-  hunting: 'hunting',
-  handling: 'animal handling',
+  mining: 'Mine',
+  plantCutting: 'Cut plants',
+  construction: 'Construct',
+  hunting: 'Hunt',
+  handling: 'Handle',
 };
 // Roughly how much nutrition a colonist eats per day.
 const DAILY_NUTRITION = 1.4;
@@ -1437,7 +1438,7 @@ export class GameController {
         // A siege camps for most of a day first: drafted that early, colonists go hungry waiting.
         this.notify(
           this.sim.raid?.siege
-            ? 'Game paused: a siege party is coming to make camp. Draft colonists (Q) to break the camp, or when they march.'
+            ? 'Game paused: a siege party is coming. Break their camp now, or draft (Q) when they march.'
             : 'Game paused. Press Q to draft your colonists.',
         );
       } else if (
@@ -1509,7 +1510,7 @@ export class GameController {
   public setTool(tool: Tool): void {
     const needs = tool.kind === 'build' ? featureDef(tool.feature).research : undefined;
     if (needs && !this.sim.isResearched(needs)) {
-      this.notify(`Requires research: ${researchDef(needs)?.name ?? needs}.`);
+      this.notify(`Needs research: ${researchDef(needs)?.name ?? needs}`);
       return;
     }
     this.tool = tool;
@@ -1956,7 +1957,8 @@ export class GameController {
 
   private notify(text: string): void {
     this.toast = text;
-    this.toastTimer = 2500;
+    // Long enough to read: a long one (a siege's instructions, why a button is off) went in two and a half seconds.
+    this.toastTimer = Math.min(9000, Math.max(2500, text.length * 60));
     this.publish();
   }
 
@@ -2275,7 +2277,7 @@ export class GameController {
     if (sim.burning.size > 0) {
       const n = sim.burning.size;
       alerts.push({
-        text: `Fire! ${n} tile${n > 1 ? 's' : ''} burning. Colonists who haul or build will fight fires near home.`,
+        text: `Fire! ${n} tile${n > 1 ? 's' : ''} burning: colonists with Haul or Construct work fight fires near home`,
         tone: 'danger',
         tile: sim.burning.values().next().value,
       });
@@ -2431,21 +2433,21 @@ export class GameController {
     if (call) {
       const { hours, left } = dueIn(call.until);
       alerts.push({
-        text: `${FACTIONS[call.faction].name}, your allies, ask for help (${left} left): lend a colonist or send ${quantity(call.item, call.count)}, from Factions`,
+        text: `${FACTIONS[call.faction].name}, your allies, ask for help (${left} left): lend a colonist or send ${quantity(call.item, call.count)} (Factions)`,
         tone: hours <= 24 ? 'danger' : 'warn',
       });
     }
     if (dispute) {
       const { hours, left } = dueIn(dispute.until);
       alerts.push({
-        text: `${FACTIONS[dispute.a].name} and ${FACTIONS[dispute.b].name} are quarrelling and want your backing (${left} left): answer from Factions`,
+        text: `${FACTIONS[dispute.a].name} and ${FACTIONS[dispute.b].name} are quarrelling and want your backing (${left} left): pick a side (Factions)`,
         tone: hours <= 24 ? 'warn' : 'calm',
       });
     }
     if (envoy) {
       const { hours, left } = dueIn(envoy.until);
       alerts.push({
-        text: `An envoy from ${FACTIONS[envoy.faction].name} waits for an answer (${left} left): see Factions`,
+        text: `An envoy from ${FACTIONS[envoy.faction].name} offers an alliance (${left} left): accept or send them home (Factions)`,
         tone: hours <= 24 ? 'warn' : 'calm',
         tile: envoy.visitor?.tile,
       });
@@ -2459,7 +2461,7 @@ export class GameController {
         text:
           request.kind === 'hunt'
             ? `${FACTIONS[request.faction].name} ask: hunt the great boar (${left} left). Drag Hunt over it`
-            : `${FACTIONS[request.faction].name} ask for ${quantity(request.item, request.count)} (${colonyStock(sim, request.item)} stored, ${left} left): send it from Factions`,
+            : `${FACTIONS[request.faction].name} ask for ${quantity(request.item, request.count)} (${colonyStock(sim, request.item)} stored, ${left} left): send it (Factions)`,
         tone: hours <= 24 ? 'warn' : 'calm',
         tile: quarry?.tile,
       });
@@ -2763,7 +2765,7 @@ export class GameController {
     if (!room && loose > 0 && storage.length > 0) {
       const [most] = [...looseTypes.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
       alerts.push({
-        text: `Stockpiles are full: ${loose} stacks lying outside, mostly ${itemDef(most).name.toLowerCase()}. Zone more storage (Z).`,
+        text: `Stockpiles are full: ${loose} stacks lying outside, mostly ${itemDef(most).name.toLowerCase()}. Drag out another stockpile (Z)`,
         tone: 'warn',
       });
     }
@@ -2799,8 +2801,8 @@ export class GameController {
       alerts.push({
         text:
           unstaffed.length > 0
-            ? `Nothing to do: ${names}. Nobody is assigned to ${unstaffed.join(', ')} (Work screen).`
-            : `Nothing to do: ${names}. Designate more work.`,
+            ? `Nothing to do: ${names}. Nobody has ${unstaffed.join(' or ')} work turned on (Work)`
+            : `Nothing to do: ${names}. Give more orders (Orders tab)`,
         tone: 'warn',
       });
     }
@@ -3242,7 +3244,7 @@ export class GameController {
       const shaft = sim.shafts[i] ?? { depth: 0, cavern: false };
       const odds = oreChances(shaft);
       details.push(
-        `${shaft.depth * METRES_PER_LEVEL} m deep${shaft.cavern ? ', into a cavern' : ''}: each dig brings up stone, iron ore ${Math.round(odds.iron * 100)}% of the time, silver ${Math.round(odds.silver * 100)}%`,
+        `${shaft.depth * METRES_PER_LEVEL} m deep${shaft.cavern ? ', into a cavern' : ''}: each dig brings up granite, iron ore ${Math.round(odds.iron * 100)}% of the time, silver ${Math.round(odds.silver * 100)}%`,
       );
       details.push(
         w.designation[i] === Designation.MINE

@@ -47,7 +47,7 @@
     "key": "electricity",
     "name": "Electricity",
     "cost": 2000,
-    "description": "Unlocks the wood-fired generator, the electric heater and the standing lamp."
+    "description": "Unlocks the wood generator, the electric heater and the standing lamp."
   },
   {
     "key": "solarPower",
@@ -134,7 +134,7 @@
     "name": "Signal beacon",
     "cost": 3000,
     "requires": ["engineering"],
-    "description": "Unlocks the signal beacon: transmit for five days and a ship may answer. Needs engineering first."
+    "description": "Unlocks the signal beacon: transmit for five days and a ship may answer. Needs Engineering first."
   },
   {
     "key": "milling",
@@ -160,7 +160,7 @@
     "name": "Deep mining",
     "cost": 1000,
     "requires": ["smelting"],
-    "description": "Unlocks the mine shaft: miners dig down for stone, iron ore and silver, richer the deeper they go. Dig deep enough and something may dig back."
+    "description": "Unlocks the mine shaft: miners dig down for granite, iron ore and silver, richer the deeper they go. Dig deep enough and something may dig back."
   },
   {
     "key": "masonry",

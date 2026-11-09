@@ -143,7 +143,7 @@
   },
   {
     "key": "stove",
-    "name": "Cooking stove",
+    "name": "Stove",
     "workbench": "cooking",
     "build": {
       "cost": [
@@ -338,7 +338,7 @@
   },
   {
     "key": "woodGenerator",
-    "name": "Wood-fired generator",
+    "name": "Wood generator",
     "power": {
       "output": 1000,
       "fuel": {
