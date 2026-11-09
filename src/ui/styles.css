@@ -2183,3 +2183,11 @@ input[type='checkbox'] {
     height: 20px;
   }
 }
+
+/* The Colonists overview's headings sort the table: they look like headings, not links. */
+.colonists-table th .sort {
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  white-space: nowrap;
+}

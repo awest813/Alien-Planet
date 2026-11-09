@@ -1491,10 +1491,59 @@ export function ConfirmButton({
 
 // Everyone at a glance: mood, needs, health, what they're doing, and what they're best at. A row picks that
 // colonist (and closes the screen, so the camera can go to them).
+// Columns the Colonists overview sorts by: a click on a heading sorts by it, again reverses it.
+type ColonistSort = 'name' | 'age' | 'mood' | 'food' | 'rest' | 'joy' | 'health';
+
+// Spouse, children and parents, in a few words (from the relations, which name family first).
+function familyLine(c: UiState['colonists'][number]): string {
+  const of = (kind: string) => c.relations.filter((r) => r.label?.startsWith(kind)).map((r) => r.name);
+  const spouse = of('Spouse')[0];
+  const children = of('Child');
+  const parents = of('Parent');
+  return [
+    spouse && `married to ${spouse}`,
+    children.length > 0 &&
+      (children.length > 2 ? `${children.length} children` : `parent of ${children.join(' and ')}`),
+    parents.length > 0 && `child of ${parents.join(' and ')}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 export function ColonistsScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
-  const living = state.colonists.filter((c) => !c.dead);
-  const need = (value: number) => (
-    <span className={value < 0.25 ? 'bad' : value < 0.5 ? 'warn' : ''}>{Math.round(value * 100)}%</span>
+  const [sort, setSort] = useState<{ by: ColonistSort; up: boolean }>({ by: 'name', up: true });
+  const health = (c: UiState['colonists'][number]) =>
+    c.status === 'Downed' ? 0 : c.bleeding ? 1 : c.status !== 'Healthy' || c.disease ? 2 : 3;
+  const value: Record<ColonistSort, (c: UiState['colonists'][number]) => number | string> = {
+    name: (c) => c.name,
+    age: (c) => c.age,
+    mood: (c) => c.mood,
+    food: (c) => c.needs.food,
+    rest: (c) => c.needs.rest,
+    joy: (c) => c.needs.joy,
+    health,
+  };
+  const living = state.colonists
+    .filter((c) => !c.dead)
+    .sort((a, b) => {
+      const x = value[sort.by](a);
+      const y = value[sort.by](b);
+      const order = typeof x === 'string' ? x.localeCompare(y as string) : x - (y as number);
+      return (sort.up ? order : -order) || a.id - b.id;
+    });
+  const need = (v: number) => <span className={v < 0.25 ? 'bad' : v < 0.5 ? 'warn' : ''}>{Math.round(v * 100)}%</span>;
+  // A heading that sorts: names A to Z, numbers lowest first (the neediest at the top), then the other way.
+  const heading = (by: ColonistSort, label: string) => (
+    <th aria-sort={sort.by === by ? (sort.up ? 'ascending' : 'descending') : 'none'}>
+      <button
+        className="link sort"
+        onClick={() => setSort((now) => ({ by, up: now.by === by ? !now.up : true }))}
+        title={`Sort by ${label.toLowerCase()}`}
+      >
+        {label}
+        {sort.by === by && <span aria-hidden>{sort.up ? ' ↑' : ' ↓'}</span>}
+      </button>
+    </th>
   );
   return (
     <Modal title={`Colonists (${living.length})`} onClose={onClose} wide>
@@ -1502,14 +1551,16 @@ export function ColonistsScreen({ state, onClose }: { state: UiState; onClose: (
         <table className="grid colonists-table">
           <thead>
             <tr>
-              <th />
-              <th>Mood</th>
-              <th>Food</th>
-              <th>Rest</th>
-              <th>Fun</th>
-              <th>Health</th>
+              {heading('name', 'Name')}
+              {heading('age', 'Age')}
+              {heading('mood', 'Mood')}
+              {heading('food', 'Food')}
+              {heading('rest', 'Rest')}
+              {heading('joy', 'Fun')}
+              {heading('health', 'Health')}
               <th>Doing</th>
               <th>Best at</th>
+              <th>Family</th>
             </tr>
           </thead>
           <tbody>
@@ -1517,7 +1568,7 @@ export function ColonistsScreen({ state, onClose }: { state: UiState; onClose: (
               const best = [...c.skillList]
                 .sort((a, b) => b.level - a.level || b.passion - a.passion)
                 .slice(0, 2)
-                .map((s) => `${s.label} ${s.level}${'★'.repeat(s.passion)}`)
+                .map((sk) => `${sk.label} ${sk.level}${'★'.repeat(sk.passion)}`)
                 .join(', ');
               const pick = () => {
                 controller.selectColonist(c.id, true);
@@ -1535,8 +1586,12 @@ export function ColonistsScreen({ state, onClose }: { state: UiState; onClose: (
                     >
                       <span className="swatch" style={{ background: c.color }} /> {c.name}
                     </button>
-                    <span className="muted small"> {c.age < ADULT ? `${c.stage}, ${c.age}` : c.age}</span>
                     {c.leader && <span className="tag good">leader</span>}
+                  </td>
+                  <td className="small">
+                    {c.age}
+                    {c.age < ADULT || c.stage === 'elder' ? <span className="muted"> {c.stage}</span> : null}
+                    {c.retired && <span className="tag">retired</span>}
                   </td>
                   <td>
                     <span style={{ color: moodColor(c.mood) }}>{c.mood}</span>
@@ -1556,6 +1611,7 @@ export function ColonistsScreen({ state, onClose }: { state: UiState; onClose: (
                   </td>
                   <td className="small">{c.drafted ? 'Drafted' : c.activity}</td>
                   <td className="small">{best}</td>
+                  <td className="small muted">{familyLine(c) || '—'}</td>
                 </tr>
               );
             })}
