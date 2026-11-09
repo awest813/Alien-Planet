@@ -111,6 +111,17 @@ export function loadSettings(): Settings {
   } catch {
     // Unreadable: use the defaults.
   }
+  // An old or edited entry can hold a number no option offers (a scale of 0 would hide the whole
+  // interface, Settings included): snap the choices to their options and keep volumes in 0..1.
+  const snap = (value: number, options: { value: number }[], fallback: number) =>
+    options.some((o) => o.value === value) ? value : fallback;
+  settings.uiScale = snap(settings.uiScale, UI_SCALES, DEFAULT_SETTINGS.uiScale);
+  settings.noticeSeconds = snap(settings.noticeSeconds, NOTICE_TIMES, DEFAULT_SETTINGS.noticeSeconds);
+  settings.panSpeed = snap(settings.panSpeed, PAN_SPEEDS, DEFAULT_SETTINGS.panSpeed);
+  for (const key of ['masterVolume', 'musicVolume', 'effectsVolume'] as const) {
+    const v = settings[key];
+    settings[key] = Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : DEFAULT_SETTINGS[key];
+  }
   return settings;
 }
 

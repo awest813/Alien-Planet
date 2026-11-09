@@ -41,7 +41,8 @@ const saveDetails = (meta: SaveMeta) =>
     .join(' · ');
 
 // Difficulty, map size and seed for a new colony.
-function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: () => void }) {
+// `confirm`: what the start button asks first (nothing to lose: none).
+function NewColonyForm({ confirm, onStarted }: { confirm: string | null; onStarted: () => void }) {
   const [seed, setSeed] = useState('');
   // Start from whatever the player chose last time.
   const last = controller.settings;
@@ -106,7 +107,7 @@ function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: ()
           onChange={(e) => setSeed(e.target.value)}
         />
         {confirm ? (
-          <ConfirmButton label="Start colony" confirm="Lose current?" onConfirm={start} />
+          <ConfirmButton label="Start colony" confirm={confirm} onConfirm={start} />
         ) : (
           <button className="primary big" onClick={start}>
             Start colony
@@ -204,7 +205,15 @@ export function TitleScreen({ state, actions }: { state: UiState; actions: MenuA
         {view === 'new' && (
           <>
             <h3>New colony</h3>
-            <NewColonyForm confirm={false} onStarted={actions.onPlay} />
+            {/* The new colony takes over the autosave slot once it's under way. */}
+            <NewColonyForm
+              confirm={
+                state.saves.some((s) => s.slot === 'autosave' && s.version === SAVE_VERSION)
+                  ? 'Replace the autosave?'
+                  : null
+              }
+              onStarted={actions.onPlay}
+            />
             <div className="row end">
               <button onClick={() => setView('main')}>Back</button>
             </div>
@@ -281,7 +290,7 @@ export function PauseMenu({ state, onClose, actions }: { state: UiState; onClose
           </p>
         </>
       )}
-      {view === 'new' && <NewColonyForm confirm onStarted={actions.onPlay} />}
+      {view === 'new' && <NewColonyForm confirm="Lose current?" onStarted={actions.onPlay} />}
     </Modal>
   );
 }
@@ -323,7 +332,7 @@ export function FallenScreen({ state, actions }: { state: UiState; actions: Menu
           <button onClick={actions.onTitle}>Title screen</button>
         </div>
       )}
-      {view === 'new' && <NewColonyForm confirm={false} onStarted={actions.onPlay} />}
+      {view === 'new' && <NewColonyForm confirm={null} onStarted={actions.onPlay} />}
       {view === 'load' && <SaveSlots state={state} manage={false} onLoaded={actions.onPlay} />}
       {view !== 'main' && (
         <div className="row end">
@@ -442,7 +451,7 @@ export function DepartedScreen({ state, actions }: { state: UiState; actions: Me
           <button onClick={actions.onTitle}>Title screen</button>
         </div>
       )}
-      {view === 'new' && <NewColonyForm confirm={false} onStarted={actions.onPlay} />}
+      {view === 'new' && <NewColonyForm confirm={null} onStarted={actions.onPlay} />}
       {view !== 'main' && (
         <div className="row end">
           <button onClick={() => setView('main')}>Back</button>
@@ -530,6 +539,7 @@ const CONTROLS: [string, string][] = [
   ['W A S D / arrows', 'Move the view (or drag with the right mouse button)'],
   ['Mouse wheel', 'Zoom'],
   ['Tab', 'Jump to the next colonist'],
+  ['H', 'Back to the colony'],
   ['Q', 'Draft the selected colonist, or everyone'],
   ['Right-click', 'Move a drafted colonist, or drop the current tool'],
   ['Esc', 'Close a screen, drop the tool, clear the selection, then open the menu'],

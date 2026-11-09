@@ -499,7 +499,7 @@ export const TOOLS: ToolDef[] = [
     'Patients heal half again as fast, are tended better and catch fewer infections (Field medicine)',
   ),
   build('table', 'Table', 'l', 'furniture', 'Colonists dislike eating without a table'),
-  build('armchair', 'Armchair', 'h', 'furniture', 'Comfortable recreation (relaxing) and decor'),
+  build('armchair', 'Armchair', '', 'furniture', 'Comfortable recreation (relaxing) and decor'),
   build('horseshoePin', 'Horseshoe pin', 'i', 'furniture', 'Recreation spot (games)'),
   build(
     'chessTable',
@@ -1233,7 +1233,11 @@ export class GameController {
   private heardShotsTo = 0;
 
   private autosave(): void {
-    if (this.inPlay && this.settings.autosave && this.sim.living().length > 0) {
+    // headcount, not living(): while the last colonists at home are dead and a party is still away, the
+    // colony carries on and is worth saving.
+    // A colony whose clock was never started has nothing to keep, and mustn't replace the last
+    // colony's autosave.
+    if (this.inPlay && this.settings.autosave && this.sim.headcount() > 0 && !this.notStarted) {
       this.save('autosave', true);
     }
   }
@@ -1253,7 +1257,7 @@ export class GameController {
   // Returns whether the quit went ahead (a failed save keeps the player in their colony).
   public async quitToTitle(): Promise<boolean> {
     const version = this.simVersion;
-    if (this.inPlay && this.settings.autosave && this.sim.living().length > 0) {
+    if (this.inPlay && this.settings.autosave && this.sim.headcount() > 0 && !this.notStarted) {
       if (!(await this.save('autosave', true))) {
         this.notify('Autosave failed, so the colony is still open. Save to a slot, or turn autosave off.');
         return false;
@@ -1342,7 +1346,7 @@ export class GameController {
       } else if (
         (event === 'death' || event === 'collapse') &&
         this.settings.pauseOnEmergency &&
-        this.sim.living().length > 0
+        this.sim.headcount() > 0
       ) {
         this.setSpeed(0);
         this.notify(event === 'death' ? 'Game paused: a colonist has died.' : 'Game paused: a colonist collapsed.');
@@ -1776,7 +1780,8 @@ export class GameController {
     this.hoverTile = null;
     this.hoverColonist = null;
     this.accumulator = 0;
-    this.focusRequest = sim.colonists[0].tile;
+    // Home, or someone still about: the first colonist may have died far away long ago.
+    this.focusRequest = sim.homeTile() ?? sim.living()[0]?.tile ?? sim.colonists[0].tile;
     // Don't replay a loaded colony's history as notifications.
     this.storySeen = sim.storyCount;
     this.notifications = [];

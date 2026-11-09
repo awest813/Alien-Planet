@@ -324,7 +324,9 @@ export function checkHealth(sim: Simulation, c: Colonist): void {
       sim.story.lastCollapseCard = sim.tick;
     }
     sim.addLog(`${c.name} has collapsed and needs a doctor.`, 'danger', card);
-    if (!sim.raid) {
+    // The pause for a collapse is for one out of the blue; in a fight (raid, pack or beast) the player is
+    // already watching.
+    if (!sim.raid && !sim.story.manhuntersActive) {
       sim.events.push('collapse');
     }
   } else if (!downed && h.downed) {

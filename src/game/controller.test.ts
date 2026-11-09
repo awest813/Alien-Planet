@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FACTIONS, featureId, itemId } from '../sim/defs';
 import { Designation, STOCKPILE_ZONE } from '../sim/world';
 import { DAYS_PER_SEASON } from '../sim/seasons';
 import { HOUR, clearAround, outline } from '../sim/test-helpers';
 import { Simulation, TICKS_PER_HOUR } from '../sim/simulation';
 import { spawnRaid } from '../sim/combat';
-import { Alert, controller } from './controller';
+import { Alert, TOOLS, controller } from './controller';
+import { deserialize, serialize } from '../sim/serialize';
+import { DEFAULT_SETTINGS, loadSettings } from './settings';
 
 // The alerts the side panel would show right now.
 const alerts = (): Alert[] =>
@@ -237,5 +239,68 @@ describe('the tile card', () => {
     expect(card(rock).details.some((d) => d.startsWith('Mine (M) for '))).toBe(true);
     w.designation[tree] = Designation.CHOP;
     expect(card(tree).details.some((d) => d.startsWith('Chop (C) for'))).toBe(false);
+  });
+});
+
+describe('saving and loading', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+  const replace = (sim: Simulation) => (controller as unknown as { replaceSim(sim: Simulation): void }).replaceSim(sim);
+
+  it('autosaves on quitting while the only colonists left are away on a trip', async () => {
+    controller.newColony('away');
+    controller.setSpeed(1);
+    const sim = controller.sim;
+    const [home, ...party] = sim.colonists;
+    for (const c of party) {
+      c.away = 'gone';
+    }
+    home.health.dead = true;
+    expect(sim.living().length).toBe(0);
+    const save = vi.spyOn(controller, 'save').mockResolvedValue(true);
+    expect(await controller.quitToTitle()).toBe(true);
+    expect(save).toHaveBeenCalledWith('autosave', true);
+  });
+
+  it("doesn't autosave a new colony whose clock was never started", async () => {
+    controller.newColony('unstarted');
+    const save = vi.spyOn(controller, 'save').mockResolvedValue(true);
+    expect(await controller.quitToTitle()).toBe(true);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('opens a loaded colony at home, not where the first colonist died', () => {
+    controller.newColony('focus');
+    const sim = controller.sim;
+    sim.colonists[0].health.dead = true;
+    sim.colonists[0].tile = sim.world.idx(1, 1);
+    replace(deserialize(serialize(sim)));
+    const focus = controller.focusRequest!;
+    expect(focus).not.toBe(sim.world.idx(1, 1));
+    expect(controller.sim.living().some((c) => controller.sim.world.distance(c.tile, focus) < 20)).toBe(true);
+  });
+});
+
+describe('controls and settings', () => {
+  it('gives no tool a key the game keeps for itself', () => {
+    const reserved = new Set(['h', 'q', 'w', 'a', 's', 'd', '1', '2', '3', ' ', 'Tab']);
+    expect(TOOLS.filter((t) => reserved.has(t.hotkey)).map((t) => t.id)).toEqual([]);
+    const keys = TOOLS.map((t) => t.hotkey).filter((k) => k);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('puts stored settings no option offers back in range', () => {
+    const stored = { uiScale: 0, noticeSeconds: -5, panSpeed: 0, masterVolume: 40, musicVolume: -1, showNames: false };
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(stored), setItem: () => undefined });
+    const s = loadSettings();
+    expect(s.uiScale).toBe(DEFAULT_SETTINGS.uiScale);
+    expect(s.noticeSeconds).toBe(DEFAULT_SETTINGS.noticeSeconds);
+    expect(s.panSpeed).toBe(DEFAULT_SETTINGS.panSpeed);
+    expect(s.masterVolume).toBe(1);
+    expect(s.musicVolume).toBe(0);
+    expect(s.showNames).toBe(false);
+    vi.unstubAllGlobals();
   });
 });
