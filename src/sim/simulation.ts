@@ -36,6 +36,7 @@ import {
   STARTING_WEAPON,
   weaponDef,
   terrainId,
+  type FeatureDef,
   type JoyKind,
   type JoySpec,
 } from './defs';
@@ -258,6 +259,9 @@ const PROVIDE_BELOW_DAYS = 1.5;
 const CONCERT_SKILL = 6;
 const CONCERT_FROM = 17;
 // Listeners get this much more from a harp than from other instruments.
+// A built wall a door can be put into (not a door already, nor a natural rock face).
+const doorable = (def: FeatureDef): boolean => def.blocksRoom && !def.door && !!def.build && !def.natural;
+
 // Right beside a fire it's warmer than a heater keeps a room, by up to this much.
 const FIRESIDE_EXTRA = 6;
 const HARP_GAIN = 1.25;
@@ -2362,10 +2366,14 @@ export class Simulation {
         !(existing !== NONE && (featureDef(existing).bridge || (def.layer === 'floor' && featureDef(existing).crop)))
       );
     }
-    // Building over a tree or a boulder clears it first; a mine shaft has to be taken down.
+    // Building over a tree or a boulder clears it first; a mine shaft has to be taken down. A door can go into a
+    // wall that's already built: the wall comes down and the door goes up in its place (a hut finished without one
+    // used to stay shut, with whoever was inside, and the Door tool did nothing on its walls).
     return (
       w.blueprint[i] !== feature &&
-      (existing === NONE || (!!featureDef(existing).harvest && !featureDef(existing).shaft))
+      (existing === NONE ||
+        (!!featureDef(existing).harvest && !featureDef(existing).shaft) ||
+        (!!def.door && doorable(featureDef(existing))))
     );
   }
 
@@ -2421,6 +2429,10 @@ export class Simulation {
     const harvest = existing && !existing.shaft ? existing.harvest : undefined;
     if (harvest) {
       w.designation[i] = { mine: Designation.MINE, chop: Designation.CHOP, forage: Designation.FORAGE }[harvest.work];
+    } else if (existing && featureDef(feature).door && doorable(existing)) {
+      // A door into a standing wall: the wall is taken down first.
+      w.designation[i] = Designation.DECONSTRUCT;
+      w.progress[i] = 0;
     } else {
       w.progress[i] = 0;
     }

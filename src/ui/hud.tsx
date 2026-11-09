@@ -1,4 +1,4 @@
-import { TOUCH } from './touch';
+import { TOUCH, forTouch } from './touch';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -878,7 +878,9 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
                                   {o.underway && <span className="muted small"> · under way</span>}
                                 </span>
                               </button>
-                              {explained === o.id && o.how && o !== next && <div className="goal-how">{o.how}</div>}
+                              {explained === o.id && o.how && o !== next && (
+                                <div className="goal-how">{forTouch(o.how)}</div>
+                              )}
                             </li>
                           ))}
                       </ul>
@@ -925,12 +927,12 @@ function AlertLine({ alert }: { alert: Alert }) {
       {target ? (
         <button className="alert-jump" onClick={() => controller.focusAlert(alert)} title="Show me">
           <ToneMark tone={alert.tone} />
-          {alert.text} <span className="go">›</span>
+          {forTouch(alert.text)} <span className="go">›</span>
         </button>
       ) : (
         <>
           <ToneMark tone={alert.tone} />
-          {alert.text}
+          {forTouch(alert.text)}
         </>
       )}
     </li>
@@ -963,7 +965,7 @@ function NextGoal({
       <div className="next-label">Next goal</div>
       <b>{goal.label}</b>
       {goal.progress && <span className="muted"> {goal.progress}</span>}
-      {goal.how && <p>{goal.how}</p>}
+      {goal.how && <p>{forTouch(goal.how)}</p>}
       {(tool || goal.screen) && (
         <button className="primary" onClick={() => startGoal(goal, onOpen, onStarted)}>
           {tool ? `Use ${tool.label}` : `Open ${goal.screen![0].toUpperCase()}${goal.screen!.slice(1)}`}
@@ -1064,7 +1066,7 @@ export function Architect({ state }: { state: UiState }) {
       <div className="hint">
         {shown && (
           <>
-            <b>{shown.label}:</b> {shown.hint}
+            <b>{shown.label}:</b> {forTouch(shown.hint)}
             {lockedShown && <span className="locked-note"> · needs research: {lockedShown}</span>}
           </>
         )}
@@ -1103,7 +1105,7 @@ export function Notices({ state, paused = false }: { state: UiState; paused?: bo
           title="Dismiss"
         >
           <ToneMark tone={n.tone} />
-          {n.text}
+          {forTouch(n.text)}
         </button>
       ))}
     </div>

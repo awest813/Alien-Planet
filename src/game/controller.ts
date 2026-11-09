@@ -878,6 +878,8 @@ export interface DiplomacyView {
     quarryTile: number | null;
   } | null;
   silver: number;
+  // Silver lying about outside storage (the top bar counts it; dealings only spend what's stored).
+  looseSilver: number;
   tributeCost: number;
   giftSizes: readonly number[];
   // Hiring the friendly faction's fighters: the price, the goodwill they need, and days of it left.
@@ -1823,6 +1825,22 @@ export class GameController {
     }
   }
 
+  // A Hunt or Tame drag that caught no animals says so (it used to do nothing, without a word, while the colony's
+  // food ran down).
+  public sayIfNoAnimals(rect: { x0: number; y0: number; x1: number; y1: number }, what: 'hunt' | 'tame'): void {
+    const w = this.sim.world;
+    const inside = this.sim.animals.some((a) => {
+      const x = w.xOf(a.tile);
+      const y = w.yOf(a.tile);
+      return a.hp > 0 && x >= rect.x0 && x <= rect.x1 && y >= rect.y0 && y <= rect.y1 && (what === 'hunt' || !a.tame);
+    });
+    if (!inside) {
+      this.notify(
+        `No animals there to ${what}. Wild animals roam the whole map: zoom out (or open the map) to find them.`,
+      );
+    }
+  }
+
   private notify(text: string): void {
     this.toast = text;
     this.toastTimer = 2500;
@@ -1964,8 +1982,8 @@ export class GameController {
         done: !!sim.objectivesDone[o.id],
         failed: sim.objectiveFailed(o.id),
         progress: o.progress?.(sim),
-        ...(GOAL_HELP[o.id] ?? { how: '' }),
-        underway: !sim.objectivesDone[o.id] && this.goalUnderway(GOAL_HELP[o.id]?.tool),
+        ...this.goalHelp(o.id),
+        underway: !sim.objectivesDone[o.id] && this.goalUnderway(this.goalHelp(o.id).tool),
       })),
       bills: sim.bills.map((bill) => {
         const recipe = RECIPES[bill.recipe];
@@ -2669,6 +2687,42 @@ export class GameController {
 
   // Whether a goal's order has been given: its tool has left marks on the map that colonists are working
   // through (trees marked for chopping, blueprints of its building, its kind of zone).
+  // A goal's help. The shelter's moves on to the door once walls stand (or are planned) without one: it went on
+  // offering "Use Wood wall", and the card skipped ahead to beds, while the hut had no way in.
+  private goalHelp(id: string): { how: string; tool?: string; screen?: ObjectiveView['screen'] } {
+    const help = GOAL_HELP[id] ?? { how: '' };
+    if (this.sim.objectivesDone[id]) {
+      return help;
+    }
+    // With a stove up, what holds meals back is raw food, not the stove the help kept asking for.
+    if (id === 'meals' && this.sim.countBuilt((f) => featureDef(f).key === 'stove') > 0) {
+      return {
+        how: 'The stove is up: a meal takes 6 raw food (meat, fish, potatoes or berries). Hunt, fish, forage or harvest to keep the cooks supplied.',
+      };
+    }
+    if (id !== 'shelter') {
+      return help;
+    }
+    const w = this.sim.world;
+    const is = (f: number, door: boolean) => f !== NONE && !!featureDef(f).blocksRoom && !!featureDef(f).door === door;
+    let walls = false;
+    // (Built things only, not every tree and rock: this runs on every refresh.)
+    for (const [tiles, layer] of [
+      [this.sim.buildingTiles(), w.feature],
+      [w.tilesWith('blueprints'), w.blueprint],
+    ] as const) {
+      for (const i of tiles) {
+        if (is(layer[i], true)) {
+          return help;
+        }
+        walls ||= is(layer[i], false) && !featureDef(layer[i]).natural;
+      }
+    }
+    return walls
+      ? { how: 'The walls need a way in: pick Door and click one of the walls (built or planned).', tool: 'door' }
+      : help;
+  }
+
   private goalUnderway(toolId: string | undefined): boolean {
     const tool = toolId ? TOOLS.find((t) => t.id === toolId)?.tool : undefined;
     const w = this.sim.world;
@@ -2730,6 +2784,7 @@ export class GameController {
           }
         : null,
       silver: colonyStock(sim, itemId('silver')),
+      looseSilver: Math.max(0, sim.stockOf(itemId('silver')) - colonyStock(sim, itemId('silver'))),
       tributeCost: tributeCost(sim),
       giftSizes: GIFT_SIZES,
       hireCost: hireCost(sim),

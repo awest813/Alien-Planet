@@ -257,3 +257,20 @@ describe('tool kits', () => {
     expect(copy.colonists[0].tool).toEqual({ quality: 12, wear: 0.5 });
   });
 });
+
+describe('a door into a finished wall', () => {
+  it('takes the wall down and puts the door up, so nobody stays shut in', () => {
+    const { sim, w, x, y } = site(5);
+    for (const i of outline(w, x + 2, y - 2, x + 6, y + 2)) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    const inside = sim.colonists[0];
+    inside.tile = w.idx(x + 4, y);
+    const wall = w.idx(x + 2, y);
+    expect(sim.canPlaceBlueprint(wall, featureId('door'))).toBe(true);
+    sim.apply({ type: 'build', tiles: [wall], feature: featureId('door') });
+    run(sim, HOUR * 6);
+    expect(w.feature[wall]).toBe(featureId('door'));
+    expect(sim.regionOf(inside.tile)).toBe(sim.regionOf(w.idx(x - 2, y)));
+  });
+});

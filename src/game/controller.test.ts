@@ -352,3 +352,44 @@ describe('second audit: the interface', () => {
     expect(controller.getState().animalsAttacking).toBe(true);
   });
 });
+
+describe('fourth audit: a newcomer playing', () => {
+  const goal = (id: string) => {
+    controller.publish();
+    return controller.getState().objectives.find((o) => o.id === id)!;
+  };
+
+  it('moves the shelter goal on to the door once walls are up without one', () => {
+    const { w, x, y } = colony('door');
+    expect(goal('shelter').tool).toBe('woodWall');
+    for (const i of outline(w, x + 2, y - 2, x + 6, y + 2)) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    expect(goal('shelter').tool).toBe('door');
+    w.setFeature(w.idx(x + 2, y), featureId('door'));
+    expect(goal('shelter').tool).toBe('woodWall');
+  });
+
+  it('stops asking for a stove once there is one', () => {
+    const { w, x, y } = colony('stove');
+    expect(goal('meals').how).toMatch(/Build a stove/);
+    w.setFeature(w.idx(x + 3, y), featureId('stove'));
+    expect(goal('meals').how).toMatch(/raw food/);
+  });
+
+  it('says so when a hunt drag catches no animals', () => {
+    const { sim } = colony('hunt');
+    sim.animals = [];
+    controller.sayIfNoAnimals({ x0: 0, y0: 0, x1: 5, y1: 5 }, 'hunt');
+    expect(controller.getState().toast).toMatch(/No animals there to hunt/);
+  });
+
+  it('tells the silver in storage from the silver lying about', () => {
+    const { sim, w, x, y } = colony('silver');
+    w.addItem(w.idx(x + 3, y), itemId('silver'), 40);
+    controller.publish();
+    const d = controller.getState().diplomacy;
+    expect(d.looseSilver).toBeGreaterThanOrEqual(40);
+    expect(d.silver + d.looseSilver).toBe(sim.stockOf(itemId('silver')));
+  });
+});

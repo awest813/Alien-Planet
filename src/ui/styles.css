@@ -364,6 +364,30 @@ kbd {
   }
 }
 
+/* Narrower still (a 1280 laptop): a little tighter all round, so the rain's icon or a third resource
+   (medicine, silver) doesn't push the screen buttons onto a second row in the middle of play. */
+@media (max-width: 1400px) {
+  .tb-time {
+    gap: 6px;
+  }
+
+  .speeds button {
+    min-width: 28px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .screens button {
+    padding-left: 5px;
+    padding-right: 5px;
+  }
+
+  /* Food and three resources at most; the rest are under "All items". */
+  .tb-resources > span.res:nth-of-type(n + 5) {
+    display: none;
+  }
+}
+
 .speeds {
   display: flex;
   gap: 2px;
@@ -1266,6 +1290,8 @@ button.link:focus-visible {
     overflow-x: auto;
     width: 100%;
     scrollbar-width: none;
+    /* The row scrolls sideways (Village, Factions and the Menu are past the edge): a fade says there's more. */
+    mask-image: linear-gradient(to right, #000 85%, transparent);
   }
 
   .screens button {

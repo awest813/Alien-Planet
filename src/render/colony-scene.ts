@@ -203,7 +203,7 @@ export class ColonyScene extends Phaser.Scene {
   private drag: { start: number; end: number } | null = null;
   private pan: { x: number; y: number; scrollX: number; scrollY: number; moved: boolean; button: number } | null = null;
   // Two fingers on a touch screen: the gap between them when the pinch began, and the zoom then.
-  private pinch: { distance: number; zoom: number } | null = null;
+  private pinch: { distance: number; zoom: number; x: number; y: number } | null = null;
 
   constructor() {
     super('ColonyScene');
@@ -1601,9 +1601,11 @@ export class ColonyScene extends Phaser.Scene {
         break;
       case 'hunt':
         controller.command({ type: 'hunt', rect, add: true });
+        controller.sayIfNoAnimals(rect, 'hunt');
         break;
       case 'tame':
         controller.command({ type: 'tame', rect, add: true });
+        controller.sayIfNoAnimals(rect, 'tame');
         break;
       case 'capture':
         controller.command({ type: 'capture', rect, add: true });
@@ -1654,7 +1656,12 @@ export class ColonyScene extends Phaser.Scene {
         // A second finger turns whatever the first was doing into a pinch.
         this.drag = null;
         this.pan = null;
-        this.pinch = { distance: Math.max(1, fingerGap()), zoom: cam.zoom };
+        this.pinch = {
+          distance: Math.max(1, fingerGap()),
+          zoom: cam.zoom,
+          x: (this.input.pointer1.x + this.input.pointer2.x) / 2,
+          y: (this.input.pointer1.y + this.input.pointer2.y) / 2,
+        };
         return;
       }
       // On a touch screen one finger drags the map in Select mode; a tap still selects.
@@ -1688,10 +1695,20 @@ export class ColonyScene extends Phaser.Scene {
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (this.pinch) {
         if (this.input.pointer1.isDown && this.input.pointer2.isDown) {
-          this.zoomAround(this.pinch.zoom * (fingerGap() / this.pinch.distance), {
+          const mid = {
             x: (this.input.pointer1.x + this.input.pointer2.x) / 2,
             y: (this.input.pointer1.y + this.input.pointer2.y) / 2,
-          });
+          };
+          this.zoomAround(this.pinch.zoom * (fingerGap() / this.pinch.distance), mid);
+          // Two fingers moving together pan the map too: with a tool in hand one finger draws, so this is how to
+          // get about without putting the tool down.
+          cam.setScroll(
+            cam.scrollX - (mid.x - this.pinch.x) / cam.zoom,
+            cam.scrollY - (mid.y - this.pinch.y) / cam.zoom,
+          );
+          this.pinch.x = mid.x;
+          this.pinch.y = mid.y;
+          this.fitBounds();
         }
         return;
       }

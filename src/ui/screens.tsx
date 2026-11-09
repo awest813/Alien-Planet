@@ -480,7 +480,9 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
         </li>
         <li>
           <b>Drag on the map</b> to give orders: chop trees, mark a stockpile, outline walls.{' '}
-          {TOUCH ? 'Tap Select to put the tool down.' : 'Right-click drops the tool.'}
+          {TOUCH
+            ? 'Two fingers move the map (and pinch to zoom); tap Select to put the tool down.'
+            : 'Right-click drops the tool.'}
         </li>
         <li>
           <b>Watch the alerts</b> above the goals. {TOUCH ? 'Tap' : 'Click'} one to jump to whoever or whatever it's
@@ -489,7 +491,7 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
       </ol>
       <p className="muted">
         First night: walls, a door and a bed for everyone before 22:00. The timber salvaged from your landing is a
-        start; a small hut (5×5) is plenty. The clock waits until you start it (Space).
+        start; a small hut (5×5) is plenty. The clock waits until you start it{TOUCH ? '' : ' (Space)'}.
       </p>
       <details>
         <summary>Controls</summary>
@@ -652,7 +654,12 @@ export function ResearchScreen({ state, onClose }: { state: UiState; onClose: ()
                     ? 'Done'
                     : `${Math.round(p.progress * p.cost).toLocaleString()} / ${p.cost.toLocaleString()} points`}
                 </span>
-                {p.current && <span className="tag good">studying now</span>}
+                {p.current &&
+                  (state.researchBench ? (
+                    <span className="tag good">studying now</span>
+                  ) : (
+                    <span className="tag">chosen: build a research bench to start</span>
+                  ))}
                 {!p.done && p.available && (
                   <button
                     onClick={() => controller.setResearch(p.current ? null : p.key)}
@@ -731,9 +738,11 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
       <WorldNews state={state} />
       <h3>Neighbours</h3>
       <p className="muted small">
-        Your silver: {d.silver}. Goodwill brings better prices, more caravans and more gifts of supplies; below 0 they
-        stop trading altogether. Raiders soften when their people are let go or ransomed, and harden when they are
-        starved; the warier they are, the more often and harder they raid.
+        Silver in storage: {d.silver}
+        {d.looseSilver > 0 && ` (and ${d.looseSilver} lying about: haul it to a stockpile to spend it)`}. Goodwill
+        brings better prices, more caravans and more gifts of supplies; below 0 they stop trading altogether. Raiders
+        soften when their people are let go or ransomed, and harden when they are starved; the warier they are, the more
+        often and harder they raid.
       </p>
       <table className="summary">
         <tbody>
@@ -757,7 +766,7 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
                       onClick={() => controller.command({ type: 'tribute', faction: f.id })}
                       title={
                         d.silver < d.tributeCost
-                          ? `The colony has ${d.silver} silver of the ${d.tributeCost} it would take`
+                          ? `The colony has ${d.silver} silver in storage of the ${d.tributeCost} it would take`
                           : 'Pay them to leave the colony alone for 12 days: their share of the raids stops (the others still come)'
                       }
                     >
@@ -815,7 +824,7 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
                             (f.goodwill ?? 0) < d.hireGoodwill
                               ? `They won't fight for the colony below goodwill ${d.hireGoodwill}`
                               : d.silver < d.hireCost
-                                ? `The colony has ${d.silver} silver of the ${d.hireCost} it would take`
+                                ? `The colony has ${d.silver} silver in storage of the ${d.hireCost} it would take`
                                 : `Their fighters come to every raid and siege for ${d.hireDays} days, timed to arrive with the raiders`
                           }
                         >
@@ -846,7 +855,7 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
                                 : d.settler.waitDays > 0
                                   ? `Nobody else is ready to leave for ${d.settler.waitDays} days`
                                   : d.silver < d.settler.cost
-                                    ? `The colony has ${d.silver} silver of the ${d.settler.cost} it would take`
+                                    ? `The colony has ${d.silver} silver in storage of the ${d.settler.cost} it would take`
                                     : 'A willing settler comes to join the colony'
                           }
                         >
