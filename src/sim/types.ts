@@ -58,6 +58,8 @@ export interface Job {
   gathering?: boolean;
   // An elder telling stories by the fire at `target`, or someone listening to them.
   telling?: boolean;
+  // Tending an elder's aches (not a wound or an illness).
+  soothe?: boolean;
   hearing?: boolean;
 }
 
@@ -346,6 +348,8 @@ export interface Health {
   poisoned: number;
   // The aches of old age (see ageing.ts); missing in older saves.
   ailments?: AilmentKey[];
+  // Eased with herbal medicine until this tick: the aches of old age hurt less meanwhile.
+  easedUntil?: number;
   // Lasting marks of old wounds (see body.ts).
   scars?: {
     part: 'torso' | 'arm' | 'leg' | 'hand' | 'head' | 'eye';

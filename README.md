@@ -71,7 +71,7 @@ How the living simulation works:
 
 - **Lands:** a tundra start is colder, rockier and snowier, with muskoxen, cool summers and no heat waves; its
   colonists land in parkas, with a tunic each for the summer. A desert has little wood or water, hot afternoons
-  and cold nights; a forest is thick with trees and berry bushes and wetter. Each has its own grass: pale on the
+  and cold nights, and dry scrub on the open sand that gives a little firewood when cut and slowly grows back; a forest is thick with trees and berry bushes and wetter. Each has its own grass: pale on the
   tundra, dry in the desert, deep green in the forest. A river or a lake around an island can cut the valley up,
   crossed at shallow fords; on a big map the river is broader with more fords, and the island stays a tight spot
   with more mainland across the water.
@@ -95,7 +95,9 @@ How the living simulation works:
   skilled adult, play together, and come of age remembering a hard or a happy childhood. From 65, elders may
   get stiff joints, a sore back, failing eyes or frailty; the frail have their meals brought, and elders can
   retire. Some evenings an elder tells the old stories by a lit fire: whoever's free gathers round, both feel
-  better for it, and the children and teens listening pick up something of the teller's best skill. Grief for a spouse, child, parent or friend lasts weeks and returns on the anniversary; the colony
+  better for it, and the children and teens listening pick up something of the teller's best skill. A doctor
+  with herbal medicine to spare (more than three doses) eases an aching elder: the old aches hurt less than
+  half as much for three days. Grief for a spouse, child, parent or friend lasts weeks and returns on the anniversary; the colony
   expects more of its leader as the years pass, and the leader and elders want rooms of their own.
 - **The wider world:** the raiders have goodwill too: releasing or ransoming their people softens them,
   starving or executing them hardens them (an execution also weighs on every colonist for days), and once they're soft enough they'll take a truce. A second friendly faction,

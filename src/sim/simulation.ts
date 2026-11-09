@@ -118,7 +118,7 @@ import {
   checkMarriages,
 } from './social';
 import { griefThoughts, updateGrief } from './grief';
-import { ageThoughts, needsCare, setRetired } from './ageing';
+import { ageThoughts, ailmentPain, needsCare, setRetired } from './ageing';
 import { stepLesson, tryLesson, trySeekPlaymate, updateChildhood, updatePlay, updateSchool } from './school';
 import {
   Difficulty,
@@ -462,6 +462,10 @@ const WORK_JOBS = new Set<JobType>([
 ]);
 const TEND_TICKS = 80;
 const MEDICINE = itemId('herbalMedicine');
+// A doctor with time to spare eases an elder's aches with herbal medicine (while the colony has more than
+// this much to spare for wounds): they hurt less for three days.
+const SOOTHE_RESERVE = 3;
+const EASE_TICKS = TICKS_PER_HOUR * 24 * 3;
 const WOOD = itemId('wood');
 // A stored weapon must be this much better (by weaponScore) before someone swaps theirs for it.
 const WEAPON_UPGRADE = 1.15;
@@ -1112,6 +1116,12 @@ export class Simulation {
       this.updateGathering();
     }
     if (this.tick % TICKS_PER_HOUR === 0) {
+      // An elder's herbal rub wears off.
+      for (const c of this.colonists) {
+        if (c.health.easedUntil !== undefined && this.tick >= c.health.easedUntil) {
+          c.health.easedUntil = undefined;
+        }
+      }
       this.updateIce();
       updateWeather(this);
       updateBeacon(this);
@@ -1816,6 +1826,9 @@ export class Simulation {
         const patient = this.colonists[job.patient];
         if (job.stage === 0) {
           return 'Fetching medicine';
+        }
+        if (job.soothe) {
+          return `Easing ${patient?.name ?? 'an elder'}'s aches`;
         }
         return patient === c ? 'Tending own wounds' : `Tending ${patient?.name ?? 'a patient'}`;
       }
@@ -3286,7 +3299,8 @@ export class Simulation {
           this.tryFeed(c, STARVING_PATIENT) ||
           this.tryTend(c) ||
           this.tryRescue(c) ||
-          this.tryFeed(c)
+          this.tryFeed(c) ||
+          this.trySoothe(c)
         );
       case 'construction':
         return this.tryConstruct(c) || this.tryDeliver(c) || this.tryDesignations(c, [Designation.DECONSTRUCT]);
@@ -7578,10 +7592,50 @@ export class Simulation {
     return true;
   }
 
+  // An elder whose old aches could do with easing, and herbal medicine to spare for it.
+  private trySoothe(c: Colonist): boolean {
+    const w = this.world;
+    if (this.stockOf(MEDICINE) <= SOOTHE_RESERVE) {
+      return false;
+    }
+    const region = this.regionOf(c.tile);
+    const patient = this.living().find(
+      (p) =>
+        p !== c &&
+        ailmentPain(p) > 0 &&
+        p.health.easedUntil === undefined &&
+        !p.health.downed &&
+        !this.isReserved(`t${p.id}`, c) &&
+        this.regions.region[p.tile] === region,
+    );
+    if (!patient) {
+      return false;
+    }
+    const medicine = this.nearestIn(
+      'items',
+      c.tile,
+      (i) => w.itemType[i] === MEDICINE && this.regions.region[i] === region && !this.itemTaken(i, c),
+      1,
+    )[0];
+    const path = medicine !== undefined ? this.pathfinder.find(c.tile, [medicine]) : null;
+    if (medicine === undefined || !path) {
+      return false;
+    }
+    this.dropCarried(c);
+    this.reserve(c, `t${patient.id}`);
+    this.reserve(c, `i${medicine}`);
+    this.assign(
+      c,
+      this.makeJob('tend', -1, { source: medicine, item: MEDICINE, patient: patient.id, soothe: true }),
+      path,
+    );
+    return true;
+  }
+
   private stepTend(c: Colonist, job: Job): void {
     const w = this.world;
     const patient = this.colonists[job.patient];
-    if (!patient || !needsTending(this, patient)) {
+    if (!patient || (job.soothe ? patient.health.dead : !needsTending(this, patient))) {
       this.endJob(c);
       return;
     }
@@ -7631,7 +7685,14 @@ export class Simulation {
       if (medicine && --c.carrying!.count <= 0) {
         c.carrying = null;
       }
-      tend(this, c, patient, medicine, this.messAround(patient.tile));
+      if (job.soothe) {
+        if (medicine) {
+          patient.health.easedUntil = this.tick + EASE_TICKS;
+          this.addThought(patient, 'achesEased');
+        }
+      } else {
+        tend(this, c, patient, medicine, this.messAround(patient.tile));
+      }
       this.endJob(c);
     }
   }

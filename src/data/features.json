@@ -1398,5 +1398,18 @@
       ],
       "work": 60
     }
+  },
+  {
+    "key": "scrub",
+    "name": "Dry scrub",
+    "natural": true,
+    "passable": true,
+    "moveCost": 1.2,
+    "harvest": {
+      "work": "chop",
+      "amount": 40,
+      "item": "wood",
+      "count": 5
+    }
   }
 ]

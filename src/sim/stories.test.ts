@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { featureId } from './defs';
+import { ailmentPain } from './ageing';
+import { featureId, itemId } from './defs';
 import { Simulation } from './simulation';
 import { HOUR, clearAround, run } from './test-helpers';
 import { SKILL_KEYS } from './types';
@@ -62,5 +63,51 @@ describe('stories by the fire', () => {
     w.setFeature(fire, 0);
     run(sim, HOUR * 2);
     expect(sim.storyCircle).toBeNull();
+  });
+});
+
+describe("easing an elder's aches", () => {
+  it('a doctor with medicine to spare rubs an aching elder, and the aches hurt less for three days', () => {
+    const sim = Simulation.newColony(63);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 12);
+    sim.animals = [];
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    const [elder, doctor] = sim.colonists;
+    elder.age = 72;
+    elder.health.ailments = ['stiffJoints', 'soreBack'];
+    const before = ailmentPain(elder);
+    for (const c of sim.colonists) {
+      c.needs.food = 1;
+      c.needs.rest = 1;
+      c.priorities.doctor = c === doctor ? 1 : 0;
+    }
+    w.addItem(w.idx(x + 2, y + 2), itemId('herbalMedicine'), 10);
+    for (let t = 0; t < HOUR * 6 && elder.health.easedUntil === undefined; t++) {
+      sim.step();
+    }
+    expect(elder.health.easedUntil).toBeDefined();
+    expect(ailmentPain(elder)).toBeCloseTo(before * 0.4);
+    expect(elder.thoughts.some((t) => t.key === 'achesEased')).toBe(true);
+    expect(sim.stockOf(itemId('herbalMedicine'))).toBe(9);
+    // Three days on, that rub has worn off (the doctor may have given another since).
+    const first = elder.health.easedUntil!;
+    expect(first - sim.tick).toBeLessThanOrEqual(HOUR * 24 * 3);
+    run(sim, HOUR * 24 * 3 + HOUR);
+    expect(elder.health.easedUntil).not.toBe(first);
+  });
+
+  it("keeps the colony's last few doses for wounds", () => {
+    const sim = Simulation.newColony(64);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 12);
+    sim.animals = [];
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    const elder = sim.colonists[0];
+    elder.age = 72;
+    elder.health.ailments = ['soreBack'];
+    w.addItem(w.idx(x + 2, y + 2), itemId('herbalMedicine'), 3);
+    run(sim, HOUR * 6);
+    expect(elder.health.easedUntil).toBeUndefined();
   });
 });

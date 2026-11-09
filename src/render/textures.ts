@@ -354,6 +354,30 @@ function drawFeature(c: Ctx, key: string): void {
         [4, 11],
       ].forEach(([x, y]) => c.fillRect(x, y, 1, 1));
       break;
+    case 'scrub':
+      // A low, dry tangle of twigs: firewood in the desert.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(3, 12, 10, 2);
+      c.fillStyle = '#7a6440';
+      [
+        [4, 8, 1, 5],
+        [6, 6, 1, 7],
+        [8, 7, 1, 6],
+        [10, 6, 1, 7],
+        [11, 9, 1, 4],
+        [5, 7, 2, 1],
+        [8, 5, 3, 1],
+      ].forEach(([x, y, w, h]) => c.fillRect(x, y, w, h));
+      c.fillStyle = '#8a8a4a';
+      [
+        [5, 6],
+        [7, 5],
+        [9, 6],
+        [11, 8],
+        [4, 9],
+        [10, 10],
+      ].forEach(([x, y]) => c.fillRect(x, y, 2, 1));
+      break;
     case 'rock':
       c.fillStyle = '#4b4a4f';
       c.fillRect(0, 0, TILE, TILE);

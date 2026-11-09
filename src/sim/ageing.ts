@@ -63,7 +63,10 @@ export const RETIRE_AGE = 68;
 const WORKERS_TO_RETIRE = 3;
 
 export const ailmentsOf = (c: Colonist): AilmentKey[] => c.health.ailments ?? [];
-export const ailmentPain = (c: Colonist): number => ailmentsOf(c).reduce((sum, a) => sum + AILMENTS[a].pain, 0);
+// While a doctor's herbal rub lasts, the aches hurt less than half as much.
+export const EASED_PAIN = 0.4;
+export const ailmentPain = (c: Colonist): number =>
+  ailmentsOf(c).reduce((sum, a) => sum + AILMENTS[a].pain, 0) * (c.health.easedUntil !== undefined ? EASED_PAIN : 1);
 export const ailmentWork = (c: Colonist): number => ailmentsOf(c).reduce((p, a) => p * AILMENTS[a].work, 1);
 export const ailmentMove = (c: Colonist): number => ailmentsOf(c).reduce((p, a) => p * AILMENTS[a].move, 1);
 export const ailmentAim = (c: Colonist): number => ailmentsOf(c).reduce((sum, a) => sum + AILMENTS[a].aim, 0);

@@ -26,9 +26,6 @@ with esbuild for speed (see ROADMAP).
 - **Some dealings are thin:** the harness seldom buys settlers (its population is at the cap), and Meadow Kin
   goodwill still ends at 100 in some runs. (Envoys walk in, wait about the colony, and walk off home with the
   answer; a returning expedition is seen on the road two hours out.)
-- **The desert's wood:** heat waves are survivable now (one heatstroke death in a 20-colony desert sample over two
-  summers), but wood is scarce, and a desert colony that doesn't plant a grove can burn the last of it and freeze in
-  a later winter (one of the 120-day playtest colonies, in year 5).
 - **Islands and the tundra run hungry:** in a 48-day sweep of every land and layout (five seeds each, Tiny and
   Medium) no colony is lost, but islands starve 3–8 times as many colonist-hours as valleys (little room to
   farm) and have the most breaks, and the tundra's cool summers grow less (Tiny tundra valleys about 2,400
@@ -39,8 +36,6 @@ with esbuild for speed (see ROADMAP).
   95–100 with over a thousand items lying about), but up to 68 ms in days with a raid on. What's left is spread
   thin: pathfinding, colonists choosing work, combat. At top speed even 100 ms per 1,000 ticks is only about 8
   ms of each second.
-- **Elders' care beyond meals:** nothing yet eases an elder's aches; frail elders have their meals brought,
-  elders retire from heavy work, and they tell stories by the fire.
 - **Testing:** the long-press hasn't been tried on a real iPhone. Performance is still checked by hand (`scripts/perf.ts`); it's too noisy for CI. Saves from before
   version 16 can't be loaded (the game says so).
 
@@ -62,6 +57,12 @@ with esbuild for speed (see ROADMAP).
     the lake grows more slowly, so the island stays a tight spot.
   - **The lands all looked alike:** each has its own grass now: pale and lichened on the tundra, dry in the
     desert, deep green in the forest.
+- **The desert's wood ran out:** a desert colony that didn't plant a grove could burn the last of its wood and
+  freeze in a later winter. Dry scrub now grows on a twentieth of the desert's open sand: it gives 5 wood when
+  cut and spreads back slowly, like the trees. Three five-year desert colonies kept 180–1,200 wood throughout
+  and nobody froze.
+- **Elders' only care was meals:** a doctor with herbal medicine to spare (more than three doses) now eases an
+  aching elder, and the aches hurt less than half as much for three days.
 - **Elders gave nothing back:** some evenings an elder tells the old stories by a lit fire; whoever's free
   gathers round, both feel better for it, and children and teens listening learn something of the teller's
   best skill.

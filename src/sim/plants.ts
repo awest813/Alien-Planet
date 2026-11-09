@@ -10,9 +10,9 @@ const BLOWN_IN = 0.25;
 // Without a record of the starting cover (an old save), spreading stops at this share of the map.
 const DEFAULT_COVER = 0.08;
 
-// Trees and berry bushes on the map.
+// Trees, berry bushes and (in the desert) dry scrub on the map.
 export function wildPlantCover(sim: Simulation): number {
-  const spreading = [featureId('tree'), featureId('berryBush')];
+  const spreading = [featureId('tree'), featureId('berryBush'), featureId('scrub')];
   return sim.countFeature((f) => spreading.includes(f));
 }
 
@@ -24,7 +24,7 @@ export function spreadWildPlants(sim: Simulation): void {
     return;
   }
   const w = sim.world;
-  const spreading = [featureId('tree'), featureId('berryBush')];
+  const spreading = [featureId('tree'), featureId('berryBush'), featureId('scrub')];
   // Back to (about) what the map started with, and no further.
   const start = sim.wildCover || w.size * DEFAULT_COVER;
   const cover = wildPlantCover(sim);
@@ -58,7 +58,12 @@ export function spreadWildPlants(sim: Simulation): void {
         w.setFeature(i, w.feature[parent]);
       }
     } else if (sim.rng.chance(windBlown)) {
-      w.setFeature(i, sim.rng.chance(0.75) ? spreading[0] : spreading[1]);
+      // (In the desert, what blows in onto the sand is as likely to be scrub as a tree.)
+      const scrubby = sim.biome === 'desert' && terrainDef(w.terrain[i]).key === 'sand';
+      w.setFeature(
+        i,
+        scrubby && sim.rng.chance(0.5) ? spreading[2] : sim.rng.chance(0.75) ? spreading[0] : spreading[1],
+      );
     }
   }
 }

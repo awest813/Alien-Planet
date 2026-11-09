@@ -307,6 +307,11 @@
     "mood": 4,
     "hours": 12
   },
+  "achesEased": {
+    "label": "Aches eased with a herbal rub",
+    "mood": 5,
+    "hours": 48
+  },
   "heardStories": {
     "label": "Heard the old stories by the fire",
     "mood": 4,

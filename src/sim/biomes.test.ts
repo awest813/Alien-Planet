@@ -264,3 +264,19 @@ describe('lands fitted to their climate and size', () => {
     expect(island(192)).toBeLessThan(island(64) * 1.2);
   });
 });
+
+describe('desert scrub', () => {
+  it('grows on the desert sand only, and gives a little wood when chopped', () => {
+    const scrub = featureId('scrub');
+    const desert = Simulation.newColony(12, 'standard', 64, { biome: 'desert' });
+    const onSand = desert.world.feature.filter(
+      (f, i) => f === scrub && terrainDef(desert.world.terrain[i]).key === 'sand',
+    );
+    expect(onSand.length).toBeGreaterThan(20);
+    expect(desert.world.feature.filter((f) => f === scrub).length).toBe(onSand.length);
+    const temperate = Simulation.newColony(12);
+    expect(temperate.world.feature.filter((f) => f === scrub).length).toBe(0);
+    expect(featureDef(scrub).harvest).toMatchObject({ work: 'chop', count: 5 });
+    expect(featureDef(scrub).natural).toBe(true);
+  });
+});

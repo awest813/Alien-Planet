@@ -17,6 +17,9 @@ export interface GeneratedMap {
   spawn: number;
 }
 
+// Share of a desert's open sand that starts with dry scrub on it.
+const DESERT_SCRUB = 0.05;
+
 export function generateWorld(
   width: number,
   height: number,
@@ -51,6 +54,7 @@ export function generateWorld(
   const STONE = terrainId('stoneFloor');
   const TREE = featureId('tree');
   const BUSH = featureId('berryBush');
+  const SCRUB = featureId('scrub');
   const ROCK = featureId('rock');
 
   for (let i = 0; i < world.size; i++) {
@@ -76,6 +80,9 @@ export function generateWorld(
         world.feature[i] = TREE;
       } else if (roll > land.bushAbove) {
         world.feature[i] = BUSH;
+      } else if (biome === 'desert' && t === SAND && hash2(x, y, seed + 47) < DESERT_SCRUB) {
+        // Dry scrub on the open sand: a little firewood that grows back.
+        world.feature[i] = SCRUB;
       }
     }
     world.terrain[i] = t;
