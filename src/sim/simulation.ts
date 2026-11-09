@@ -102,7 +102,7 @@ import { emptyXp, learn, rollPassions, rustSkills, skillFactor } from './skills'
 import { PassRegions, Rooms, computePassRegions, computeRooms } from './regions';
 import { Rng, hash2 } from './rng';
 import { Caravan, sellArt, updateCaravan } from './trade';
-import { updateAlliances, worldAction } from './alliances';
+import { updateAlliances, updateVisitors, worldAction } from './alliances';
 import { travel, updateExpeditions } from './expeditions';
 import { WET_CHILL, WeatherState, douse, freshWeather, isWet, updateFires, updateWeather, weatherDef } from './weather';
 import {
@@ -1106,6 +1106,7 @@ export class Simulation {
     updateEnemies(this);
     updateAnimals(this);
     updateCaravan(this);
+    updateVisitors(this);
 
     // Goals are checked often enough that one ticks off moments after it's done (a couple of seconds at
     // normal speed), but not every tick.

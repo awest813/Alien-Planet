@@ -906,11 +906,15 @@ export class ColonyScene extends Phaser.Scene {
     this.fadedCounts = covered;
   }
 
-  // Visiting traders: green-clad figures with green name labels.
+  // Visiting traders: green-clad figures with green name labels. An envoy (waiting on an answer, or on their way
+  // home with it) wears blue, with a gold name.
   private syncTraders(): void {
     const sim = controller.sim;
     const world = sim.world;
-    const visitors = sim.caravan?.visitors ?? [];
+    const d = sim.diplomacy;
+    const envoys = [...(d.envoy?.visitor ? [d.envoy.visitor] : []), ...(d.departing ?? [])];
+    const envoyIds = new Set(envoys.map((v) => v.id));
+    const visitors = [...(sim.caravan?.visitors ?? []), ...envoys];
     const present = new Set(visitors.map((v) => v.id));
     for (const [id, trader] of this.traders) {
       if (!present.has(id)) {
@@ -922,13 +926,14 @@ export class ColonyScene extends Phaser.Scene {
       let trader = this.traders.get(v.id);
       if (!trader) {
         const legs = this.add.image(0, 0, 'pawn-legs-0');
-        const body = this.add.image(0, 0, 'pawn-body').setTint(0x5f9a4a);
+        const envoy = envoyIds.has(v.id);
+        const body = this.add.image(0, 0, 'pawn-body').setTint(envoy ? 0x4a6fa5 : 0x5f9a4a);
         const head = this.add.image(0, 0, 'pawn-head');
         const label = this.add
           .text(0, -11, v.name, {
             fontFamily: 'system-ui, sans-serif',
             fontSize: '6px',
-            color: '#9fe38a',
+            color: envoy ? '#ffd98a' : '#9fe38a',
             stroke: '#000000',
             strokeThickness: 2,
           })

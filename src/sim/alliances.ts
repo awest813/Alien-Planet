@@ -4,7 +4,7 @@ import { buySettler, changeGoodwill, fightersHired, friendly, proposeTruce } fro
 import { cannotGo, sendExpedition } from './expeditions';
 import { ransom } from './prisoners';
 import type { Simulation } from './simulation';
-import { colonyStock, goodwillOf, takeFromStockpiles } from './trade';
+import { Visitor, colonyStock, goodwillOf, stepVisitor, takeFromStockpiles } from './trade';
 import type { WorldAction } from './types';
 
 // The two friendly factions, the Meadow Kin and the Hollowstone Clans, don't get on. Now and then they
@@ -23,6 +23,8 @@ export interface Dispute {
 export interface Envoy {
   faction: number;
   until: number;
+  // The envoy in person, waiting about the colony for an answer (older saves: none).
+  visitor?: Visitor;
 }
 
 export interface Alliance {
@@ -142,7 +144,7 @@ export function updateAlliances(sim: Simulation): void {
     d.nextEnvoyDay = gap(sim, ENVOY_GAP);
     if (keen.length > 0) {
       const f = keen.length > 1 && sim.rng.next() < 0.5 ? keen[1] : keen[0];
-      d.envoy = { faction: f.id, until: sim.tick + ANSWER_DAYS * DAY };
+      d.envoy = { faction: f.id, until: sim.tick + ANSWER_DAYS * DAY, visitor: envoyArrives(sim, f.id) };
       sim.addLog(
         `An envoy from ${name(f.id)} has come to offer an alliance for ${ALLIANCE_DAYS} days: their fighters would come to your raids more readily, and they would ask your help when raided (Factions).`,
         'info',
@@ -209,6 +211,10 @@ export function answerEnvoy(sim: Simulation, accept: boolean): string | null {
     return 'No envoy is waiting.';
   }
   d.envoy = null;
+  // They set off home, answer in hand.
+  if (envoy.visitor) {
+    (d.departing ??= []).push(envoy.visitor);
+  }
   if (!accept) {
     changeGoodwill(sim, envoy.faction, -DECLINE_ENVOY);
     sim.addLog(`The colony sent ${name(envoy.faction)}'s envoy home without an alliance.`, 'info');
@@ -301,5 +307,45 @@ export function worldAction(sim: Simulation, action: WorldAction): string | null
       return answerCall(sim, action.answer);
     case 'expedition':
       return sendExpedition(sim, action.to, action.purpose, action.colonists);
+  }
+}
+
+// The envoy walks in from the map edge nearest the colony (none if there's no way in).
+function envoyArrives(sim: Simulation, faction: number): Visitor | undefined {
+  const w = sim.world;
+  const home = sim.homeTile();
+  const region = sim.outsideRegion();
+  if (home === undefined || region === undefined) {
+    return undefined;
+  }
+  const edge = sim.nearest(
+    home,
+    (i) => {
+      const x = w.xOf(i);
+      const y = w.yOf(i);
+      return (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) && sim.regionOf(i) === region;
+    },
+    1,
+  )[0];
+  if (edge === undefined) {
+    return undefined;
+  }
+  const names = FACTIONS[faction].names;
+  const name = names.length > 0 ? `Envoy ${sim.rng.pick(names)}` : 'Envoy';
+  return { id: sim.nextVisitorId++, name, tile: edge, path: [], moveProgress: 0, restUntil: 0 };
+}
+
+// Every tick: an envoy waiting about the colony, and visitors on their way home.
+export function updateVisitors(sim: Simulation): void {
+  const d = sim.diplomacy;
+  const home = sim.homeTile();
+  if (d.envoy?.visitor) {
+    stepVisitor(sim, d.envoy.visitor, false, home);
+  }
+  if (d.departing?.length) {
+    for (const v of d.departing) {
+      stepVisitor(sim, v, true, home);
+    }
+    d.departing = d.departing.filter((v) => v.tile >= 0);
   }
 }

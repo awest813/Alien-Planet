@@ -209,48 +209,7 @@ export function updateCaravan(sim: Simulation): void {
     sim.addLog(`The traders from ${FACTIONS[caravan.faction].name} are packing up.`, 'info');
   }
   for (const v of caravan.visitors) {
-    if (v.path.length === 0 && sim.tick >= v.restUntil) {
-      if (caravan.leaving) {
-        const region = sim.regionOf(v.tile);
-        const exit = sim.nearest(
-          v.tile,
-          (i) => {
-            const x = w.xOf(i);
-            const y = w.yOf(i);
-            return (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) && sim.regionOf(i) === region;
-          },
-          1,
-        )[0];
-        v.path = exit !== undefined ? (sim.pathfinder.find(v.tile, [exit]) ?? []) : [];
-        if (v.path.length === 0) {
-          // At the edge (or with nowhere to go): gone.
-          v.tile = -1;
-        }
-      } else if (home !== undefined) {
-        // Stand somewhere near the middle of the colony.
-        const x = w.xOf(home) + sim.rng.int(-4, 4);
-        const y = w.yOf(home) + sim.rng.int(-4, 4);
-        if (w.inBounds(x, y) && w.isPassable(w.idx(x, y)) && sim.regionOf(w.idx(x, y)) === sim.regionOf(v.tile)) {
-          v.path = sim.pathfinder.find(v.tile, [w.idx(x, y)]) ?? [];
-        }
-        v.restUntil = sim.tick + sim.rng.int(200, 600);
-      }
-    }
-    if (v.path.length > 0) {
-      const next = v.path[0];
-      if (!w.isPassable(next)) {
-        v.path = [];
-        v.moveProgress = 0;
-        continue;
-      }
-      const diagonal = w.xOf(next) !== w.xOf(v.tile) && w.yOf(next) !== w.yOf(v.tile);
-      v.moveProgress += (MOVE_SPEED * 0.85) / (w.moveCost(next) * (diagonal ? Math.SQRT2 : 1));
-      if (v.moveProgress >= 1) {
-        v.tile = next;
-        v.path.shift();
-        v.moveProgress = 0;
-      }
-    }
+    stepVisitor(sim, v, caravan.leaving, home);
   }
   caravan.visitors = caravan.visitors.filter((v) => v.tile >= 0);
   if (
@@ -504,4 +463,52 @@ export function sellArt(sim: Simulation, tile: number): string | null {
     true,
   );
   return null;
+}
+
+// A visitor's tick: on their way out, to the map edge and gone (their tile set to -1); otherwise standing
+// about near the middle of the colony, moving now and then. (Traders, and an envoy waiting on an answer.)
+export function stepVisitor(sim: Simulation, v: Visitor, leaving: boolean, home: number | undefined): void {
+  const w = sim.world;
+  if (v.path.length === 0 && sim.tick >= v.restUntil) {
+    if (leaving) {
+      const region = sim.regionOf(v.tile);
+      const exit = sim.nearest(
+        v.tile,
+        (i) => {
+          const x = w.xOf(i);
+          const y = w.yOf(i);
+          return (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) && sim.regionOf(i) === region;
+        },
+        1,
+      )[0];
+      v.path = exit !== undefined ? (sim.pathfinder.find(v.tile, [exit]) ?? []) : [];
+      if (v.path.length === 0) {
+        // At the edge (or with nowhere to go): gone.
+        v.tile = -1;
+      }
+    } else if (home !== undefined) {
+      // Stand somewhere near the middle of the colony.
+      const x = w.xOf(home) + sim.rng.int(-4, 4);
+      const y = w.yOf(home) + sim.rng.int(-4, 4);
+      if (w.inBounds(x, y) && w.isPassable(w.idx(x, y)) && sim.regionOf(w.idx(x, y)) === sim.regionOf(v.tile)) {
+        v.path = sim.pathfinder.find(v.tile, [w.idx(x, y)]) ?? [];
+      }
+      v.restUntil = sim.tick + sim.rng.int(200, 600);
+    }
+  }
+  if (v.path.length > 0) {
+    const next = v.path[0];
+    if (!w.isPassable(next)) {
+      v.path = [];
+      v.moveProgress = 0;
+      return;
+    }
+    const diagonal = w.xOf(next) !== w.xOf(v.tile) && w.yOf(next) !== w.yOf(v.tile);
+    v.moveProgress += (MOVE_SPEED * 0.85) / (w.moveCost(next) * (diagonal ? Math.SQRT2 : 1));
+    if (v.moveProgress >= 1) {
+      v.tile = next;
+      v.path.shift();
+      v.moveProgress = 0;
+    }
+  }
 }

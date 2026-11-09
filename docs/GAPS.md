@@ -26,12 +26,12 @@ with esbuild for speed (see ROADMAP).
   from 9 breaks in ten years to 2, mean mood 48.8).
 - **Elders barely appear in ten years** (founders are 18–53), so ailments, care and retirement show little in the
   usual runs; care is meals only.
-- **Some dealings are thin:** there's no execute action (so that can't harden raiders); envoys and returning
-  expeditions are log lines and figures at the map edge, not visitors who walk in; colonists away don't hear of
-  deaths at home; the harness seldom buys settlers (its population is at the cap). Meadow Kin goodwill still
-  ends at 100 in some runs.
-- **The desert is the hardest land:** heat waves at the height of summer can kill several colonists before they
-  get shelter. It may want gentler tuning.
+- **Some dealings are thin:** there's no execute action (so that can't harden raiders); returning expeditions
+  simply appear at the map edge; the harness seldom buys settlers (its population is at the cap). Meadow Kin
+  goodwill still ends at 100 in some runs. (Envoys now walk in, wait about the colony, and walk off home with the
+  answer.)
+- **The desert's heat** was killing colonists in summer heat waves; in a 20-colony desert sample over two
+  summers there's now one heatstroke death (a demolisher's colony).
 - **Pens:** troughs take potatoes, berries or grain, but nothing else (no hay). Fences that make no pen, and pens
   with no trough, get an alert.
 - **Tundra is hard on a slow start:** trees are scarce, and a farming-first colony that hasn't finished its hut

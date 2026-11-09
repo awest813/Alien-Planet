@@ -166,6 +166,32 @@ describe('envoys and alliances', () => {
     expect(sim.diplomacy.alliance ?? null).toBeNull();
   });
 
+  it('the envoy walks in to wait about the colony, and walks off home with the answer', () => {
+    const { sim } = colony(6);
+    sim.goodwill[HILLS] = 60;
+    sim.tick = DAY * 20;
+    sim.diplomacy.nextDisputeDay = 1000;
+    sim.diplomacy.nextEnvoyDay = 0;
+    hours(sim, 24 * 2, () => !!sim.diplomacy.envoy);
+    const envoy = sim.diplomacy.envoy!.visitor!;
+    expect(envoy.name).toMatch(/^Envoy /);
+    const w = sim.world;
+    // From the map edge to the middle of the colony.
+    expect(w.distance(envoy.tile, sim.homeTile()!)).toBeGreaterThan(10);
+    let closest = Infinity;
+    for (let k = 0; k < 6; k++) {
+      run(sim, HOUR);
+      closest = Math.min(closest, w.distance(envoy.tile, sim.homeTile()!));
+    }
+    expect(closest).toBeLessThan(6);
+    answerEnvoy(sim, false);
+    expect(sim.diplomacy.departing).toContain(envoy);
+    run(sim, DAY);
+    expect(sim.diplomacy.departing).toHaveLength(0);
+    // Saved and loaded mid-visit.
+    expect(deserialize(structuredClone(serialize(sim))).diplomacy.departing).toEqual([]);
+  });
+
   it("an ally's fighters come to raids more readily, under their own name", () => {
     const { sim } = colony(7);
     expect(helperFaction(sim)).toBe(KIN);

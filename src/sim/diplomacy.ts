@@ -4,6 +4,7 @@ import { TICKS_PER_HOUR, populationFor } from './constants';
 import { FACTIONS, RECIPES, itemDef, itemId, quantity, weaponDef } from './defs';
 import type { Expedition } from './expeditions';
 import type { Alliance, AllyCall, Dispute, Envoy } from './alliances';
+import type { Visitor } from './trade';
 import type { Simulation } from './simulation';
 import {
   colonyStock,
@@ -59,6 +60,8 @@ export interface Diplomacy {
   nextDisputeDay?: number;
   envoy?: Envoy | null;
   nextEnvoyDay?: number;
+  // Visitors on their way back to the map edge (an envoy with the colony's answer).
+  departing?: Visitor[];
   alliance?: Alliance | null;
   call?: AllyCall | null;
   // Colonists off the map (see expeditions.ts).
