@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ailmentPain } from './ageing';
 import { featureId, itemId } from './defs';
+import { damage } from './health';
 import { Simulation } from './simulation';
 import { HOUR, clearAround, run } from './test-helpers';
 import { SKILL_KEYS } from './types';
@@ -52,6 +53,22 @@ describe('stories by the fire', () => {
     expect(sim.stats.storyNights).toBe(1);
     // Not again the next evening: once in two days.
     expect(sim.story.storiesAt).toBeGreaterThan(sim.tick + 24 * HOUR);
+  });
+
+  it('are not broken up by a concert', () => {
+    const { sim, w, fire, other } = evening(61);
+    for (let t = 0; t < HOUR * 3 && !sim.storyCircle; t++) {
+      sim.step();
+    }
+    expect(sim.storyCircle).not.toBeNull();
+    // A fine musician at a lute nearby, who would strike up a concert on any other evening.
+    const lute = w.neighbors(fire + 4 * w.width).find((i) => w.isPassable(i) && w.feature[i] === 0)!;
+    w.setFeature(lute, featureId('lute'));
+    other.skills.artistic = 15;
+    for (let t = 0; t < HOUR; t++) {
+      sim.step();
+      expect(sim.concert).toBeNull();
+    }
   });
 
   it('needs an elder and a fire', () => {
@@ -109,5 +126,52 @@ describe("easing an elder's aches", () => {
     w.addItem(w.idx(x + 2, y + 2), itemId('herbalMedicine'), 3);
     run(sim, HOUR * 6);
     expect(elder.health.easedUntil).toBeUndefined();
+  });
+});
+
+describe('a rub for the aches gives way to real tending', () => {
+  const setup = (seed: number) => {
+    const sim = Simulation.newColony(seed);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 12);
+    sim.animals = [];
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    const [elder, doctor, other] = sim.colonists;
+    elder.age = 72;
+    elder.health.ailments = ['stiffJoints', 'soreBack'];
+    for (const c of sim.colonists) {
+      c.needs.food = 1;
+      c.needs.rest = 1;
+      c.priorities.doctor = c === doctor ? 1 : 0;
+    }
+    w.addItem(w.idx(x + 8, y + 8), itemId('herbalMedicine'), 10);
+    for (let t = 0; t < HOUR * 2 && doctor.job?.type !== 'soothe'; t++) {
+      sim.step();
+    }
+    expect(doctor.job?.type).toBe('soothe');
+    return { sim, elder, doctor, other };
+  };
+
+  it('stops when the elder is hurt, and the doctor tends them instead', () => {
+    const { sim, elder, doctor } = setup(65);
+    damage(sim, elder, 0.2, 'cut');
+    run(sim, 30);
+    expect(doctor.job?.type).not.toBe('soothe');
+    for (let t = 0; t < HOUR && doctor.job?.type !== 'tend'; t++) {
+      sim.step();
+    }
+    expect(doctor.job?.type).toBe('tend');
+    expect(doctor.job?.patient).toBe(elder.id);
+  });
+
+  it("doesn't keep the doctor from someone else bleeding", () => {
+    const { sim, doctor, other } = setup(66);
+    damage(sim, other, 0.3, 'cut');
+    // (Called away within moments, not after the rub: that took 300 ticks of bleeding.)
+    for (let t = 0; t < 120 && doctor.job?.patient !== other.id; t++) {
+      sim.step();
+    }
+    expect(doctor.job?.type).toBe('tend');
+    expect(doctor.job?.patient).toBe(other.id);
   });
 });

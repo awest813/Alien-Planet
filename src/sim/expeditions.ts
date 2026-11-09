@@ -168,7 +168,7 @@ function leave(sim: Simulation, c: Colonist): void {
   c.away = 'leaving';
   // Anyone on their way to tend or feed them gives up.
   for (const o of sim.colonists) {
-    if (o !== c && o.job && o.job.patient === c.id && ['tend', 'feed', 'rescue'].includes(o.job.type)) {
+    if (o !== c && o.job && o.job.patient === c.id && ['tend', 'soothe', 'feed', 'rescue'].includes(o.job.type)) {
       sim.endJob(o);
     }
   }

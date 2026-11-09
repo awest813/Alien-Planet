@@ -223,4 +223,29 @@ describe('the colony provider', () => {
     expect(sim.colonists[1].job?.type).toBe('hunt');
     expect(sim.colonists.filter((c) => c.job?.type === 'hunt')).toHaveLength(1);
   });
+
+  it('is someone who can go: not asleep, laid up in bed or in a break', () => {
+    const { sim, w, x, y } = field(46);
+    for (const i of outline(w, x - 6, y - 6, x - 2, y - 2)) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    w.setFeature(w.idx(x - 4, y - 2), featureId('door'));
+    for (let i = 0; i < w.size; i++) {
+      if (w.itemType[i] !== 0 && itemDef(w.itemType[i]).nutrition > 0) {
+        w.takeItem(i, w.itemCount[i]);
+      }
+    }
+    sim.colonists.forEach((c, k) => {
+      c.priorities.hunting = 3;
+      c.skills.animals = 12 - k;
+    });
+    const providers = () => (sim as unknown as { providers(): number[] }).providers();
+    const after = () => {
+      (sim as unknown as { providersAt: number }).providersAt = 0;
+      return providers();
+    };
+    expect(after()).toEqual([sim.colonists[0].id]);
+    sim.colonists[0].sleeping = true;
+    expect(after()).toEqual([sim.colonists[1].id]);
+  });
 });

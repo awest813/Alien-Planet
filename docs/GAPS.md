@@ -53,7 +53,9 @@ with esbuild for speed (see ROADMAP).
   - **Big maps were speckled:** lakes, hills and woods kept a Tiny map's size, so a Large map was a scatter of
     small blobs. From Medium up they grow with the map (more slowly than it).
   - **The island's lake was a perfect ring:** its shores now bend broadly; the shallows bend with them, so the
-    fords still meet them. Every colony in the sample can walk off its map.
+    fords still meet them. Every colony in the sample can walk off its map. (This applies at every size, so
+    Tiny and Small island maps changed too: their islands are a little larger on average, about 440 tiles of
+    land on Tiny from 380.)
   - **The colony's provider chased game past the fishing spots:** a catch is surer than a chase, so the
     provider fishes first and hunts only without a spot. Island hunger fell by half or more (Tiny desert
     islands 10,600 colonist-hours to 4,200; Tiny tundra islands 7,700 to 2,400).

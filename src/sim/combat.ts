@@ -4,7 +4,18 @@ import { beaconTile, transmitting } from './beacon';
 import { qualityFactor } from './apparel';
 import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
 import { MUSTER_ALERT, fromEdgeTicks, inAbout, musterTicks, raiderTilesPerTick, walkTicks } from './arrivals';
-import { FACTIONS, NONE, NORMAL_QUALITY, WeaponDef, featureDef, featureId, itemDef, itemId, weaponDef } from './defs';
+import {
+  ANIMALS,
+  FACTIONS,
+  NONE,
+  NORMAL_QUALITY,
+  WeaponDef,
+  featureDef,
+  featureId,
+  itemDef,
+  itemId,
+  weaponDef,
+} from './defs';
 import { damage, painOf } from './health';
 import { fallWounded } from './prisoners';
 import { burnTime, ignite } from './weather';
@@ -849,6 +860,13 @@ function hurtLivestock(sim: Simulation, a: Animal, e: Enemy): void {
   const w = weaponDef(e.weapon);
   a.hp -= roll(sim, w.damage);
   if (a.hp <= 0) {
+    // What's left of it can still be butchered.
+    const def = ANIMALS[a.kind];
+    sim.world.addFilth(a.tile, Filth.BLOOD);
+    sim.world.dropItemNear(a.tile, itemId('rawMeat'), Math.floor(def.meat / 2));
+    if (def.leather > 0) {
+      sim.world.dropItemNear(a.tile, itemId('leather'), def.leather);
+    }
     sim.addLog(`Raiders killed the colony's ${animalName(a).toLowerCase()}.`, 'danger');
     sim.stats.ravaged = (sim.stats.ravaged ?? 0) + 1;
   }

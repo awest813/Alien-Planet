@@ -392,6 +392,7 @@ function skillOfJob(c: Colonist): SkillKey | null {
     case 'research':
       return 'research';
     case 'tend':
+    case 'soothe':
       return 'medicine';
     case 'sculpt':
       return 'artistic';

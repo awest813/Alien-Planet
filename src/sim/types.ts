@@ -16,6 +16,8 @@ export type JobType =
   | 'joy'
   | 'sleep'
   | 'tend'
+  // Easing an elder's aches with herbal medicine: not tending, so never in the way of it.
+  | 'soothe'
   | 'rest'
   | 'hunt'
   | 'equip'
@@ -58,8 +60,6 @@ export interface Job {
   gathering?: boolean;
   // An elder telling stories by the fire at `target`, or someone listening to them.
   telling?: boolean;
-  // Tending an elder's aches (not a wound or an illness).
-  soothe?: boolean;
   hearing?: boolean;
 }
 

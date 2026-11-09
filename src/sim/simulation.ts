@@ -1858,13 +1858,14 @@ export class Simulation {
         return 'Wandering';
       case 'lesson':
         return job.line === 1 ? 'Teaching the children' : 'At lessons';
+      case 'soothe':
+        return job.stage === 0
+          ? 'Fetching medicine'
+          : `Easing ${this.colonists[job.patient]?.name ?? 'an elder'}'s aches`;
       case 'tend': {
         const patient = this.colonists[job.patient];
         if (job.stage === 0) {
           return 'Fetching medicine';
-        }
-        if (job.soothe) {
-          return `Easing ${patient?.name ?? 'an elder'}'s aches`;
         }
         return patient === c ? 'Tending own wounds' : `Tending ${patient?.name ?? 'a patient'}`;
       }
@@ -1924,7 +1925,7 @@ export class Simulation {
         };
       }
     }
-    if (job.type === 'tend' && job.stage === 2) {
+    if ((job.type === 'tend' || job.type === 'soothe') && job.stage === 2) {
       return { tile: this.colonists[job.patient].tile, ratio: Math.min(1, job.progress / TEND_TICKS) };
     }
     if (job.type === 'craft' && job.stage === 1 && this.isAtWorkSpot(c, job.target, false)) {
@@ -3313,7 +3314,16 @@ export class Simulation {
         this.providerIds = [];
       } else {
         const able = this.living()
-          .filter((c) => c.priorities.hunting > 0 && canWork(c, 'hunting') && !c.drafted && !c.health.downed)
+          .filter(
+            (c) =>
+              c.priorities.hunting > 0 &&
+              canWork(c, 'hunting') &&
+              !c.drafted &&
+              !c.health.downed &&
+              !c.sleeping &&
+              !needsBedRest(c) &&
+              !this.inMentalBreak(c),
+          )
           .sort((a, b) => b.skills.animals - a.skills.animals || a.id - b.id);
         this.providerIds = able.slice(0, this.living().length >= 7 ? 2 : 1).map((c) => c.id);
       }
@@ -3420,6 +3430,7 @@ export class Simulation {
         }
         break;
       case 'tend':
+      case 'soothe':
         this.stepTend(c, job);
         break;
       case 'feed':
@@ -5610,6 +5621,8 @@ export class Simulation {
     const hour = Math.floor(this.hour);
     if (
       !this.concert &&
+      // (Not while an elder is telling stories: the audience is round the fire.)
+      !this.storyCircle &&
       // Not if a gathering is on, or due before the concert would end.
       !(this.gathering && this.gathering.startsAt < this.tick + CONCERT_TICKS) &&
       c.skills.artistic >= CONCERT_SKILL &&
@@ -5637,6 +5650,8 @@ export class Simulation {
           (job === 'joy' || job === 'wander' || !job) &&
           !o.job?.listening &&
           !o.job?.gathering &&
+          !o.job?.telling &&
+          !o.job?.hearing &&
           !this.inMentalBreak(o) &&
           this.slotOf(o) !== 'W' &&
           this.slotOf(o) !== 'S'
@@ -5980,7 +5995,11 @@ export class Simulation {
     if (rite) {
       return !job || !BUSY_FOR_RITES.has(job);
     }
-    return this.slotOf(c) !== 'W' && (!job || job === 'wander' || (job === 'joy' && !c.job?.listening));
+    // (Not from a concert, or from stories by the fire: a party waits for those to finish.)
+    return (
+      this.slotOf(c) !== 'W' &&
+      (!job || job === 'wander' || (job === 'joy' && !c.job?.listening && !c.job?.telling && !c.job?.hearing))
+    );
   }
 
   // At a gathering: company and good cheer, and talk with whoever else is there.
@@ -7676,7 +7695,9 @@ export class Simulation {
   // An elder whose old aches could do with easing, and herbal medicine to spare for it.
   private trySoothe(c: Colonist): boolean {
     const w = this.world;
-    if (this.stockOf(MEDICINE) <= SOOTHE_RESERVE) {
+    // (Counting doses other doctors are already off to fetch for a rub.)
+    const fetching = this.living().filter((o) => o !== c && o.job?.type === 'soothe').length;
+    if (this.stockOf(MEDICINE) - fetching <= SOOTHE_RESERVE) {
       return false;
     }
     const region = this.regionOf(c.tile);
@@ -7686,7 +7707,8 @@ export class Simulation {
         ailmentPain(p) > 0 &&
         p.health.easedUntil === undefined &&
         !p.health.downed &&
-        !this.isReserved(`t${p.id}`, c) &&
+        !needsTending(this, p) &&
+        !this.isReserved(`s${p.id}`, c) &&
         this.regions.region[p.tile] === region,
     );
     if (!patient) {
@@ -7703,20 +7725,23 @@ export class Simulation {
       return false;
     }
     this.dropCarried(c);
-    this.reserve(c, `t${patient.id}`);
+    this.reserve(c, `s${patient.id}`);
     this.reserve(c, `i${medicine}`);
-    this.assign(
-      c,
-      this.makeJob('tend', -1, { source: medicine, item: MEDICINE, patient: patient.id, soothe: true }),
-      path,
-    );
+    this.assign(c, this.makeJob('soothe', -1, { source: medicine, item: MEDICINE, patient: patient.id }), path);
     return true;
   }
 
   private stepTend(c: Colonist, job: Job): void {
     const w = this.world;
     const patient = this.colonists[job.patient];
-    if (!patient || (job.soothe ? patient.health.dead : !needsTending(this, patient))) {
+    // (A rub for an elder's aches stops at once if they're hurt or fall ill: then they need real tending.)
+    const soothe = job.type === 'soothe';
+    if (
+      !patient ||
+      (soothe
+        ? patient.health.dead || patient.health.downed || needsTending(this, patient)
+        : !needsTending(this, patient))
+    ) {
       this.endJob(c);
       return;
     }
@@ -7766,7 +7791,7 @@ export class Simulation {
       if (medicine && --c.carrying!.count <= 0) {
         c.carrying = null;
       }
-      if (job.soothe) {
+      if (soothe) {
         if (medicine) {
           patient.health.easedUntil = this.tick + EASE_TICKS;
           this.addThought(patient, 'achesEased');
