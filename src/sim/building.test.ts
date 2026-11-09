@@ -69,6 +69,20 @@ describe('floors', () => {
     expect(w.floor[tile]).toBe(NONE);
     expect(sim.stockOf(itemId('stoneBlocks'))).toBeGreaterThan(blocks);
   });
+
+  it("give back the wood still in a generator's hopper", () => {
+    const { sim, w, x, y } = site(3);
+    const tile = w.idx(x + 3, y + 3);
+    sim.research.done.push('electricity');
+    w.setFeature(tile, featureId('woodGenerator'));
+    w.fuel[tile] = 60;
+    const wood = sim.stockOf(itemId('wood'));
+    sim.apply({ type: 'designate', kind: 'deconstruct', rect: { x0: x + 3, y0: y + 3, x1: x + 3, y1: y + 3 } });
+    run(sim, HOUR * 3);
+    expect(w.feature[tile]).toBe(NONE);
+    // The refund (three-quarters of its 30 wood) and the 60 in the hopper (less any burned meanwhile).
+    expect(sim.stockOf(itemId('wood')) - wood).toBeGreaterThan(22 + 50);
+  });
 });
 
 describe('roofs', () => {

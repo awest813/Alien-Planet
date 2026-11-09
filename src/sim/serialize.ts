@@ -5,7 +5,7 @@ import { Diplomacy, freshDiplomacy } from './diplomacy';
 import { Shaft } from './depths';
 import { ChronicleEntry, chronicleFromStory } from './chronicle';
 import type { BeaconState } from './beacon';
-import { NONE, featureDef } from './defs';
+import { NONE, RECIPES, featureDef } from './defs';
 import type { JoyKind } from './defs';
 import { RaidState } from './combat';
 import { PowerState } from './power';
@@ -396,7 +396,10 @@ export function deserialize(data: SaveData): Simulation {
 
   const sim = new Simulation(world, colonists, data.seed, new Rng(data.rngState));
   sim.tick = data.tick;
-  sim.bills = structuredClone(data.bills);
+  // Recipes are appended over time: an older save has no bill for the newer ones, so they get the default.
+  sim.bills = RECIPES.map((r) =>
+    data.bills[r.id] ? { ...data.bills[r.id] } : { recipe: r.id, target: r.defaultTarget },
+  );
   sim.stats = structuredClone(data.stats);
   sim.log = data.log.map((entry) => ({ ...entry }));
   sim.storyLog = structuredClone(data.storyLog);

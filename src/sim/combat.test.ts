@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { colonistTarget, coverSpot, lineOfSight, spawnRaid, throughArmor, weaponScore, woundEnemy } from './combat';
-import { ITEMS, NONE, STARTING_WEAPON, WEAPONS, featureId, itemId, terrainId, weaponDef } from './defs';
+import { FACTIONS, ITEMS, NONE, STARTING_WEAPON, WEAPONS, featureId, itemId, terrainId, weaponDef } from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
 import { HOUR, clearAround, outline, run } from './test-helpers';
@@ -433,5 +433,64 @@ describe('ravagers', () => {
     const left = crops();
     run(sim, 30);
     expect(e.ravageAt === undefined || crops() === left).toBe(true);
+  });
+});
+
+describe('audit fixes', () => {
+  it('an archer outside shoots back at a colonist firing through embrasures', () => {
+    const { sim, w, x, y } = field(21);
+    const [c, ...rest] = sim.colonists;
+    for (const o of rest) {
+      o.away = 'gone';
+    }
+    // A sealed stone hut with embrasures along its east side, the colonist inside.
+    for (const i of outline(w, x - 2, y - 2, x + 2, y + 2)) {
+      w.setFeature(i, featureId(w.xOf(i) === x + 2 && Math.abs(w.yOf(i) - y) <= 1 ? 'embrasure' : 'stoneWall'));
+    }
+    c.tile = w.idx(x + 1, y);
+    c.drafted = true;
+    const e = raider(sim, w.idx(x + 7, y), 'shortBow', { repathAt: forever });
+    expect(sim.regionOf(e.tile)).not.toBe(sim.regionOf(c.tile));
+    let shots = 0;
+    for (let t = 0; t < 300; t++) {
+      sim.shots.length = 0;
+      sim.step();
+      shots += sim.shots.filter((s) => s.from === e.tile && s.to === c.tile).length;
+    }
+    expect(shots).toBeGreaterThan(0);
+  });
+
+  it("a siege with nowhere to camp comes on as a raid, with the raid's warning time", () => {
+    const sim = Simulation.newColony(4);
+    sim.story.lastEventTick = forever;
+    // Zones everywhere: no room for a camp.
+    sim.world.zone.fill(1);
+    const hostile = FACTIONS.findIndex((f) => f.hostile);
+    expect(spawnRaid(sim, hostile, 4, true)).toBe(true);
+    expect(sim.raid!.siege).toBeUndefined();
+    expect(sim.raid!.contactAt).toBeGreaterThan(sim.tick);
+  });
+
+  it('patches up battered walls once the raid is over', () => {
+    const { sim, w, x, y } = field(22);
+    const wall = w.idx(x + 4, y);
+    w.setFeature(wall, featureId('stoneWall'));
+    w.damage[wall] = 50;
+    const e = raider(sim, w.idx(x + 8, y), 'club');
+    e.hp = 0;
+    sim.step();
+    expect(sim.raid).toBeNull();
+    expect(w.damage[wall]).toBe(0);
+  });
+
+  it('raiders who come on early are expected sooner', () => {
+    const { sim, w, x, y } = field(23);
+    const e = raider(sim, w.idx(x + 8, y), 'club');
+    sim.raid!.musterUntil = sim.tick + 3 * HOUR;
+    sim.raid!.contactAt = sim.tick + 4 * HOUR;
+    e.hp = 0.5; // hurt: they all come on
+    sim.step();
+    expect(sim.raid!.musterUntil).toBeUndefined();
+    expect(sim.raid!.contactAt).toBeLessThanOrEqual(sim.tick + HOUR + 1);
   });
 });

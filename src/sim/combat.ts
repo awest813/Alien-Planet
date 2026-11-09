@@ -326,7 +326,10 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
     }
     // Some lay waste to whatever's outside the walls: fields and livestock. (Behind walls a colony was safe from
     // everything but the time it took to break in; now what it leaves out in the open pays.)
-    const ravagers = !thieves && !siege && sim.day >= RAVAGERS_FROM_DAY ? Math.floor(count / 4) : 0;
+    // A siege party makes camp if there's room for one; if not, it comes on as an ordinary raid, with a raid's
+    // wait at the edge, arrival time and ravagers.
+    const camped = siege && setupSiege(sim, centre);
+    const ravagers = !thieves && !camped && sim.day >= RAVAGERS_FROM_DAY ? Math.floor(count / 4) : 0;
     for (const e of sim.enemies.slice(-count).slice(wreckers + firebrands, wreckers + firebrands + ravagers)) {
       e.ravager = true;
     }
@@ -334,11 +337,11 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
     // party's camp keeps its own time.)
     const home = sim.homeTile() ?? sim.living()[0]?.tile ?? centre;
     const walk = walkTicks(w, centre, home, raiderTilesPerTick(def.speed * (thieves ? 1.2 : 1)), ARRIVAL_RANGE);
-    const muster = siege ? 0 : musterTicks(walk);
+    const muster = camped ? 0 : musterTicks(walk);
     if (muster > 0) {
       sim.raid.musterUntil = sim.tick + muster;
     }
-    if (!siege) {
+    if (!camped) {
       sim.raid.contactAt = sim.tick + walk + muster;
     }
     const when = inAbout(walk + muster);
@@ -351,7 +354,7 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
       sim.events.push('raid');
       return true;
     }
-    if (siege && setupSiege(sim, centre)) {
+    if (camped) {
       const hours = Math.round((sim.raid.siege!.attackAt - sim.tick) / TICKS_PER_HOUR);
       sim.addLog(
         `Siege! ${count} raiders from ${def.name} are coming from the ${side} to make camp. They'll dig in and attack in about ${hours} hours: break the camp first, or fortify and wait.`,
@@ -372,16 +375,25 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
   return false;
 }
 
+const canShootAt = (w: World, from: number, to: number, range: number): boolean =>
+  w.distance(from, to) <= range && lineOfSight(w, from, to);
+
 // Who a raider goes after: archers pick off the exposed and the wounded, melee fighters whoever
 // is nearest.
 function targetFor(sim: Simulation, e: Enemy): Colonist | undefined {
   const w = sim.world;
   const region = sim.regionOf(e.tile);
-  const ranged = weaponDef(e.weapon).range > 1;
+  const range = weaponDef(e.weapon).range;
+  const ranged = range > 1;
   let best: Colonist | undefined;
   let bestScore = Infinity;
   for (const c of sim.living()) {
-    if (c.health.downed || sim.regionOf(c.tile) !== region) {
+    if (c.health.downed) {
+      continue;
+    }
+    // Out of reach on foot (behind embrasures, say): an archer still shoots at anyone in range and in
+    // sight. Otherwise the defenders would fire through the gaps with nobody firing back.
+    if (sim.regionOf(c.tile) !== region && !(ranged && canShootAt(w, e.tile, c.tile, range))) {
       continue;
     }
     const d = w.distance(e.tile, c.tile);
@@ -1001,6 +1013,10 @@ function holdingAtEdge(sim: Simulation, e: Enemy): boolean {
     sim.living().some((c) => !c.health.downed && w.distance(c.tile, e.tile) <= MUSTER_ALERT) ||
     sim.allies.some((a) => a.hp > 0 && w.distance(a.tile, e.tile) <= MUSTER_ALERT)
   ) {
+    // Coming on early: they'll be here that much sooner (the top bar and any allies go by it).
+    if (raid.contactAt !== undefined && sim.tick < raid.musterUntil) {
+      raid.contactAt -= raid.musterUntil - sim.tick;
+    }
     raid.musterUntil = undefined;
     return false;
   }
@@ -1163,6 +1179,9 @@ export function updateEnemies(sim: Simulation): void {
   if (raid && sim.enemies.length === 0) {
     sim.raid = null;
     takeDownCamp(sim, raid);
+    // Battered walls, doors and the beacon are patched up once it's over (nothing shows the damage, and
+    // half-broken walls would otherwise carry over, unseen, into the next raid).
+    sim.world.damage.fill(0);
     sim.rebuildAfterRaid();
     const standing = sim.living().filter((c) => !c.health.downed);
     // Every raider fell without the raid breaking first: that's a win too.
@@ -1747,7 +1766,14 @@ function digIn(sim: Simulation, siege: SiegeState): void {
 function siegeTurn(sim: Simulation, e: Enemy, siege: SiegeState): boolean {
   const w = sim.world;
   const weapon = weaponDef(e.weapon);
-  const colonists = sim.living().filter((c) => !c.health.downed && sim.regionOf(c.tile) === sim.regionOf(e.tile));
+  const colonists = sim
+    .living()
+    .filter(
+      (c) =>
+        !c.health.downed &&
+        (sim.regionOf(c.tile) === sim.regionOf(e.tile) ||
+          (weapon.range > 1 && canShootAt(w, e.tile, c.tile, weapon.range))),
+    );
   if (weapon.range <= 1 && colonists.some((c) => chebyshev(w, c.tile, e.tile) <= CAMP_CHARGE)) {
     return false;
   }

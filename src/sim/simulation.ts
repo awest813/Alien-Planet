@@ -4053,12 +4053,14 @@ export class Simulation {
     const speed = this.isResearched('cropRotation') ? 1.25 : 1;
     // Only sow where the crop can ripen: under a sun lamp, or outdoors with enough season left.
     const earlySpring = this.season === 'Spring' && seasonDay(this.totalHours) <= 2;
+    const glass = this.isResearched('glassmaking');
     const canRipen = (i: number) => {
       if (this.temperatureAt(i) < CROP_MIN_TEMP) {
         return false;
       }
-      // A sun lamp indoors beats the calendar; outdoors the night frost still kills.
-      if (lit[i] && this.isIndoors(i)) {
+      // A sun lamp indoors beats the calendar, and so does a glass greenhouse (a field walled in as a room,
+      // open to the sky: see growCrops); outdoors the night frost still kills.
+      if ((lit[i] || (glass && w.roof[i] === NONE)) && this.isIndoors(i)) {
         return true;
       }
       // Early spring frosts kill seedlings; and leave a day's margin before winter.
@@ -4335,6 +4337,9 @@ export class Simulation {
         const target = this.deconstructTarget(t);
         const def = featureDef(target);
         const build = def.build!;
+        // The fuel still in a generator's hopper comes out with it. (A trough's feed is a mix of foods, counted
+        // but not told apart, so it isn't given back.)
+        const hopper = !def.layer && def.power?.fuel ? Math.floor(w.fuel[t]) : 0;
         if (def.layer) {
           w.setLayer(def.layer, t, NONE);
         } else {
@@ -4352,6 +4357,9 @@ export class Simulation {
         this.rescueStranded();
         for (const cost of build.cost) {
           w.dropItemNear(t, cost.item, refund(cost.count));
+        }
+        if (hopper > 0) {
+          w.dropItemNear(t, def.power!.fuel!.item, hopper);
         }
         if (!def.layer) {
           w.addFilth(t, Filth.RUBBLE);
@@ -4416,7 +4424,7 @@ export class Simulation {
   private rescueStranded(): void {
     const w = this.world;
     const stranded = (i: number) => !w.isPassable(i) || !w.neighbors(i).some((n) => w.isPassable(n));
-    for (const body of [...this.living(), ...this.enemies, ...this.animals]) {
+    for (const body of [...this.living(), ...this.enemies, ...this.allies, ...this.animals]) {
       if (!stranded(body.tile)) {
         continue;
       }
@@ -4453,7 +4461,7 @@ export class Simulation {
         p.tile = free;
       }
     }
-    for (const e of this.enemies) {
+    for (const e of [...this.enemies, ...this.allies]) {
       if (e.tile === t && free !== undefined) {
         e.tile = free;
         e.path = [];

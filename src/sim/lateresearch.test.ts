@@ -5,7 +5,7 @@ import { Simulation } from './simulation';
 import { HOUR, clearAround, outline, run } from './test-helpers';
 import { WORK_TYPES } from './types';
 import { isAvailable, researchCost } from './research';
-import { STOCKPILE_ZONE } from './world';
+import { GROW_ZONE, STOCKPILE_ZONE } from './world';
 
 // A colony set to study one late project, with everything before it already known and one colonist at
 // the research bench.
@@ -129,6 +129,33 @@ describe('late research', () => {
     };
     expect(grown(false)).toBe(0);
     expect(grown(true)).toBeGreaterThan(0);
+  });
+
+  it('and a greenhouse can be sown in winter too', () => {
+    const sows = (glass: boolean) => {
+      const sim = Simulation.newColony(5);
+      const w = sim.world;
+      const { x, y } = clearAround(sim, 10);
+      if (glass) {
+        sim.research.done.push('glassmaking');
+      }
+      for (const i of outline(w, x + 1, y + 1, x + 5, y + 5)) {
+        w.setFeature(i, featureId('woodWall'));
+      }
+      for (let dy = 2; dy <= 4; dy++) {
+        for (let dx = 2; dx <= 4; dx++) {
+          w.zone[w.idx(x + dx, y + dy)] = GROW_ZONE + featureId('potatoPlant');
+        }
+      }
+      const c = sim.colonists[0];
+      c.tile = w.idx(x + 3, y + 3);
+      sim.tick = (18 * 24 + 12) * HOUR;
+      sim.syncClock();
+      (sim as unknown as { temperatureAt(i: number): number }).temperatureAt = () => 18;
+      return (sim as unknown as { trySow(c: unknown): boolean }).trySow(c);
+    };
+    expect(sows(false)).toBe(false);
+    expect(sows(true)).toBe(true);
   });
 
   it('further study goes on round after round, each dearer, each speeding work a little', () => {

@@ -160,34 +160,45 @@ export function generateWorld(
     const dry = (x: number, y: number) =>
       world.inBounds(x, y) && world.terrain[world.idx(x, y)] !== DEEP && world.terrain[world.idx(x, y)] !== SHALLOW;
     // Ten tiles out if there's dry ground for it, else nearer (a small island may have no room that far).
-    let raised = false;
-    for (let k = 0; k < 48 && !raised; k++) {
-      const reach = [10, 8, 6][Math.floor(k / 16)];
-      const angle = ((k % 16) / 16) * Math.PI * 2 + hash2(seed, 7, seed);
-      const ox = Math.round(sx + Math.cos(angle) * reach);
-      const oy = Math.round(sy + Math.sin(angle) * reach);
-      let fits = true;
-      for (let y = oy - 3; y <= oy + 3 && fits; y++) {
-        for (let x = ox - 3; x <= ox + 3; x++) {
-          if (!dry(x, y)) {
-            fits = false;
-            break;
-          }
-        }
-      }
-      if (!fits) {
-        continue;
-      }
+    // On land pocked with ponds there may be no clear patch at all: then it goes on the dry part of the
+    // patch that has the most.
+    const raise = (ox: number, oy: number) => {
       for (let y = oy - 3; y <= oy + 3; y++) {
         for (let x = ox - 3; x <= ox + 3; x++) {
-          if (Math.hypot(x - ox, y - oy) <= 3.2) {
+          if (Math.hypot(x - ox, y - oy) <= 3.2 && dry(x, y)) {
             const i = world.idx(x, y);
             world.terrain[i] = STONE;
             world.feature[i] = ROCK;
           }
         }
       }
+    };
+    let raised = false;
+    let best: { x: number; y: number; dry: number } | undefined;
+    for (let k = 0; k < 48 && !raised; k++) {
+      const reach = [10, 8, 6][Math.floor(k / 16)];
+      const angle = ((k % 16) / 16) * Math.PI * 2 + hash2(seed, 7, seed);
+      const ox = Math.round(sx + Math.cos(angle) * reach);
+      const oy = Math.round(sy + Math.sin(angle) * reach);
+      let dryTiles = 0;
+      for (let y = oy - 3; y <= oy + 3; y++) {
+        for (let x = ox - 3; x <= ox + 3; x++) {
+          if (dry(x, y)) {
+            dryTiles++;
+          }
+        }
+      }
+      if (dryTiles < 49) {
+        if (!best || dryTiles > best.dry) {
+          best = { x: ox, y: oy, dry: dryTiles };
+        }
+        continue;
+      }
+      raise(ox, oy);
       raised = true;
+    }
+    if (!raised && best && best.dry > 0) {
+      raise(best.x, best.y);
     }
   }
 
@@ -233,10 +244,9 @@ export function generateWorld(
   }
 
   // Every start has timber and something to eat close by (in a desert, an oasis of sorts).
-  if (biome !== 'temperate' || map !== 'valley') {
-    ensureNear(world, spawn, TREE, MIN_TREES, 14, seed + 811);
-    ensureNear(world, spawn, BUSH, MIN_BUSHES, 16, seed + 823);
-  }
+  // (It only adds where there's too little, so most valleys are as they were.)
+  ensureNear(world, spawn, TREE, MIN_TREES, 14, seed + 811);
+  ensureNear(world, spawn, BUSH, MIN_BUSHES, 16, seed + 823);
 
   // Clear a small landing area around the spawn point.
   for (let y = sy - 2; y <= sy + 2; y++) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ANIMALS, featureId, itemId } from './defs';
-import { BREACH_DEPTH, breach, breachWeight, oreChances, shaftAt, shafts } from './depths';
+import { BREACH_DEPTH, MAX_DEPTH, breach, breachWeight, digDeeper, oreChances, shaftAt, shafts } from './depths';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
 import { triggerEvent } from './storyteller';
@@ -189,5 +189,31 @@ describe('breaches', () => {
     shaftAt(sim, tile).depth = 7;
     const loaded = deserialize(structuredClone(serialize(sim)));
     expect(loaded.shafts[tile]).toEqual({ depth: 7, cavern: false });
+  });
+});
+
+describe('a shaft at bedrock', () => {
+  it("doesn't announce its depth again at every stretch, and can still be breached", () => {
+    const sim = Simulation.newColony(9);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    const tile = w.idx(x + 3, y);
+    w.setFeature(tile, featureId('mineShaft'));
+    const shaft = shaftAt(sim, tile);
+    shaft.depth = MAX_DEPTH - 1;
+    shaft.quietTo = MAX_DEPTH;
+    const before = sim.log.length;
+    for (let k = 0; k < 5; k++) {
+      digDeeper(sim, sim.colonists[0], tile);
+    }
+    const said = sim.log.slice(before).map((l) => l.text);
+    expect(said.filter((t) => t.includes('bedrock')).length).toBe(1);
+    expect(said.filter((t) => t.includes('hear things moving')).length).toBe(1);
+    expect(said.filter((t) => t.includes('has dug the mine shaft down')).length).toBeLessThanOrEqual(1);
+    // A breach at depth 50 leaves it quiet no deeper than bedrock, so it can stir again.
+    shaft.depth = 50;
+    shaft.quietTo = undefined;
+    breach(sim, 2);
+    expect(shaft.quietTo).toBeLessThanOrEqual(MAX_DEPTH);
   });
 });

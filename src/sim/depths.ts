@@ -79,8 +79,9 @@ export function digDeeper(sim: Simulation, c: Colonist, tile: number): void {
     w.dropItemNear(tile, itemId(key), count);
     sim.stats.produced[key] = (sim.stats.produced[key] ?? 0) + count;
   }
-  // At bedrock it goes no deeper, and keeps giving what it gives there.
-  if (shaft.depth < MAX_DEPTH) {
+  // At bedrock it goes no deeper, and keeps giving what it gives there (without saying so each time).
+  const deeper = shaft.depth < MAX_DEPTH;
+  if (deeper) {
     shaft.depth++;
     if (shaft.depth === MAX_DEPTH) {
       sim.addLog(
@@ -96,7 +97,7 @@ export function digDeeper(sim: Simulation, c: Colonist, tile: number): void {
     w.addFilth(beside, Filth.RUBBLE);
   }
   c.workStreak++;
-  if (shaft.depth % 5 === 0) {
+  if (deeper && shaft.depth % 5 === 0) {
     const ore = found
       .slice(1)
       .map(([key, count]) => `${count} ${itemDef(itemId(key)).name.toLowerCase()}`)
@@ -106,7 +107,7 @@ export function digDeeper(sim: Simulation, c: Colonist, tile: number): void {
       'good',
     );
   }
-  if (shaft.depth === breachFrom(shaft) && sim.story.difficulty !== 'peaceful') {
+  if (deeper && shaft.depth === breachFrom(shaft) && sim.story.difficulty !== 'peaceful') {
     sim.addLog('The mine shaft is deep now. The miners hear things moving in the rock below.', 'warn', true);
   }
 }
@@ -137,7 +138,9 @@ export function breach(sim: Simulation, count: number): boolean {
   }
   const first = !deepest.shaft.cavern;
   deepest.shaft.cavern = true;
-  deepest.shaft.quietTo = deepest.shaft.depth + QUIET_STRETCHES;
+  // (No deeper than bedrock, or a shaft dug to the bottom would never stir again; the event's own cooldown
+  // keeps the breaches apart there.)
+  deepest.shaft.quietTo = Math.min(MAX_DEPTH, deepest.shaft.depth + QUIET_STRETCHES);
   sim.stats.breaches = (sim.stats.breaches ?? 0) + 1;
   sim.addLog(
     `The miners have broken into ${first ? 'a cavern' : 'another cavern'}, and ${came} cave crawlers are pouring up out of the mine shaft! Draft colonists and fight them off.`,

@@ -328,3 +328,32 @@ describe('landing sites', () => {
     }
   });
 });
+
+describe('every start has the basics close by', () => {
+  const near = (sim: Simulation, key: string, radius: number) => {
+    const w = sim.world;
+    const home = sim.colonists[0].tile;
+    let n = 0;
+    for (let i = 0; i < w.size; i++) {
+      if (w.feature[i] === featureId(key) && w.distance(i, home) <= radius) {
+        n++;
+      }
+    }
+    return n;
+  };
+
+  it('stone on an island pocked with ponds', () => {
+    const sim = Simulation.newColony(95041, 'standard', 64, { map: 'island' });
+    expect(near(sim, 'rock', 18)).toBeGreaterThan(10);
+  });
+
+  it('timber in the thinnest temperate valleys', () => {
+    for (const [seed, size] of [
+      [102960, 96],
+      [372206, 64],
+      [63365, 64],
+    ]) {
+      expect(near(Simulation.newColony(seed, 'standard', size), 'tree', 16)).toBeGreaterThanOrEqual(25);
+    }
+  });
+});
