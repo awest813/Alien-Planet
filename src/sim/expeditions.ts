@@ -25,6 +25,8 @@ export interface Expedition {
   back: number;
   // Silver they carry to trade with.
   purse: number;
+  // Seen on the road home (said once, a little before they're back).
+  sighted?: boolean;
 }
 
 export const RUINS = -1;
@@ -32,6 +34,8 @@ export const MAX_PARTY = 3;
 const DAY = TICKS_PER_HOUR * 24;
 // Days away: a neighbour's settlement is closer than the ruins.
 export const TRIP_DAYS: Record<Purpose, number> = { trade: 3, salvage: 5, aid: 3 };
+// They're seen on the road this long before they're back.
+const SIGHTED_TICKS = TICKS_PER_HOUR * 2;
 // Leaving: someone who can't reach the edge in this long sets off from where they are.
 const LEAVING_TICKS = TICKS_PER_HOUR * 8;
 // Trade: what each member carries to spend (more as the colony grows), and how far it goes at the settlement
@@ -232,6 +236,19 @@ export function updateExpeditions(sim: Simulation): void {
   for (const e of expeditions(sim)) {
     if (sim.tick >= e.back) {
       comeHome(sim, e);
+    } else if (!e.sighted && sim.tick >= e.back - SIGHTED_TICKS) {
+      e.sighted = true;
+      const party = e.members
+        .map((id) => sim.colonists[id])
+        .filter((c) => c && !c.health.dead)
+        .map((c) => c.name);
+      if (party.length > 0) {
+        const from = e.to === RUINS ? 'the ruins' : FACTIONS[e.to].name.replace(/^The /, 'the ');
+        sim.addLog(
+          `${party.join(', ').replace(/, ([^,]*)$/, ' and $1')} ${party.length > 1 ? 'are' : 'is'} on the road home from ${from}: back in about two hours.`,
+          'good',
+        );
+      }
     }
   }
   // Nobody stays away without a party to be with (a save edited by hand, say): they walk back in.

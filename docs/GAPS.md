@@ -12,11 +12,6 @@ with esbuild for speed (see ROADMAP).
 
 ## Still open
 
-- **The last research waits on materials.** Late projects need a building and materials as well as points, and
-  the test colony (`craft`) learns 37 of 44 by year 4; the other seven wait one point short for iron, stone and
-  stone blocks it never keeps in storage (a player who stockpiles them finishes). Research no longer runs dry:
-  Further study (after engineering and surgery) can be studied round after round, each dearer and each speeding
-  all work 3% (up to ten rounds); the test colony finishes 11 rounds by year 10.
 - **Goals reach 53–55 of 65 by year 10** in the test colony; the rest are niche or need a player's choices
   (masterwork crafts, winter greenhouses, all research).
 - **A walled, armed colony still rarely loses anyone to raids.** From the second year, raids against wooden
@@ -27,39 +22,44 @@ with esbuild for speed (see ROADMAP).
   from 9 breaks in ten years to 2, mean mood 48.8).
 - **Elders:** about one in ten new adults (founders and newcomers) is already 55–70, so most colonies know an elder
   within ten years (one of two ten-year runs had one or two elders from year 1 and three deaths of old age; the
-  other's oldest reached 63). Care is meals only.
-- **Some dealings are thin:** returning expeditions
-  simply appear at the map edge; the harness seldom buys settlers (its population is at the cap). Meadow Kin
-  goodwill still ends at 100 in some runs. (Envoys now walk in, wait about the colony, and walk off home with the
-  answer.)
+  other's oldest reached 63).
+- **Some dealings are thin:** the harness seldom buys settlers (its population is at the cap), and Meadow Kin
+  goodwill still ends at 100 in some runs. (Envoys walk in, wait about the colony, and walk off home with the
+  answer; a returning expedition is seen on the road two hours out.)
 - **The desert's wood:** heat waves are survivable now (one heatstroke death in a 20-colony desert sample over two
   summers), but wood is scarce, and a desert colony that doesn't plant a grove can burn the last of it and freeze in
   a later winter (one of the 120-day playtest colonies, in year 5).
-- **Pens:** troughs take potatoes, berries or grain, but nothing else (no hay). Fences that make no pen, and pens
-  with no trough, get an alert.
 - **Tundra is hard on a slow start:** trees are scarce, and a farming-first colony that hasn't finished its hut
   by the first cold can be lost (one of four sensible tundra colonies in a 36-day sample, on day 18).
-- **Drawing zoomed right out on a slow machine:** with 4× CPU throttling a desktop window showing the whole Medium
-  map takes about 28–31 ms a frame (phones about 14–16 ms). The feature layer (about 9 ms) can't use the GPU
-  layer. (Rebuilding the interface's state, 5 times a second, is down to about 2 ms on a busy Medium map; the
-  alerts were 2.2 ms of it and are now 0.5 ms.)
-- **Large maps (192×192) are lightly tested:** they have had 48-day and three-year balance runs, but no
-  ten-year run or 100-player playtest yet. Their colonies starve about 1.5 times as many hours per colonist
-  as Medium's (long walks to fields and kitchens, and the harness's fields don't grow with fifteen people
-  until a third field at eleven). Showing the whole map on a slow phone hasn't been measured; on a desktop it
-  costs about twice Medium's.
-- **A busy colony's simulation gets slower as items pile up.** On a Medium map `scripts/perf.ts` gives about 44 ms per
-  1,000 ticks at day 8 (budget 60), but a busy colony that mines hard reaches about 95–100 ms per 1,000 ticks in
-  days 31–40, with over a thousand items lying about. What's left is spread thin: pathfinding, colonists choosing
-  work, animals and room measuring. (Region and room recounts after each mined tile are now 1.2 ms, from 2.4;
-  storage, the colony's centre and the list of buildings no longer rebuild when a tree is felled or rock mined;
-  and gear searches are skipped when there's no spare gear. Two 41-day Medium balance colonies run in 16.9 s, from
-  20.5 s.) At top speed even 100 ms per 1,000 ticks is only about 8 ms of each second.
-- **Testing:** the browser tests haven't run on GitHub yet, and the long-press hasn't been tried on a real
-  iPhone. Performance is still checked by hand (`scripts/perf.ts`); it's too noisy for CI. Saves from before
+- **A busy colony's simulation slows during raids.** On a Medium map `scripts/perf.ts` gives about 39 ms per
+  1,000 ticks at day 8 (budget 60), and two busy 41-day crafting colonies ran at 30–58 ms through day 40 (from
+  95–100 with over a thousand items lying about), but up to 68 ms in days with a raid on. What's left is spread
+  thin: pathfinding, colonists choosing work, combat. At top speed even 100 ms per 1,000 ticks is only about 8
+  ms of each second.
+- **Elders' care beyond meals:** nothing yet eases an elder's aches or keeps them company; frail elders have
+  their meals brought, and elders retire from heavy work.
+- **Testing:** the long-press hasn't been tried on a real iPhone. Performance is still checked by hand (`scripts/perf.ts`); it's too noisy for CI. Saves from before
   version 16 can't be loaded (the game says so).
 
 ## Closed in this pass
+
+- **The last research waited on materials:** research counted only what was in a stockpile, so a colony whose
+  stockpiles were full sat short of iron with 93 of it by the smelter. It now counts and takes materials
+  lying anywhere a colonist can reach (not forbidden), storage first; the Research screen says so. The test
+  colony (`craft`) learns 42 of 44 by year 4 (from 37), with nothing held back; the harness also lays in what
+  research is waiting on. (`STOCKS=1` prints a colony's workshop stocks and bills.)
+- **No hay for the pens:** a grain harvest leaves 8 hay with its 12 grain, and troughs take hay first. While
+  the colony's own food is short a trough gets hay or nothing (it used to get nothing at all).
+- **Drawing zoomed right out on a slow machine:** far out, the features are drawn by the GPU from a copy of
+  the layer, updated at most once a second. With 4× CPU throttling the whole map takes 7 ms a frame on
+  Medium (from 14.6) and 10 ms on Large (from 27).
+- **Large maps were lightly tested:** a ten-year run on two seeds (17 of 22 and 19 of 20 alive; deaths from old
+  age, grey flu and shaking sickness) and the 100-player playtest on Large (no crashes or broken rules; the
+  five colonies lost were the self-wrecking personas).
+- **Map size changed the game more than the room:** see docs/MAP_SCALING.md. Raiders reached a Tiny colony in
+  minutes, so on small maps they gather at the edge until there's 1.5 hours' warning, and the warning says
+  when; allies arrive with the raid; traders stay their full time; a far pile of goods suggests a stockpile.
+- **The browser tests ran only here:** they now run on GitHub with every push to main, and pass.
 
 - **Research ran out by the third year:** nine late projects (steelmaking, glassmaking, double glazing,
   reinforced walls, barbed traps, antiseptics, plant breeding, prosthetics, precision tools), each needing a

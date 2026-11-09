@@ -263,7 +263,7 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     screen: 'research',
   },
   steel: {
-    how: 'Research Steelmaking: it needs a smelter standing and 40 iron in storage to finish.',
+    how: 'Research Steelmaking: it needs a smelter standing and 40 iron at hand to finish.',
     screen: 'research',
   },
   masterCraft: {
@@ -959,7 +959,7 @@ function researchNeeds(sim: Simulation, p: ResearchDef): { needs?: string; held?
   if (hold.building) {
     view.held = `Build a ${building!.toLowerCase()} to study this.`;
   } else if (nearlyDone && hold.short.length > 0) {
-    view.held = `Waiting on ${hold.short.map((s) => `${s.count} more ${itemDef(s.item).name.toLowerCase()}`).join(' and ')} in storage to finish.`;
+    view.held = `Waiting on ${hold.short.map((s) => `${s.count} more ${itemDef(s.item).name.toLowerCase()}`).join(' and ')} to finish (in storage or lying about, not forbidden).`;
   }
   return view;
 }

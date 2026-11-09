@@ -6147,7 +6147,7 @@ export class Simulation {
     }
     for (const need of project.materials ?? []) {
       const item = itemId(need.item);
-      const have = this.storedCount(item);
+      const have = this.materialCount(item);
       if (have < need.count) {
         hold.short.push({ item, count: need.count - have });
       }
@@ -6155,12 +6155,27 @@ export class Simulation {
     return hold;
   }
 
-  // Items of a kind in storage (not forbidden), for research materials.
-  private storedCount(item: number): number {
+  // Research materials: in storage, or lying anywhere a colonist could fetch them from (not forbidden).
+  // (Counting storage alone, a colony with full stockpiles saw its research held up for iron piled by the
+  // smelter.)
+  private isMaterial(i: number, item: number): boolean {
+    const w = this.world;
+    if (w.itemType[i] !== item || w.forbidden[i]) {
+      return false;
+    }
+    if (this.isStockpile(i)) {
+      return true;
+    }
+    const region = this.regions.region[i];
+    return region >= 0 && this.living().some((c) => this.regions.region[c.tile] === region);
+  }
+
+  private materialCount(item: number): number {
+    this.ensureRegions();
     const w = this.world;
     let n = 0;
     for (const i of w.tilesWith('items')) {
-      if (w.itemType[i] === item && !w.forbidden[i] && this.isStockpile(i)) {
+      if (this.isMaterial(i, item)) {
         n += w.itemCount[i];
       }
     }
@@ -6173,8 +6188,11 @@ export class Simulation {
     for (const need of researchDef(key)?.materials ?? []) {
       const item = itemId(need.item);
       let left = need.count;
-      for (const i of [...w.tilesWith('items')]) {
-        if (left > 0 && w.itemType[i] === item && !w.forbidden[i] && this.isStockpile(i)) {
+      // (Storage first, then whatever's lying about.)
+      const tiles = [...w.tilesWith('items')].filter((i) => this.isMaterial(i, item));
+      tiles.sort((a, b) => Number(this.isStockpile(b)) - Number(this.isStockpile(a)));
+      for (const i of tiles) {
+        if (left > 0) {
           left -= w.takeItem(i, left);
         }
       }

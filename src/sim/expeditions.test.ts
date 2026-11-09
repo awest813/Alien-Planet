@@ -71,7 +71,13 @@ describe('expeditions', () => {
     expect(sendExpedition(sim, RUINS, 'salvage', [a.id, b.id])).toBeNull();
     run(sim, DAY * (TRIP_DAYS.salvage - 1));
     expect(a.away).toBe('gone');
-    run(sim, DAY + HOUR * 2);
+    // Seen on the road a couple of hours before they're in.
+    const party = `${a.name} and ${b.name} are on the road home from the ruins`;
+    expect(sim.log.some((l) => l.text.startsWith(party))).toBe(false);
+    run(sim, DAY - HOUR);
+    expect(sim.log.some((l) => l.text.startsWith(party))).toBe(true);
+    expect(a.away).toBe('gone');
+    run(sim, HOUR * 3);
     expect(a.away).toBeUndefined();
     expect(b.away).toBeUndefined();
     expect(sim.living()).toContain(a);

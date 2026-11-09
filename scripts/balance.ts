@@ -10,7 +10,8 @@
 // storyteller difficulty (standard otherwise); "trace" prints the colony whenever someone dies;
 // "size=96" or "size=128" plays on a bigger map; "seed=N" replays one colony; "start=K" skips the
 // first K seeds; "nohunt" leaves the wildlife alone. With DEBUG=1 in the environment, a trace also
-// shows research, production, bills, rooms and heaters.
+// shows research, production, bills, rooms and heaters; with STOCKS=1, each colony ends with its stocks of
+// workshop materials, their bills and the workshops built.
 import { Biome, MapKind } from '../src/sim/biomes';
 import { colonistTarget, lineOfSight } from '../src/sim/combat';
 import {
@@ -203,6 +204,8 @@ interface Result {
   starvingByDay: Record<number, number>;
   objectives: number;
   research: number;
+  // Projects not learned (and what holds each back), once only a few are left.
+  researchLeft: string[];
   // Day Tailoring (and so parkas) arrived; -1 if never.
   tailoringDay: number;
   frost: number;
@@ -877,9 +880,28 @@ function play(seed: number): Result {
       hearthPlaced = true;
       sim.apply({ type: 'build', feature: featureId('hearth'), tiles: [at(hut.x + 7, hut.y + 4)] });
     }
+    // Research that waits only on materials (the Research screen says what): lay them in, as a player would,
+    // rather than spending them as fast as they come.
+    const researchWants = new Map<string, number>();
+    for (const r of RESEARCH) {
+      if (r.repeatable || sim.isResearched(r.key) || !isAvailable(sim.research, r) || !r.materials) {
+        continue;
+      }
+      const hold = sim.researchHold(r.key);
+      if (!hold.building && hold.short.length > 0) {
+        for (const need of r.materials) {
+          researchWants.set(need.item, Math.max(researchWants.get(need.item) ?? 0, need.count));
+        }
+      }
+    }
+    const wantFor = (key: string) => researchWants.get(key) ?? 0;
+    if (Math.floor(sim.hour) === 7 && wantFor('stone') > 0 && sim.stockOf(itemId('stone')) < wantFor('stone')) {
+      dig('rock', 12);
+    }
+
     // An obsessed artist's vision needs granite blocks: cut plenty while it lasts, as a player would.
     const blocks = RECIPES.find((r) => r.key === 'cutBlocks')!;
-    const wanted = sim.obsession ? 70 : 30;
+    const wanted = Math.max(sim.obsession ? 70 : 30, 30 + wantFor('stoneBlocks'));
     // ...and granite to cut them from.
     if (sim.obsession && Math.floor(sim.hour) === 7 && sim.stockOf(itemId('stone')) < 30) {
       const c = sim.living()[0];
@@ -1047,8 +1069,15 @@ function play(seed: number): Result {
         setBill('makeIronTools', 4);
       }
       if (smelterPlaced) {
-        setBill('makeIronSword', Math.ceil(sim.living().length / 2));
-        setBill('makeIronMail', sim.living().length);
+        // (Research waiting on iron gets it first: more smelted, and no new gear until it's in.)
+        const ironForResearch = wantFor('iron');
+        setBill('smeltIron', 40 + ironForResearch);
+        const gearWaits = ironForResearch > 0 && sim.stockOf(itemId('iron')) < ironForResearch;
+        setBill('makeIronSword', gearWaits ? 0 : Math.ceil(sim.living().length / 2));
+        setBill('makeIronMail', gearWaits ? 0 : sim.living().length);
+      }
+      if (kilnPlaced) {
+        setBill('fireBricks', 60 + wantFor('bricks'));
       }
       // Each morning, dig more clay and ore when the stock runs low and little is marked.
       if (Math.floor(sim.hour) === 6) {
@@ -1191,6 +1220,22 @@ function play(seed: number): Result {
     shipsLanded,
     burned: burnCounts.get(sim) ?? 0,
   };
+  if (process.env.STOCKS) {
+    for (const key of ['ironOre', 'iron', 'bricks', 'clay', 'stone', 'stoneBlocks', 'leather']) {
+      const recipeFor = RECIPES.filter((r) => r.product.item === itemId(key)).map(
+        (r) => `${r.key}:${sim.bills[r.id]?.target}`,
+      );
+      console.log(
+        `    ${key}: stock ${sim.stockOf(itemId(key))} produced ${sim.stats.produced[key] ?? 0} bills ${recipeFor.join(',')}`,
+      );
+    }
+    console.log(
+      '    buildings',
+      ['kiln', 'smelter', 'stonecutterTable', 'craftingBench']
+        .map((k) => `${k}:${sim.countBuilt((f) => featureDef(f).key === k)}`)
+        .join(' '),
+    );
+  }
   return {
     seed,
     // (Away on an expedition counts as alive.)
@@ -1216,6 +1261,14 @@ function play(seed: number): Result {
     // (Goals only, not the phase:N markers.)
     objectives: OBJECTIVES.filter((o) => sim.objectivesDone[o.id]).length,
     research: sim.research.done.length,
+    researchLeft: RESEARCH.filter((p) => !p.repeatable && !sim.isResearched(p.key)).map((p) => {
+      const hold = sim.researchHold(p.key);
+      const why = [
+        ...(hold.building ? [hold.building] : []),
+        ...hold.short.map((x) => `${x.count} ${itemDef(x.item).key}`),
+      ];
+      return why.length > 0 ? `${p.key} (${why.join(', ')})` : p.key;
+    }),
     tailoringDay: tailoringDays.get(sim) ?? -1,
     frost: story.filter((s) => s.startsWith('Frost killed')).length,
     events,
@@ -1380,6 +1433,9 @@ for (const seed of seedList) {
   );
   for (const d of r.deaths) {
     console.log(`    ${d}`);
+  }
+  if (r.researchLeft.length > 0 && r.researchLeft.length <= 10) {
+    console.log(`    research not learned: ${r.researchLeft.join('; ')}`);
   }
   if (r.starvingHours > 0) {
     console.log(`    starving colonist-hours by day: ${JSON.stringify(r.starvingByDay)}`);

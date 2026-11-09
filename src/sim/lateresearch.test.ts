@@ -46,7 +46,7 @@ function study(key: string) {
 }
 
 describe('late research', () => {
-  it('waits for its building, and holds just short of the end until the materials are in storage', () => {
+  it('waits for its building, and holds just short of the end until the materials are at hand', () => {
     const { sim, w, x, y, hours, progress } = study('steelmaking');
     const cost = researchDef('steelmaking')!.cost;
     hours(4);
@@ -72,6 +72,18 @@ describe('late research', () => {
       }
     }
     expect(iron).toBe(10);
+  });
+
+  it('counts materials lying about (not forbidden ones), not just what is in storage', () => {
+    const { sim, w, x, y } = study('steelmaking');
+    w.setFeature(w.idx(x + 6, y + 6), featureId('smelter'));
+    // Forty iron by the smelter, out of any stockpile.
+    const pile = w.idx(x + 8, y + 2);
+    w.addItem(pile, itemId('iron'), 40);
+    expect(sim.isStockpile(pile)).toBe(false);
+    expect(sim.researchHold('steelmaking').short).toEqual([]);
+    sim.apply({ type: 'forbid', rect: { x0: x + 8, y0: y + 2, x1: x + 8, y1: y + 2 }, on: true });
+    expect(sim.researchHold('steelmaking').short).toEqual([{ item: itemId('iron'), count: 40 }]);
   });
 
   it('pays off: steel tools, fitted injuries, bigger harvests', () => {
