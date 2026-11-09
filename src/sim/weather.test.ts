@@ -269,3 +269,33 @@ describe('third audit: fire and weather', () => {
     expect(t).toBeLessThanOrEqual(Math.max(27, sim.temperatureAt(w.idx(x - 6, y)) + 0.01));
   });
 });
+
+describe('stepping out of a fire', () => {
+  const setup = () => {
+    const sim = Simulation.newColony(45);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    const bed = w.idx(x + 3, y);
+    w.setFeature(bed, featureId('bed'));
+    expect(ignite(sim, bed)).toBe(true);
+    const c = sim.colonists[0];
+    c.tile = bed;
+    sim.tick -= sim.tick % 20;
+    const step = () => (sim as unknown as { stepOutOfFire(c: unknown): boolean }).stepOutOfFire(c);
+    return { sim, c, bed, step };
+  };
+
+  it("isn't for someone carrying the hurt out (they'd drop the patient back in the flames)", () => {
+    const { c, step } = setup();
+    c.job = { type: 'rescue', stage: 1 } as unknown as typeof c.job;
+    expect(step()).toBe(false);
+  });
+
+  it('is for anyone else lying there, sulking included', () => {
+    const { sim, c, bed, step } = setup();
+    sim.startBreak(c, 'sulk', 4);
+    c.path = [];
+    expect(step()).toBe(true);
+    expect(c.path.length + (c.tile === bed ? 0 : 1)).toBeGreaterThan(0);
+  });
+});

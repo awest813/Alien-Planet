@@ -940,8 +940,8 @@ export function armorTakes(sim: Simulation, target: Colonist, amount: number, pi
   }
   const dealt = amount * (1 - itemDef(target.armor.item).armor!.protection * (1 - pierce));
   // Better-made armor stands up to more before it falls apart (a masterwork about half again as long as a poor
-  // piece); how well it stops a blow is the kind of armor's.
-  target.armor.wear -= (dealt * 0.6) / qualityFactor(target.armor.quality);
+  // piece; ordinary armor as before); how well it stops a blow is the kind of armor's.
+  target.armor.wear -= (dealt * 0.6 * qualityFactor(NORMAL_QUALITY)) / qualityFactor(target.armor.quality);
   if (target.armor.wear <= 0) {
     sim.addLog(`${target.name}'s ${itemDef(target.armor.item).name.toLowerCase()} has fallen apart.`, 'warn');
     target.armor = null;
@@ -1369,7 +1369,7 @@ export function colonistCombat(sim: Simulation, c: Colonist): boolean {
   if (
     !c.drafted &&
     (c.job?.type === 'tend' || c.job?.type === 'rescue' || c.job?.type === 'feed') &&
-    chebyshev(sim.world, c.tile, target.tile) > 1
+    !sim.enemies.some((e) => e.hp > 0 && chebyshev(sim.world, c.tile, e.tile) <= 1)
   ) {
     return false;
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   armorTakes,
+  colonistCombat,
   colonistTarget,
   coverSpot,
   lineOfSight,
@@ -9,7 +10,18 @@ import {
   weaponScore,
   woundEnemy,
 } from './combat';
-import { FACTIONS, ITEMS, NONE, STARTING_WEAPON, WEAPONS, featureId, itemId, terrainId, weaponDef } from './defs';
+import {
+  FACTIONS,
+  ITEMS,
+  NONE,
+  NORMAL_QUALITY,
+  STARTING_WEAPON,
+  WEAPONS,
+  featureId,
+  itemId,
+  terrainId,
+  weaponDef,
+} from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
 import { HOUR, clearAround, outline, run } from './test-helpers';
@@ -577,3 +589,51 @@ describe('third audit: gear, doors, fights and wounds', () => {
     expect(wearAfter(18)).toBeGreaterThan(wearAfter(1));
   });
 });
+
+describe('fourth audit: the fixes, fixed', () => {
+  it('an archer in cover with a shot at a maddened animal keeps it, rather than walking closer', () => {
+    const { sim, w, x, y } = field(35);
+    const [c, victim] = sim.colonists;
+    c.drafted = true;
+    c.stance = 'cover';
+    c.weapon = 'shortBow';
+    const wolf = sim.animals[0];
+    wolf.tile = w.idx(x + 7, y);
+    wolf.revengeOn = victim.id;
+    wolf.manhunter = true;
+    (sim as unknown as { draftedTactics(c: unknown): void }).draftedTactics(c);
+    expect(c.path).toEqual([]);
+  });
+
+  it('ordinary armor wears as it always did; only better or worse made differs', () => {
+    const { sim } = field(36);
+    const c = sim.colonists[0];
+    c.armor = { item: itemId('ironMail'), quality: NORMAL_QUALITY, wear: 1 };
+    const dealt = armorTakes(sim, c, 0.5);
+    expect(1 - c.armor!.wear).toBeCloseTo(dealt * 0.6, 6);
+  });
+
+  it("a doctor at work fights back against a raider right beside them, whoever they'd rather shoot", () => {
+    const { sim, w } = field(37);
+    const [doctor, patient] = sim.colonists;
+    doctor.job = {
+      type: 'tend',
+      target: patient.tile,
+      stage: 0,
+      progress: 0,
+      wait: 0,
+      patient: patient.id,
+    } as unknown as typeof doctor.job;
+    const dx = w.xOf(doctor.tile);
+    const dy = w.yOf(doctor.tile);
+    // One unhurt beside them, and one badly hurt a little way off (the one they'd sooner shoot).
+    raider(sim, w.idx(dx + 1, dy), 'club', { hp: 1, repathAt: forever });
+    raider(sim, w.idx(dx - 3, dy), 'club', { hp: 0.2, repathAt: forever });
+    expect(colonistCombatFor(sim, doctor)).toBe(true);
+  });
+});
+
+function colonistCombatFor(sim: Simulation, c: Simulation['colonists'][number]): boolean {
+  c.cooldown = 99;
+  return colonistCombat(sim, c);
+}

@@ -1471,7 +1471,7 @@ export class Simulation {
       case 'lock':
         if (w.setLocked(cmd.tile, cmd.locked) && cmd.locked) {
           // Whoever stands in the doorway steps aside, and anything lying there is moved off it.
-          this.pushColonistsOff(cmd.tile);
+          this.pushColonistsOff(cmd.tile, true);
           if (w.itemType[cmd.tile] !== NONE) {
             const moved = w.pickUp(cmd.tile, w.itemCount[cmd.tile]);
             w.dropItemNear(cmd.tile, moved.item, moved.count, moved.fresh, moved.quality);
@@ -2964,6 +2964,9 @@ export class Simulation {
       if ((c.job && !allowed!.includes(c.job.type)) || exposedSulk) {
         this.endJob(c);
       }
+      if (this.stepOutOfFire(c)) {
+        return;
+      }
     } else {
       const slot = this.slotOf(c);
       // Doctors get out of bed (or drop their work) for someone who is bleeding or collapsed.
@@ -3054,17 +3057,8 @@ export class Simulation {
           this.startFirefight(c, found.fire, found.path);
         }
       }
-      // Standing (or sleeping) in the fire itself, and not there to fight it: step out of it. (Children, the
-      // retired and anyone with firefighting off slept on while their bed burned.)
-      if (this.tick % SLOW_TICKS === 0 && this.world.fire[c.tile] > 0 && !c.drafted && c.job?.type !== 'extinguish') {
-        const out = this.world.neighbors(c.tile).find((n) => this.world.isPassable(n) && this.world.fire[n] <= 0);
-        if (out !== undefined) {
-          // (That's this turn: bedtime would otherwise put them straight back where they lay.)
-          this.endJob(c);
-          c.path = [out];
-          this.move(c);
-          return;
-        }
+      if (this.stepOutOfFire(c)) {
+        return;
       }
       if (c.job?.type === 'eat') {
         // Eating comes first.
@@ -4484,18 +4478,19 @@ export class Simulation {
     }
   }
 
-  private pushColonistsOff(t: number): void {
+  // `sides`: a door just locked on whoever stood in the doorway puts them on their own side, the colony's people,
+  // prisoners and livestock in and everyone else out (the first open neighbour in a fixed order put a raider
+  // locked out inside the room). Otherwise (something built where they stood), the first open neighbour.
+  private pushColonistsOff(t: number, sides = false): void {
     const w = this.world;
     if (w.isPassable(t)) {
       return;
     }
-    // A free neighbour, or failing that (walled in on all sides) the nearest open tile. A door locked on someone
-    // in the doorway puts them on their own side: the colony's people (and prisoners) in, everyone else out.
-    // (First open neighbour in a fixed order put a raider locked out inside the room.)
+    // A free neighbour, or failing that (walled in on all sides) the nearest open tile.
     const open = w.neighbors(t).filter((n) => w.isPassable(n));
     const any = open[0] ?? w.nearestPassable(t);
-    const inside = open.find((n) => this.isIndoors(n)) ?? any;
-    const outside = open.find((n) => !this.isIndoors(n)) ?? any;
+    const inside = sides ? (open.find((n) => this.isIndoors(n)) ?? any) : any;
+    const outside = sides ? (open.find((n) => !this.isIndoors(n)) ?? any) : any;
     for (const other of this.living()) {
       if (other.tile === t) {
         if (inside !== undefined) {
@@ -4509,9 +4504,11 @@ export class Simulation {
         p.tile = inside;
       }
     }
-    for (const e of [...this.enemies, ...this.allies, ...this.animals, ...(this.caravan?.visitors ?? [])]) {
-      if (e.tile === t && outside !== undefined) {
-        e.tile = outside;
+    const theirs = [...this.enemies, ...this.allies, ...this.animals, ...(this.caravan?.visitors ?? [])];
+    for (const e of theirs) {
+      const to = 'tame' in e && e.tame ? inside : outside;
+      if (e.tile === t && to !== undefined) {
+        e.tile = to;
         e.path = [];
         e.moveProgress = 0;
       }
@@ -7005,7 +7002,7 @@ export class Simulation {
       return;
     }
     if (this.enemies.length === 0) {
-      this.animalTactics(c, melee, every);
+      this.animalTactics(c, melee, charging, every);
       return;
     }
     this.nextTactics.set(c.id, this.tick + every);
@@ -7041,10 +7038,39 @@ export class Simulation {
     }
   }
 
+  // Standing (or sleeping, or sulking) in a fire, and not there to fight it: step out of it, and that's this turn
+  // (bedtime would otherwise put them straight back where they lay). Children, the retired and anyone with
+  // firefighting off used to sleep on while their bed burned. Not someone already on their way off the tile, nor
+  // someone carrying, tending or feeding the hurt (a rescuer would drop the patient back in the flames).
+  private stepOutOfFire(c: Colonist): boolean {
+    const w = this.world;
+    const job = c.job?.type;
+    if (
+      this.tick % SLOW_TICKS !== 0 ||
+      w.fire[c.tile] <= 0 ||
+      c.drafted ||
+      job === 'extinguish' ||
+      job === 'rescue' ||
+      job === 'tend' ||
+      job === 'feed' ||
+      (c.path.length > 0 && w.fire[c.path[0]] <= 0)
+    ) {
+      return false;
+    }
+    const out = w.neighbors(c.tile).find((n) => w.isPassable(n) && w.fire[n] <= 0);
+    if (out === undefined) {
+      return false;
+    }
+    this.endJob(c);
+    c.path = [out];
+    this.move(c);
+    return true;
+  }
+
   // No raiders, but maddened animals (a pack, cave crawlers, the great beast) after the colony: close on the
   // nearest, to within reach of the colonist's weapon and in sight of it. (Drafted colonists used to stand
   // where they were, whatever their stance, unless one came into reach.)
-  private animalTactics(c: Colonist, melee: boolean, every: number): void {
+  private animalTactics(c: Colonist, melee: boolean, charging: boolean, every: number): void {
     const w = this.world;
     const region = this.regionOf(c.tile);
     const target = this.animals
@@ -7054,7 +7080,10 @@ export class Simulation {
       return;
     }
     this.nextTactics.set(c.id, this.tick + every);
-    const reach = melee ? 1.5 : weaponDef(c.weapon).range * 0.6;
+    // Anyone with a shot keeps taking it (an archer in cover used to leave it, and stop shooting, to walk closer);
+    // only those charging close in further, and only those with no shot at all move up to get one.
+    const range = weaponDef(c.weapon).range;
+    const reach = melee ? 1.5 : charging ? range * 0.6 : range;
     if (w.distance(c.tile, target.tile) <= reach && (melee || lineOfSight(w, c.tile, target.tile))) {
       return;
     }
