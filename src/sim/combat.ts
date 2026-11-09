@@ -3,6 +3,7 @@ import { scarAim } from './body';
 import { beaconTile, transmitting } from './beacon';
 import { qualityFactor } from './apparel';
 import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
+import { MUSTER_ALERT, fromEdgeTicks, inAbout, musterTicks, raiderTilesPerTick, walkTicks } from './arrivals';
 import { FACTIONS, NONE, NORMAL_QUALITY, WeaponDef, featureDef, featureId, itemDef, itemId, weaponDef } from './defs';
 import { damage, painOf } from './health';
 import { fallWounded } from './prisoners';
@@ -43,6 +44,10 @@ export interface RaidState {
   standing?: number[];
   // Thieves after the stores rather than a fight; what they got away with.
   thieves?: boolean;
+  // On a small map they gather at the edge until then, so there's time to get ready (see arrivals.ts).
+  musterUntil?: number;
+  // When they're expected to reach the colony (for friends who mean to arrive at the same time).
+  contactAt?: number;
   stolen?: number;
 }
 
@@ -306,9 +311,21 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
     for (const e of sim.enemies.slice(-count).slice(wreckers, wreckers + firebrands)) {
       e.firebrand = true;
     }
+    // How long until they reach the colony: the walk, and on a small map a wait at the edge first. (A siege
+    // party's camp keeps its own time.)
+    const home = sim.homeTile() ?? sim.living()[0]?.tile ?? centre;
+    const walk = walkTicks(w, centre, home, raiderTilesPerTick(def.speed * (thieves ? 1.2 : 1)), ARRIVAL_RANGE);
+    const muster = siege ? 0 : musterTicks(walk);
+    if (muster > 0) {
+      sim.raid.musterUntil = sim.tick + muster;
+    }
+    if (!siege) {
+      sim.raid.contactAt = sim.tick + walk + muster;
+    }
+    const when = inAbout(walk + muster);
     if (thieves) {
       sim.addLog(
-        `Thieves! ${count} from ${def.name} are slipping in from the ${side} to rob the stores. Draft colonists to catch them.`,
+        `Thieves! ${count} from ${def.name} are slipping in from the ${side} to rob the stores, ${when}. Draft colonists to catch them.`,
         'danger',
         true,
       );
@@ -326,7 +343,7 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
       return true;
     }
     sim.addLog(
-      `Raid! ${count} raiders from ${def.name} are coming from the ${side}. ${wreckers > 0 ? `${wreckers === 1 ? 'One is' : `${wreckers} are`} making for the beacon. ` : ''}${firebrands > 0 ? `${firebrands === 1 ? 'One carries' : 'Two carry'} fire for the wooden walls. ` : ''}Draft your colonists.`,
+      `Raid! ${count} raiders from ${def.name} are coming from the ${side}, and will reach the colony ${when}. ${wreckers > 0 ? `${wreckers === 1 ? 'One is' : `${wreckers} are`} making for the beacon. ` : ''}${firebrands > 0 ? `${firebrands === 1 ? 'One carries' : 'Two carry'} fire for the wooden walls. ` : ''}Draft your colonists.`,
       'danger',
       true,
     );
@@ -865,6 +882,27 @@ function choosePost(sim: Simulation, e: Enemy, target: Colonist): number | undef
   return best;
 }
 
+// A raid gathering at the edge (on a small map) stands its ground until it's time, unless a colonist comes
+// close or one of them is hurt: then they all come on at once.
+function holdingAtEdge(sim: Simulation, e: Enemy): boolean {
+  const raid = sim.raid;
+  if (raid?.musterUntil === undefined) {
+    return false;
+  }
+  const w = sim.world;
+  if (
+    sim.tick >= raid.musterUntil ||
+    e.hp < 1 ||
+    sim.living().some((c) => !c.health.downed && w.distance(c.tile, e.tile) <= MUSTER_ALERT) ||
+    sim.allies.some((a) => a.hp > 0 && w.distance(a.tile, e.tile) <= MUSTER_ALERT)
+  ) {
+    raid.musterUntil = undefined;
+    return false;
+  }
+  e.path = [];
+  return true;
+}
+
 export function updateEnemies(sim: Simulation): void {
   const w = sim.world;
   for (const e of sim.enemies) {
@@ -886,6 +924,9 @@ export function updateEnemies(sim: Simulation): void {
         sim.addLog(`${e.name} is badly hurt and running for it.`, 'good');
         continue;
       }
+    }
+    if (holdingAtEdge(sim, e)) {
+      continue;
     }
     if (strikeAlly(sim, e)) {
       continue;
@@ -1265,8 +1306,8 @@ export function weaponScore(key: string, quality: number): number {
 
 // ---- Allies ----
 // Now and then, when raiders come, the friendly faction sends a few fighters to help: the better they
-// think of the colony, the likelier. They come in from the edge nearest the colony an hour or few into the
-// raid, go after the raiders, and head home once the raiders are beaten or gone.
+// think of the colony, the likelier. They come in from the edge nearest the colony, timed to arrive with the
+// raiders (or up to an hour after), go after them, and head home once the raiders are beaten or gone.
 
 // Chance of help with each raid: none below 30 goodwill, rising to one in two at 100.
 export const allyChance = (goodwill: number): number => Math.max(0, Math.min(0.5, (goodwill - 30) / 140));
@@ -1283,19 +1324,24 @@ export function maybeSendAllies(sim: Simulation): void {
   if (!raid || friend < 0) {
     return;
   }
-  // Against a siege they come for the attack, not to storm the camp alone.
-  const from = raid.siege && !raid.siege.attacking ? Math.max(sim.tick, raid.siege.attackAt) : sim.tick;
-  // Hired, they come for sure, within the hour, and in strength.
+  // They mean to get there when the raiders do (against a siege, for the attack, not to storm the camp
+  // alone), so they set off a walk from the nearest edge ahead of that.
+  const contact = raid.siege && !raid.siege.attacking ? raid.siege.attackAt : (raid.contactAt ?? sim.tick);
+  const home = sim.homeTile() ?? sim.living()[0]?.tile;
+  const walk = home === undefined ? 0 : fromEdgeTicks(sim.world, home, raiderTilesPerTick(1));
+  const from = Math.max(sim.tick, contact - walk);
+  // Hired, they come for sure, on time, and in strength.
   if (fightersHired(sim)) {
     raid.allies = Math.max(3, Math.min(5, Math.round(raid.initial / 2)));
-    raid.alliesAt = from + TICKS_PER_HOUR;
+    raid.alliesAt = from;
     return;
   }
   if (sim.rng.next() >= allyChance(goodwillOf(sim, friend)) + (alliedWith(sim, friend) ? ALLY_HELP : 0)) {
     return;
   }
   raid.allies = Math.max(2, Math.min(4, Math.round(raid.initial / 3)));
-  raid.alliesAt = from + sim.rng.int(1, 3) * TICKS_PER_HOUR;
+  // (Not always quite on time.)
+  raid.alliesAt = from + sim.rng.int(0, 1) * TICKS_PER_HOUR;
 }
 
 function alliesArrive(sim: Simulation, count: number): void {

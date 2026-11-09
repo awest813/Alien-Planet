@@ -156,6 +156,10 @@ describe('new events', () => {
     expect(pack.length).toBeGreaterThanOrEqual(2);
     expect(pack.every((a) => a.revengeOn >= 0)).toBe(true);
     expect(sim.events).toContain('manhunters');
+    // (On this small map they gather at the edge first; send them in.)
+    for (const a of pack) {
+      a.musterUntil = undefined;
+    }
     // Once their first target is down, they pick another.
     const first = sim.colonists[pack[0].revengeOn];
     first.health.downed = true;

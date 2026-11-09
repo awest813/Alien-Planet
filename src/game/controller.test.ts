@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { featureId, itemId } from '../sim/defs';
+import { FACTIONS, featureId, itemId } from '../sim/defs';
 import { STOCKPILE_ZONE } from '../sim/world';
 import { DAYS_PER_SEASON } from '../sim/seasons';
 import { HOUR, clearAround, outline } from '../sim/test-helpers';
 import { TICKS_PER_HOUR } from '../sim/simulation';
+import { spawnRaid } from '../sim/combat';
 import { Alert, controller } from './controller';
 
 // The alerts the side panel would show right now.
@@ -161,5 +162,49 @@ describe('alerts', () => {
     expect(texts().some((t) => t.includes('obsessed'))).toBe(true);
     artist.health.dead = true;
     expect(texts().some((t) => t.includes('obsessed'))).toBe(false);
+  });
+});
+
+describe('on a big map', () => {
+  it('suggest a stockpile out where goods are piling up far from storage', () => {
+    controller.newColony('far', 'standard', 128);
+    const sim = controller.sim;
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 12);
+    sim.apply({ type: 'zone', rect: { x0: x - 2, y0: y - 2, x1: x + 2, y1: y + 2 }, zone: STOCKPILE_ZONE });
+    const far = (dx: number) => {
+      const tx = x + dx < w.width ? x + dx : x - dx;
+      return w.idx(tx, y);
+    };
+    const near = alerts().find((a) => a.text.includes('from any stockpile'));
+    expect(near).toBeUndefined();
+    // A felling 50 tiles off: 70 logs left lying.
+    w.addItem(far(50), itemId('wood'), 40);
+    w.addItem(far(51), itemId('wood'), 30);
+    const alert = alerts().find((a) => a.text.includes('from any stockpile'));
+    expect(alert?.text).toMatch(/^70 items lie more than 40 tiles/);
+    expect(alert?.tile).toBe(far(50));
+    // On a Tiny map nothing is ever that far.
+    controller.newColony('far');
+    expect(texts().some((t) => t.includes('from any stockpile'))).toBe(false);
+  });
+});
+
+describe('a raid on the way', () => {
+  it('says when to expect the raiders, and that they are gathering on a small map', () => {
+    controller.newColony('raid');
+    const sim = controller.sim;
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    expect(
+      spawnRaid(
+        sim,
+        FACTIONS.findIndex((f) => f.hostile),
+        3,
+      ),
+    ).toBe(true);
+    const raid = texts().find((t) => t.startsWith('Raid:'));
+    expect(raid).toMatch(
+      /gathering at the edge: here (within the hour|in about (an hour|\d+ hours))\. Draft with Q\.$/,
+    );
   });
 });

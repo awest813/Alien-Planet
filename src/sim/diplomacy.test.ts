@@ -218,11 +218,12 @@ describe('hiring fighters', () => {
     expect(fightersHired(sim)).toBe(true);
     expect(colonyStock(sim, SILVER)).toBe(silver - hireCost(sim));
     expect(deserialize(structuredClone(serialize(sim))).diplomacy.fightersUntil).toBe(sim.diplomacy.fightersUntil);
-    // A raid: they're coming, for sure, within the hour.
+    // A raid: they're coming, for sure, setting off in time to meet the raiders.
     expect(spawnRaid(sim, RAIDERS[0], 6)).toBe(true);
     maybeSendAllies(sim);
     expect(sim.raid!.allies).toBeGreaterThanOrEqual(3);
-    expect(sim.raid!.alliesAt).toBe(sim.tick + HOUR);
+    expect(sim.raid!.alliesAt).toBeGreaterThanOrEqual(sim.tick);
+    expect(sim.raid!.alliesAt).toBeLessThanOrEqual(sim.raid!.contactAt!);
     // Twelve days on, it's over.
     sim.tick += HIRE_DAYS * 24 * HOUR;
     expect(fightersHired(sim)).toBe(false);

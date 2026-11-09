@@ -1,3 +1,4 @@
+import { inAbout } from '../sim/arrivals';
 import { TRANSMIT_HOURS, beaconTile } from '../sim/beacon';
 import { Musician, SoundScene, sound } from './audio';
 import { isInstrument } from './music';
@@ -893,6 +894,39 @@ export interface DiplomacyView {
   travellers: { id: number; name: string; why: string | null }[];
   // Supplies for 1..MAX_PARTY members, by purpose.
   supplies: { trade: number[]; salvage: number[] };
+}
+
+// On a big map, work far out (a distant felling, a mine across the valley) leaves goods that take hours to
+// carry home. Past this distance from any storage, and this many of them, the colony is told.
+export const FAR_ITEMS_RANGE = 40;
+const FAR_ITEMS = 60;
+
+// Loose goods far from every stockpile: how many, and where most of them lie. (Storage is looked at by
+// 16×16 block, so this stays cheap on a big map.)
+export function farFromStorage(sim: Simulation, storage: readonly number[]): { count: number; tile: number } | null {
+  const w = sim.world;
+  if (storage.length === 0 || w.width <= FAR_ITEMS_RANGE * 2) {
+    return null;
+  }
+  const blocks = new Map<number, number>();
+  for (const i of storage) {
+    blocks.set(((w.yOf(i) >> 4) << 8) | (w.xOf(i) >> 4), i);
+  }
+  const stores = [...blocks.values()];
+  let count = 0;
+  let most = -1;
+  let tile = -1;
+  for (const i of w.tilesWith('items')) {
+    if (sim.isStockpile(i) || w.forbidden[i] === 1 || stores.some((s) => w.distance(s, i) <= FAR_ITEMS_RANGE)) {
+      continue;
+    }
+    count += w.itemCount[i];
+    if (w.itemCount[i] > most) {
+      most = w.itemCount[i];
+      tile = i;
+    }
+  }
+  return count >= FAR_ITEMS ? { count, tile } : null;
 }
 
 export interface Alert {
@@ -2082,8 +2116,14 @@ export class GameController {
         tile: siege.camp,
       });
     } else if (raiders > 0) {
+      // Still on the way (or gathering at the edge of a small map): when to expect them.
+      const raid = sim.raid;
+      const coming =
+        raid && raid.arrivedTick === undefined && raid.contactAt !== undefined && raid.contactAt > sim.tick
+          ? `${raid.musterUntil !== undefined ? ', gathering at the edge' : ', on their way'}: here ${inAbout(raid.contactAt - sim.tick)}`
+          : '';
       alerts.push({
-        text: `Raid: ${raiders} raider${raiders > 1 ? 's' : ''} from ${FACTIONS[sim.enemies[0].faction].name}. Draft with Q.`,
+        text: `Raid: ${raiders} raider${raiders > 1 ? 's' : ''} from ${FACTIONS[sim.enemies[0].faction].name}${coming}. Draft with Q.`,
         tone: 'danger',
         tile: sim.enemies.find((e) => !e.fleeing)?.tile,
       });
@@ -2430,9 +2470,17 @@ export class GameController {
       }
     }
     // Shelves, iceboxes and drying racks are storage too.
-    const anyStorage = sim.world.zone.some(isStockpileZone) || sim.buildingTiles().some((i) => sim.isStockpile(i));
-    if (!anyStorage && totals.some((t) => t.total > 0)) {
+    const storage = sim.storageTiles();
+    if (storage.length === 0 && totals.some((t) => t.total > 0)) {
       alerts.push({ text: 'No stockpile: items are left where they fall', tone: 'warn' });
+    }
+    const far = farFromStorage(sim, storage);
+    if (far) {
+      alerts.push({
+        text: `${far.count} items lie more than ${FAR_ITEMS_RANGE} tiles from any stockpile: a stockpile out there would save long walks`,
+        tone: 'warn',
+        tile: far.tile,
+      });
     }
     // Blueprints waiting on materials the colony doesn't have.
     const outstanding = new Map<number, number>();
@@ -2476,7 +2524,7 @@ export class GameController {
       sim
         .storageTiles()
         .some((i) => [...looseTypes.keys()].some((type) => w.canHoldItem(i, type) && sim.storesItem(i, type)));
-    if (!room && loose > 0 && anyStorage) {
+    if (!room && loose > 0 && storage.length > 0) {
       const [most] = [...looseTypes.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
       alerts.push({
         text: `Stockpiles are full: ${loose} stacks lying outside, mostly ${itemDef(most).name.toLowerCase()}. Zone more storage (Z).`,

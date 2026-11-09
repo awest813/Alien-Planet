@@ -157,7 +157,8 @@ describe('sieges', () => {
     sim.diplomacy.fightersUntil = sim.tick + 1000 * TICKS_PER_HOUR;
     triggerEvent(sim, 'siege');
     const siege = besieging(sim)!;
-    expect(sim.raid!.alliesAt).toBeGreaterThan(siege.attackAt);
+    // They set off to arrive for the attack (the walk in from the edge of a small map is under an hour).
+    expect(sim.raid!.alliesAt).toBeGreaterThanOrEqual(siege.attackAt - TICKS_PER_HOUR);
   });
 
   it('let colonists bring in and tend the hurt near the camp', () => {

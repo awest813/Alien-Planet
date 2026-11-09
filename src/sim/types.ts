@@ -285,6 +285,8 @@ export interface Animal {
   huntAgainAt?: number;
   // The beast a neighbouring faction asked the colony to hunt down: tougher, and stays until it's dead.
   quarry?: boolean;
+  // A maddened pack gathering at the edge of a small map: it waits until then (see arrivals.ts).
+  musterUntil?: number;
   // A named animal (the great beast), how many times tougher than its kind, and whether its leaving was
   // told.
   name?: string;

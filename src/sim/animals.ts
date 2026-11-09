@@ -6,6 +6,7 @@ import type { Season } from './seasons';
 import type { Simulation } from './simulation';
 import { Animal, Colonist } from './types';
 import { Filth } from './world';
+import { MUSTER_ALERT, animalTilesPerTick, musterTicks, walkTicks } from './arrivals';
 import { beastLeaves, beastSlain } from './beast';
 import { animalWeight } from './biomes';
 import { changeGoodwill, friendly, onGoodTerms } from './diplomacy';
@@ -282,14 +283,32 @@ export function manhuntersArrive(sim: Simulation, kind: string, count: number): 
   if (edge === undefined || !sim.living().some((c) => !c.health.downed && sim.regionOf(c.tile) === region)) {
     return 0;
   }
+  // On a small map they gather at the edge before they charge, so there's time to get ready.
+  const home = sim.homeTile() ?? sim.living()[0].tile;
+  const walk = walkTicks(w, edge, home, animalTilesPerTick(ANIMALS[kind].speed), 0);
+  const muster = musterTicks(walk);
   for (let n = 0; n < count; n++) {
     const a = addAnimal(sim, edge, kind);
     a.manhunter = true;
     a.revengeOn = nearestPrey(sim, a)!.id;
-    // Their fury lasts most of a day.
-    a.revengeUntil = sim.tick + TICKS_PER_HOUR * 16;
+    // Their fury lasts most of a day (from when they set off).
+    a.revengeUntil = sim.tick + muster + TICKS_PER_HOUR * 16;
+    if (muster > 0) {
+      a.musterUntil = sim.tick + muster;
+    }
   }
   return count;
+}
+
+// Roughly how long until a pack just arrived (the last `count` animals) reaches the colony.
+export function packDueIn(sim: Simulation, count: number): number {
+  const lead = sim.animals[sim.animals.length - 1];
+  const home = sim.homeTile() ?? sim.living()[0]?.tile;
+  if (!lead || count === 0 || home === undefined) {
+    return 0;
+  }
+  const walk = walkTicks(sim.world, lead.tile, home, animalTilesPerTick(ANIMALS[lead.kind].speed), 0);
+  return walk + Math.max(0, (lead.musterUntil ?? sim.tick) - sim.tick);
 }
 
 function pathTo(sim: Simulation, a: Animal, goals: number[]): void {
@@ -645,6 +664,17 @@ export function updateAnimals(sim: Simulation): void {
     }
     const def = ANIMALS[a.kind];
     a.cooldown--;
+    // A maddened pack gathering at the edge holds until it's time, or until someone comes close or one is hurt.
+    if (a.musterUntil !== undefined) {
+      if (
+        sim.tick < a.musterUntil &&
+        a.hp >= maxHp(a) &&
+        !sim.living().some((c) => !c.health.downed && w.distance(c.tile, a.tile) <= MUSTER_ALERT)
+      ) {
+        continue;
+      }
+      a.musterUntil = undefined;
+    }
     // A maddened animal with nobody it can reach goes back where it came from.
     if (a.manhunter && a.revengeOn < 0) {
       const next = a.revengeUntil > sim.tick ? nearestPrey(sim, a) : undefined;

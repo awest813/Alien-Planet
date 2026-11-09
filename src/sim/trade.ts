@@ -53,6 +53,8 @@ export const startingGoodwill = (faction: number): number =>
 export const dealBalance = (cost: number, income: number) => Math.ceil(cost) - Math.floor(income);
 // How long a caravan stays, counted from when it sets out.
 const VISIT_HOURS = 30;
+// Time allowed for the walk in from the edge (a Large map takes about 3 hours).
+const WALK_IN_HOURS = 6;
 // Traders this close to home have arrived and are open for business.
 const ARRIVED = 10;
 const SILVER = () => itemId('silver');
@@ -185,7 +187,9 @@ export function caravanArrives(sim: Simulation): boolean {
     visitors,
     stock,
     silver: Math.round(sim.rng.int(200, 400) * scale),
-    leaveAt: sim.tick + VISIT_HOURS * TICKS_PER_HOUR,
+    // Their stay counts from when they reach the colony (set then); until then, a cap for a party that
+    // never gets there.
+    leaveAt: sim.tick + (VISIT_HOURS + WALK_IN_HOURS) * TICKS_PER_HOUR,
     leaving: false,
   };
   // Just a log line: the card comes when they arrive and trade opens.
@@ -218,6 +222,7 @@ export function updateCaravan(sim: Simulation): void {
     caravan.visitors.some((v) => w.distance(v.tile, home) <= ARRIVED)
   ) {
     caravan.arrivedTick = sim.tick;
+    caravan.leaveAt = sim.tick + VISIT_HOURS * TICKS_PER_HOUR;
     sim.addLog(
       `Traders from ${FACTIONS[caravan.faction].name} have arrived. Open Trade to deal with them.`,
       'good',

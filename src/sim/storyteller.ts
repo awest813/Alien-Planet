@@ -1,5 +1,6 @@
 import { SIGNAL_RAID_WEIGHT, transmitting } from './beacon';
-import { herdArrives, herdsWary, manhuntersArrive, wildCap, wildCount } from './animals';
+import { herdArrives, herdsWary, manhuntersArrive, packDueIn, wildCap, wildCount } from './animals';
+import { inAbout } from './arrivals';
 import { maybeSendAllies, spawnRaid, weaponScore } from './combat';
 import { TICKS_PER_HOUR, populationFor } from './constants';
 import { ANIMALS, FACTIONS, NONE, featureDef, isFood, itemDef, itemId, terrainDef } from './defs';
@@ -550,7 +551,7 @@ const EVENTS: EventDef[] = [
         return false;
       }
       sim.addLog(
-        `A pack of ${arrived} maddened ${ANIMALS[kind].plural} is charging the colony! Draft colonists and fight them off.`,
+        `A pack of ${arrived} maddened ${ANIMALS[kind].plural} is coming for the colony, and will be on it ${inAbout(packDueIn(sim, arrived))}! Draft colonists and fight them off.`,
         'danger',
         true,
       );
