@@ -467,7 +467,7 @@ const EVENTS: EventDef[] = [
     minDay: 5,
     cooldownDays: 8,
     threat: true,
-    weight: (sim) => (sim.countFeature((f) => !!featureDef(f).crop) > 8 ? 0.6 : 0),
+    weight: (sim) => (sim.countBuilt((f) => !!featureDef(f).crop) > 8 ? 0.6 : 0),
     run: (sim) => {
       const w = sim.world;
       const exposed = (i: number) => w.feature[i] !== NONE && !!featureDef(w.feature[i]).crop && !sim.isRoofed(i);
@@ -696,7 +696,7 @@ const EVENTS: EventDef[] = [
     key: 'bumperCrop',
     minDay: 4,
     cooldownDays: 8,
-    weight: (sim) => (sim.countFeature((f) => !!featureDef(f).crop) > 8 ? 0.6 : 0),
+    weight: (sim) => (sim.countBuilt((f) => !!featureDef(f).crop) > 8 ? 0.6 : 0),
     run: (sim) => {
       const w = sim.world;
       let grown = 0;

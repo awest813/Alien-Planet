@@ -1,4 +1,4 @@
-import { MAX_COST_LINES, NONE, NORMAL_QUALITY, driedFrom, featureDef, itemDef, terrainDef } from './defs';
+import { MAX_COST_LINES, NONE, NORMAL_QUALITY, driedFrom, featureDef, itemDef, terrainDef, terrainId } from './defs';
 import type { Carried } from './types';
 
 export type TileKind = 'items' | 'features' | 'designations' | 'blueprints' | 'zones' | 'filth';
@@ -88,6 +88,13 @@ const storing = (f: number): boolean => {
 };
 
 // Features that decide where pens are, besides the fences themselves (which are walls to the map).
+// Shallow water or ice: the tiles that freeze and thaw.
+let freezable: [number, number] | null = null;
+export const isFreezable = (t: number): boolean => {
+  freezable ??= [terrainId('shallowWater'), terrainId('ice')];
+  return t === freezable[0] || t === freezable[1];
+};
+
 const pennish = (f: number): boolean => {
   if (f === NONE) {
     return false;
@@ -157,6 +164,8 @@ export class World {
   public storageVersion = 0;
   // Bumped when anything not natural (a building, a crop) comes or goes: not trees or rock.
   public builtVersion = 0;
+  // Bumped when a tile becomes, or stops being, shallow water or ice (not when one freezes or thaws).
+  public waterVersion = 0;
   // Bumped whenever any feature changes (furniture affects room stats).
   public featureVersion = 0;
 
@@ -402,6 +411,9 @@ export class World {
 
   public setTerrain(i: number, t: number): void {
     const before = this.isPassable(i);
+    if (isFreezable(this.terrain[i]) !== isFreezable(t)) {
+      this.waterVersion++;
+    }
     this.terrain[i] = t;
     // Regions and rooms are worked out again only when walking changes (ice coming and going doesn't).
     if (before !== this.isPassable(i)) {

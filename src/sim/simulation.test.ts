@@ -31,7 +31,7 @@ describe('world generation', () => {
     expect(a.colonists.map((c) => c.name)).toEqual(b.colonists.map((c) => c.name));
   });
 
-  it('lands three, four or five colonists, by map size, on dry, walkable ground', () => {
+  it('lands three to six colonists, by map size, on dry, walkable ground', () => {
     for (let seed = 1; seed <= 20; seed++) {
       const size = MAP_SIZES[seed % MAP_SIZES.length];
       const sim = Simulation.newColony(seed, 'standard', size.size);

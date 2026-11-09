@@ -412,6 +412,7 @@ function play(seed: number): Result {
 
   let builtDay2 = false;
   let secondFarm = false;
+  let thirdFarm = false;
   let hearthPlaced = false;
   let gamesPlaced = false;
   let artPlaced = false;
@@ -1002,6 +1003,19 @@ function play(seed: number): Result {
     // A second field early enough to stock up for winter, as a player would.
     if (!secondFarm && (sim.living().length >= 7 || sim.day >= 5)) {
       secondFarm = true;
+      const field = findSite(sim, 7, 5, avoid);
+      if (field) {
+        claim(avoid, sim, field.x, field.y, 7, 5);
+        sim.apply({
+          type: 'zone',
+          rect: { x0: field.x, y0: field.y, x1: field.x + 6, y1: field.y + 4 },
+          zone: crop('potatoPlant'),
+        });
+      }
+    }
+    // A third field once the colony outgrows the first two (a big map's colony runs to fifteen or more).
+    if (secondFarm && !thirdFarm && sim.living().length >= 11) {
+      thirdFarm = true;
       const field = findSite(sim, 7, 5, avoid);
       if (field) {
         claim(avoid, sim, field.x, field.y, 7, 5);

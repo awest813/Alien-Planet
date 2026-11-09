@@ -2,12 +2,14 @@
 // game speed smooth). Not part of the tests (timings vary too much between machines); run it after changes to
 // anything that runs every tick.
 //
-//   npx esbuild scripts/perf.ts --bundle --platform=node --format=esm --outfile=/tmp/perf.mjs && node /tmp/perf.mjs
+//   npx esbuild scripts/perf.ts --bundle --platform=node --format=esm --outfile=/tmp/perf.mjs && node /tmp/perf.mjs [size=128]
+//
+// The largest map by default; "size=N" measures another (it needn't be one of the sizes offered).
 import { MAP_SIZES } from '../src/sim/constants';
 import { Simulation } from '../src/sim/simulation';
 
 const BUDGET_MS = 60;
-const size = MAP_SIZES[MAP_SIZES.length - 1].size;
+const size = Number(process.argv.find((a) => a.startsWith('size='))?.slice(5) ?? MAP_SIZES[MAP_SIZES.length - 1].size);
 const sim = Simulation.newColony(5, 'standard', size);
 // Let the colony get going first (stockpiles fill, jobs pile up).
 for (let t = 0; t < 200 * 24 * 3; t++) {

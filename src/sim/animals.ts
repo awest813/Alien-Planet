@@ -164,6 +164,7 @@ function stalk(sim: Simulation, a: Animal): boolean {
       return false;
     }
     a.chasing = prey.id;
+    chasedThisTick?.add(prey.id);
   }
   if (chebyshev(sim, a.tile, prey.tile) <= 1) {
     a.path = [];
@@ -623,8 +624,18 @@ function guard(sim: Simulation, a: Animal): boolean {
   return true;
 }
 
+// Animals some predator is after this tick (or was, earlier in it): only these need the full look round
+// for a hunter on their heels. Never misses one, so the answer is the same as checking every animal.
+let chasedThisTick: Set<number> | null = null;
+
 export function updateAnimals(sim: Simulation): void {
   standDownAfterPack(sim);
+  chasedThisTick = new Set();
+  for (const p of sim.animals) {
+    if (p.chasing !== undefined) {
+      chasedThisTick.add(p.chasing);
+    }
+  }
   const w = sim.world;
   const awake = sim.living().filter((c) => !c.sleeping);
   const home = sim.homeTile() ?? sim.living()[0]?.tile;
@@ -713,9 +724,26 @@ export function updateAnimals(sim: Simulation): void {
       (sim.tick + a.id) % 4 === 0
     ) {
       // Skittish animals keep their distance from people, and from anything hunting them.
-      const near =
-        awake.find((c) => w.distance(c.tile, a.tile) < def.fleeRange)?.tile ??
-        sim.animals.find((p) => p.chasing === a.id && p.hp > 0 && w.distance(p.tile, a.tile) < 6)?.tile;
+      let near: number | undefined;
+      const ax = w.xOf(a.tile);
+      const ay = w.yOf(a.tile);
+      for (const c of awake) {
+        // (Distance is never less than the larger of dx and dy: a quick check before the real one.)
+        const dx = Math.abs(w.xOf(c.tile) - ax);
+        const dy = Math.abs(w.yOf(c.tile) - ay);
+        if (dx < def.fleeRange && dy < def.fleeRange && w.distance(c.tile, a.tile) < def.fleeRange) {
+          near = c.tile;
+          break;
+        }
+      }
+      if (near === undefined && chasedThisTick.has(a.id)) {
+        for (const p of sim.animals) {
+          if (p.chasing === a.id && p.hp > 0 && w.distance(p.tile, a.tile) < 6) {
+            near = p.tile;
+            break;
+          }
+        }
+      }
       if (near !== undefined) {
         const to = wanderTarget(sim, a, WANDER_RADIUS, near);
         if (to !== undefined) {
@@ -738,7 +766,9 @@ export function updateAnimals(sim: Simulation): void {
       move(sim, a);
     }
   }
-  sim.animals = sim.animals.filter((a) => a.hp > 0);
+  if (sim.animals.some((a) => a.hp <= 0)) {
+    sim.animals = sim.animals.filter((a) => a.hp > 0);
+  }
 }
 
 // A colonist's attack landed. Kills drop meat and leather; some animals fight back.

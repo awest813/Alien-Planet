@@ -225,6 +225,7 @@ import {
   TileKind,
   World,
   growZoneCrop,
+  isFreezable,
   isStockpileZone,
   priorityRank,
   stockpileZone,
@@ -474,6 +475,9 @@ const FISH_WORK = 90;
 const FISH_PER_CATCH = 3;
 // Colonists only fish while the colony holds less than this much nutrition per head.
 const FISH_FOOD_TARGET = 6;
+// Hunters leave marked game farther than this from home until it wanders closer: on a big map, a hunt
+// across the valley ends with someone mauled, or downed in the snow, a long way from help.
+export const HUNT_RANGE = 48;
 // Shallow water freezes from the shore inwards below this, and thaws above THAW.
 const FREEZE = -2;
 const THAW = 3;
@@ -1599,9 +1603,22 @@ export class Simulation {
 
   private shelterRegions = { version: -1, regions: new Set<number>() };
 
+  // How many features of any kind (trees and rock included) pass the test.
   public countFeature(test: (featureId: number) => boolean): number {
     let n = 0;
     for (const i of this.world.tilesWith('features')) {
+      if (test(this.world.feature[i])) {
+        n++;
+      }
+    }
+    return n;
+  }
+
+  // How many built features (crops included; not trees or rock) pass the test: the same answer as
+  // countFeature for anything a colonist builds, without wading through a big map's forests.
+  public countBuilt(test: (featureId: number) => boolean): number {
+    let n = 0;
+    for (const i of this.buildingTiles()) {
       if (test(this.world.feature[i])) {
         n++;
       }
@@ -1955,7 +1972,16 @@ export class Simulation {
     const hour = Math.floor(this.totalHours);
     let before = 0;
     const changes: number[] = [];
-    for (let i = 0; i < w.size; i++) {
+    if (this.waterTiles.version !== w.waterVersion) {
+      const tiles: number[] = [];
+      for (let i = 0; i < w.size; i++) {
+        if (isFreezable(w.terrain[i])) {
+          tiles.push(i);
+        }
+      }
+      this.waterTiles = { version: w.waterVersion, tiles };
+    }
+    for (const i of this.waterTiles.tiles) {
       const terrain = w.terrain[i];
       if (terrain === ICE) {
         before++;
@@ -1982,6 +2008,9 @@ export class Simulation {
     }
   }
 
+  // The shallows and ice, kept until a tile turns to or from water: what updateIce looks over.
+  private waterTiles = { version: -1, tiles: [] as number[] };
+
   private growCrops(): void {
     const w = this.world;
     const hour = this.hour;
@@ -1991,7 +2020,7 @@ export class Simulation {
     const speed = this.isResearched('cropRotation') ? 1.25 : 1;
     const lit = this.litTiles();
     let frosted = 0;
-    for (const i of w.tilesWith('features')) {
+    for (const i of this.buildingTiles()) {
       const f = w.feature[i];
       const crop = f !== NONE ? featureDef(f).crop : undefined;
       if (!crop) {
@@ -3455,9 +3484,12 @@ export class Simulation {
       const y0 = Math.max(0, fy - r);
       const y1 = Math.min(w.height - 1, fy + r);
       for (let y = y0; y <= y1; y++) {
+        const dy = Math.abs(y - fy);
         for (let x = x0; x <= x1; x++) {
-          const i = w.idx(x, y);
-          const d = w.distance(from, i);
+          const i = y * w.width + x;
+          // w.distance(from, i), worked out from the coordinates already in hand.
+          const dx = Math.abs(x - fx);
+          const d = Math.max(dx, dy) + 0.414 * Math.min(dx, dy);
           if (this.couldRank(best, i, d, limit) && test(i)) {
             this.rank(best, i, d, limit);
           }
@@ -4434,7 +4466,7 @@ export class Simulation {
 
   // Everything built (crops included): what most searches for a bench, bed or table want, without
   // wading through every tree and rock on the map. Kept until a building changes.
-  private buildingTiles(): number[] {
+  public buildingTiles(): readonly number[] {
     const w = this.world;
     if (this.buildingVersion !== w.builtVersion) {
       this.buildingVersion = w.builtVersion;
@@ -4444,7 +4476,7 @@ export class Simulation {
   }
 
   private buildingVersion = -1;
-  private buildingCache: number[] = [];
+  private buildingCache: readonly number[] = [];
   private storageKey = '';
   private storageCache: number[] = [];
   // Bumped whenever zones change.
@@ -5286,7 +5318,7 @@ export class Simulation {
     if (this.memorialVersion !== this.world.featureVersion) {
       this.memorialVersion = this.world.featureVersion;
       const memorial = featureId('memorial');
-      this.memorialStands = this.countFeature((f) => f === memorial) > 0;
+      this.memorialStands = this.countBuilt((f) => f === memorial) > 0;
     }
     return this.memorialStands;
   }
@@ -5297,7 +5329,7 @@ export class Simulation {
   private hasJoyBuilding(): boolean {
     if (this.joyBuiltVersion !== this.world.featureVersion) {
       this.joyBuiltVersion = this.world.featureVersion;
-      this.joyBuilt = this.countFeature((f) => !!featureDef(f).joy) > 0;
+      this.joyBuilt = this.countBuilt((f) => !!featureDef(f).joy) > 0;
     }
     return this.joyBuilt;
   }
@@ -6082,7 +6114,7 @@ export class Simulation {
     if (!project) {
       return hold;
     }
-    if (project.building && this.countFeature((f) => featureDef(f).key === project.building) === 0) {
+    if (project.building && this.countBuilt((f) => featureDef(f).key === project.building) === 0) {
       hold.building = project.building;
     }
     for (const need of project.materials ?? []) {
@@ -6215,12 +6247,15 @@ export class Simulation {
       return false;
     }
     const region = this.regionOf(c.tile);
+    const home = this.homeTile() ?? c.tile;
     const prey = this.animals
       .filter(
         (a) =>
           a.hunted &&
           a.hp > 0 &&
           this.regions.region[a.tile] === region &&
+          // (The neighbours' quarry is worth the trek.)
+          (a.quarry || w.distance(home, a.tile) <= HUNT_RANGE) &&
           !this.isReserved(`h${a.id}`, c) &&
           !spareForBreeding(this, a),
       )
@@ -6238,6 +6273,12 @@ export class Simulation {
     const prey = this.animals.find((a) => a.id === job.patient);
     // (Another hunter's kill may have left it one of the last pair.)
     if (!prey || prey.hp <= 0 || !prey.hunted || spareForBreeding(this, prey)) {
+      this.endJob(c);
+      return;
+    }
+    // Prey that runs well out of range is let go (a wounded one may come back).
+    const home = this.homeTile() ?? c.tile;
+    if (!prey.quarry && w.distance(home, prey.tile) > HUNT_RANGE + 12) {
       this.endJob(c);
       return;
     }
@@ -7574,7 +7615,7 @@ const produced = (s: Simulation, key: string) => s.stats.produced[key] ?? 0;
 // Kinds of recreation the colony's buildings offer (walks don't count).
 const recreationKinds = (s: Simulation) => {
   const kinds = new Set<string>();
-  for (const i of s.world.tilesWith('features')) {
+  for (const i of s.buildingTiles()) {
     const joy = featureDef(s.world.feature[i]).joy;
     if (joy) {
       kinds.add(joy.kind);
@@ -7621,13 +7662,13 @@ export const OBJECTIVES: ObjectiveDef[] = [
     label: 'Build an enclosed shelter (walls + door)',
     phase: 1,
     // (A door too: someone walled into a ring of rock hasn't built a shelter.)
-    check: (s) => s.hasShelter() && s.countFeature((f) => !!featureDef(f).door) > 0,
+    check: (s) => s.hasShelter() && s.countBuilt((f) => !!featureDef(f).door) > 0,
   },
   {
     id: 'bed',
     label: 'Build a bed',
     phase: 1,
-    check: (s) => s.countFeature((f) => featureDef(f).bed) > 0,
+    check: (s) => s.countBuilt((f) => featureDef(f).bed) > 0,
   },
   {
     id: 'night',
@@ -7663,7 +7704,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'rec',
     label: 'Build a recreation spot',
     phase: 2,
-    check: (s) => s.countFeature((f) => !!featureDef(f).joy) > 0,
+    check: (s) => s.countBuilt((f) => !!featureDef(f).joy) > 0,
   },
   {
     id: 'heat',
@@ -7675,7 +7716,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'cloth',
     label: 'Weave cloth and build an armchair',
     phase: 2,
-    check: (s) => s.countFeature((f) => FEATURES[f - 1].key === 'armchair') > 0,
+    check: (s) => s.countBuilt((f) => FEATURES[f - 1].key === 'armchair') > 0,
   },
   {
     id: 'medicine',
@@ -7719,7 +7760,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'researchBench',
     label: 'Build a research bench and pick a project',
     phase: 4,
-    check: (s) => s.countFeature((f) => featureDef(f).researchStation) > 0 && s.research.current !== null,
+    check: (s) => s.countBuilt((f) => featureDef(f).researchStation) > 0 && s.research.current !== null,
   },
   {
     id: 'research3',
@@ -7732,7 +7773,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'hearth',
     label: 'Research hearths and build a stone hearth',
     phase: 4,
-    check: (s) => s.countFeature((f) => FEATURES[f - 1].key === 'hearth') > 0,
+    check: (s) => s.countBuilt((f) => FEATURES[f - 1].key === 'hearth') > 0,
   },
   {
     id: 'bow',
@@ -7746,9 +7787,9 @@ export const OBJECTIVES: ObjectiveDef[] = [
     phase: 4,
     // (The colony's own: not a siege party's.)
     check: (s) =>
-      [...s.world.tilesWith('features')].some(
-        (i) => FEATURES[s.world.feature[i] - 1].key === 'sandbags' && !s.raid?.siege?.built?.includes(i),
-      ),
+      s
+        .buildingTiles()
+        .some((i) => FEATURES[s.world.feature[i] - 1].key === 'sandbags' && !s.raid?.siege?.built?.includes(i)),
   },
   {
     id: 'winter',
@@ -7767,7 +7808,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'power',
     label: 'Research electricity and build a generator',
     phase: 5,
-    check: (s) => s.countFeature((f) => !!featureDef(f).power && featureDef(f).power!.output > 0) > 0,
+    check: (s) => s.countBuilt((f) => !!featureDef(f).power && featureDef(f).power!.output > 0) > 0,
   },
   {
     id: 'coldStore',
@@ -7813,7 +7854,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'instrument',
     label: 'Build a musical instrument',
     phase: 5,
-    check: (s) => s.countFeature((f) => !!featureDef(f).joy?.instrument) > 0,
+    check: (s) => s.countBuilt((f) => !!featureDef(f).joy?.instrument) > 0,
   },
   {
     id: 'concert',

@@ -67,7 +67,7 @@ function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: ()
         ))}
       </div>
       <h3>Map size</h3>
-      <div className="difficulties">
+      <div className="difficulties four">
         {MAP_SIZES.map((m) => (
           <button key={m.size} className={mapSize === m.size ? 'active' : ''} onClick={() => setMapSize(m.size)}>
             <b>{m.label} map</b>

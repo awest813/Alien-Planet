@@ -817,7 +817,7 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
 - Performance budget: under 60 ms per 1,000 ticks on a Large map, checked with each phase. Measure a bundled
   build (`npx esbuild scripts/balance.ts --bundle --platform=node --format=esm --outfile=/tmp/balance.mjs`):
   under tsx, every imported value goes through a getter, which inflates the numbers by about half. After
-  Phase L, a busy Large colony over 40 days ran at about 48 ms per 1,000 ticks (from 58), once `nearest`
+  Phase L, a busy 128×128 colony over 40 days ran at about 48 ms per 1,000 ticks (from 58), once `nearest`
   searched outward from its starting point instead of scanning the whole map, hunters re-planned less often
   on long chases, and skittish animals looked about every fourth tick instead of every tick.
 

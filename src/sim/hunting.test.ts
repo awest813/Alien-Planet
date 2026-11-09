@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { hurtAnimal, spareForBreeding } from './animals';
 import { ANIMALS, FACTIONS } from './defs';
-import { Simulation } from './simulation';
+import { HUNT_RANGE, Simulation } from './simulation';
 import { goodwillOf } from './trade';
 import { HOUR, clearAround, run } from './test-helpers';
 import { Animal } from './types';
@@ -124,5 +124,43 @@ describe('the Meadow Kin mind the valley', () => {
     expect(sim.story.waryUntil).toBeGreaterThan(sim.tick);
     expect(goodwillOf(sim, kin())).toBeLessThan(before);
     expect(sim.log.some((l) => l.text.includes('displeased'))).toBe(true);
+  });
+});
+
+describe('hunting range', () => {
+  it('leaves marked game far from home alone until it comes within range', () => {
+    const sim = Simulation.newColony(43, 'standard', 192);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 16);
+    sim.animals = [];
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    for (const c of sim.colonists) {
+      c.priorities.hunting = 1;
+      c.needs.food = 1;
+    }
+    const home = sim.homeTile() ?? sim.colonists[0].tile;
+    const region = sim.regionOf(w.idx(x, y));
+    // A deer about 70 tiles off, on ground the colonists can reach.
+    let far = -1;
+    for (let i = 0; i < w.size && far < 0; i++) {
+      const d = w.distance(home, i);
+      if (d > HUNT_RANGE + 20 && d < HUNT_RANGE + 26 && w.isPassable(i) && sim.regionOf(i) === region) {
+        far = i;
+      }
+    }
+    expect(far).toBeGreaterThanOrEqual(0);
+    const deer = place(sim, 'deer', far, { hunted: true, restUntil: Number.MAX_SAFE_INTEGER });
+    let setOut = false;
+    for (let t = 0; t < HOUR * 2; t++) {
+      sim.step();
+      setOut ||= sim.colonists.some((c) => c.job?.type === 'hunt');
+    }
+    expect(setOut).toBe(false);
+    expect(deer.hp).toBe(ANIMALS.deer.hp);
+    // Within range, it's hunted.
+    deer.tile = w.idx(x + 10, y);
+    deer.path = [];
+    run(sim, HOUR * 6);
+    expect(sim.stats.hunted).toBe(1);
   });
 });

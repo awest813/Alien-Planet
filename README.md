@@ -2,8 +2,9 @@
 
 **An original colony simulation in the browser, built with Phaser 4, TypeScript, and React.**
 
-A handful of colonists land on a procedurally generated map: three on a small 64×64 valley (room for six), four on a
-medium 96×96 one (room for nine) or five on a large 128×128 frontier (room for twelve). You don't control them directly: you designate work
+A handful of colonists land on a procedurally generated map: three on a tiny 64×64 valley (room for six), four on a
+small 96×96 one (room for nine), five on a medium 128×128 frontier (room for twelve) or six on a large 192×192
+country (room for fifteen). You don't control them directly: you designate work
 (chop, mine, forage, build, farm, cook, haul to storage) and they decide who does what, around their own needs.
 They get hungry, tired and bored, and their mood reacts to what they eat, where they sleep, how warm they are and
 how nice their rooms are. Let mood drop too far for too long and a colonist will wander off in a daze.
@@ -441,7 +442,7 @@ npx tsx scripts/balance.ts 26 8                # 26 days (through winter) on 8 s
 npx tsx scripts/balance.ts 20 8 passive        # never draft during raids
 npx tsx scripts/balance.ts 20 8 harsh          # or peaceful
 npx tsx scripts/balance.ts 20 4 trace          # print the colony state whenever someone dies
-npx tsx scripts/balance.ts 30 6 size=128       # on a Large map (size=96 for Medium)
+npx tsx scripts/balance.ts 30 6 size=192       # on a Large map (96 Small, 128 Medium)
 npx tsx scripts/balance.ts 30 1 trace seed=7919 # replay one colony (DEBUG=1 adds rooms, bills, research)
 npx tsx scripts/balance.ts 48 6 flow           # day-by-day food, materials, crops and wildlife, averaged
 ```

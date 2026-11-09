@@ -1,6 +1,6 @@
 # Gap list
 
-Where Colony Alpha is thin, unbalanced or untested, from ten-year runs (Small, Medium and Large maps; Peaceful,
+Where Colony Alpha is thin, unbalanced or untested, from ten-year runs (Tiny, Small and Medium maps; Peaceful,
 Standard and Harsh), 48-day balance runs, 100-player playtests, a newcomer's browser playthrough and code
 audits. Each gap says what the evidence is and what would close it. The roadmap (ROADMAP.md) holds the longer
 plans.
@@ -39,16 +39,21 @@ with esbuild for speed (see ROADMAP).
   with no trough, get an alert.
 - **Tundra is hard on a slow start:** trees are scarce, and a farming-first colony that hasn't finished its hut
   by the first cold can be lost (one of four sensible tundra colonies in a 36-day sample, on day 18).
-- **Drawing zoomed right out on a slow machine:** with 4× CPU throttling a desktop window showing the whole Large
+- **Drawing zoomed right out on a slow machine:** with 4× CPU throttling a desktop window showing the whole Medium
   map takes about 28–31 ms a frame (phones about 14–16 ms). The feature layer (about 9 ms) can't use the GPU
-  layer. (Rebuilding the interface's state, 5 times a second, is down to about 2 ms on a busy Large map; the
+  layer. (Rebuilding the interface's state, 5 times a second, is down to about 2 ms on a busy Medium map; the
   alerts were 2.2 ms of it and are now 0.5 ms.)
-- **A busy colony's simulation gets slower as items pile up.** On a Large map `scripts/perf.ts` gives about 49 ms per
+- **Large maps (192×192) are lightly tested:** they have had 48-day and three-year balance runs, but no
+  ten-year run or 100-player playtest yet. Their colonies starve about 1.5 times as many hours per colonist
+  as Medium's (long walks to fields and kitchens, and the harness's fields don't grow with fifteen people
+  until a third field at eleven). Showing the whole map on a slow phone hasn't been measured; on a desktop it
+  costs about twice Medium's.
+- **A busy colony's simulation gets slower as items pile up.** On a Medium map `scripts/perf.ts` gives about 44 ms per
   1,000 ticks at day 8 (budget 60), but a busy colony that mines hard reaches about 95–100 ms per 1,000 ticks in
   days 31–40, with over a thousand items lying about. What's left is spread thin: pathfinding, colonists choosing
   work, animals and room measuring. (Region and room recounts after each mined tile are now 1.2 ms, from 2.4;
   storage, the colony's centre and the list of buildings no longer rebuild when a tree is felled or rock mined;
-  and gear searches are skipped when there's no spare gear. Two 41-day Large balance colonies run in 16.9 s, from
+  and gear searches are skipped when there's no spare gear. Two 41-day Medium balance colonies run in 16.9 s, from
   20.5 s.) At top speed even 100 ms per 1,000 ticks is only about 8 ms of each second.
 - **Testing:** the browser tests haven't run on GitHub yet, and the long-press hasn't been tried on a real
   iPhone. Performance is still checked by hand (`scripts/perf.ts`); it's too noisy for CI. Saves from before
@@ -110,12 +115,23 @@ with esbuild for speed (see ROADMAP).
   worth (from 65); Standard holds about 37–39.
 - **No touch stand-in for right-click on the Work grid:** holding a cell steps it down.
 - **Drawing zoomed out was slow:** the ground is a GPU layer, sparse layers draw only their filled tiles, and
-  pawn marks no longer redraw their text every frame. With 4× throttling, a phone showing the whole Large map went
+  pawn marks no longer redraw their text every frame. With 4× throttling, a phone showing the whole Medium map went
   from 57–62 ms a frame to 14–16 ms.
-- **Large maps were hard to read zoomed out:** colonists showed as specks, so far out each gets a ring in their
+- **No map bigger than 128×128:** the sizes are now Tiny (64), Small (96), Medium (128, the old Large) and
+  a new Large, 192×192, with six colonists and room for fifteen. Over 48 days on six seeds it kept 90 of 90
+  colonists (and 31 of 31 over three years on two seeds), with Medium at 73 of 73 in the same harness.
+  - **Hunters crossing the map:** on the first Large runs, 11 of 89 colonists died. Hunters went after game
+    across the map, were mauled or downed far from help, and froze. Hunters now leave marked game more than
+    48 tiles from home (the neighbours' quarry excepted) and give up a chase that runs past 60.
+  - **Simulation speed:** goal checks, alerts and crops walked every tree on the map, ice looked at every
+    tile each hour, and animals checked every other animal for a hunter. A day-8 colony now runs at about
+    40 ms per 1,000 ticks on Large (from 61) and 39 on Medium (from 50), with the same outcomes.
+  - **Drawing:** a desktop window draws Large in about 3 ms a frame, or 8 ms with the whole map on screen.
+  - An XL map (256×256) is planned in docs/XL_MAP.md.
+- **Medium maps (128×128, called Large until the 192×192 size came) were hard to read zoomed out:** colonists showed as specks, so far out each gets a ring in their
   colour and raiders a red dot; a map smaller than the window sits in its middle, not against the left edge; and
   on a phone the colonist bar scrolls in one row (with 16 colonists it had wrapped to about 300 px). A 48-day
-  Large balance run across six seeds kept 72 of 72 colonists; a desktop window draws a Large map in about 2 ms a
+  Medium balance run across six seeds kept 72 of 72 colonists; a desktop window draws a Medium map in about 2 ms a
   frame at the usual zoom and about 4 ms showing all of it.
 - **No browser tests:** a Playwright suite (every screen, save and load, the phone layout, the Work grid's long
   press) runs in CI. Long playtests run weekly in their own workflow.

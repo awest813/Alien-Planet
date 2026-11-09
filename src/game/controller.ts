@@ -298,7 +298,7 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     tool: 'sculptureLarge',
   },
   population: {
-    how: 'Wanderers ask to join now and then until the valley is full (6 on a small map, 9 medium, 12 large); keep the colony comfortable and fed.',
+    how: 'Wanderers ask to join now and then until the valley is full (6 on a tiny map, 9 small, 12 medium, 15 large); keep the colony comfortable and fed.',
   },
   secondWinter: { how: 'Everything from the first winter, with a bigger colony.' },
 };
@@ -350,7 +350,7 @@ export const TOOLS: ToolDef[] = [
     hotkey: 'v',
     tool: { kind: 'hunt' },
     group: 'orders',
-    hint: 'Drag over animals to hunt them for meat and leather (boars fight back). The Village screen can keep a breeding pair of each kind',
+    hint: 'Drag over animals to hunt them for meat and leather (boars fight back). Hunters go up to about 48 tiles from home; the Village screen can keep a breeding pair of each kind',
   },
   {
     id: 'tame',
@@ -1781,7 +1781,7 @@ export class GameController {
         requires: p.requires.map((r) => researchDef(r)?.name ?? r),
         ...researchNeeds(sim, p),
       })),
-      researchBench: sim.countFeature((f) => featureDef(f).researchStation) > 0,
+      researchBench: sim.countBuilt((f) => featureDef(f).researchStation) > 0,
       lockedTools: Object.fromEntries(
         TOOLS.flatMap((t) => {
           const needs = t.tool.kind === 'build' ? featureDef(t.tool.feature).research : undefined;
@@ -1914,7 +1914,7 @@ export class GameController {
             ? `${input} → mended`
             : `${input} → ${recipe.product.count} ${product.name.toLowerCase()}`,
           bench: BENCH_NAMES[recipe.bench],
-          hasBench: sim.countFeature((f) => featureDef(f).workbench === recipe.bench) > 0,
+          hasBench: sim.countBuilt((f) => featureDef(f).workbench === recipe.bench) > 0,
           minSkill:
             recipe.minSkill > 0 ? `${recipe.bench === 'cooking' ? 'Cooking' : 'Crafting'} ${recipe.minSkill}` : null,
           locked:
@@ -2115,7 +2115,7 @@ export class GameController {
     const lying = sim.captives.filter((p) => p.state === 'downed');
     if (lying.length > 0 && raiders === 0) {
       const marked = lying.filter((p) => p.capture);
-      const hasBed = sim.countFeature((f) => featureDef(f).key === 'prisonerBed') > 0;
+      const hasBed = sim.countBuilt((f) => featureDef(f).key === 'prisonerBed') > 0;
       const hasWarden = sim.living().some((c) => c.priorities.warden > 0 && !c.health.downed);
       alerts.push({
         text:
@@ -2175,14 +2175,14 @@ export class GameController {
       alerts.push({ text: 'No medicine: grow healroot for better treatment', tone: 'warn' });
     }
     // Fires gone out for want of wood.
-    const cold = [...w.tilesWith('features')].filter(
-      (i) => featureDef(w.feature[i]).burns && featureDef(w.feature[i]).heater > 0 && w.fuel[i] <= 0,
-    );
+    const cold = sim
+      .buildingTiles()
+      .filter((i) => featureDef(w.feature[i]).burns && featureDef(w.feature[i]).heater > 0 && w.fuel[i] <= 0);
     // Burning through the woodpile: warn while there's still time to chop more.
     // Fires that burn all the time (a kiln or smelter only burns while it's worked).
-    const burning = [...w.tilesWith('features')].filter(
-      (i) => featureDef(w.feature[i]).burns && !featureDef(w.feature[i]).workbench && w.fuel[i] > 0,
-    );
+    const burning = sim
+      .buildingTiles()
+      .filter((i) => featureDef(w.feature[i]).burns && !featureDef(w.feature[i]).workbench && w.fuel[i] > 0);
     const perDay = burning.reduce((sum, i) => sum + featureDef(w.feature[i]).burns!.perDay, 0);
     if (cold.length === 0 && perDay > 0 && this.availableStock(itemId('wood')) < perDay * 3) {
       alerts.push({
@@ -2227,7 +2227,7 @@ export class GameController {
         tone: days < 2 ? 'danger' : 'warn',
       });
     }
-    if (sim.woodForFiresOnly() && sim.countFeature((f) => !!featureDef(f).power?.fuel) > 0) {
+    if (sim.woodForFiresOnly() && sim.countBuilt((f) => !!featureDef(f).power?.fuel) > 0) {
       alerts.push({ text: 'Wood is short: the generators go without, to keep the fires lit', tone: 'warn' });
     }
     const untilWinter = daysUntilWinter(sim.totalHours);
@@ -2256,7 +2256,7 @@ export class GameController {
     const researching = sim.research.current !== null;
     if (
       !researching &&
-      sim.countFeature((f) => featureDef(f).researchStation) > 0 &&
+      sim.countBuilt((f) => featureDef(f).researchStation) > 0 &&
       availableProjects(sim.research).some((p) => !p.repeatable)
     ) {
       alerts.push({ text: 'No research project selected', tone: 'warn' });
@@ -2279,7 +2279,7 @@ export class GameController {
         tone: 'warn',
       });
     }
-    if (eclipseOn(sim) && sim.countFeature((f) => !!featureDef(f).power?.solar) > 0) {
+    if (eclipseOn(sim) && sim.countBuilt((f) => !!featureDef(f).power?.solar) > 0) {
       alerts.push({ text: 'Eclipse: solar panels are dark until the sun comes back', tone: 'warn' });
     }
     const manhunters = sim.animals.filter((a) => a.manhunter && a.hp > 0 && a.revengeOn >= 0);
@@ -2351,7 +2351,7 @@ export class GameController {
         tone: days < 1 ? 'danger' : 'warn',
       });
     }
-    const beds = sim.countFeature((f) => featureDef(f).bed);
+    const beds = sim.countBuilt((f) => featureDef(f).bed);
     const alive = sim.living().length;
     if (sim.day > 1 && alive > 0 && beds < alive) {
       const missing = alive - beds;
@@ -2359,7 +2359,7 @@ export class GameController {
     }
     // Beds nobody can get to: a door opening onto rock, say, or a room walled in on every side.
     if (beds > 0) {
-      const bedTiles = [...sim.world.tilesWith('features')].filter((i) => featureDef(sim.world.feature[i]).bed);
+      const bedTiles = sim.buildingTiles().filter((i) => featureDef(sim.world.feature[i]).bed);
       const regions = new Set(
         sim
           .living()
@@ -2413,7 +2413,7 @@ export class GameController {
       }
     }
     // Fences that don't make a pen yet, and pens with nothing to eat from.
-    const fences = sim.countFeature((f) => featureDef(f).key === 'fence');
+    const fences = sim.countBuilt((f) => featureDef(f).key === 'fence');
     if (fences >= 8) {
       const { pens } = penMap(sim);
       if (pens.length === 0) {
@@ -2430,8 +2430,7 @@ export class GameController {
       }
     }
     // Shelves, iceboxes and drying racks are storage too.
-    const anyStorage =
-      sim.world.zone.some(isStockpileZone) || [...sim.world.tilesWith('features')].some((i) => sim.isStockpile(i));
+    const anyStorage = sim.world.zone.some(isStockpileZone) || sim.buildingTiles().some((i) => sim.isStockpile(i));
     if (!anyStorage && totals.some((t) => t.total > 0)) {
       alerts.push({ text: 'No stockpile: items are left where they fall', tone: 'warn' });
     }
@@ -2485,7 +2484,7 @@ export class GameController {
       });
     }
     const ateRaw = sim.colonists.some((c) => c.thoughts.some((t) => t.key === 'ateRaw'));
-    if (ateRaw && sim.countFeature((f) => featureDef(f).workbench === 'cooking') === 0) {
+    if (ateRaw && sim.countBuilt((f) => featureDef(f).workbench === 'cooking') === 0) {
       alerts.push({ text: 'No stove: colonists are eating raw food', tone: 'warn' });
     }
     const idle = sim.living().filter((c) => {
