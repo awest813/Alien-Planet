@@ -1013,13 +1013,49 @@ export class Simulation {
   }
 
   public outdoorTemperature(): number {
+    // Asked many times a tick (every tile outdoors that someone stands on): worked out once for the moment it's
+    // asked about, and again only when the hour, the weather or a cold snap, heat wave or eclipse changes.
+    const st = this.story;
+    const c = this.outdoorCache;
+    if (
+      c.tick === this.tick &&
+      c.weather === this.weather.kind &&
+      c.cold === st.coldSnapUntil &&
+      c.heat === st.heatWaveUntil &&
+      c.eclipse === st.eclipseUntil &&
+      c.biome === this.biome
+    ) {
+      return c.value;
+    }
     const coldSnap = coldSnapOn(this) ? 12 : 0;
     const heatWave = heatWaveOn(this) ? 10 : 0;
     const eclipse = eclipseOn(this) ? 3 : 0;
-    return (
-      outdoorTemperature(this.totalHours, this.seed, this.biome) - coldSnap + heatWave - eclipse + weatherDef(this).temp
-    );
+    const value =
+      outdoorTemperature(this.totalHours, this.seed, this.biome) -
+      coldSnap +
+      heatWave -
+      eclipse +
+      weatherDef(this).temp;
+    this.outdoorCache = {
+      tick: this.tick,
+      weather: this.weather.kind,
+      cold: st.coldSnapUntil,
+      heat: st.heatWaveUntil,
+      eclipse: st.eclipseUntil,
+      biome: this.biome,
+      value,
+    };
+    return value;
   }
+  private outdoorCache: {
+    tick: number;
+    weather: string;
+    cold: number | undefined;
+    heat: number | undefined;
+    eclipse: number | undefined;
+    biome: string;
+    value: number;
+  } = { tick: -1, weather: '', cold: undefined, heat: undefined, eclipse: undefined, biome: '', value: 0 };
 
   // Whether clouds or rain hide the sky (no aurora to see).
   public weatherIsOvercast(): boolean {
@@ -3614,6 +3650,25 @@ export class Simulation {
       search(this.buildingTiles());
     } else {
       search(w.tilesWith(kind));
+    }
+    return best.map((b) => b.i);
+  }
+
+  // The same search over a given list of tiles (in any order: the ranking breaks ties by tile index).
+  private nearestAmong(
+    tiles: readonly number[],
+    from: number,
+    test: (i: number) => boolean,
+    limit = 4,
+    bias?: (i: number) => number,
+  ): number[] {
+    const w = this.world;
+    const best: { i: number; d: number }[] = [];
+    for (const i of tiles) {
+      const d = w.distance(from, i) + (bias ? bias(i) : 0);
+      if (this.couldRank(best, i, d, limit) && test(i)) {
+        this.rank(best, i, d, limit);
+      }
     }
     return best.map((b) => b.i);
   }
@@ -7010,15 +7065,40 @@ export class Simulation {
       const t = felt(i);
       return t < min ? min - t : t > max ? t - max : 0;
     };
-    const spot = ok(c.tile)
-      ? c.tile
-      : (this.nearest(c.tile, (i) => reachable(i) && ok(i), 1)[0] ??
+    // Out in the open, every other open tile feels the same as this one: only rooms, roofs and the ground a
+    // fire warms can be better, so only those are looked at (the same answer as searching the whole map, at a
+    // fraction of the work: a whole-map search for each cold colonist was a sixth of a big map's time).
+    const sheltered = (i: number) =>
+      this.world.roof[i] !== NONE || this.isIndoors(i) || this.doorway(i) !== undefined || this.fireWarmth().has(i);
+    let spot: number | undefined;
+    if (ok(c.tile)) {
+      spot = c.tile;
+    } else if (!sheltered(c.tile)) {
+      const places: number[] = [];
+      for (let i = 0; i < w.size; i++) {
+        if (sheltered(i)) {
+          places.push(i);
+        }
+      }
+      spot =
+        this.nearestAmong(places, c.tile, (i) => reachable(i) && ok(i), 1)[0] ??
+        this.nearestAmong(
+          places,
+          c.tile,
+          (i) => reachable(i) && gap(i) < gap(c.tile) - 3,
+          1,
+          (i) => gap(i) * 3,
+        )[0];
+    } else {
+      spot =
+        this.nearest(c.tile, (i) => reachable(i) && ok(i), 1)[0] ??
         this.nearest(
           c.tile,
           (i) => reachable(i) && gap(i) < gap(c.tile) - 3,
           1,
           (i) => gap(i) * 3,
-        )[0]);
+        )[0];
+    }
     if (spot === undefined) {
       return false;
     }
