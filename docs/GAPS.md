@@ -112,6 +112,11 @@ with esbuild for speed (see ROADMAP).
 - **Drawing zoomed out was slow:** the ground is a GPU layer, sparse layers draw only their filled tiles, and
   pawn marks no longer redraw their text every frame. With 4× throttling, a phone showing the whole Large map went
   from 57–62 ms a frame to 14–16 ms.
+- **Large maps were hard to read zoomed out:** colonists showed as specks, so far out each gets a ring in their
+  colour and raiders a red dot; a map smaller than the window sits in its middle, not against the left edge; and
+  on a phone the colonist bar scrolls in one row (with 16 colonists it had wrapped to about 300 px). A 48-day
+  Large balance run across six seeds kept 72 of 72 colonists; a desktop window draws a Large map in about 2 ms a
+  frame at the usual zoom and about 4 ms showing all of it.
 - **No browser tests:** a Playwright suite (every screen, save and load, the phone layout, the Work grid's long
   press) runs in CI. Long playtests run weekly in their own workflow.
 - **The balance harness played one way:** `craft` (kiln, smelter, bricks, iron, gear) and `diplomat` (tribute,

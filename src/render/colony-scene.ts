@@ -97,6 +97,8 @@ const SEASON_INDEX: Record<string, number> = { Spring: 0, Summer: 1, Autumn: 2, 
 
 // Below this zoom, map text (names, stack counts) is too small to read.
 const READABLE_ZOOM = 0.9;
+// Below this, colonists and raiders get a marker the size of a few screen pixels.
+const MARKER_ZOOM = 0.6;
 const Depth = { WATER: 0.5, OVERLAY: 20, NIGHT: 30, PAWNS: 40, LABELS: 41, PREVIEW: 50 };
 const PAN_SPEED = 700;
 const MIN_ZOOM = 1;
@@ -485,7 +487,7 @@ export class ColonyScene extends Phaser.Scene {
     this.buildLight(world);
     const size = world.width * TILE;
     this.night.setSize(size + 4000, size + 4000).setPosition(-2000, -2000);
-    this.cameras.main.setBounds(-TILE * 8, -TILE * 8, size + TILE * 16, size + TILE * 16);
+    this.fitBounds();
     for (const c of controller.sim.colonists) {
       this.pawns.set(c.id, this.createPawn(c));
     }
@@ -1209,6 +1211,33 @@ export class ColonyScene extends Phaser.Scene {
       }
     }
 
+    // Zoomed far out (a Large map whole), figures are specks: a ring in each colonist's colour, and a red dot for
+    // each raider, about the same size on screen however far out, show where everyone is.
+    const zoom = this.cameras.main.zoom;
+    if (zoom < MARKER_ZOOM) {
+      const r = 5 / zoom;
+      for (const c of sim.living()) {
+        const { x, y } = this.pawnPosition(c);
+        const color = Phaser.Display.Color.HexStringToColor(c.color).color;
+        g.lineStyle(3 / zoom, 0x000000, 0.6).strokeCircle(x, y, r);
+        g.lineStyle(2 / zoom, color, 1).strokeCircle(x, y, r);
+      }
+      for (const e of sim.enemies) {
+        if (e.hp > 0) {
+          g.fillStyle(0x000000, 0.6).fillCircle(
+            (world.xOf(e.tile) + 0.5) * TILE,
+            (world.yOf(e.tile) + 0.5) * TILE,
+            4.5 / zoom,
+          );
+          g.fillStyle(0xff4d4d, 1).fillCircle(
+            (world.xOf(e.tile) + 0.5) * TILE,
+            (world.yOf(e.tile) + 0.5) * TILE,
+            3.5 / zoom,
+          );
+        }
+      }
+    }
+
     const selected = controller.selectedColonist !== null ? sim.colonists[controller.selectedColonist] : null;
     // (Gone off the map on an expedition: no ring where they last stood.)
     if (selected && selected.away !== 'gone') {
@@ -1651,6 +1680,25 @@ export class ColonyScene extends Phaser.Scene {
       worldX - cam.width / 2 - (at.x - cam.width / 2) / zoom,
       worldY - cam.height / 2 - (at.y - cam.height / 2) / zoom,
     );
+    this.fitBounds();
+  }
+
+  // The camera's bounds: the map with a margin, widened to the view when zoomed out past it, so a
+  // map smaller than the screen sits in the middle rather than against the top-left corner.
+  private fitBounds(): void {
+    const cam = this.cameras.main;
+    const world = controller.sim.world;
+    const margin = TILE * 8;
+    const mapW = world.width * TILE + margin * 2;
+    const mapH = world.height * TILE + margin * 2;
+    const w = Math.max(mapW, cam.width / cam.zoom);
+    const h = Math.max(mapH, cam.height / cam.zoom);
+    const b = cam.getBounds();
+    const x = mapW / 2 - margin - w / 2;
+    const y = mapH / 2 - margin - h / 2;
+    if (b.x !== x || b.y !== y || b.width !== w || b.height !== h) {
+      cam.setBounds(x, y, w, h);
+    }
   }
 
   private setupKeyboard(): void {
@@ -1733,6 +1781,7 @@ export class ColonyScene extends Phaser.Scene {
       controller.focusRequest = null;
       cam.centerOn((world.xOf(i) + 0.5) * TILE, (world.yOf(i) + 0.5) * TILE);
     }
+    this.fitBounds();
     controller.cameraView = this.visibleTiles();
     const h = this.held;
     const dx = (h.has('d') || h.has('ArrowRight') ? 1 : 0) - (h.has('a') || h.has('ArrowLeft') ? 1 : 0);

@@ -410,6 +410,26 @@ kbd {
   pointer-events: none;
 }
 
+/* A phone with a big colony: one row that scrolls sideways, rather than rows of names over half the map. The ☰
+   overview stays in reach at the end. */
+@media (max-width: 720px) {
+  .colonist-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    pointer-events: auto;
+    scrollbar-width: none;
+  }
+
+  .colonist-bar .chip {
+    flex: none;
+  }
+
+  .colonist-bar > .chip:last-child {
+    position: sticky;
+    right: 0;
+  }
+}
+
 .chip {
   display: flex;
   align-items: center;
