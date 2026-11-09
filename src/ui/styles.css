@@ -466,6 +466,13 @@ kbd {
     flex: none;
   }
 
+  .colonist-bar .chip-count {
+    display: inline;
+    margin-left: 4px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
   .colonist-bar > .chip:last-child {
     position: sticky;
     right: 0;
@@ -473,6 +480,10 @@ kbd {
     background: #10141c;
     box-shadow: -10px 0 10px #10141c;
   }
+}
+
+.chip-count {
+  display: none;
 }
 
 .chip {
@@ -2145,6 +2156,12 @@ input[type='checkbox'] {
 }
 
 @media (max-width: 400px) {
+  /* With a colonist's card open on the smallest phones, only the newest notice (and anything urgent): more covered
+     the card's tabs. */
+  .ui:has(.left-column .inspector) .notices > .notification:not(.danger):nth-last-child(n + 2) {
+    display: none;
+  }
+
   .target {
     min-width: 44px;
   }

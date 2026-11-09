@@ -352,7 +352,8 @@ export function ColonistBar({ state, onOpen }: { state: UiState; onOpen: (screen
         title="Everyone at a glance: mood, needs, health and skills"
         aria-label="All colonists"
       >
-        ☰
+        ☰{/* (On a phone, where the row scrolls and only a few names show: how many there are.) */}
+        <span className="chip-count">{state.colonists.filter((c) => !c.dead).length}</span>
       </button>
     </div>
   );
