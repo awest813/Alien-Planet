@@ -1,5 +1,5 @@
 import { Biome, MapKind, biomeDef } from './biomes';
-import { NONE, featureId, terrainId } from './defs';
+import { NONE, featureDef, featureId, terrainDef, terrainId } from './defs';
 import { computePassRegions } from './regions';
 import { fbm, hash2 } from './rng';
 import { World } from './world';
@@ -33,12 +33,15 @@ export function generateWorld(
   const moisture = new Float32Array(world.size);
   const rockiness = new Float32Array(world.size);
 
+  // On a big map the land's shapes (lakes, hills, woods) grow with it, more slowly than the map: the same
+  // noise would scatter a Large map with the small blobs of a Tiny one. Small maps keep their scale.
+  const scale = Math.min(1, Math.sqrt(96 / Math.min(width, height)));
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = world.idx(x, y);
-      elevation[i] = fbm(x, y, seed, 4, 0.07);
-      moisture[i] = fbm(x, y, seed + 7919, 3, 0.09);
-      rockiness[i] = fbm(x, y, seed + 104729, 4, 0.06);
+      elevation[i] = fbm(x, y, seed, 4, 0.07 * scale);
+      moisture[i] = fbm(x, y, seed + 7919, 3, 0.09 * scale);
+      rockiness[i] = fbm(x, y, seed + 104729, 4, 0.06 * scale);
     }
   }
 
@@ -114,6 +117,32 @@ export function generateWorld(
     if (d < best) {
       best = d;
       spawn = i;
+    }
+  }
+  // The middle of the map can be a poor place to land: wedged between rock and a river, or on the water's
+  // edge. Then the best spot nearby with room to build (and dry feet) is taken instead.
+  if (!goodLanding(world, spawn)) {
+    let bestScore = landingScore(world, spawn, cx, cy);
+    const reach = Math.max(8, Math.round(Math.min(width, height) * LANDING_SEARCH));
+    for (let y = Math.round(cy) - reach; y <= Math.round(cy) + reach; y++) {
+      for (let x = Math.round(cx) - reach; x <= Math.round(cx) + reach; x++) {
+        if (!world.inBounds(x, y)) {
+          continue;
+        }
+        const i = world.idx(x, y);
+        if (region[i] !== largest || world.feature[i] !== NONE || world.terrain[i] === SHALLOW) {
+          continue;
+        }
+        // (On an island map, somewhere on the island.)
+        if (map === 'island' && Math.hypot(x - cx, y - cy) > lakeHalf(world) * 0.25) {
+          continue;
+        }
+        const score = landingScore(world, i, cx, cy);
+        if (score > bestScore) {
+          bestScore = score;
+          spawn = i;
+        }
+      }
     }
   }
 
@@ -226,6 +255,49 @@ export function generateWorld(
   return { world, spawn };
 }
 
+// A landing wants room to build: open ground (or ground with only trees and bushes to clear) within six tiles,
+// and no water within two. Out of the 169 tiles of that square, a good one has this many.
+const GOOD_LANDING = 80;
+const LANDING_NEAR = 6;
+// How far from the middle to look for a better landing, as a share of the map's side.
+const LANDING_SEARCH = 0.15;
+
+function openAround(world: World, at: number): { open: number; wet: boolean } {
+  const ax = world.xOf(at);
+  const ay = world.yOf(at);
+  let open = 0;
+  let wet = false;
+  for (let y = ay - LANDING_NEAR; y <= ay + LANDING_NEAR; y++) {
+    for (let x = ax - LANDING_NEAR; x <= ax + LANDING_NEAR; x++) {
+      if (!world.inBounds(x, y)) {
+        continue;
+      }
+      const i = world.idx(x, y);
+      const key = terrainDef(world.terrain[i]).key;
+      if (key === 'shallowWater' || key === 'deepWater') {
+        wet ||= Math.max(Math.abs(x - ax), Math.abs(y - ay)) <= 2;
+        continue;
+      }
+      const f = world.feature[i];
+      if (terrainDef(world.terrain[i]).buildable && (f === NONE || (featureDef(f).natural && featureDef(f).passable))) {
+        open++;
+      }
+    }
+  }
+  return { open, wet };
+}
+
+const goodLanding = (world: World, at: number): boolean => {
+  const { open, wet } = openAround(world, at);
+  return open >= GOOD_LANDING && !wet;
+};
+
+// Room to build, dry feet, and not far from the middle.
+function landingScore(world: World, at: number, cx: number, cy: number): number {
+  const { open, wet } = openAround(world, at);
+  return Math.min(open, 130) - (wet ? 60 : 0) - Math.hypot(world.xOf(at) - cx, world.yOf(at) - cy) * 1.5;
+}
+
 // A start has at least this many trees and berry bushes within reach of the landing.
 const MIN_TREES = 36;
 const MIN_BUSHES = 8;
@@ -311,6 +383,14 @@ function carveRiver(world: World, seed: number): void {
   }
 }
 
+// On a big map the lake (and the island in it) grows more slowly than the map, so the island stays a tight
+// spot to farm, with more mainland across the fords. Small maps keep the lake as it was. Distances in the
+// lake are fractions of this: the island is inside 0.4 of it (give or take the shore's bends).
+function lakeHalf(world: World): number {
+  const side = Math.min(world.width, world.height);
+  return (side / 2) * Math.min(1, Math.sqrt(96 / side));
+}
+
 // The colony lands on an island in a lake: a ring of deep water round the middle of the map, crossed
 // by two shallow fords. Little room to farm, lots of fish, and only two ways in.
 function carveLake(world: World, seed: number): void {
@@ -319,18 +399,19 @@ function carveLake(world: World, seed: number): void {
   const SAND = terrainId('sand');
   const cx = world.width / 2;
   const cy = world.height / 2;
-  // On a big map the lake (and the island in it) grows more slowly than the map, so the island stays a tight
-  // spot to farm, with more mainland across the fords. Small maps keep the lake as it was.
-  const side = Math.min(world.width, world.height);
-  const half = (side / 2) * Math.min(1, Math.sqrt(96 / side));
+  const half = lakeHalf(world);
   const fordAngle = hash2(seed, 9, seed + 29) * Math.PI * 2;
   const fordAt = [fordAngle, fordAngle + Math.PI * (0.8 + hash2(seed, 10, seed + 29) * 0.4)];
   for (let i = 0; i < world.size; i++) {
     const dx = world.xOf(i) + 0.5 - cx;
     const dy = world.yOf(i) + 0.5 - cy;
     const angle = Math.atan2(dy, dx);
-    // The shores wander a little.
-    const r = Math.hypot(dx, dy) / half + (fbm(world.xOf(i), world.yOf(i), seed + 31337, 2, 0.12) - 0.5) * 0.12;
+    // The shores wander: broad bends (a few around the lake, whatever its size) and small wiggles. The whole
+    // ring bends together, so the shallows still meet the fords.
+    const r =
+      Math.hypot(dx, dy) / half +
+      (fbm(world.xOf(i), world.yOf(i), seed + 31337, 2, 0.12) - 0.5) * 0.12 +
+      (fbm(world.xOf(i), world.yOf(i), seed + 27191, 2, 2.2 / half) - 0.5) * 0.3;
     const ford = fordAt.some((a) => {
       const gap = Math.abs(Math.atan2(Math.sin(angle - a), Math.cos(angle - a)));
       return gap * Math.hypot(dx, dy) <= 1.5;

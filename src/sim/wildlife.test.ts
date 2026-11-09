@@ -206,11 +206,13 @@ describe('a living valley', () => {
     for (let k = 0; k < 4; k++) {
       place(sim, 'deer', w.idx(x + 5 + k, y + 5));
     }
-    for (let d = 0; d < 20 && sim.animals.length === 4; d++) {
+    const deer = () => sim.animals.filter((a) => a.kind === 'deer');
+    for (let d = 0; d < 20 && deer().length === 4; d++) {
       animalsAtDawn(sim);
     }
-    expect(sim.animals.length).toBeGreaterThan(4);
-    expect(sim.animals.every((a) => a.kind === 'deer' && !a.tame)).toBe(true);
+    // (Another kind may wander in meanwhile; it's the deer that matter here.)
+    expect(deer().length).toBeGreaterThan(4);
+    expect(deer().every((a) => !a.tame)).toBe(true);
     expect(sim.animals.length).toBeLessThanOrEqual(Math.ceil(wildCap(sim) * 0.75) + 1);
   });
 

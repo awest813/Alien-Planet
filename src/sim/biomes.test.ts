@@ -280,3 +280,51 @@ describe('desert scrub', () => {
     expect(featureDef(scrub).natural).toBe(true);
   });
 });
+
+describe('landing sites', () => {
+  it('have room to build and dry feet on every land and layout, and an island colony lands on the island', () => {
+    for (const size of [64, 192]) {
+      for (const [biome, map] of LANDS) {
+        const sim = Simulation.newColony(17, 'standard', size, { biome, map });
+        const w = sim.world;
+        const spawn = sim.colonists[0].tile;
+        let open = 0;
+        let wet = false;
+        for (let y = w.yOf(spawn) - 6; y <= w.yOf(spawn) + 6; y++) {
+          for (let x = w.xOf(spawn) - 6; x <= w.xOf(spawn) + 6; x++) {
+            if (!w.inBounds(x, y)) {
+              continue;
+            }
+            const i = w.idx(x, y);
+            const key = terrainDef(w.terrain[i]).key;
+            if (key === 'shallowWater' || key === 'deepWater') {
+              wet ||= Math.max(Math.abs(x - w.xOf(spawn)), Math.abs(y - w.yOf(spawn))) <= 2;
+            } else if (w.isPassable(i) && terrainDef(w.terrain[i]).buildable) {
+              open++;
+            }
+          }
+        }
+        expect(open, `${size} ${biome} ${map}`).toBeGreaterThanOrEqual(80);
+        expect(wet, `${size} ${biome} ${map}`).toBe(false);
+        expect(sim.outsideRegion()).toBe(sim.regionOf(spawn));
+        if (map === 'island') {
+          // On the island: walking on dry land alone (no wading the fords) never reaches the map's edge.
+          const seen = new Set([spawn]);
+          const queue = [spawn];
+          let edge = false;
+          while (queue.length > 0 && !edge) {
+            const i = queue.pop()!;
+            edge = w.xOf(i) === 0 || w.yOf(i) === 0 || w.xOf(i) === size - 1 || w.yOf(i) === size - 1;
+            for (const n of w.neighbors(i)) {
+              if (!seen.has(n) && w.isPassable(n) && terrainDef(w.terrain[n]).key !== 'shallowWater') {
+                seen.add(n);
+                queue.push(n);
+              }
+            }
+          }
+          expect(edge, `${size} ${biome} island`).toBe(false);
+        }
+      }
+    }
+  });
+});

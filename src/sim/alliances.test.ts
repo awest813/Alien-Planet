@@ -179,7 +179,7 @@ describe('envoys and alliances', () => {
     // From the map edge to the middle of the colony.
     expect(w.distance(envoy.tile, sim.homeTile()!)).toBeGreaterThan(10);
     let closest = Infinity;
-    for (let k = 0; k < 6; k++) {
+    for (let k = 0; k < 12; k++) {
       run(sim, HOUR);
       closest = Math.min(closest, w.distance(envoy.tile, sim.homeTile()!));
     }

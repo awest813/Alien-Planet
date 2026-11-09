@@ -3226,7 +3226,8 @@ export class Simulation {
     // Food running short: the colony's provider (or two, in a big colony) fishes or hunts before anything
     // else. (Hunting comes late in the order; an island colony starved beside its lake, everyone busy with
     // everything but the fishing spots. Sending everyone was worse: nothing got built or hauled.)
-    if (this.providers().includes(c.id) && (this.tryHunt(c) || this.tryFish(c))) {
+    // (Fishing first: a catch is surer than a chase after scarce game.)
+    if (this.providers().includes(c.id) && (this.tryFish(c) || this.tryHunt(c))) {
       return true;
     }
     const order = this.workOrder();

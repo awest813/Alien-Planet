@@ -4,7 +4,8 @@
 
 A handful of colonists land on a procedurally generated map: three on a tiny 64×64 valley (room for six), four on a
 small 96×96 one (room for nine), five on a medium 128×128 frontier (room for twelve) or six on a large 192×192
-country (room for fifteen). You don't control them directly: you designate work
+country (room for fifteen), near the middle on a spot with room to build and dry feet. You don't control them
+directly: you designate work
 (chop, mine, forage, build, farm, cook, haul to storage) and they decide who does what, around their own needs.
 They get hungry, tired and bored, and their mood reacts to what they eat, where they sleep, how warm they are and
 how nice their rooms are. Let mood drop too far for too long and a colonist will wander off in a daze.
@@ -328,7 +329,8 @@ How the storytelling layer works:
 - **Water:** shallow water is slow to wade through and leaves colonists soaked (a small mood hit); deep water
   is impassable until you build a bridge over it. Fishing spots on the shore let hunters catch raw fish while
   the colony is short of food; once there's a roof over everyone and food is down to a day and a half, the
-  colony's best hunter (two in a colony of seven or more) goes fishing or hunting before any other work. In hard frost the shallows freeze from the shore inwards and can be walked
+  colony's best hunter (two in a colony of seven or more) goes fishing (or, with no fishing spot, hunting)
+  before any other work. In hard frost the shallows freeze from the shore inwards and can be walked
   across; frozen water can still be fished through the ice, at half the pace, and the ice melts again when it
   warms up.
 - **Sun lamps:** crops beneath them grow day and night, all year, so a heated greenhouse can farm in winter.

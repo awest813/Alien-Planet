@@ -41,6 +41,20 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Map generation audited** (576 maps: every land, layout and size, 12 seeds each):
+  - **Poor landings:** the colony landed on the dry tile nearest the middle, which could be wedged between rock
+    and a river (7 open tiles within 6 of it, on a Tiny tundra river) or on the water's edge (70 of 576). A
+    landing without room to build or with water within two tiles now moves to the best spot nearby (on an
+    island map, still on the island): every landing has at least 80 open tiles round it, none is wet, and the
+    furthest is 14 tiles from the middle.
+  - **Big maps were speckled:** lakes, hills and woods kept a Tiny map's size, so a Large map was a scatter of
+    small blobs. From Medium up they grow with the map (more slowly than it).
+  - **The island's lake was a perfect ring:** its shores now bend broadly; the shallows bend with them, so the
+    fords still meet them. Every colony in the sample can walk off its map.
+  - **The colony's provider chased game past the fishing spots:** a catch is surer than a chase, so the
+    provider fishes first and hunts only without a spot. Island hunger fell by half or more (Tiny desert
+    islands 10,600 colonist-hours to 4,200; Tiny tundra islands 7,700 to 2,400).
+  - Generation takes under 100 ms on a Large map.
 - **Every land and layout audited:** a 48-day balance sweep of all 24 lands × layouts at Tiny and Medium, and
   the maps looked at whole. What it found, and what changed:
   - **Tundra colonies froze, then fried:** no leather meant no parkas, and colonists met −12°C in tunics, or in
