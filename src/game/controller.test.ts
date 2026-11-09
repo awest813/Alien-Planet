@@ -3,7 +3,7 @@ import { FACTIONS, featureId, itemId } from '../sim/defs';
 import { STOCKPILE_ZONE } from '../sim/world';
 import { DAYS_PER_SEASON } from '../sim/seasons';
 import { HOUR, clearAround, outline } from '../sim/test-helpers';
-import { TICKS_PER_HOUR } from '../sim/simulation';
+import { Simulation, TICKS_PER_HOUR } from '../sim/simulation';
 import { spawnRaid } from '../sim/combat';
 import { Alert, controller } from './controller';
 
@@ -206,5 +206,19 @@ describe('a raid on the way', () => {
     expect(raid).toMatch(
       /gathering at the edge: here (within the hour|in about (an hour|\d+ hours))\. Draft with Q\.$/,
     );
+  });
+});
+
+describe('loading a colony', () => {
+  it('drops the new-game "give your first orders" banner for a game already under way', () => {
+    controller.newColony('fresh');
+    controller.publish();
+    expect(controller.getState().notStarted).toBe(true);
+    // A save loaded before the clock was ever started.
+    const loaded = Simulation.newColony(77);
+    loaded.tick = 30 * 24 * TICKS_PER_HOUR;
+    (controller as unknown as { replaceSim(sim: Simulation): void }).replaceSim(loaded);
+    controller.publish();
+    expect(controller.getState().notStarted).toBe(false);
   });
 });

@@ -726,7 +726,11 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
                     <button
                       disabled={d.silver < d.tributeCost}
                       onClick={() => controller.command({ type: 'tribute', faction: f.id })}
-                      title="Pay them to leave the colony alone for 12 days: their share of the raids stops (the others still come)"
+                      title={
+                        d.silver < d.tributeCost
+                          ? `The colony has ${d.silver} silver of the ${d.tributeCost} it would take`
+                          : 'Pay them to leave the colony alone for 12 days: their share of the raids stops (the others still come)'
+                      }
                     >
                       Pay {d.tributeCost} silver for peace
                     </button>
@@ -768,7 +772,9 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
                           title={
                             (f.goodwill ?? 0) < d.hireGoodwill
                               ? `They won't fight for the colony below goodwill ${d.hireGoodwill}`
-                              : `Their fighters come to every raid and siege for ${d.hireDays} days, within the hour`
+                              : d.silver < d.hireCost
+                                ? `The colony has ${d.silver} silver of the ${d.hireCost} it would take`
+                                : `Their fighters come to every raid and siege for ${d.hireDays} days, timed to arrive with the raiders`
                           }
                         >
                           Hire fighters: {d.hireCost} silver
@@ -797,7 +803,9 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
                                 ? `They won't send one of their own below goodwill ${d.settler.goodwill}`
                                 : d.settler.waitDays > 0
                                   ? `Nobody else is ready to leave for ${d.settler.waitDays} days`
-                                  : 'A willing settler comes to join the colony'
+                                  : d.silver < d.settler.cost
+                                    ? `The colony has ${d.silver} silver of the ${d.settler.cost} it would take`
+                                    : 'A willing settler comes to join the colony'
                           }
                         >
                           Ask for a settler: {d.settler.cost} silver
@@ -1014,11 +1022,12 @@ export function VillageScreen({ state, onClose }: { state: UiState; onClose: () 
         {choice('long', v.hours, 'Long', () => set({ hours: 'long' }))}
       </div>
       <p className="muted small">{POLICY_TEXT.hours[v.hours]}</p>
-      <label className="setting">
-        <span>
-          Days of rest: one day in six, nobody works but to keep everyone safe and fed, and all are the happier for it
-        </span>
+      <label className="setting check-first">
         <input type="checkbox" checked={v.restDays} onChange={(e) => set({ restDays: e.target.checked })} />
+        <span>
+          <b>Days of rest:</b> one day in six, nobody works but to keep everyone safe and fed, and all are the happier
+          for it
+        </span>
       </label>
       <div className="muted small">Hunting</div>
       <div className="row">

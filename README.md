@@ -218,13 +218,15 @@ How the storytelling layer works:
   for emergencies, and bring food to colonists too hurt to get up (a starving patient before a wound that isn't
   bleeding). With nobody on their feet to help, a downed colonist crawls out of the cold and, if they're going
   hungry, to the nearest food.
-- **Combat and raids:** raiders from hostile factions arrive at the map edge. The Rust Wardens favour bows, the
+- **Combat and raids:** raiders from hostile factions arrive at the map edge, and the warning says when they'll
+  reach the colony: on a small map, where the walk is short, they gather at the edge until there's an hour and a
+  half to get ready (they come on at once if anyone goes out to meet them). The Rust Wardens favour bows, the
   Ashen Howlers clubs and spears; later raids bring better bows, crossbows and armor. The game pauses. Archers on
   both sides look for firing positions behind cover, keep to their range and are rattled (suppressed: worse aim)
   by shots landing close; melee fighters charge. Pain puts a badly hurt raider down, as it does a colonist, and
   hurt raiders may break and run; the raid flees once nearly half of them are down or running. Now and then the
   Meadow Kin send a few fighters to help (more likely the better they think of the colony): they come in from the
-  edge, go after the raiders and head home when it's over. Undrafted colonists run indoors when raiders come close, and fight back only
+  edge, timed to arrive with the raiders, go after them and head home when it's over. Undrafted colonists run indoors when raiders come close, and fight back only
   when cornered. Walling yourself in doesn't stop them: raiders who can't reach anyone smash through the nearest
   wall or door (clubs and spears break walls faster than bows).
 - **Sieges:** from the second year a war party may come to stay instead: they make camp 20–28 tiles from the

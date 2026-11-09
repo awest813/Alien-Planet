@@ -1750,6 +1750,8 @@ export class GameController {
     this.sim = sim;
     this.simVersion++;
     this.idleSince.clear();
+    // (A new colony sets it again; a loaded one is under way, whatever was showing before.)
+    this.notStarted = false;
     // A colony started after the last one fell shouldn't sit paused: resume at the player's speed,
     // now or (if a menu is holding the pause) when the menu closes.
     if (this.fallen) {

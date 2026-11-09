@@ -427,6 +427,9 @@ kbd {
   .colonist-bar > .chip:last-child {
     position: sticky;
     right: 0;
+    /* (Solid, with a shadow to its left, so the names scrolling under it don't show through.) */
+    background: #10141c;
+    box-shadow: -10px 0 10px #10141c;
   }
 }
 
@@ -1074,6 +1077,10 @@ button.brush.active {
 
   .left-column {
     max-width: 360px;
+    /* A colonist's or tile's card sits over the alerts tab rather than under it: the tab covered the card's
+       close button. (Closing the card shows the tab again.) */
+    position: relative;
+    z-index: 6;
   }
 
   /* Notices along the bottom of the map, clear of a colonist's card at the top. */
@@ -1332,9 +1339,20 @@ button.primary:hover:not(:disabled) {
   flex: 1;
 }
 
+/* A setting that's a sentence: the box beside the start of it, rather than across the card from its end. */
+.setting.check-first {
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.setting.check-first input[type='checkbox'] {
+  margin-top: 2px;
+}
+
 .setting input[type='checkbox'] {
   margin: 0;
-  flex-shrink: 0;
+  /* (Inputs grow to fill a row by default, for text boxes; a checkbox mustn't, or it takes half the row.) */
+  flex: none;
   width: 18px;
   height: 18px;
   accent-color: var(--accent);
