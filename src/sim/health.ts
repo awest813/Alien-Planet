@@ -272,7 +272,9 @@ export function updateHealth(sim: Simulation, c: Colonist, hours: number): void 
     // one is hard on the very young too.
     const old = c.age >= ELDER ? 1.3 + (c.age - ELDER) * 0.02 : 1;
     const frail = Math.max(old, def.contagious && c.age < TODDLER * 2 ? 1.4 : 1);
-    h.disease.severity += def.severityPerHour * (tended ? 0.45 : 1) * frail * hours;
+    // Tending slows an illness; field medicine slows it more.
+    const care = tended ? (sim.isResearched('fieldMedicine') ? 0.35 : 0.45) : 1;
+    h.disease.severity += def.severityPerHour * care * frail * hours;
     h.disease.immunity += def.immunityPerHour * restBonus * (c.age >= ELDER ? 0.85 : 1) * hours;
     if (h.disease.immunity >= 1 && h.disease.severity < 1) {
       sim.addLog(`${c.name} has recovered from ${h.disease.label.toLowerCase()}.`, 'good');

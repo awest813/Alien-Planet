@@ -23,7 +23,7 @@
   },
   "shakingSickness": {
     "label": "Shaking sickness",
-    "description": "Comes with travellers and passes by touch: only those who tend or share a bed with the sick catch it. Deadly without a doctor.",
+    "description": "Comes with travellers and passes by touch: anyone right beside the sick can catch it. Deadly without a doctor.",
     "severityPerHour": 0.05,
     "immunityPerHour": 0.033,
     "contagious": 0.08,

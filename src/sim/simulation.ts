@@ -255,6 +255,8 @@ const FINE_MUSIC_SKILL = 10;
 const PROVIDE_BELOW_DAYS = 1.5;
 const CONCERT_SKILL = 6;
 const CONCERT_FROM = 17;
+// Listeners get this much more from a harp than from other instruments.
+const HARP_GAIN = 1.25;
 const CONCERT_UNTIL = 22;
 const CONCERT_TICKS = TICKS_PER_HOUR * 2;
 const CONCERT_RADIUS = 3;
@@ -5282,7 +5284,7 @@ export class Simulation {
       const rolled = !!made.apparel || !!made.weapon || !!made.armor || product === TOOL_KIT;
       // A meal cooked amid mess comes out worse, and so less safe to eat.
       const taint = bench === 'cooking' ? Math.min(MAX_KITCHEN_TAINT, this.messAround(job.target)) : 0;
-      // (Precision tools: a grade better, about two points of quality.)
+      // (Precision tools: about two points of quality, half a grade.)
       const tools = this.isResearched('precisionTools') ? 2 : 0;
       const quality = rolled
         ? Math.max(0, Math.min(20, skill + tools + this.rng.int(-2, 2)))
@@ -5641,11 +5643,13 @@ export class Simulation {
     learn(this, c, 'artistic');
     if (this.tick % SLOW_TICKS === 0) {
       const fine = c.skills.artistic >= FINE_MUSIC_SKILL;
+      // The harp, the finest instrument a colony can make, carries a quarter more.
+      const finest = featureDef(this.world.feature[spot]).key === 'harp' ? HARP_GAIN : 1;
       for (const o of this.living()) {
         if (o === c || o.sleeping || o.health.downed || !this.inEarshot(spot, o.tile)) {
           continue;
         }
-        this.enjoy(o, 'music', LISTEN_GAIN * SLOW_TICKS * musicQuality(c) * this.joyEfficiency(o, 'music'));
+        this.enjoy(o, 'music', LISTEN_GAIN * SLOW_TICKS * musicQuality(c) * finest * this.joyEfficiency(o, 'music'));
         this.addThought(o, fine ? 'heardFineMusic' : 'heardMusic');
       }
     }

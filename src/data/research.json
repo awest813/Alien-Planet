@@ -41,13 +41,13 @@
     "key": "fieldMedicine",
     "name": "Field medicine",
     "cost": 1600,
-    "description": "Doctors tend wounds and illness noticeably better."
+    "description": "Doctors tend wounds and illness noticeably better. Unlocks the hospital bed."
   },
   {
     "key": "electricity",
     "name": "Electricity",
     "cost": 2000,
-    "description": "Unlocks the wood-fired generator and the electric heater."
+    "description": "Unlocks the wood-fired generator, the electric heater and the standing lamp."
   },
   {
     "key": "solarPower",
@@ -74,7 +74,7 @@
     "key": "tailoring",
     "name": "Tailoring",
     "cost": 1400,
-    "description": "Unlocks tailoring tunics from cloth and warm parkas from leather."
+    "description": "Unlocks tailoring tunics from cloth and warm parkas from leather, carpet, and mending worn clothes."
   },
   {
     "key": "longbows",
@@ -127,7 +127,7 @@
     "key": "instruments",
     "name": "Instruments",
     "cost": 1000,
-    "description": "Unlocks the harp, the finest instrument a colony can make."
+    "description": "Unlocks the harp, the finest instrument a colony can make: listeners enjoy it a quarter more."
   },
   {
     "key": "signalBeacon",
@@ -341,7 +341,7 @@
         "count": 20
       }
     ],
-    "description": "Fitted limbs and lenses: lasting injuries cost half as much."
+    "description": "Fitted limbs and lenses: a limp, a stiff hand or a lost eye costs half as much."
   },
   {
     "key": "precisionTools",
@@ -355,7 +355,7 @@
         "count": 30
       }
     ],
-    "description": "Fine files and gauges: everything crafted comes out a grade better."
+    "description": "Fine files and gauges: everything crafted comes out noticeably better made."
   },
   {
     "key": "furtherStudy",

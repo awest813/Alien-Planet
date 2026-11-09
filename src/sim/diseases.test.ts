@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { infect, spreadDisease, updateHealth } from './health';
+import { infect, spreadDisease, tend, updateHealth } from './health';
 import { ELDER } from './lifespans';
 import { Simulation } from './simulation';
 import { triggerEvent } from './storyteller';
@@ -45,5 +45,23 @@ describe('more diseases', () => {
     const old = course(ELDER + 10);
     expect(old.severity).toBeGreaterThan(young.severity * 1.3);
     expect(old.immunity).toBeLessThan(young.immunity);
+  });
+});
+
+describe('field medicine', () => {
+  it('slows a tended illness more, as its description says', () => {
+    const severity = (research: boolean) => {
+      const sim = Simulation.newColony(12);
+      const [doctor, c] = sim.colonists;
+      if (research) {
+        sim.research.done.push('fieldMedicine');
+      }
+      c.age = 30;
+      infect(sim, c, 'marshFever');
+      tend(sim, doctor, c, false);
+      updateHealth(sim, c, 6);
+      return c.health.disease!.severity;
+    };
+    expect(severity(true)).toBeLessThan(severity(false));
   });
 });

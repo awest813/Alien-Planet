@@ -242,7 +242,10 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     how: 'Build a memorial stone (Art & decor); an artist carves it with the names of the fallen.',
     tool: 'memorial',
   },
-  beaconResearch: { how: 'Research Electricity, then the Signal beacon (Research).', screen: 'research' },
+  beaconResearch: {
+    how: 'Research Electricity, then Engineering, then the Signal beacon (Research).',
+    screen: 'research',
+  },
   beaconBuilt: {
     how: 'Build the signal beacon (Power tab) and keep the grid running: it draws a lot of power.',
     tool: 'signalBeacon',
@@ -270,7 +273,7 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     screen: 'research',
   },
   masterCraft: {
-    how: 'Give your best crafter crafting work; Precision tools research lifts every piece a grade.',
+    how: 'Give your best crafter crafting work; Precision tools research lifts every piece a little.',
     screen: 'production',
   },
   thiefCaught: { how: 'When thieves come, draft colonists and bring one down before they reach the edge of the map.' },
@@ -520,7 +523,13 @@ export const TOOLS: ToolDef[] = [
   build('drum', 'Drum', '', 'furniture', 'Music: players train Artistic and anyone within earshot enjoys it'),
   build('flute', 'Flute stand', '', 'furniture', 'Music: players train Artistic and anyone within earshot enjoys it'),
   build('lute', 'Lute stand', '', 'furniture', 'Music: a skilled player may give an evening concert'),
-  build('harp', 'Harp', '', 'furniture', 'The finest instrument: a skilled harpist can hold the whole colony'),
+  build(
+    'harp',
+    'Harp',
+    '',
+    'furniture',
+    'The finest instrument: listeners enjoy it a quarter more, and a skilled harpist can hold the whole colony',
+  ),
   build(
     'sculptureSmall',
     'Small sculpture',
@@ -580,7 +589,7 @@ export const TOOLS: ToolDef[] = [
     'Fishing spot',
     '',
     'production',
-    'Build on the shore; hunters fish here when food runs short and all winter',
+    'Build on the shore; hunters fish here when food runs short, and more in winter',
   ),
   build(
     'trough',
@@ -3055,8 +3064,8 @@ export class GameController {
     if (def?.fishing) {
       details.push(
         w.neighbors(i).some((n) => w.isFishable(n))
-          ? 'Hunters fish here when food runs short, and all winter'
-          : 'The water is frozen',
+          ? 'Hunters fish here when food runs short, and more in winter'
+          : 'The water is frozen: fishing goes on through the ice, at half the pace',
       );
     }
     if (def?.growLight) {

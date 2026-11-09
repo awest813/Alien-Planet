@@ -150,3 +150,23 @@ describe('concerts', () => {
     }
   });
 });
+
+describe('the harp', () => {
+  it('gives listeners a quarter more than a lute in the same hands', () => {
+    const gain = (instrument: string) => {
+      const { sim, w, x, y, spot } = stage(5, instrument);
+      const [player, listener] = sim.colonists;
+      player.skills.artistic = 8;
+      listener.tile = w.idx(x + 5, y + 1);
+      listener.needs.joy = 0.3;
+      listener.recentJoy = {};
+      sim.tick -= sim.tick % 20;
+      const job = { type: 'joy', target: spot } as unknown;
+      (sim as unknown as { playMusic(c: unknown, job: unknown, spot: number): void }).playMusic(player, job, spot);
+      return listener.needs.joy - 0.3;
+    };
+    const lute = gain('lute');
+    expect(lute).toBeGreaterThan(0);
+    expect(gain('harp')).toBeCloseTo(lute * 1.25, 5);
+  });
+});

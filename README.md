@@ -51,11 +51,11 @@ Objectives:
 - **Phase 2 – Living:** create a growing zone, harvest 24 potatoes, cook 5 meals at a stove, build a recreation
   spot, heat a bedroom with a campfire, and weave cloth for an armchair.
 - **Phase 3 – Story:** harvest 5 herbal medicine, have a doctor tend someone, see two colonists become friends,
-  repel a raid, hunt an animal, equip a recurve bow, build sandbags, and reach day 12 with at least 4 colonists
-  alive.
-- **Phase 4 – Seasons:** build a research bench and pick a project, complete three research projects, research
-  hearths and build a stone hearth, and survive your first winter.
-- **Phase 5 – Prosperity:** power, cold storage, taming, fine meals, parkas, a full colony, a second winter, and the
+  repel a raid, hunt an animal, and reach day 12 losing no more than one colonist.
+- **Phase 4 – Seasons:** build a research bench and pick a project, complete three research projects, equip a
+  recurve bow, build sandbags, research hearths and build a stone hearth, and survive your first winter.
+- **Phase 5 – Prosperity:** power, cold storage, taming, fine meals, bread from your own grain, iron, parkas, a full
+  colony, a child born in the valley, a raider prisoner won over (not on Peaceful), a second winter, and the
   culture goals (recreation, art, music, gatherings).
 - **Phase 6 – Legacy:** the long game. Research the signal beacon, build it and keep it powered for five days
   while raiders, drawn by the signal, come for it. A ship answers and lands beside the beacon. Board it and the
@@ -249,7 +249,7 @@ How the storytelling layer works:
   right-click a raider to have the selected colonist, or everyone drafted, concentrate fire on them.
 - **Animal husbandry:** mark wild animals with the Tame tool; colonists with the Handle work type (and the
   Animals skill) calm them and try to win them over, harder for wilder animals, and a boar may lash out.
-  Tame animals stay near the colony, pairs breed most mornings, and each morning tame deer give milk, muskoxen
+  Tame animals stay near the colony, fed pairs often have young, and each morning tame deer give milk, muskoxen
   shed wool (spun into cloth at the crafting bench) and grouse lay eggs (cooked like meat). Tame boars and
   wolves bite raiders who come close. Mark a tame animal for hunting to slaughter it for meat and leather.
 - **Clothing and exposure:** colonists start in tunics. Research Tailoring to make tunics from cloth and warm
@@ -295,8 +295,8 @@ How the storytelling layer works:
   summers, freezing winter nights). Crops don't grow in winter and hard frost kills anything left in the field,
   so plant enough in spring and summer and harvest before winter.
 - **Research:** build a research bench, pick a project in the Research screen, and colonists with the Research
-  work type study it (training the Intellectual skill). Twenty-one projects unlock the recurve bow, sandbags, the
-  stone hearth, the fine bed, tailoring and all the electrical tech below, or improve insulation, crop growth and
+  work type study it (training the Intellectual skill). Forty-five projects unlock, among much else, the recurve bow,
+  sandbags, the stone hearth, the fine bed, tailoring and all the electrical tech below, or improve insulation, crop growth and
   doctoring.
 - **Power:** the colony shares one grid. Wood-fired generators (kept fuelled by haulers) and solar panels (daytime
   only, weaker in winter) supply it; batteries store the surplus. If demand outstrips supply and storage,
