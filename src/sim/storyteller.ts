@@ -371,7 +371,9 @@ const EVENTS: EventDef[] = [
   },
   {
     key: 'wanderer',
-    minDay: 2,
+    // (Not on day 2: it starts at midnight, and a stranger turning up in the first night found a hut with a bed
+    // for everyone but them.)
+    minDay: 3,
     cooldownDays: 6,
     weight: (sim) => (roomToGrow(sim) ? 1 : 0),
     run: (sim) => {

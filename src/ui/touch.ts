@@ -9,6 +9,8 @@ export function forTouch(text: string): string {
   return text
     .replace(/ \((?:[A-Z0-9]|Space|Esc|Tab)\)/g, '')
     .replace(/\bDraft with Q\b/g, 'Draft from the top bar')
+    .replace(/\bPress Q to draft\b/g, 'Tap Draft all to draft')
+    .replace(/\bpress Q to draft\b/g, 'tap Draft all to draft')
     .replace(/\bClick\b/g, 'Tap')
     .replace(/\bclick\b/g, 'tap');
 }

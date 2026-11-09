@@ -230,9 +230,13 @@ function useMenuView<V extends string>(): [V | 'main', (view: V | 'main') => voi
       return;
     }
     const root = [...document.querySelectorAll<HTMLElement>('.title-panel, .modal')].pop();
-    root
-      ?.querySelector<HTMLElement>('button:not(:disabled):not(.modal-x), select:not(:disabled), input:not(:disabled)')
-      ?.focus();
+    // (The chosen option if there is one: focus on the first, Peaceful, looked like a second choice.)
+    (
+      root?.querySelector<HTMLElement>('[aria-pressed="true"]') ??
+      root?.querySelector<HTMLElement>(
+        'button:not(:disabled):not(.modal-x), select:not(:disabled), input:not(:disabled)',
+      )
+    )?.focus();
   }, [view]);
   return [view, setView];
 }

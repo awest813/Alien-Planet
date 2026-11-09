@@ -441,3 +441,22 @@ describe('mid-game: what the screens say', () => {
     expect(raidLine).toMatch(near ? /already on colonists/ : /will reach the colony/);
   });
 });
+
+describe('a hut with a gap in its walls', () => {
+  it('says the walls leave a gap, rather than "plan walls and a door"', () => {
+    const { sim, w, x, y } = colony('gap');
+    const ring = outline(w, x + 2, y - 2, x + 6, y + 2);
+    for (const i of ring) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    w.setFeature(w.idx(x + 2, y), featureId('door'));
+    // One tile of the far wall never built (over water, say).
+    w.setFeature(w.idx(x + 6, y), 0);
+    expect(sim.hasShelter()).toBe(false);
+    sim.tick = 17 * HOUR - 7 * HOUR;
+    sim.syncClock();
+    expect(texts().some((t) => t.includes('leave a gap'))).toBe(true);
+    controller.publish();
+    expect(controller.getState().objectives.find((o) => o.id === 'shelter')?.how).toMatch(/gap/);
+  });
+});

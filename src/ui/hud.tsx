@@ -796,7 +796,11 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
   // The goal to work on next: the first one still open in the current phase that the player can act on now
   // (not one whose order is already given, or that only needs waiting for), else the first one open.
   const openGoals = phases[0]?.objectives.filter((o) => !o.done && !o.failed) ?? [];
-  const next = openGoals.find((o) => (o.tool || o.screen) && !o.underway) ?? openGoals[0];
+  // From midday, a shelter still to plan comes first, whatever order the player took the goals in (one who
+  // skipped the stockpile was still being asked for it as night came with the walls unbuilt).
+  const hour = parseInt(state.time, 10);
+  const shelterFirst = openGoals.find((o) => o.id === 'shelter' && !o.underway && hour >= 12);
+  const next = shelterFirst ?? openGoals.find((o) => (o.tool || o.screen) && !o.underway) ?? openGoals[0];
   if (!open) {
     return (
       <button
@@ -1078,6 +1082,13 @@ export function Architect({ state }: { state: UiState }) {
         </button>
       </div>
       <div className="arch-tools" ref={tools0}>
+        {/* On a touch screen a tool in hand (picked here, or by a goal) can be put down from any tab: Select lives
+            in Orders, out of sight, and a tap on a colonist went on placing blueprints under them. */}
+        {TOUCH && state.toolId !== 'select' && group !== 'orders' && (
+          <button className="put-down" onClick={() => controller.setTool({ kind: 'select' })}>
+            ✕ Done
+          </button>
+        )}
         {tools.map((t) => {
           const locked = state.lockedTools[t.id];
           return (
@@ -1132,7 +1143,7 @@ export function Notices({ state, paused = false }: { state: UiState; paused?: bo
               : '❚❚ Paused · click or Space to resume'}
         </button>
       )}
-      {state.toast && <div className="toast">{state.toast}</div>}
+      {state.toast && <div className="toast">{forTouch(state.toast)}</div>}
       {state.notifications.map((n) => (
         <button
           key={n.id}

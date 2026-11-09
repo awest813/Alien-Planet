@@ -1590,9 +1590,32 @@ export class ColonyScene extends Phaser.Scene {
     const tool = controller.tool;
     const rect = this.dragRect(start, end);
     switch (tool.kind) {
-      case 'designate':
+      case 'designate': {
+        // Marked tiles in the rectangle before and after: a drag that marked nothing says so (a Forage drag over
+        // no bushes, when the food alert says to forage, did nothing without a word).
+        const world = controller.sim.world;
+        const marked = () => {
+          let n = 0;
+          for (let y = Math.min(rect.y0, rect.y1); y <= Math.max(rect.y0, rect.y1); y++) {
+            for (let x = Math.min(rect.x0, rect.x1); x <= Math.max(rect.x0, rect.x1); x++) {
+              n += world.designation[world.idx(x, y)] !== 0 ? 1 : 0;
+            }
+          }
+          return n;
+        };
+        const before = marked();
         controller.command({ type: 'designate', rect, kind: tool.designation });
+        if (before === 0 && marked() === 0) {
+          const what = {
+            mine: 'rock to mine',
+            chop: 'trees to chop',
+            forage: 'bushes to forage',
+            deconstruct: 'buildings to take down',
+          }[tool.designation];
+          controller.hint(`No ${what ?? 'work'} there. Drag over the ones you want.`);
+        }
         break;
+      }
       case 'cancel':
         controller.command({ type: 'cancel', rect });
         controller.command({ type: 'hunt', rect, add: false });
@@ -1616,9 +1639,28 @@ export class ColonyScene extends Phaser.Scene {
       case 'zone':
         controller.command({ type: 'zone', rect, zone: tool.zone });
         break;
-      case 'build':
-        controller.command({ type: 'build', feature: tool.feature, tiles: this.dragTiles(tool, start, end) });
+      case 'build': {
+        const tiles = this.dragTiles(tool, start, end);
+        const world = controller.sim.world;
+        // Tiles of a wall outline that can't take a wall (water, mostly) leave a gap: say so, or the room never closes
+        // and nothing says why.
+        const skipped = featureDef(tool.feature).blocksRoom
+          ? tiles.filter(
+              (i) =>
+                !controller.sim.canPlaceBlueprint(i, tool.feature) &&
+                world.blueprint[i] !== tool.feature &&
+                // (A wall already standing there is no gap.)
+                !(world.feature[i] !== NONE && featureDef(world.feature[i]).blocksRoom),
+            ).length
+          : 0;
+        controller.command({ type: 'build', feature: tool.feature, tiles });
+        if (skipped > 0) {
+          controller.hint(
+            `${skipped} tile${skipped > 1 ? 's' : ''} of that outline can't take a wall (water, or something in the way): the room won't close until the gap is walled some other way.`,
+          );
+        }
         break;
+      }
     }
   }
 

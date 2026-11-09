@@ -229,7 +229,10 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
   shelter: { how: 'Drag a rectangle of wood walls, then pick Door and click one of those walls.', tool: 'woodWall' },
   bed: { how: 'Click beds inside the shelter, one per colonist.', tool: 'bed' },
   night: { how: 'Have walls, a door and beds up before 22:00, when colonists go to sleep.' },
-  grow: { how: 'Drag a potato field over soil or grass.', tool: 'growPotatoes' },
+  grow: {
+    how: 'Drag a potato field over soil or grass (sand grows them slowly).',
+    tool: 'growPotatoes',
+  },
   harvest: { how: 'Potatoes take a few days to ripen; growers harvest them on their own.' },
   meals: { how: 'Build a stove from granite (mine rock for it); cooks turn raw food into meals.', tool: 'stove' },
   rec: { how: 'Build a horseshoe pin so colonists have something to do for fun.', tool: 'horseshoePin' },
@@ -2544,7 +2547,13 @@ export class GameController {
       const left = Math.ceil(NIGHT_START - sim.hour);
       const walls = [...w.tilesWith('blueprints')].filter((i) => featureDef(w.blueprint[i]).blocksRoom).length;
       alerts.push({
-        text: `No shelter yet, and night falls in ${left}h${walls > 0 ? ` (${walls} walls and doors still to build)` : ': plan walls and a door'}`,
+        text: `No shelter yet, and night falls in ${left}h${
+          walls > 0
+            ? ` (${walls} walls and doors still to build)`
+            : this.wallsLeak()
+              ? ': the walls are up but leave a gap (over water, or a missing piece): wall it up'
+              : ': plan walls and a door'
+        }`,
         tone: left <= 2 ? 'danger' : 'warn',
       });
     }
@@ -2553,7 +2562,11 @@ export class GameController {
       const outside = sim.living().filter((c) => c.sleeping && !sim.isRoofed(c.tile)).length;
       if (outside > 0) {
         alerts.push({
-          text: `${outside} colonist${outside > 1 ? 's are' : ' is'} sleeping outside: cold and miserable. Build a shelter with beds`,
+          text: `${outside} colonist${outside > 1 ? 's are' : ' is'} sleeping outside: cold and miserable. ${
+            this.wallsLeak()
+              ? 'The walls leave a gap (over water, or a missing piece): wall it up to close the room'
+              : 'Build a shelter with beds'
+          }`,
           tone: 'warn',
         });
       }
@@ -2806,6 +2819,12 @@ export class GameController {
     if (this.sim.objectivesDone[id]) {
       return help;
     }
+    if (id === 'shelter' && this.wallsLeak()) {
+      return {
+        how: 'The walls and door are up, but they leave a gap (over water, or a missing piece), so the room is open. Find it and wall it up.',
+        tool: 'woodWall',
+      };
+    }
     const after = AFTER_RESEARCH[id];
     if (after && this.sim.isResearched(after.research)) {
       return { how: after.how, tool: after.tool, screen: after.screen };
@@ -2837,6 +2856,24 @@ export class GameController {
     return walls
       ? { how: 'The walls need a way in: pick Door and click one of the walls (built or planned).', tool: 'door' }
       : help;
+  }
+
+  // Walls and a door built, nothing left to build, and still no closed room: there's a gap somewhere (a wall
+  // outline dragged over water leaves one, without a word). The help used to say "plan walls and a door".
+  private wallsLeak(): boolean {
+    const sim = this.sim;
+    if (sim.hasShelter()) {
+      return false;
+    }
+    const w = sim.world;
+    for (const i of w.tilesWith('blueprints')) {
+      if (featureDef(w.blueprint[i]).blocksRoom) {
+        return false;
+      }
+    }
+    const built = (door: boolean) =>
+      sim.countBuilt((f) => !!featureDef(f).blocksRoom && !!featureDef(f).door === door && !featureDef(f).natural);
+    return built(true) > 0 && built(false) >= 4;
   }
 
   private goalUnderway(toolId: string | undefined): boolean {
