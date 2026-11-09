@@ -1,5 +1,6 @@
 import {
   CROP_MIN_TEMP,
+  HEATER_TARGET,
   MAGNIFICENT_ROOM,
   describeRoom,
   measureRooms,
@@ -65,6 +66,7 @@ import {
   colonistCombat,
   colonistTarget,
   coverSpot,
+  lineOfSight,
   updateEnemies,
   weaponScore,
 } from './combat';
@@ -256,6 +258,8 @@ const PROVIDE_BELOW_DAYS = 1.5;
 const CONCERT_SKILL = 6;
 const CONCERT_FROM = 17;
 // Listeners get this much more from a harp than from other instruments.
+// Right beside a fire it's warmer than a heater keeps a room, by up to this much.
+const FIRESIDE_EXTRA = 6;
 const HARP_GAIN = 1.25;
 const CONCERT_UNTIL = 22;
 const CONCERT_TICKS = TICKS_PER_HOUR * 2;
@@ -1578,10 +1582,10 @@ export class Simulation {
   public temperatureAt(i: number): number {
     this.ensureRegions();
     const room = this.doorway(i) ?? this.rooms.room[i];
-    return (
-      (room >= 0 && this.rooms.enclosed[room] ? this.roomTemps[room] : this.outdoorTemperature()) +
-      (this.fireWarmth().get(i) ?? 0)
-    );
+    const base = room >= 0 && this.rooms.enclosed[room] ? this.roomTemps[room] : this.outdoorTemperature();
+    // A fire's own warmth, as a heater's, tops out: beside a summer hearth it was 40°C and more.
+    const fire = this.fireWarmth().get(i) ?? 0;
+    return base + Math.min(fire, Math.max(0, HEATER_TARGET + FIRESIDE_EXTRA - base));
   }
 
   // A fire burning in the open warms the ground right around it (its full heat beside it, half two
@@ -3050,6 +3054,18 @@ export class Simulation {
           this.startFirefight(c, found.fire, found.path);
         }
       }
+      // Standing (or sleeping) in the fire itself, and not there to fight it: step out of it. (Children, the
+      // retired and anyone with firefighting off slept on while their bed burned.)
+      if (this.tick % SLOW_TICKS === 0 && this.world.fire[c.tile] > 0 && !c.drafted && c.job?.type !== 'extinguish') {
+        const out = this.world.neighbors(c.tile).find((n) => this.world.isPassable(n) && this.world.fire[n] <= 0);
+        if (out !== undefined) {
+          // (That's this turn: bedtime would otherwise put them straight back where they lay.)
+          this.endJob(c);
+          c.path = [out];
+          this.move(c);
+          return;
+        }
+      }
       if (c.job?.type === 'eat') {
         // Eating comes first.
       } else if (job === 'sleep') {
@@ -3064,6 +3080,8 @@ export class Simulation {
         // An evening party, concert or story circle runs on past bedtime to its end (an hour or so); only
         // exhaustion breaks it up. (Cut off at bedtime, nobody got anything from it.)
         ((slot === 'S' && c.needs.rest < 0.98 && !this.inEveningCompany(c)) || c.needs.rest < 0.1) &&
+        // (Not while stepping out of a fire.)
+        this.world.fire[c.tile] <= 0 &&
         job !== 'rest' &&
         job !== 'tend' &&
         job !== 'warmUp' &&
@@ -4471,40 +4489,31 @@ export class Simulation {
     if (w.isPassable(t)) {
       return;
     }
-    // A free neighbour, or failing that (walled in on all sides) the nearest open tile.
-    const free = w.neighbors(t).find((n) => w.isPassable(n)) ?? w.nearestPassable(t);
+    // A free neighbour, or failing that (walled in on all sides) the nearest open tile. A door locked on someone
+    // in the doorway puts them on their own side: the colony's people (and prisoners) in, everyone else out.
+    // (First open neighbour in a fixed order put a raider locked out inside the room.)
+    const open = w.neighbors(t).filter((n) => w.isPassable(n));
+    const any = open[0] ?? w.nearestPassable(t);
+    const inside = open.find((n) => this.isIndoors(n)) ?? any;
+    const outside = open.find((n) => !this.isIndoors(n)) ?? any;
     for (const other of this.living()) {
       if (other.tile === t) {
-        if (free !== undefined) {
-          other.tile = free;
+        if (inside !== undefined) {
+          other.tile = inside;
         }
         this.endJob(other);
       }
     }
     for (const p of this.captives) {
-      if (p.tile === t && free !== undefined) {
-        p.tile = free;
+      if (p.tile === t && inside !== undefined) {
+        p.tile = inside;
       }
     }
-    for (const e of [...this.enemies, ...this.allies]) {
-      if (e.tile === t && free !== undefined) {
-        e.tile = free;
+    for (const e of [...this.enemies, ...this.allies, ...this.animals, ...(this.caravan?.visitors ?? [])]) {
+      if (e.tile === t && outside !== undefined) {
+        e.tile = outside;
         e.path = [];
         e.moveProgress = 0;
-      }
-    }
-    for (const a of this.animals) {
-      if (a.tile === t && free !== undefined) {
-        a.tile = free;
-        a.path = [];
-        a.moveProgress = 0;
-      }
-    }
-    for (const v of this.caravan?.visitors ?? []) {
-      if (v.tile === t && free !== undefined) {
-        v.tile = free;
-        v.path = [];
-        v.moveProgress = 0;
       }
     }
   }
@@ -6410,7 +6419,9 @@ export class Simulation {
         .filter((o) => o.health.downed)
         .map((o) => o.tile),
     );
-    const free = (i: number) => this.regions.region[i] === region && !this.isReserved(`b${i}`, c) && !lyingThere.has(i);
+    // (Not a bed that's on fire.)
+    const free = (i: number) =>
+      this.regions.region[i] === region && !this.isReserved(`b${i}`, c) && !lyingThere.has(i) && w.fire[i] <= 0;
     const isBed = (i: number) => w.feature[i] !== NONE && featureDef(w.feature[i]).bed;
     const spot =
       // Patients go to a hospital bed indoors if there's one free (out in the open, an ordinary bed
@@ -6990,12 +7001,11 @@ export class Simulation {
     const melee = weaponDef(c.weapon).range <= 1;
     const charging = c.stance === 'charge' || (melee && c.stance !== 'hold');
     const every = charging ? 20 : 60;
-    if (
-      c.stance === 'hold' ||
-      c.path.length > 0 ||
-      (this.nextTactics.get(c.id) ?? 0) > this.tick ||
-      this.enemies.length === 0
-    ) {
+    if (c.stance === 'hold' || c.path.length > 0 || (this.nextTactics.get(c.id) ?? 0) > this.tick) {
+      return;
+    }
+    if (this.enemies.length === 0) {
+      this.animalTactics(c, melee, every);
       return;
     }
     this.nextTactics.set(c.id, this.tick + every);
@@ -7026,6 +7036,32 @@ export class Simulation {
     const path = goal.length > 0 ? this.pathfinder.find(c.tile, goal) : null;
     if (path && path.length > 0) {
       c.path = charging ? path.slice(0, 4) : path;
+      c.moveProgress = 0;
+      c.draftTarget = c.path[c.path.length - 1];
+    }
+  }
+
+  // No raiders, but maddened animals (a pack, cave crawlers, the great beast) after the colony: close on the
+  // nearest, to within reach of the colonist's weapon and in sight of it. (Drafted colonists used to stand
+  // where they were, whatever their stance, unless one came into reach.)
+  private animalTactics(c: Colonist, melee: boolean, every: number): void {
+    const w = this.world;
+    const region = this.regionOf(c.tile);
+    const target = this.animals
+      .filter((a) => a.hp > 0 && !a.tame && (a.manhunter || a.revengeOn >= 0) && this.regionOf(a.tile) === region)
+      .sort((a, b) => w.distance(c.tile, a.tile) - w.distance(c.tile, b.tile))[0];
+    if (!target) {
+      return;
+    }
+    this.nextTactics.set(c.id, this.tick + every);
+    const reach = melee ? 1.5 : weaponDef(c.weapon).range * 0.6;
+    if (w.distance(c.tile, target.tile) <= reach && (melee || lineOfSight(w, c.tile, target.tile))) {
+      return;
+    }
+    const goal = w.neighbors(target.tile).filter((n) => w.isPassable(n));
+    const path = goal.length > 0 ? this.pathfinder.find(c.tile, goal) : null;
+    if (path && path.length > 0) {
+      c.path = path.slice(0, 4);
       c.moveProgress = 0;
       c.draftTarget = c.path[c.path.length - 1];
     }
@@ -7249,7 +7285,8 @@ export class Simulation {
     if (!p.health.downed || p.health.dead) {
       return false;
     }
-    if (!this.isIndoors(p.tile)) {
+    // Lying in the open, or in a fire.
+    if (!this.isIndoors(p.tile) || this.world.fire[p.tile] > 0) {
       return true;
     }
     // Already indoors: only worth moving if there's somewhere comfortable indoors to take them.
@@ -7713,8 +7750,8 @@ export class Simulation {
       return false;
     }
     this.reserve(c, `t${patient.id}`);
-    // Medicine helps with wounds; an illness only needs looking after.
-    const wounded = patient.health.injuries.some((injury) => injury.tended === 0);
+    // Medicine helps with fresh wounds, and cures an infected one outright; an illness only needs looking after.
+    const wounded = patient.health.injuries.some((injury) => injury.tended === 0 || isInfected(injury));
     const medicine = wounded
       ? this.nearestIn(
           'items',

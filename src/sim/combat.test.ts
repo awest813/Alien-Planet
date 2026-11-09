@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { colonistTarget, coverSpot, lineOfSight, spawnRaid, throughArmor, weaponScore, woundEnemy } from './combat';
+import {
+  armorTakes,
+  colonistTarget,
+  coverSpot,
+  lineOfSight,
+  spawnRaid,
+  throughArmor,
+  weaponScore,
+  woundEnemy,
+} from './combat';
 import { FACTIONS, ITEMS, NONE, STARTING_WEAPON, WEAPONS, featureId, itemId, terrainId, weaponDef } from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
@@ -515,5 +524,56 @@ describe('a raider cut off from everyone', () => {
     sim.step();
     expect(stranded.fleeing).toBe(true);
     expect(sim.raid!.outcome).toBeUndefined();
+  });
+});
+
+describe('third audit: gear, doors, fights and wounds', () => {
+  it("keeps bows and mail one to a tile on a shelf, so their quality and wear don't blend", () => {
+    const { w, x, y } = field(31);
+    const shelf = w.idx(x + 3, y);
+    w.setFeature(shelf, featureId('shelf'));
+    expect(w.capacity(shelf, itemId('longbow'))).toBe(1);
+    expect(w.capacity(shelf, itemId('ironMail'))).toBe(1);
+    expect(w.capacity(shelf, itemId('wood'))).toBeGreaterThan(ITEMS[itemId('wood') - 1].stackLimit);
+  });
+
+  it('a door locked on a raider in the doorway leaves them outside', () => {
+    const { sim, w, x, y } = field(32);
+    for (const i of outline(w, x + 2, y - 2, x + 6, y + 2)) {
+      w.setFeature(i, featureId('stoneWall'));
+    }
+    const door = w.idx(x + 4, y - 2);
+    w.setFeature(door, featureId('door'));
+    const e = raider(sim, door, 'club', { repathAt: forever });
+    sim.apply({ type: 'lock', tile: door, locked: true });
+    expect(sim.isIndoors(e.tile)).toBe(false);
+  });
+
+  it('drafted colonists close on a maddened animal, not only on raiders', () => {
+    const { sim, w, x, y } = field(33);
+    const [c, victim] = sim.colonists;
+    c.drafted = true;
+    c.stance = 'charge';
+    c.weapon = 'spear';
+    const wolf = sim.animals[0];
+    wolf.tile = w.idx(x + 10, y);
+    wolf.revengeOn = victim.id;
+    wolf.manhunter = true;
+    victim.tile = w.idx(x + 11, y);
+    const start = w.distance(c.tile, wolf.tile);
+    (sim as unknown as { draftedTactics(c: unknown): void }).draftedTactics(c);
+    expect(c.path.length).toBeGreaterThan(0);
+    expect(w.distance(c.path[c.path.length - 1], wolf.tile)).toBeLessThan(start);
+  });
+
+  it('better-made armor wears more slowly', () => {
+    const wearAfter = (quality: number) => {
+      const { sim } = field(34);
+      const c = sim.colonists[0];
+      c.armor = { item: itemId('ironMail'), quality, wear: 1 };
+      armorTakes(sim, c, 0.5);
+      return c.armor!.wear;
+    };
+    expect(wearAfter(18)).toBeGreaterThan(wearAfter(1));
   });
 });

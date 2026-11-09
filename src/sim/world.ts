@@ -198,9 +198,15 @@ export class World {
   }
 
   // How many of an item fit on a tile: a stack, or several on a shelf.
+  // Gear (weapons, armor, clothes, tools) lies one to a tile even on a shelf: a stack shares one quality and one
+  // wear, so a masterwork bow shelved with a poor one made two middling bows, and worn mail mended itself.
   public capacity(i: number, item: number): number {
+    const def = itemDef(item);
+    if (def.weapon || def.armor || def.apparel || def.tool) {
+      return def.stackLimit;
+    }
     const f = this.feature[i];
-    return itemDef(item).stackLimit * (f !== NONE && featureDef(f).shelf > 0 ? featureDef(f).shelf : 1);
+    return def.stackLimit * (f !== NONE && featureDef(f).shelf > 0 ? featureDef(f).shelf : 1);
   }
 
   // Locks or unlocks the door on a tile (anything else is left alone).

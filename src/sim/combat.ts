@@ -939,7 +939,9 @@ export function armorTakes(sim: Simulation, target: Colonist, amount: number, pi
     return amount;
   }
   const dealt = amount * (1 - itemDef(target.armor.item).armor!.protection * (1 - pierce));
-  target.armor.wear -= dealt * 0.6;
+  // Better-made armor stands up to more before it falls apart (a masterwork about half again as long as a poor
+  // piece); how well it stops a blow is the kind of armor's.
+  target.armor.wear -= (dealt * 0.6) / qualityFactor(target.armor.quality);
   if (target.armor.wear <= 0) {
     sim.addLog(`${target.name}'s ${itemDef(target.armor.item).name.toLowerCase()} has fallen apart.`, 'warn');
     target.armor = null;
@@ -1360,6 +1362,15 @@ export function colonistCombat(sim: Simulation, c: Colonist): boolean {
   }
   const target = colonistTarget(sim, c);
   if (!target) {
+    return false;
+  }
+  // Someone tending, carrying or feeding the hurt keeps at it unless a raider is right on them (a doctor used to
+  // drop a bleeding patient to trade shots with anyone within six tiles).
+  if (
+    !c.drafted &&
+    (c.job?.type === 'tend' || c.job?.type === 'rescue' || c.job?.type === 'feed') &&
+    chebyshev(sim.world, c.tile, target.tile) > 1
+  ) {
     return false;
   }
   if (!c.drafted && c.job) {
