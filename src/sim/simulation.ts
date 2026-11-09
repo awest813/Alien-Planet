@@ -2554,7 +2554,12 @@ export class Simulation {
     // (Not again within a day of the last: having let it all out, they hold together a while, however bad things
     // are. Grief stacked on grief had them breaking again and again within days.)
     const spent = c.thoughts.some((t) => t.key === 'recoveredFromBreak');
-    c.lowMoodTicks = c.mood < BREAK_THRESHOLD && !spent ? c.lowMoodTicks + SLOW_TICKS : 0;
+    // And never more than a third of the colony at once: someone has to keep the fires going. (A whole colony
+    // sulking through a harsh winter froze.)
+    const living = this.living();
+    const breaking = living.filter((o) => this.inMentalBreak(o)).length;
+    const held = breaking >= Math.max(1, Math.floor(living.length / 3));
+    c.lowMoodTicks = c.mood < BREAK_THRESHOLD && !spent && !held ? c.lowMoodTicks + SLOW_TICKS : 0;
     if (c.lowMoodTicks > TICKS_PER_HOUR * 2 && this.rng.next() < 0.05) {
       c.lowMoodTicks = 0;
       this.startBreak(c, chooseBreak(this, c), this.rng.int(3, 5));

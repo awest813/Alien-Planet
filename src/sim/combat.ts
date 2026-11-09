@@ -653,7 +653,6 @@ const BEACON_FRAGILE = 4;
 
 const FIREBRANDS_FROM_DAY = 40;
 const THROW_RANGE = 4;
-const THROW_EVERY = TICKS_PER_HOUR * 2;
 // Whether the colony has wooden walls or doors a firebrand could set alight.
 function woodenDefences(sim: Simulation): boolean {
   const w = sim.world;
@@ -684,14 +683,17 @@ function throwFire(sim: Simulation, e: Enemy): void {
       }
       const i = w.idx(x, y);
       // (Only what they can see to throw at: not through a wall into the room behind it.)
+      // (At the walls and doors: what keeps the colony out, and warm.)
       if (
         w.feature[i] !== NONE &&
         featureDef(w.feature[i]).build &&
+        w.blocksRoom(i) &&
         burnTime(sim, i) > 0 &&
         lineOfSight(w, e.tile, i) &&
         ignite(sim, i)
       ) {
-        e.throwAt = sim.tick + THROW_EVERY;
+        // One firebrand each: a whole hut burning down in midwinter while everyone fights froze colonies.
+        e.throwAt = Number.MAX_SAFE_INTEGER;
         sim.addLog(`${e.name} set the ${featureDef(w.feature[i]).name.toLowerCase()} alight!`, 'danger');
         sim.events.push('fire');
         return;
