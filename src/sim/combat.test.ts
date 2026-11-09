@@ -494,3 +494,26 @@ describe('audit fixes', () => {
     expect(sim.raid!.contactAt).toBeLessThanOrEqual(sim.tick + HOUR + 1);
   });
 });
+
+describe('a raider cut off from everyone', () => {
+  it("gives up alone; the raid isn't counted as withdrawn while the rest fight on", () => {
+    const { sim, w, x, y } = field(24);
+    // One raider on a patch ringed by deep water, out of reach of anyone and with no wall to break.
+    const cx = x - 9;
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) === 2) {
+          w.setTerrain(w.idx(cx + dx, y + dy), terrainId('deepWater'));
+        }
+      }
+    }
+    const stranded = raider(sim, w.idx(cx, y), 'club');
+    for (let k = 0; k < 3; k++) {
+      raider(sim, w.idx(x + 8, y + k), 'club');
+    }
+    sim.raid!.initial = 4;
+    sim.step();
+    expect(stranded.fleeing).toBe(true);
+    expect(sim.raid!.outcome).toBeUndefined();
+  });
+});

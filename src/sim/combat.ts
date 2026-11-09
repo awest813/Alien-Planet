@@ -1075,7 +1075,9 @@ export function updateEnemies(sim: Simulation): void {
     }
     if (!target) {
       // Nobody left to fight: leave. Everyone downed is a defeat; nobody reachable, a withdrawal.
-      if (sim.raid && !sim.raid.outcome) {
+      // (Only once the last of them gives up: one raider cut off from everyone isn't the raid withdrawing,
+      // and an outcome stops allies setting off.)
+      if (sim.raid && !sim.raid.outcome && !sim.enemies.some((o) => o !== e && o.hp > 0 && !o.fleeing)) {
         sim.raid.outcome = sim.living().some((c) => !c.health.downed) ? 'withdrew' : 'overrun';
       }
       e.fleeing = true;
