@@ -1039,7 +1039,8 @@ export function PrisonersScreen({ state, onClose }: { state: UiState; onClose: (
       <p className="muted">
         Colonists with <b>Warden</b> work bring captives to a prisoner bed, feed them, and talk with them twice a day or
         so. Once their resistance is worn down, each talk may win them over to join the colony; a happy, kind warden
-        does best. Their people notice: letting them go (or selling them back) softens them, starving them does not.
+        does best. Their people notice: letting them go (or selling them back) softens them; starving them hardens them,
+        and an execution they never forget.
       </p>
       {held.length === 0 && lying.length === 0 && <p className="muted">Nobody is held.</p>}
       {held.length > 0 && (
@@ -1080,6 +1081,7 @@ export function PrisonersScreen({ state, onClose }: { state: UiState; onClose: (
                     />
                     <ConfirmButton
                       label="Execute"
+                      grave
                       confirm="Put them to death? Everyone will take it hard"
                       onConfirm={() => controller.command({ type: 'execute', captive: p.id })}
                     />
@@ -1339,11 +1341,14 @@ export function ConfirmButton({
   confirm,
   onConfirm,
   disabled,
+  grave,
 }: {
   label: string;
   confirm: string;
   onConfirm: () => void;
   disabled?: boolean;
+  // Drawn in the danger colour before it's even armed (an execution, not a quiet "set free").
+  grave?: boolean;
 }) {
   const [armed, setArmed] = useState(false);
   useEffect(() => {
@@ -1355,7 +1360,7 @@ export function ConfirmButton({
   }, [armed]);
   return (
     <button
-      className={armed ? 'active danger' : ''}
+      className={armed ? 'active danger' : grave ? 'danger' : ''}
       disabled={disabled}
       onClick={() => {
         if (armed) {

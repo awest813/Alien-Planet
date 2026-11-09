@@ -75,17 +75,19 @@ How the living simulation works:
   than can fight back, and a little more for a rich colony). Raiders who can't get in break walls and doors, and
   sappers dig through rock. Thieves slip in to grab the richest stack from the stores and run, more often the
   richer the colony; bring one down and they drop it. While the signal beacon transmits, a third of each raid
-  goes straight for it. From the second year, raids against wooden walls bring firebrands who set them alight.
+  goes straight for it. From the second year, raids against wooden walls bring firebrands, who set walls and doors alight (once each,
+  and not in winter or wet weather).
   Vermin spoil food left on the stockpile floor, mostly in winter (shelves, iceboxes and
   frozen stores are safe).
 - **Late research:** later projects need a building standing to study (a smelter for steel, a kiln for glass)
   and materials from storage to finish: steelmaking, glassmaking (daylight for a field walled in as a room, so
   a warm greenhouse grows in winter), double glazing, reinforced walls, barbed traps, antiseptics, plant breeding,
-  prosthetics and precision tools. The beacon needs engineering first.
+  prosthetics and precision tools. The beacon needs engineering first. After engineering and surgery, Further
+  study can be taken up round after round, each dearer, each making all work a little faster (up to ten rounds).
 - **More disease:** marsh fever, the winter cough, the grey flu (winter, catching, can kill) and the rare
   shaking sickness (passes by touch, deadly untended). Every illness is harder on the old.
 - **Family life:** colonists who dislike each other argue, and bitter rivals can come to blows (someone breaks it
-  up); a marriage that sours for long enough can end. Children have lessons at a lesson board from the most
+  up); a marriage that sours for long enough can end. About one in ten newcomers is already 55–70. Children have lessons at a lesson board from the most
   skilled adult, play together, and come of age remembering a hard or a happy childhood. From 65, elders may
   get stiff joints, a sore back, failing eyes or frailty; the frail have their meals brought, and elders can
   retire. Grief for a spouse, child, parent or friend lasts weeks and returns on the anniversary; the colony
@@ -93,11 +95,11 @@ How the living simulation works:
 - **The wider world:** the raiders have goodwill too: releasing or ransoming their people softens them,
   starving or executing them hardens them (an execution also weighs on every colonist for days), and once they're soft enough they'll take a truce. A second friendly faction,
   the Hollowstone Clans, trades iron, tools and stone and quarrels with the Meadow Kin: back one and the other
-  takes it badly. Envoys offer alliances; an ally's fighters come to raids more often, and when they're raided
+  takes it badly. Envoys walk in to offer alliances; an ally's fighters come to raids more often, and when they're raided
   they ask for a colonist or goods, and refusing ends the alliance. Send one to three colonists on an expedition
   to a neighbour's settlement (to trade) or the ruins (to salvage); they come back days later with goods,
   maybe a recruit, maybe hurt. Silver buys expedition supplies and settlers from the Meadow Kin.
-- **Pens and hunting:** fence a pen with a gate, put in a feeding trough (haulers fill it with potatoes), and
+- **Pens and hunting:** fence a pen with a gate, put in a feeding trough (haulers fill it with potatoes, berries or grain), and
   tame animals stay there; fed pairs breed in any season. A village policy can limit hunting to the surplus,
   leaving a breeding pair of each kind, and the Meadow Kin take it badly if the valley is hunted out.
 
