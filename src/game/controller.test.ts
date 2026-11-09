@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FACTIONS, featureId, itemId } from '../sim/defs';
-import { STOCKPILE_ZONE } from '../sim/world';
+import { Designation, STOCKPILE_ZONE } from '../sim/world';
 import { DAYS_PER_SEASON } from '../sim/seasons';
 import { HOUR, clearAround, outline } from '../sim/test-helpers';
 import { Simulation, TICKS_PER_HOUR } from '../sim/simulation';
@@ -220,5 +220,22 @@ describe('loading a colony', () => {
     (controller as unknown as { replaceSim(sim: Simulation): void }).replaceSim(loaded);
     controller.publish();
     expect(controller.getState().notStarted).toBe(false);
+  });
+});
+
+describe('the tile card', () => {
+  const card = (tile: number) =>
+    (controller as unknown as { describeTile(i: number): { details: string[] } }).describeTile(tile);
+
+  it('says what a tree or rock gives and which order gets it, until it is ordered', () => {
+    const { w, x, y } = colony('card');
+    const tree = w.idx(x + 3, y);
+    w.setFeature(tree, featureId('tree'));
+    expect(card(tree).details.some((d) => /^Chop \(C\) for \d+ wood$/.test(d))).toBe(true);
+    const rock = w.idx(x - 3, y);
+    w.setFeature(rock, featureId('rock'));
+    expect(card(rock).details.some((d) => d.startsWith('Mine (M) for '))).toBe(true);
+    w.designation[tree] = Designation.CHOP;
+    expect(card(tree).details.some((d) => d.startsWith('Chop (C) for'))).toBe(false);
   });
 });

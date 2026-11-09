@@ -66,6 +66,7 @@ function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: ()
           </button>
         ))}
       </div>
+      <p className="choice-note">{DIFFICULTIES.find((d) => d.key === difficulty)?.description}</p>
       <h3>Map size</h3>
       <div className="difficulties four">
         {MAP_SIZES.map((m) => (
@@ -75,6 +76,7 @@ function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: ()
           </button>
         ))}
       </div>
+      <p className="choice-note">{MAP_SIZES.find((m) => m.size === mapSize)?.description}</p>
       <h3>Land</h3>
       <div className="difficulties four">
         {BIOME_LIST.map((b) => (
@@ -84,6 +86,7 @@ function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: ()
           </button>
         ))}
       </div>
+      <p className="choice-note">{BIOME_LIST.find((b) => b.key === biome)?.description}</p>
       <h3>Lie of the land</h3>
       <div className="difficulties">
         {MAP_KINDS.map((m) => (
@@ -93,6 +96,7 @@ function NewColonyForm({ confirm, onStarted }: { confirm: boolean; onStarted: ()
           </button>
         ))}
       </div>
+      <p className="choice-note">{MAP_KINDS.find((m) => m.key === mapKind)?.description}</p>
       <div className="row start-row">
         <input
           placeholder="Seed (optional)"

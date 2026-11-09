@@ -507,7 +507,12 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
         <summary>Raids and combat</summary>
         <ul className="help-steps">
           <li>
-            Raiders pause the game. Press <kbd>Q</kbd> to draft everyone (or a selected colonist).
+            Raiders pause the game, and the warning says when they'll reach the colony (on a small map they gather at
+            the edge first). Press <kbd>Q</kbd> to draft everyone (or a selected colonist).
+          </li>
+          <li>
+            Walls keep raiders out, but not off the fields: some go for the crops and the animals outside. Meet them, or
+            let them have what's out there.
           </li>
           <li>
             Pick a stance in the inspector: take cover, hold or charge. {TOUCH ? 'Tap' : 'Right-click'} the map to move
@@ -550,7 +555,8 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
           </li>
           <li>
             The <b>Factions</b> screen shows what the neighbours ask of you: send it, or hunt down the great boar, for
-            silver and goodwill. Gifts win goodwill too, and silver paid to raiders buys twelve days of peace.
+            silver and goodwill. Gifts win goodwill too, and silver paid to raiders buys twelve days of peace. Good
+            friends send food when you're short: ask on the same screen.
           </li>
           <li>
             After Deep mining, a <b>mine shaft</b> gives miners endless digging for stone, iron ore and silver, richer
@@ -562,7 +568,9 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
           </li>
           <li>
             Married couples may have children. Babies stay with a parent; children play and learn by watching the adults
-            work; teens help with light work; at 18 they're grown. The old slow down, and in time pass on.
+            work; teens help with light work; at 18 they're grown. The old slow down, and in time pass on. On some
+            evenings an elder tells stories by a lit fire, and the children listening pick up the elder's craft; a
+            doctor with herbal medicine to spare eases an elder's aches.
           </li>
           <li>
             Food that keeps without power: grow <b>grain</b>, mill it and bake bread (research Milling), or hang meat,

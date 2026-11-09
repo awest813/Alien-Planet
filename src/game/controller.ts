@@ -3024,6 +3024,13 @@ export class GameController {
     if (def?.crop) {
       details.push(w.growth[i] >= 1 ? 'Ready to harvest' : `${Math.floor(w.growth[i] * 100)}% grown`);
     }
+    // What a tree, bush, rock or vein gives, and the order that gets it (unless it's already marked).
+    if (def?.natural && def.harvest && !def.shaft && w.designation[i] === Designation.NONE) {
+      const how = { mine: 'Mine (M)', chop: 'Chop (C)', forage: 'Forage (G)' }[def.harvest.work] ?? '';
+      if (how) {
+        details.push(`${how} for ${quantity(def.harvest.item, def.harvest.count)}`);
+      }
+    }
     if (w.fire[i] > 0) {
       details.push('On fire!');
     }

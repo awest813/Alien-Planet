@@ -960,6 +960,14 @@ button.brush.active {
   grid-template-columns: repeat(4, 1fr);
 }
 
+/* The chosen option's description, under its group: only on a phone, where the cards show just their names. */
+.choice-note {
+  display: none;
+  margin: 0 0 6px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 .difficulties button {
   display: flex;
   flex-direction: column;
@@ -1096,9 +1104,28 @@ button.brush.active {
     z-index: 5;
   }
 
+  /* New colony on a phone: the choices two to a row, and only the chosen one says more, so the whole form fits
+     in a screen or two instead of fourteen full-width cards; the seed and Start stay in reach at the bottom. */
   .difficulties,
   .difficulties.four {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .difficulties button span {
+    display: none;
+  }
+
+  .choice-note {
+    display: block;
+  }
+
+  .title-panel .start-row {
+    position: sticky;
+    bottom: -24px;
+    margin: 0 -24px -24px;
+    padding: 12px 24px 24px;
+    background: var(--panel-solid, #10141c);
+    box-shadow: 0 -8px 12px rgba(16, 20, 28, 0.9);
   }
 }
 
