@@ -9,6 +9,7 @@ import { NIGHT_END, NIGHT_START } from '../sim/simulation';
 import { Animal, Colonist, Enemy } from '../sim/types';
 import { Designation, GROW_ZONE, World } from '../sim/world';
 import { Frames, TILE, TILESET_FAR_KEY, TILESET_KEY, createTextures } from './textures';
+import { TERRAIN_LANDS } from './tileset-layout';
 import { LightBuffer, LitTile, litTiles } from './lighting';
 import { auroraOn, eclipseOn } from '../sim/storyteller';
 
@@ -141,6 +142,10 @@ export class ColonyScene extends Phaser.Scene {
   private ship: Phaser.GameObjects.Image | undefined;
   // The season the ground is drawn for (0 spring … 3 winter); a change repaints it.
   private terrainSeason = 1;
+  // Which of the grass looks the colony's land uses.
+  private land(): number {
+    return Math.max(0, TERRAIN_LANDS.indexOf(controller.sim.biome));
+  }
   // A ground tile changed this frame: the ground's texture of tile indexes is remade once, after them all.
   private groundChanged = false;
   // The far feature layer is behind the map, and when it was last brought up to date.
@@ -674,7 +679,7 @@ export class ColonyScene extends Phaser.Scene {
     for (let i = 0; i < world.size; i++) {
       const x = world.xOf(i);
       const y = world.yOf(i);
-      this.putGround(x, y, Frames.terrain(world.terrain[i], terrainVariant(x, y), season));
+      this.putGround(x, y, Frames.terrain(world.terrain[i], terrainVariant(x, y), season, this.land()));
     }
     for (const i of world.tilesWith('features')) {
       const tile = this.layers.feature.getTileAt(world.xOf(i), world.yOf(i));
@@ -688,7 +693,7 @@ export class ColonyScene extends Phaser.Scene {
     const x = world.xOf(i);
     const y = world.yOf(i);
     const L = this.layers;
-    this.putGround(x, y, Frames.terrain(world.terrain[i], terrainVariant(x, y), this.terrainSeason));
+    this.putGround(x, y, Frames.terrain(world.terrain[i], terrainVariant(x, y), this.terrainSeason, this.land()));
     this.put(L.floor, x, y, world.floor[i] !== NONE ? Frames.feature(world.floor[i]) : -1);
     this.put(L.roof, x, y, world.roof[i] !== NONE ? Frames.feature(world.roof[i]) : -1);
     this.put(L.filth, x, y, world.filth[i] !== 0 ? Frames.filth(world.filthKind(i), world.filthAmount(i)) : -1);

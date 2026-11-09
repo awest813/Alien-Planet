@@ -277,18 +277,24 @@ function carveRiver(world: World, seed: number): void {
   const base = span / 2 + side * span * (0.14 + hash2(seed, 6, seed + 17) * 0.05);
   const phase = hash2(seed, 7, seed + 17) * Math.PI * 2;
   const bend = span * 0.05;
-  const fords = [0.2, 0.5, 0.8].map((f) => Math.round(length * (f + (hash2(seed, f * 10, seed + 19) - 0.5) * 0.1)));
+  // On a big map the river is broader, and there are more fords along its length (about one every 48
+  // tiles), so it reads as a river and isn't a long walk round. Small maps keep the narrow one.
+  const breadth = Math.max(1, span / 96);
+  const count = Math.max(3, Math.round(length / 48));
+  const at = count === 3 ? [0.2, 0.5, 0.8] : Array.from({ length: count }, (_, k) => (k + 0.5) / count);
+  const fords = at.map((f) => Math.round(length * (f + (hash2(seed, f * 10, seed + 19) - 0.5) * 0.1)));
+  const fordWidth = Math.round(breadth);
   for (let along = 0; along < length; along++) {
     const centre = base + Math.sin((along / length) * Math.PI * 2 + phase) * bend + Math.sin(along * 0.37 + phase);
-    const ford = fords.some((f) => Math.abs(f - along) <= 1);
+    const ford = fords.some((f) => Math.abs(f - along) <= fordWidth);
     for (let off = 0; off < span; off++) {
       const d = Math.abs(off + 0.5 - centre);
       const i = across ? world.idx(along, off) : world.idx(off, along);
-      if (d <= 1.6 && !ford) {
+      if (d <= 1.6 * breadth && !ford) {
         world.terrain[i] = DEEP;
-      } else if (d <= 2.8) {
+      } else if (d <= 2.8 * breadth) {
         world.terrain[i] = SHALLOW;
-      } else if (d <= 3.8 && world.terrain[i] !== DEEP && world.terrain[i] !== SHALLOW) {
+      } else if (d <= 3.8 * breadth && world.terrain[i] !== DEEP && world.terrain[i] !== SHALLOW) {
         world.terrain[i] = SAND;
       } else {
         continue;
@@ -306,7 +312,10 @@ function carveLake(world: World, seed: number): void {
   const SAND = terrainId('sand');
   const cx = world.width / 2;
   const cy = world.height / 2;
-  const half = Math.min(world.width, world.height) / 2;
+  // On a big map the lake (and the island in it) grows more slowly than the map, so the island stays a tight
+  // spot to farm, with more mainland across the fords. Small maps keep the lake as it was.
+  const side = Math.min(world.width, world.height);
+  const half = (side / 2) * Math.min(1, Math.sqrt(96 / side));
   const fordAngle = hash2(seed, 9, seed + 29) * Math.PI * 2;
   const fordAt = [fordAngle, fordAngle + Math.PI * (0.8 + hash2(seed, 10, seed + 29) * 0.4)];
   for (let i = 0; i < world.size; i++) {

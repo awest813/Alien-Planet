@@ -29,19 +29,42 @@ with esbuild for speed (see ROADMAP).
 - **The desert's wood:** heat waves are survivable now (one heatstroke death in a 20-colony desert sample over two
   summers), but wood is scarce, and a desert colony that doesn't plant a grove can burn the last of it and freeze in
   a later winter (one of the 120-day playtest colonies, in year 5).
-- **Tundra is hard on a slow start:** trees are scarce, and a farming-first colony that hasn't finished its hut
-  by the first cold can be lost (one of four sensible tundra colonies in a 36-day sample, on day 18).
+- **Islands and the tundra run hungry:** in a 48-day sweep of every land and layout (five seeds each, Tiny and
+  Medium) no colony is lost, but islands starve 3–8 times as many colonist-hours as valleys (little room to
+  farm) and have the most breaks, and the tundra's cool summers grow less (Tiny tundra valleys about 2,400
+  hours, from 990, though with fewer deaths). Fishing helps islands most: the harness now builds four spots
+  there.
 - **A busy colony's simulation slows during raids.** On a Medium map `scripts/perf.ts` gives about 39 ms per
   1,000 ticks at day 8 (budget 60), and two busy 41-day crafting colonies ran at 30–58 ms through day 40 (from
   95–100 with over a thousand items lying about), but up to 68 ms in days with a raid on. What's left is spread
   thin: pathfinding, colonists choosing work, combat. At top speed even 100 ms per 1,000 ticks is only about 8
   ms of each second.
-- **Elders' care beyond meals:** nothing yet eases an elder's aches or keeps them company; frail elders have
-  their meals brought, and elders retire from heavy work.
+- **Elders' care beyond meals:** nothing yet eases an elder's aches; frail elders have their meals brought,
+  elders retire from heavy work, and they tell stories by the fire.
 - **Testing:** the long-press hasn't been tried on a real iPhone. Performance is still checked by hand (`scripts/perf.ts`); it's too noisy for CI. Saves from before
   version 16 can't be loaded (the game says so).
 
 ## Closed in this pass
+
+- **Every land and layout audited:** a 48-day balance sweep of all 24 lands × layouts at Tiny and Medium, and
+  the maps looked at whole. What it found, and what changed:
+  - **Tundra colonies froze, then fried:** no leather meant no parkas, and colonists met −12°C in tunics, or in
+    nothing once those wore out (Medium tundra islands: 35 of 70 alive, 31 dead of cold). Tundra colonists now
+    land in parkas with a tunic each for the summer, and newcomers come dressed for the season. The tundra's
+    summers peaked at 28°C, and a heat wave on top killed parka-wearers by heatstroke: its climate is now
+    cooler and steadier (about 2–22°C in summer, −12–8°C in winter), with no heat waves. Medium tundra islands
+    now keep 56 of 63; tundra valleys and rivers lose nobody to cold or heat.
+  - **Nobody fished while starving:** hunting comes late in the work order, so an island colony starved beside
+    its lake. Once there's a roof over everyone and food is under a day and a half, the best hunter (two in a
+    colony of seven or more) goes for food first. (Sending everyone made things worse: nothing got built.)
+  - **Big maps looked like small ones:** the river kept the same width and three fords at 192 tiles, and the
+    island grew with the map. On Medium and up the river is broader with a ford about every 48 tiles, and
+    the lake grows more slowly, so the island stays a tight spot.
+  - **The lands all looked alike:** each has its own grass now: pale and lichened on the tundra, dry in the
+    desert, deep green in the forest.
+- **Elders gave nothing back:** some evenings an elder tells the old stories by a lit fire; whoever's free
+  gathers round, both feel better for it, and children and teens listening learn something of the teller's
+  best skill.
 
 - **The last research waited on materials:** research counted only what was in a stockpile, so a colony whose
   stockpiles were full sat short of iron with 93 of it by the smelter. It now counts and takes materials

@@ -8,10 +8,12 @@ export const TILE = 16;
 export const TILESET_COLUMNS = 16;
 
 const CROPS = FEATURES.filter((f) => f.crop);
-// Each terrain has four looks (plain, and three with details) in each of the four seasons.
+// Each terrain has four looks (plain, and three with details) in each of the four seasons, for each kind of
+// land (grass is greener in a forest, paler and sparser on the tundra, dry in the desert).
 export const TERRAIN_VARIANTS = 4;
 export const TERRAIN_SEASONS = 4;
-const TERRAIN_FRAMES = TERRAIN_VARIANTS * TERRAIN_SEASONS;
+export const TERRAIN_LANDS = ['temperate', 'tundra', 'desert', 'forest'] as const;
+const TERRAIN_FRAMES = TERRAIN_VARIANTS * TERRAIN_SEASONS * TERRAIN_LANDS.length;
 // Designations are numbered from 1; frame 0 of the section is left empty.
 const DESIGNATION_FRAMES = 5;
 const OVERLAY_FRAMES = 3;
@@ -47,9 +49,9 @@ export const TILESET_ROWS = rows;
 
 // Frame indices in the generated tileset.
 export const Frames = {
-  // `season`: 0 spring, 1 summer, 2 autumn, 3 winter.
-  terrain: (terrain: number, variant: number, season = 1) =>
-    starts.terrain + terrain * TERRAIN_FRAMES + season * TERRAIN_VARIANTS + variant,
+  // `season`: 0 spring, 1 summer, 2 autumn, 3 winter; `land`: an index into TERRAIN_LANDS.
+  terrain: (terrain: number, variant: number, season = 1, land = 0) =>
+    starts.terrain + terrain * TERRAIN_FRAMES + (land * TERRAIN_SEASONS + season) * TERRAIN_VARIANTS + variant,
   feature: (feature: number) => starts.features + feature - 1,
   blueprint: (feature: number) => starts.blueprints + feature - 1,
   designation: (designation: number) => starts.designations + designation,

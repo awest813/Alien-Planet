@@ -1018,7 +1018,8 @@ function play(seed: number): Result {
       const spots = sim.nearest(
         start,
         (i) => w.blueprint[i] === NONE && !avoid.has(i) && sim.canPlaceBlueprint(i, featureId('fishingSpot')),
-        2,
+        // (On an island, where there's little room to farm, a player leans on the lake.)
+        mapKind === 'island' ? 4 : 2,
       );
       sim.apply({ type: 'build', feature: featureId('fishingSpot'), tiles: spots });
     }
@@ -1203,7 +1204,7 @@ function play(seed: number): Result {
     caravan: count(/^Traders from .* have arrived/),
     heatWave: count(/heat wave has settled/),
     eclipse: count(/^An eclipse/),
-    manhunters: count(/maddened .* is charging/),
+    manhunters: count(/maddened .* (is charging|is coming for the colony)/),
     meteorite: count(/^A meteorite/),
     refugee: count(/wounded and fleeing raiders/),
     aurora: count(/^An aurora/),
@@ -1211,6 +1212,7 @@ function play(seed: number): Result {
     bumperCrop: count(/^Perfect growing weather/),
     lightning: count(/^Lightning struck/),
     concerts: sim.stats.concerts ?? 0,
+    storyNights: sim.stats.storyNights ?? 0,
     parties: sim.stats.parties ?? 0,
     feasts: sim.stats.feasts ?? 0,
     festivals: count(/^(It's Planting Day|The harvest festival is tonight|The midwinter bonfire will be lit)/),
@@ -1229,6 +1231,14 @@ function play(seed: number): Result {
         `    ${key}: stock ${sim.stockOf(itemId(key))} produced ${sim.stats.produced[key] ?? 0} bills ${recipeFor.join(',')}`,
       );
     }
+    const w = sim.world;
+    const fishing = [...w.tilesWith('features')].filter((i) => w.feature[i] === featureId('fishingSpot')).length;
+    const planned = [...w.tilesWith('blueprints')].filter((i) => w.blueprint[i] === featureId('fishingSpot')).length;
+    const hunters = sim
+      .living()
+      .filter((c) => c.priorities.hunting > 0)
+      .map((c) => `${c.name}:${c.priorities.hunting}`);
+    console.log(`    fishing spots ${fishing} (planned ${planned}); hunters ${hunters.join(' ')}`);
     console.log(
       '    buildings',
       ['kiln', 'smelter', 'stonecutterTable', 'craftingBench']

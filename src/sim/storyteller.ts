@@ -25,6 +25,8 @@ export const DIFFICULTIES: { key: Difficulty; label: string; description: string
 
 export interface StoryState {
   lastEventTick: number;
+  // When an elder may next tell stories by the fire (older saves: any time).
+  storiesAt?: number;
   // Tick before which each event may not fire again.
   cooldowns: Record<string, number>;
   coldSnapUntil: number;
@@ -508,7 +510,9 @@ const EVENTS: EventDef[] = [
     minDay: 5,
     cooldownDays: 8,
     threat: true,
-    weight: (sim) => (heatWaveOn(sim) || coldSnapOn(sim) ? 0 : 1),
+    // (Not on the tundra: a heat wave there, on top of summer, brought 35°C rooms and colonists in parkas
+    // dying of heatstroke.)
+    weight: (sim) => (heatWaveOn(sim) || coldSnapOn(sim) || sim.biome === 'tundra' ? 0 : 1),
     run: (sim) => {
       sim.story.heatWaveUntil = sim.tick + 2 * DAY;
       sim.addLog('A heat wave has settled over the valley. Keep colonists cool indoors.', 'warn', true);

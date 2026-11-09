@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { hurtAnimal, spareForBreeding } from './animals';
-import { ANIMALS, FACTIONS } from './defs';
+import { ANIMALS, FACTIONS, featureId, itemDef, itemId } from './defs';
 import { HUNT_RANGE, Simulation } from './simulation';
 import { goodwillOf } from './trade';
-import { HOUR, clearAround, run } from './test-helpers';
+import { HOUR, clearAround, outline, run } from './test-helpers';
 import { Animal } from './types';
 
 function field(seed: number) {
@@ -191,5 +191,36 @@ describe('marked game out of range', () => {
     // Livestock in a far pen can still be marked for slaughter.
     const cow = place(sim, 'muskox', far, { hunted: true, tame: true });
     expect(sim.huntable(cow)).toBe(true);
+  });
+});
+
+describe('the colony provider', () => {
+  it('goes for food before other work when food is short (once there is shelter)', () => {
+    const { sim, w, x, y } = field(45);
+    // A hut, so the first shelter is done.
+    for (const i of outline(w, x - 6, y - 6, x - 2, y - 2)) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    w.setFeature(w.idx(x - 4, y - 2), featureId('door'));
+    expect(sim.hasShelter()).toBe(true);
+    // Nothing to eat in the stores, and building to do at top priority.
+    for (let i = 0; i < w.size; i++) {
+      if (w.itemType[i] !== 0 && itemDef(w.itemType[i]).nutrition > 0) {
+        w.takeItem(i, w.itemCount[i]);
+      }
+    }
+    sim.apply({ type: 'build', feature: featureId('woodWall'), tiles: [w.idx(x + 4, y + 4)] });
+    w.addItem(w.idx(x + 3, y + 4), itemId('wood'), 50);
+    sim.colonists.forEach((c, k) => {
+      c.priorities.construction = 1;
+      c.priorities.hunting = 3;
+      c.skills.animals = k === 1 ? 12 : 1;
+      c.needs.food = 1;
+      c.job = null;
+    });
+    place(sim, 'deer', w.idx(x + 8, y), { hunted: true });
+    run(sim, 60);
+    expect(sim.colonists[1].job?.type).toBe('hunt');
+    expect(sim.colonists.filter((c) => c.job?.type === 'hunt')).toHaveLength(1);
   });
 });

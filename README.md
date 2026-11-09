@@ -69,9 +69,12 @@ Objectives:
 
 How the living simulation works:
 
-- **Lands:** a tundra start is colder, rockier and snowier, with muskoxen; a desert has little wood or water,
-  hot afternoons and cold nights; a forest is thick with trees and berry bushes and wetter. A river or a lake
-  around an island can cut the valley up, crossed at shallow fords.
+- **Lands:** a tundra start is colder, rockier and snowier, with muskoxen, cool summers and no heat waves; its
+  colonists land in parkas, with a tunic each for the summer. A desert has little wood or water, hot afternoons
+  and cold nights; a forest is thick with trees and berry bushes and wetter. Each has its own grass: pale on the
+  tundra, dry in the desert, deep green in the forest. A river or a lake around an island can cut the valley up,
+  crossed at shallow fords; on a big map the river is broader with more fords, and the island stays a tight spot
+  with more mainland across the water.
 - **Threats that vary:** raids are sized to a fair fight against the colony's able fighters (about a third more
   than can fight back, and a little more for a rich colony). Raiders who can't get in break walls and doors, and
   sappers dig through rock. Thieves slip in to grab the richest stack from the stores and run, more often the
@@ -91,7 +94,8 @@ How the living simulation works:
   up); a marriage that sours for long enough can end. About one in ten newcomers is already 55–70. Children have lessons at a lesson board from the most
   skilled adult, play together, and come of age remembering a hard or a happy childhood. From 65, elders may
   get stiff joints, a sore back, failing eyes or frailty; the frail have their meals brought, and elders can
-  retire. Grief for a spouse, child, parent or friend lasts weeks and returns on the anniversary; the colony
+  retire. Some evenings an elder tells the old stories by a lit fire: whoever's free gathers round, both feel
+  better for it, and the children and teens listening pick up something of the teller's best skill. Grief for a spouse, child, parent or friend lasts weeks and returns on the anniversary; the colony
   expects more of its leader as the years pass, and the leader and elders want rooms of their own.
 - **The wider world:** the raiders have goodwill too: releasing or ransoming their people softens them,
   starving or executing them hardens them (an execution also weighs on every colonist for days), and once they're soft enough they'll take a truce. A second friendly faction,
@@ -321,7 +325,8 @@ How the storytelling layer works:
   kept back.
 - **Water:** shallow water is slow to wade through and leaves colonists soaked (a small mood hit); deep water
   is impassable until you build a bridge over it. Fishing spots on the shore let hunters catch raw fish while
-  the colony is short of food. In hard frost the shallows freeze from the shore inwards and can be walked
+  the colony is short of food; once there's a roof over everyone and food is down to a day and a half, the
+  colony's best hunter (two in a colony of seven or more) goes fishing or hunting before any other work. In hard frost the shallows freeze from the shore inwards and can be walked
   across; frozen water can still be fished through the ice, at half the pace, and the ice melts again when it
   warms up.
 - **Sun lamps:** crops beneath them grow day and night, all year, so a heated greenhouse can farm in winter.

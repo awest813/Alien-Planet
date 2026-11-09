@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Biome, MapKind } from './biomes';
-import { ANIMALS, NONE, featureDef, featureId, terrainDef, terrainId } from './defs';
+import { ANIMALS, NONE, featureDef, featureId, itemId, terrainDef, terrainId } from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
 import { HOUR, outline, run } from './test-helpers';
+import { eventWeight } from './storyteller';
 import { updateWeather } from './weather';
 import { GROW_ZONE, STOCKPILE_ZONE } from './world';
 
@@ -220,5 +221,46 @@ describe('a colony in every land', () => {
     expect(sim.living().length).toBe(sim.colonists.length);
     expect(sim.living().every((c) => !c.health.downed && c.needs.food > 0.1)).toBe(true);
     expect(sim.countFeature((f) => featureDef(f).bed)).toBeGreaterThan(0);
+  });
+});
+
+describe('lands fitted to their climate and size', () => {
+  it('tundra colonists land in parkas with a tunic each for the summer, and the tundra has no heat waves', () => {
+    const sim = Simulation.newColony(5, 'standard', 64, { biome: 'tundra' });
+    expect(sim.colonists.every((c) => c.apparel?.item === itemId('parka'))).toBe(true);
+    expect(sim.stockOf(itemId('tunic'))).toBe(sim.colonists.length);
+    const temperate = Simulation.newColony(5);
+    expect(temperate.colonists.every((c) => c.apparel?.item === itemId('tunic'))).toBe(true);
+    // A heat wave never comes to the tundra; elsewhere it can.
+    sim.tick = 10 * 24 * HOUR;
+    sim.syncClock();
+    expect(eventWeight(sim, 'heatWave')).toBe(0);
+    temperate.tick = 10 * 24 * HOUR;
+    temperate.syncClock();
+    expect(eventWeight(temperate, 'heatWave')).toBeGreaterThan(0);
+  });
+
+  it('a big map has a broader river with more fords, and a lake that leaves the island a tight spot', () => {
+    const deep = terrainId('deepWater');
+    const count = (sim: Simulation, t: number) => sim.world.terrain.filter((x) => x === t).length;
+    const small = Simulation.newColony(9, 'standard', 64, { map: 'river' });
+    const large = Simulation.newColony(9, 'standard', 192, { map: 'river' });
+    // Deep water per tile of river length: about twice as broad on the big map.
+    expect(count(large, deep) / 192).toBeGreaterThan((count(small, deep) / 64) * 1.6);
+    // The island's share of the map is smaller on a big map than a small one.
+    const island = (size: number) => {
+      const sim = Simulation.newColony(9, 'standard', size, { map: 'island' });
+      const w = sim.world;
+      let inside = 0;
+      for (let i = 0; i < w.size; i++) {
+        const d = Math.hypot(w.xOf(i) + 0.5 - size / 2, w.yOf(i) + 0.5 - size / 2);
+        // Land inside the ring of lake water around the middle.
+        if (d < size * 0.2 && w.isPassable(i) && terrainDef(w.terrain[i]).key !== 'deepWater') {
+          inside++;
+        }
+      }
+      return inside / w.size;
+    };
+    expect(island(192)).toBeLessThan(island(64) * 1.2);
   });
 });

@@ -4,6 +4,7 @@ import { hash2 } from '../sim/rng';
 import { setTilesetImage } from './icons';
 import {
   Frames,
+  TERRAIN_LANDS,
   TERRAIN_SEASONS,
   TERRAIN_VARIANTS,
   TILE,
@@ -34,9 +35,11 @@ export function createTextures(scene: Phaser.Scene): void {
   };
 
   TERRAIN.forEach((t) => {
-    for (let season = 0; season < TERRAIN_SEASONS; season++) {
-      for (let v = 0; v < TERRAIN_VARIANTS; v++) {
-        at(Frames.terrain(t.id, v, season), (c) => drawTerrain(c, t.key, v, season));
+    for (let land = 0; land < TERRAIN_LANDS.length; land++) {
+      for (let season = 0; season < TERRAIN_SEASONS; season++) {
+        for (let v = 0; v < TERRAIN_VARIANTS; v++) {
+          at(Frames.terrain(t.id, v, season, land), (c) => drawTerrain(c, t.key, v, season, TERRAIN_LANDS[land]));
+        }
       }
     }
   });
@@ -188,7 +191,36 @@ function speckle(c: Ctx, seed: number, colors: string[], density: number): void 
 }
 
 // Ground in four looks (0 plain; 1–3 with details) through the four seasons (0 spring … 3 winter).
-function drawTerrain(c: Ctx, key: string, variant: number, season: number): void {
+// Grass by the kind of land: paler and sparser on the tundra (snowed over all winter), dry in the desert,
+// deep and mossy in the forest. (Spring, summer, autumn, winter.)
+const LAND_GRASS: Partial<Record<(typeof TERRAIN_LANDS)[number], [string, string[], number][]>> = {
+  tundra: [
+    ['#7d8c6a', ['#6f7d5e', '#8e9a78', '#a6ad94'], 0.24],
+    ['#6b8a50', ['#5d7a46', '#7a965c', '#9aa880'], 0.24],
+    ['#8a7a52', ['#7a6a46', '#9a8a5e', '#a4505a'], 0.24],
+    ['#c6d0d4', ['#d6dee2', '#e6eef2', '#b2bec4'], 0.2],
+  ],
+  desert: [
+    ['#7e9446', ['#6e8440', '#90a454', '#a8a660'], 0.22],
+    ['#9a9450', ['#8a8446', '#aaa25c', '#b8ac6a'], 0.22],
+    ['#a08a4c', ['#907a44', '#b09a58', '#8a7a46'], 0.22],
+    ['#8e9070', ['#80826a', '#9c9e80', '#a8a68a'], 0.2],
+  ],
+  forest: [
+    ['#4a7a2c', ['#3e6a26', '#58893a', '#6a9a44'], 0.24],
+    ['#436e2a', ['#385e24', '#507c34', '#2f5420'], 0.24],
+    ['#66702e', ['#5a6228', '#767e36', '#8a6a2a'], 0.24],
+    ['#7a8a74', ['#6a7a66', '#8c9a86', '#b8c4c2'], 0.18],
+  ],
+};
+
+function drawTerrain(
+  c: Ctx,
+  key: string,
+  variant: number,
+  season: number,
+  land: (typeof TERRAIN_LANDS)[number] = 'temperate',
+): void {
   const seed = variant * 97 + season * 31 + key.length * 13;
   const winter = season === 3;
   const palettes: Record<string, [string, string[], number][]> = {
@@ -205,7 +237,7 @@ function drawTerrain(c: Ctx, key: string, variant: number, season: number): void
     stoneFloor: [['#77746f', ['#6a6762', '#85827c'], 0.25]],
     ice: [['#cfe4ef', ['#bcd6e6', '#e6f3fa'], 0.2]],
   };
-  const options = palettes[key];
+  const options = (key === 'grass' && LAND_GRASS[land]) || palettes[key];
   const [base, specks, density] = options[Math.min(season, options.length - 1)];
   c.fillStyle = base;
   c.fillRect(0, 0, TILE, TILE);

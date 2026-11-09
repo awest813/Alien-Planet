@@ -147,6 +147,7 @@ import {
   RoomInfo,
   ScheduleSlot,
   Shot,
+  SKILL_KEYS,
   SkillKey,
   Skills,
   Stats,
@@ -250,12 +251,23 @@ const LISTEN_GAIN = 1 / (TICKS_PER_HOUR * 10);
 // Players this good make listeners feel it more.
 const FINE_MUSIC_SKILL = 10;
 // Concerts: who can give one, when, for how long, and how close the audience gathers.
+// Below this many days of food, the colony's provider goes for food before other work.
+const PROVIDE_BELOW_DAYS = 1.5;
 const CONCERT_SKILL = 6;
 const CONCERT_FROM = 17;
 const CONCERT_UNTIL = 22;
 const CONCERT_TICKS = TICKS_PER_HOUR * 2;
 const CONCERT_RADIUS = 3;
 const CONCERT_HOURS_TO_FULL = 1.5;
+// An elder telling stories: in the evening, by a lit fire, for an hour and a half, no more than once in two
+// days. Listeners enjoy the company; children and teens pick up something of the teller's best skill.
+const STORIES_FROM = 18;
+const STORIES_UNTIL = 21;
+const STORY_TICKS = TICKS_PER_HOUR * 1.5;
+const STORY_GAP_TICKS = TICKS_PER_HOUR * 24 * 2;
+const STORY_HOURS_TO_FULL = 2;
+// Of every tick spent listening, what a child learns of the teller's craft (working at it learns 1).
+const STORY_LESSON = 0.5;
 // How good a player sounds: 0.5 for a beginner to 1.5 for a master.
 const musicQuality = (c: Colonist) => 0.5 + c.skills.artistic / 20;
 // Below this after a meal, a colonist eats again straight away.
@@ -518,7 +530,7 @@ const STONE_FIRST_ORDER: readonly WorkTypeKey[] = (() => {
 })();
 const defaultPriorities = (): Priorities => Object.fromEntries(WORK_TYPES.map((work) => [work, 3])) as Priorities;
 
-function createColonist(id: number, name: string, tile: number, rng: Rng): Colonist {
+function createColonist(id: number, name: string, tile: number, rng: Rng, cold = false): Colonist {
   const skills: Skills = {
     mining: rng.int(1, 9),
     construction: rng.int(1, 9),
@@ -575,7 +587,7 @@ function createColonist(id: number, name: string, tile: number, rng: Rng): Colon
     stance: 'cover',
     focus: -1,
     tool: null,
-    apparel: starterApparel(),
+    apparel: starterApparel(cold),
     practicedAt: {},
     recentJoy: {},
   };
@@ -669,6 +681,8 @@ export class Simulation {
   private noGatherUntil = new Map<number, number>();
   // An evening concert under way: who's playing, at which instrument, until when.
   public concert: { player: number; tile: number; endsAt: number } | null = null;
+  // An elder telling stories by a fire (not saved: a loaded game simply starts without one).
+  public storyCircle: { teller: number; fire: number; endsAt: number } | null = null;
   // Finished sculptures by tile.
   public artworks = new Map<number, Artwork>();
   public story: StoryState = freshStory();
@@ -840,7 +854,7 @@ export class Simulation {
     const { colonists: landing } = populationFor(size);
     for (let id = 0; id < landing; id++) {
       const name = names.splice(rng.int(0, names.length - 1), 1)[0];
-      const c = createColonist(id, name, spots[id % spots.length], rng);
+      const c = createColonist(id, name, spots[id % spots.length], rng, biome === 'tundra');
       for (const other of colonists) {
         introduce(c, other, rng);
       }
@@ -848,6 +862,10 @@ export class Simulation {
     }
     // Survival rations to tide the colony over until the first harvest.
     world.dropItemNear(spawn, itemId('meal'), 4 * landing);
+    // On the tundra they land in parkas, with a tunic each for the summer.
+    if (biome === 'tundra') {
+      world.dropItemNear(spawn, itemId('tunic'), landing);
+    }
     // A little silver for the first traders who come by.
     world.dropItemNear(spawn, itemId('silver'), 100);
     // Timber salvaged from the landing: enough for a door and a bed or two, to make the first night easier.
@@ -864,6 +882,11 @@ export class Simulation {
       true,
     );
     return sim;
+  }
+
+  // Newcomers on the tundra come in parkas unless it's summer.
+  private dressForCold(): boolean {
+    return this.biome === 'tundra' && this.season !== 'Summer';
   }
 
   // Everyone alive and here (not away on an expedition).
@@ -922,7 +945,7 @@ export class Simulation {
     for (let n = 2; taken.has(unique); n++) {
       unique = `${name} ${n}`;
     }
-    const c = createColonist(this.colonists.length, unique, tile, this.rng);
+    const c = createColonist(this.colonists.length, unique, tile, this.rng, this.dressForCold());
     for (const other of this.colonists) {
       introduce(c, other, this.rng);
     }
@@ -950,7 +973,7 @@ export class Simulation {
     if (edge === undefined) {
       return null;
     }
-    const c = createColonist(this.colonists.length, this.freshName(), edge, this.rng);
+    const c = createColonist(this.colonists.length, this.freshName(), edge, this.rng, this.dressForCold());
     for (const other of this.colonists) {
       introduce(c, other, this.rng);
     }
@@ -1085,6 +1108,7 @@ export class Simulation {
       updateFires(this, SLOW_TICKS / TICKS_PER_HOUR);
       updateSocial(this);
       this.checkConcert();
+      this.checkStories();
       this.updateGathering();
     }
     if (this.tick % TICKS_PER_HOUR === 0) {
@@ -1766,6 +1790,12 @@ export class Simulation {
       case 'joy':
         if (job.listening) {
           return 'Listening to a concert';
+        }
+        if (job.telling) {
+          return 'Telling stories by the fire';
+        }
+        if (job.hearing) {
+          return 'Listening to the old stories';
         }
         if (job.gathering && this.gathering) {
           return `At ${GATHERINGS[this.gathering.kind].name}`;
@@ -3180,6 +3210,12 @@ export class Simulation {
     if (c.priorities.hauling > 0 && canWork(c, 'hauling') && this.generatorRunningLow() && this.tryRefuel(c, true)) {
       return true;
     }
+    // Food running short: the colony's provider (or two, in a big colony) fishes or hunts before anything
+    // else. (Hunting comes late in the order; an island colony starved beside its lake, everyone busy with
+    // everything but the fishing spots. Sending everyone was worse: nothing got built or hauled.)
+    if (this.providers().includes(c.id) && (this.tryHunt(c) || this.tryFish(c))) {
+      return true;
+    }
     const order = this.workOrder();
     for (let p = 1; p <= 4; p++) {
       for (const work of order) {
@@ -3216,6 +3252,26 @@ export class Simulation {
     return this.cachedWorkOrder;
   }
   private workOrderAt = 0;
+
+  // Who goes for food first while it's short: the best with animals among those who hunt (two in a colony
+  // of seven or more). None while there's enough.
+  private providers(): readonly number[] {
+    if (this.tick >= this.providersAt) {
+      this.providersAt = this.tick + SLOW_TICKS;
+      // (Not before there's a roof to sleep under: the first hut comes before the fishing.)
+      if (foodDays(this) >= PROVIDE_BELOW_DAYS || !this.hasShelter()) {
+        this.providerIds = [];
+      } else {
+        const able = this.living()
+          .filter((c) => c.priorities.hunting > 0 && canWork(c, 'hunting') && !c.drafted && !c.health.downed)
+          .sort((a, b) => b.skills.animals - a.skills.animals || a.id - b.id);
+        this.providerIds = able.slice(0, this.living().length >= 7 ? 2 : 1).map((c) => c.id);
+      }
+    }
+    return this.providerIds;
+  }
+  private providersAt = 0;
+  private providerIds: number[] = [];
   private cachedWorkOrder: readonly WorkTypeKey[] = WORK_TYPES;
 
   private tryWorkType(c: Colonist, work: WorkTypeKey): boolean {
@@ -5416,6 +5472,10 @@ export class Simulation {
       this.stepListen(c, job);
       return;
     }
+    if (job.telling || job.hearing) {
+      this.stepStories(c, job);
+      return;
+    }
     if (job.gathering) {
       this.stepGather(c, job);
       return;
@@ -5542,6 +5602,120 @@ export class Simulation {
     this.stats.concerts = (this.stats.concerts ?? 0) + 1;
     this.addThought(c, 'gaveConcert');
     this.addLog(`${c.name}'s concert is over.`, 'info');
+  }
+
+  // ---- Stories by the fire ----
+
+  // Each slow tick in the evening: an elder off duty may gather whoever's free round a lit fire.
+  private checkStories(): void {
+    const circle = this.storyCircle;
+    if (circle) {
+      const teller = this.colonists[circle.teller];
+      // Over, or the teller's been called away: everyone drifts off.
+      if (!teller || teller.health.dead || !teller.job?.telling || this.tick >= circle.endsAt) {
+        this.storyCircle = null;
+      }
+      return;
+    }
+    const hour = this.hour;
+    if (
+      hour < STORIES_FROM ||
+      hour >= STORIES_UNTIL ||
+      this.concert ||
+      this.gathering ||
+      this.raid ||
+      this.tick < (this.story.storiesAt ?? 0) ||
+      // (Soon after dusk, most evenings it's due: the gap between them does the spacing.)
+      !this.rng.chance(0.25)
+    ) {
+      return;
+    }
+    const offDuty = (c: Colonist) =>
+      !c.drafted &&
+      !c.sleeping &&
+      !c.health.downed &&
+      !this.inMentalBreak(c) &&
+      this.slotOf(c) !== 'W' &&
+      this.slotOf(c) !== 'S' &&
+      (!c.job || c.job.type === 'joy' || c.job.type === 'wander') &&
+      !c.job?.listening &&
+      !c.job?.gathering;
+    const elders = this.living().filter((c) => c.age >= ELDER && offDuty(c));
+    if (elders.length === 0) {
+      return;
+    }
+    const teller = this.rng.pick(elders);
+    const region = this.regionOf(teller.tile);
+    const w = this.world;
+    const fire = this.nearestIn(
+      'buildings',
+      teller.tile,
+      (i) => {
+        const def = featureDef(w.feature[i]);
+        return def.heater > 0 && !!def.burns && w.fuel[i] > 0 && this.hasWorkSpot(i, false, region);
+      },
+      1,
+    )[0];
+    const listeners = this.living().filter((o) => o !== teller && offDuty(o) && this.regions.region[o.tile] === region);
+    if (fire === undefined || listeners.length === 0) {
+      return;
+    }
+    const spots = this.workSpots(fire, false, region);
+    const path = this.pathfinder.find(teller.tile, spots);
+    if (!path) {
+      return;
+    }
+    this.endJob(teller);
+    this.assign(teller, this.makeJob('joy', fire, { telling: true, wait: STORY_TICKS + TICKS_PER_HOUR }), path);
+    this.storyCircle = { teller: teller.id, fire, endsAt: this.tick + STORY_TICKS };
+    this.story.storiesAt = this.tick + STORY_GAP_TICKS;
+    const fireName = featureDef(w.feature[fire]).name.toLowerCase();
+    this.addLog(`${teller.name} is telling the old stories by the ${fireName}. Anyone free is welcome.`, 'good');
+    for (const o of listeners) {
+      const was = o.job;
+      this.endJob(o);
+      const there = this.pathToGather(o, fire, region);
+      if (there) {
+        this.reserve(o, `l${there.at(-1) ?? o.tile}`);
+        this.assign(o, this.makeJob('joy', fire, { hearing: true, wait: STORY_TICKS + TICKS_PER_HOUR }), there);
+      } else if (was) {
+        this.findJob(o);
+      }
+    }
+  }
+
+  // The teller's best craft: what the children listening pick up.
+  private bestSkill(c: Colonist): SkillKey {
+    return SKILL_KEYS.reduce((best, k) => (c.skills[k] > c.skills[best] ? k : best), SKILL_KEYS[0]);
+  }
+
+  // Telling, or listening: company by the fire, and for the young, a lesson in the teller's craft.
+  private stepStories(c: Colonist, job: Job): void {
+    const circle = this.storyCircle;
+    const teller = circle ? this.colonists[circle.teller] : undefined;
+    const done = !circle || !teller || circle.fire !== job.target || this.tick >= circle.endsAt;
+    if (done || --job.wait <= 0) {
+      if (job.progress >= TICKS_PER_HOUR / 2) {
+        this.addThought(c, job.telling ? 'toldStories' : 'heardStories');
+        if (job.telling) {
+          this.stats.storyNights = (this.stats.storyNights ?? 0) + 1;
+        }
+      }
+      if (job.telling && circle?.teller === c.id) {
+        this.storyCircle = null;
+      }
+      this.endJob(c);
+      return;
+    }
+    // (On the way there, nothing yet.)
+    if (c.path.length > 0) {
+      return;
+    }
+    job.progress++;
+    this.enjoy(c, 'social', this.joyEfficiency(c, 'social') / (TICKS_PER_HOUR * STORY_HOURS_TO_FULL));
+    if (job.hearing && teller && c.age < ADULT) {
+      learn(this, c, this.bestSkill(teller), STORY_LESSON);
+    }
   }
 
   // A concert stops if the player stops playing (drafted, collapsed, called away).

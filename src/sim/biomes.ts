@@ -65,9 +65,10 @@ export const BIOMES: Record<Biome, BiomeDef> = {
     key: 'tundra',
     label: 'Tundra',
     description: 'Long hard winters and a short growing season. Plenty of stone, few trees; muskoxen and wolves.',
-    mean: -5,
-    swing: 12,
-    daily: 7,
+    // Cool summers (about 6–22°C) and bitter winters (about −14–2°C), with little between day and night.
+    mean: -8,
+    swing: 10,
+    daily: 5,
     weather: {
       Autumn: { clear: 0.42, rain: 0.2, snow: 0.15, fog: 0.23 },
       Winter: { clear: 0.45, snow: 0.45, fog: 0.1 },

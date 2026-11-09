@@ -40,10 +40,12 @@ describe('regressions', () => {
     const w = sim.world;
     const c0 = sim.colonists[0];
     let target = -1;
-    for (let d = 3; d < 8 && target < 0; d++) {
-      const t = c0.tile + d;
-      if (w.isPassable(t) && w.feature[t] === 0) {
-        target = t;
+    // Open ground a few steps from them, in whichever direction there is some.
+    for (let d = 3; d < 10 && target < 0; d++) {
+      for (const t of [c0.tile + d, c0.tile - d, c0.tile + d * w.width, c0.tile - d * w.width]) {
+        if (target < 0 && t >= 0 && t < w.size && w.isPassable(t) && w.feature[t] === 0) {
+          target = t;
+        }
       }
     }
     expect(target).toBeGreaterThanOrEqual(0);

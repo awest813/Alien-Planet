@@ -307,6 +307,16 @@
     "mood": 4,
     "hours": 12
   },
+  "heardStories": {
+    "label": "Heard the old stories by the fire",
+    "mood": 4,
+    "hours": 18
+  },
+  "toldStories": {
+    "label": "Told the old stories: still has something to give",
+    "mood": 6,
+    "hours": 24
+  },
   "attendedParty": {
     "label": "Went to a party",
     "mood": 4,

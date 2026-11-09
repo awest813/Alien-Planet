@@ -71,7 +71,13 @@ export function wornScore(c: Colonist, outdoor: number): number {
   return a ? apparelScore(a.item, a.quality, a.wear, outdoor) : weatherFit(0, 0, outdoor);
 }
 
-export const starterApparel = (): WornApparel => ({ item: itemId('tunic'), quality: 6, wear: 1 });
+// What people arrive in: a tunic, or a parka where it's cold (the tundra outside summer). A tundra colony,
+// short of leather for its first winters, froze in tunics; the founders bring tunics for the summer too.
+export const starterApparel = (cold = false): WornApparel => ({
+  item: itemId(cold ? 'parka' : 'tunic'),
+  quality: 6,
+  wear: 1,
+});
 
 // Clothes wear out with use, and fall apart in the end.
 export function wearApparel(sim: Simulation, c: Colonist, hours: number): void {

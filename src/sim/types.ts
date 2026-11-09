@@ -56,6 +56,9 @@ export interface Job {
   listening?: boolean;
   // At a gathering (party, festival, wedding, funeral) centred on `target`.
   gathering?: boolean;
+  // An elder telling stories by the fire at `target`, or someone listening to them.
+  telling?: boolean;
+  hearing?: boolean;
 }
 
 export interface Skills {
@@ -583,6 +586,8 @@ export interface Stats {
   artSold?: number;
   // Concerts given, and the gatherings held.
   concerts?: number;
+  // Evenings an elder told the old stories by the fire.
+  storyNights?: number;
   parties?: number;
   feasts?: number;
   weddings?: number;
