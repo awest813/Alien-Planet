@@ -170,6 +170,8 @@ describe('envoys and alliances', () => {
     const { sim } = colony(6);
     sim.goodwill[HILLS] = 60;
     sim.tick = DAY * 20;
+    // (Fair weather: in the rain an envoy waits under whatever shelter there is, wherever that is.)
+    sim.weather = { kind: 'clear', until: Number.MAX_SAFE_INTEGER };
     sim.diplomacy.nextDisputeDay = 1000;
     sim.diplomacy.nextEnvoyDay = 0;
     hours(sim, 24 * 2, () => !!sim.diplomacy.envoy);

@@ -3,7 +3,7 @@ import { NONE, featureId } from './defs';
 import { damage, updateExposure } from './health';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
-import { HOUR, clearAround, run } from './test-helpers';
+import { HOUR, clearAround, outline, run } from './test-helpers';
 import { WeatherKind, ignite, isWet } from './weather';
 
 const forever = Number.MAX_SAFE_INTEGER;
@@ -186,5 +186,86 @@ describe('fire', () => {
     expect(copy.weather.kind).toBe('drought');
     expect(copy.burning.has(t)).toBe(true);
     expect(copy.world.fire[t]).toBeCloseTo(w.fire[t]);
+  });
+});
+
+describe('third audit: fire and weather', () => {
+  it("leaves torches and graves alone: one is a fire already, the other mustn't forget who lies there", () => {
+    const sim = Simulation.newColony(41);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 8);
+    const torch = w.idx(x + 3, y);
+    const grave = w.idx(x - 3, y);
+    w.setFeature(torch, featureId('torch'));
+    w.setFeature(grave, featureId('grave'));
+    expect(ignite(sim, torch)).toBe(false);
+    expect(ignite(sim, grave)).toBe(false);
+  });
+
+  it('rain puts out a burning door as it does a wall', () => {
+    const sim = Simulation.newColony(42);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    for (const i of outline(w, x + 2, y - 2, x + 6, y + 2)) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    const door = w.idx(x + 2, y);
+    w.setFeature(door, featureId('door'));
+    sim.weather = { kind: 'rain', until: forever };
+    for (const c of sim.colonists) {
+      c.priorities.hauling = 0;
+      c.priorities.construction = 0;
+    }
+    expect(ignite(sim, door)).toBe(true);
+    run(sim, HOUR * 1.4);
+    expect(w.feature[door]).toBe(featureId('door'));
+    expect(w.fire[door]).toBe(0);
+  });
+
+  it("doesn't start snow on a mild day", () => {
+    let warmSnow = 0;
+    for (const seed of [1, 2, 3]) {
+      const sim = Simulation.newColony(seed);
+      for (let h = 0; h < 24 * 40; h++) {
+        const before = sim.weather.kind;
+        run(sim, HOUR);
+        if (sim.weather.kind === 'snow' && before !== 'snow' && sim.outdoorTemperature() + 1 > 3) {
+          warmSnow++;
+        }
+      }
+    }
+    expect(warmSnow).toBe(0);
+  });
+
+  it('wakes a sleeper whose bed catches fire, whoever they are', () => {
+    const sim = Simulation.newColony(43);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    const bed = w.idx(x + 3, y);
+    w.setFeature(bed, featureId('bed'));
+    const c = sim.colonists[0];
+    c.age = 8;
+    c.tile = bed;
+    c.needs.rest = 0.2;
+    sim.tick = (22 - 7) * HOUR;
+    sim.syncClock();
+    run(sim, 30);
+    expect(ignite(sim, bed)).toBe(true);
+    run(sim, HOUR / 2);
+    expect(c.tile).not.toBe(bed);
+  });
+
+  it('keeps the warmth beside a hearth in summer to a little over what a heater keeps a room', () => {
+    const sim = Simulation.newColony(44, 'standard', 64, { biome: 'desert' });
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    const fire = w.idx(x + 3, y);
+    w.setFeature(fire, featureId('campfire'));
+    w.fuel[fire] = 20;
+    sim.tick = 8 * 24 * HOUR + 7 * HOUR;
+    sim.syncClock();
+    const beside = w.idx(x + 4, y);
+    const t = sim.temperatureAt(beside);
+    expect(t).toBeLessThanOrEqual(Math.max(27, sim.temperatureAt(w.idx(x - 6, y)) + 0.01));
   });
 });

@@ -85,9 +85,13 @@ export function updateWeather(sim: Simulation): void {
   if (kind === 'storm' && sim.day <= 1) {
     kind = 'rain';
   }
-  // Below freezing, rain and storms come down as snow.
-  if ((kind === 'rain' || kind === 'storm') && sim.outdoorTemperature() - weatherDef(sim).temp < 0) {
+  // Below freezing, rain and storms come down as snow; and well above it, snow comes down as rain (snow chosen on
+  // a mild winter's day thawed and cleared within the hour).
+  const base = sim.outdoorTemperature() - weatherDef(sim).temp;
+  if ((kind === 'rain' || kind === 'storm') && base < 0) {
     kind = 'snow';
+  } else if (kind === 'snow' && base > 2) {
+    kind = 'rain';
   }
   const [lo, hi] = WEATHER[kind].hours;
   const changed = kind !== weather.kind;
@@ -130,10 +134,11 @@ export function burnTime(sim: Simulation, tile: number): number {
   if (def.key === 'berryBush' || def.crop) {
     return 0.6;
   }
-  // Wooden buildings burn; stone, metal and anything that's itself a fire don't. Bridges are
+  // Wooden buildings burn; stone, metal and anything that's itself a fire (a torch too) don't. Bridges are
   // left out so a fire never strands anyone in deep water.
+  // (Torches burn by design, and a grave doesn't: burned out and rebuilt, it forgot who lay there.)
   const wooden = def.build?.cost.some((c) => c.item === itemId('wood'));
-  return wooden && !def.bridge && def.heater === 0 && !def.power ? 1.5 : 0;
+  return wooden && !def.bridge && def.heater === 0 && !def.burns && !def.power && def.key !== 'grave' ? 1.5 : 0;
 }
 
 // Sets a tile alight. Returns whether it caught.
@@ -168,7 +173,9 @@ export function updateFires(sim: Simulation, hours: number): void {
       putOut(sim, tile);
       continue;
     }
-    const raining = isWet(sim, tile);
+    // Rain falls on the burning thing itself: a door counts as dry for whoever stands in the doorway, but not
+    // for the door (a burning door in the rain burned down, leaving the room open).
+    const raining = weatherDef(sim).wet && w.roof[tile] === NONE && !sim.isIndoors(tile);
     if (raining && sim.rng.next() < RAIN_DOUSE * hours) {
       putOut(sim, tile);
       continue;
