@@ -304,3 +304,52 @@ describe('controls and settings', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('second audit: the interface', () => {
+  const toast = () => controller.getState().toast;
+
+  it('stands everyone down with Q even while one of them is in a mental break', () => {
+    controller.newColony('draft');
+    const sim = controller.sim;
+    const [broken, ...rest] = sim.colonists;
+    sim.startBreak(broken, 'daze', 4);
+    controller.toggleDraftAll();
+    expect(rest.every((c) => c.drafted)).toBe(true);
+    controller.toggleDraftAll();
+    expect(rest.some((c) => c.drafted)).toBe(false);
+  });
+
+  it('says on the spot why a dealing with the wider world was refused', () => {
+    controller.newColony('away');
+    const sim = controller.sim;
+    sim.diplomacy.silver = 1000;
+    controller.command({
+      type: 'world',
+      action: { kind: 'expedition', to: 0, purpose: 'salvage', colonists: sim.colonists.map((c) => c.id) },
+    });
+    expect(toast()).toBeTruthy();
+    expect(sim.colonists.some((c) => c.away)).toBe(false);
+  });
+
+  it("judges the leader's spirits by the bar the colony does, which rises over the years", () => {
+    controller.newColony('leader');
+    const sim = controller.sim;
+    sim.village.leader = 0;
+    sim.colonists[0].mood = 50;
+    sim.tick = 6 * 24 * 24 * HOUR;
+    sim.syncClock();
+    controller.publish();
+    expect(controller.getState().village.leader?.spirits).toBe('fair');
+  });
+
+  it('shows Draft all while maddened animals hunt the colony, not only in a raid', () => {
+    controller.newColony('pack');
+    const sim = controller.sim;
+    expect(controller.getState().animalsAttacking).toBe(false);
+    const a = sim.animals[0];
+    a.manhunter = true;
+    a.revengeOn = sim.colonists[0].id;
+    controller.publish();
+    expect(controller.getState().animalsAttacking).toBe(true);
+  });
+});

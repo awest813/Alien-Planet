@@ -43,7 +43,7 @@ import { LEGEND } from '../sim/minds';
 import { PART_LABELS, SCAR_LABELS, isInfected, scarsOf } from '../sim/body';
 import { AILMENTS, ailmentsOf } from '../sim/ageing';
 import { MAX_PEN, penMap } from '../sim/pens';
-import { Hours, Hunting, Rations, tally } from '../sim/village';
+import { GOOD_LEADER_MOOD, Hours, Hunting, POOR_LEADER_MOOD, Rations, leaderBar, tally } from '../sim/village';
 import {
   applyTrade,
   colonyStock,
@@ -1015,7 +1015,9 @@ export interface UiState {
   festivals: boolean;
   // The colony's leader (null: none yet), when they were chosen, how a vote would go now, and the policies.
   village: {
-    leader: { id: number; name: string; mood: number } | null;
+    // `spirits`: how the colony takes the leader's mood (by the same bar as the well- and poorly-led thoughts,
+    // which rises over the years).
+    leader: { id: number; name: string; mood: number; spirits: 'good' | 'poor' | 'fair' } | null;
     electedOn: number;
     standings: { name: string; votes: number }[];
     rations: Rations;
@@ -1024,6 +1026,9 @@ export interface UiState {
     hunting: Hunting;
   };
   raid: RaidView | null;
+  // Maddened animals (a pack, cave crawlers, the great beast) hunting colonists: a fight too, for the
+  // "Draft all" button.
+  animalsAttacking: boolean;
   hover: TileView | null;
   hoverColonist: number | null;
   selectedTile: TileView | null;
@@ -1387,7 +1392,17 @@ export class GameController {
       said &&
       said !== before &&
       this.sim.storyCount === stories &&
-      (cmd.type === 'gift' || cmd.type === 'tribute' || cmd.type === 'fulfilRequest' || cmd.type === 'hireFighters')
+      [
+        'gift',
+        'tribute',
+        'fulfilRequest',
+        'hireFighters',
+        // Expeditions, ransoms, truces, loans and the rest, and what's done with a prisoner: a refusal ("someone
+        // has to stay and mind the colony") would otherwise go to the log behind the open screen.
+        'world',
+        'release',
+        'execute',
+      ].includes(cmd.type)
     ) {
       this.notify(said.text);
       return;
@@ -1447,7 +1462,9 @@ export class GameController {
 
   // Drafts every able colonist, or stands everyone down if they're all drafted already.
   public toggleDraftAll(): void {
-    const able = this.sim.living().filter((c) => !c.health.downed && c.age >= DRAFT_AGE);
+    // (Not anyone in a mental break: the colony can't draft them, and counting them would keep this drafting
+    // everyone again rather than standing them down.)
+    const able = this.sim.living().filter((c) => !c.health.downed && c.age >= DRAFT_AGE && !this.sim.inMentalBreak(c));
     const draft = able.some((c) => !c.drafted);
     // Done what the "press Q" toast asked: it can go.
     if (draft && this.toast?.includes('Press Q')) {
@@ -1976,6 +1993,7 @@ export class GameController {
       story: [...sim.storyLog].reverse(),
       festivals: sim.story.festivals !== false,
       village: this.villageView(),
+      animalsAttacking: sim.animals.some((a) => a.manhunter && a.hp > 0 && a.revengeOn >= 0),
       raid:
         sim.enemies.length > 0
           ? { faction: FACTIONS[sim.enemies[0].faction].name, remaining: sim.enemies.filter((e) => !e.fleeing).length }
@@ -2236,7 +2254,9 @@ export class GameController {
       .buildingTiles()
       .filter((i) => featureDef(w.feature[i]).burns && !featureDef(w.feature[i]).workbench && w.fuel[i] > 0);
     const perDay = burning.reduce((sum, i) => sum + featureDef(w.feature[i]).burns!.perDay, 0);
+    let woodLow = -1;
     if (cold.length === 0 && perDay > 0 && this.availableStock(itemId('wood')) < perDay * 3) {
+      woodLow = alerts.length;
       alerts.push({
         text: `Wood is running low: the fires burn about ${Math.round(perDay)} a day. Chop trees (C)`,
         tone: sim.season === 'Winter' || daysUntilWinter(sim.totalHours) < 4 ? 'danger' : 'warn',
@@ -2274,6 +2294,10 @@ export class GameController {
     if (burn > 0 && winterNear && wood < burn * 4) {
       const trees = sim.countFeature((f) => featureDef(f).key === 'tree');
       const days = Math.floor(wood / burn);
+      // This says it better than "wood is running low": not both.
+      if (woodLow >= 0) {
+        alerts.splice(woodLow, 1);
+      }
       alerts.push({
         text: `Firewood running low: ${wood} wood, ${days < 1 ? 'under a day' : `about ${days} day${days > 1 ? 's' : ''}`} of fires. ${trees < 20 ? 'Few trees are left: grow poplars (Zones)' : 'Chop trees (C)'}`,
         tone: days < 2 ? 'danger' : 'warn',
@@ -2792,7 +2816,19 @@ export class GameController {
     const leader = sim.colonists[v.leader];
     return {
       leader:
-        leader && !leader.health.dead ? { id: leader.id, name: leader.name, mood: Math.round(leader.mood) } : null,
+        leader && !leader.health.dead
+          ? {
+              id: leader.id,
+              name: leader.name,
+              mood: Math.round(leader.mood),
+              spirits:
+                leader.mood >= GOOD_LEADER_MOOD + leaderBar(sim)
+                  ? 'good'
+                  : leader.mood < POOR_LEADER_MOOD + leaderBar(sim)
+                    ? 'poor'
+                    : 'fair',
+            }
+          : null,
       electedOn: v.electedOn,
       standings: [...tally(sim).entries()]
         .map(([id, votes]) => ({ name: sim.colonists[id].name, votes }))

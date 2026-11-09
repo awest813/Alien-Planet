@@ -4,7 +4,7 @@ import { ChronicleYear, UiState, controller } from '../game/controller';
 import { ChronicleKind } from '../sim/chronicle';
 import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey, WorldAction } from '../sim/types';
 import { Bar, SLOT_LABELS, WORK_LABELS, moodColor } from './common';
-import { ADULT, TEEN, TEEN_WORK } from '../sim/lifespans';
+import { ADULT, DRAFT_AGE, RETIRED_WORK, TEEN, TEEN_WORK } from '../sim/lifespans';
 import { Hours, Hunting, POLICY_TEXT, Rations } from '../sim/village';
 
 // Full-screen dialogs opened from the top bar.
@@ -221,15 +221,18 @@ export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => 
                     const set = (next: number) =>
                       controller.command({ type: 'priority', colonist: c.id, work, value: next });
                     const stars = skill?.passion ? '★'.repeat(skill.passion) : '';
-                    // Children don't work, and teens only do light work.
-                    if (c.age < ADULT && (c.age < TEEN || !TEEN_WORK.includes(work))) {
+                    // Children don't work, teens only do light work, and the retired only what they please.
+                    const young = c.age < ADULT && (c.age < TEEN || !TEEN_WORK.includes(work));
+                    if (young || (c.retired && !RETIRED_WORK.includes(work))) {
                       return (
                         <td key={work}>
                           <span
                             className="priority too-young"
                             role="img"
-                            aria-label={`${c.name}, ${WORK_LABELS[work]}: too young`}
-                            title={`${c.name} is too young for this work`}
+                            aria-label={`${c.name}, ${WORK_LABELS[work]}: ${young ? 'too young' : 'retired'}`}
+                            title={
+                              young ? `${c.name} is too young for this work` : `${c.name} has retired from this work`
+                            }
                           >
                             ·
                           </span>
@@ -935,8 +938,16 @@ function Expeditions({ state }: { state: UiState }) {
   const target = d.destinations[Math.min(dest, d.destinations.length - 1)];
   const party = chosen.filter((id) => d.travellers.some((t) => t.id === id && t.why === null));
   const cost = party.length > 0 ? d.supplies[target.purpose][party.length - 1] : 0;
+  // (Counting only those still able to go: someone ticked who then fell ill mustn't hold a place.)
   const toggle = (id: number) =>
-    setChosen((now) => (now.includes(id) ? now.filter((x) => x !== id) : now.length < 3 ? [...now, id] : now));
+    setChosen((now) => {
+      const able = now.filter((x) => d.travellers.some((t) => t.id === x && t.why === null));
+      return able.includes(id) ? able.filter((x) => x !== id) : able.length < 3 ? [...able, id] : able;
+    });
+  // Somebody grown has to mind the colony (as the colony insists).
+  const staying = state.colonists.filter(
+    (c) => !c.dead && c.status !== 'Away' && c.status !== 'Downed' && c.age >= DRAFT_AGE && !party.includes(c.id),
+  ).length;
   return (
     <>
       <h3>Expeditions</h3>
@@ -976,7 +987,8 @@ function Expeditions({ state }: { state: UiState }) {
       </div>
       <div className="row">
         <button
-          disabled={party.length === 0 || !target.open || d.silver < cost}
+          disabled={party.length === 0 || !target.open || d.silver < cost || staying === 0}
+          title={staying === 0 && party.length > 0 ? 'Someone has to stay and mind the colony' : undefined}
           onClick={() => {
             controller.command({
               type: 'world',
@@ -1009,9 +1021,9 @@ export function VillageScreen({ state, onClose }: { state: UiState; onClose: () 
         <p>
           <b>{v.leader.name}</b>, chosen on day {v.electedOn}.{' '}
           <span className="muted">
-            {v.leader.mood >= 45
+            {v.leader.spirits === 'good'
               ? 'In good spirits: everyone feels in good hands.'
-              : v.leader.mood < 25
+              : v.leader.spirits === 'poor'
                 ? 'Struggling, and it shows: the colony feels it too.'
                 : 'Holding up.'}
           </span>

@@ -50,7 +50,7 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
   const p = state.power;
   const net = p.supply - p.demand;
   const anyFree = state.colonists.some(
-    (c) => !c.dead && c.status !== 'Downed' && c.status !== 'Away' && !c.drafted && c.age >= DRAFT_AGE,
+    (c) => !c.dead && c.status !== 'Downed' && c.status !== 'Away' && !c.drafted && !c.inBreak && c.age >= DRAFT_AGE,
   );
   return (
     <header className="panel topbar">
@@ -116,7 +116,7 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
         )}
       </div>
       <nav className="screens">
-        {state.raid && (
+        {(state.raid || state.animalsAttacking) && (
           <button
             className="danger"
             onClick={() => controller.toggleDraftAll()}
@@ -340,12 +340,14 @@ function ColonistCard({ c }: { c: ColonistView }) {
         {!c.dead && c.status !== 'Downed' && c.status !== 'Away' && (
           <button
             className={c.drafted ? 'active danger' : ''}
-            disabled={c.age < DRAFT_AGE}
+            disabled={c.age < DRAFT_AGE || (c.inBreak && !c.drafted)}
             onClick={() => controller.toggleDraft(c.id)}
             title={
               c.age < DRAFT_AGE
                 ? `${c.name} is too young to fight`
-                : `Draft for combat (Q). ${TOUCH ? 'Tap' : 'Right-click'} the map to move.`
+                : c.inBreak && !c.drafted
+                  ? `${c.name} is in no state to fight until the break passes`
+                  : `Draft for combat (Q). ${TOUCH ? 'Tap' : 'Right-click'} the map to move.`
             }
           >
             {c.drafted ? 'Drafted' : 'Draft'}
