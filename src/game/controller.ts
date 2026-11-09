@@ -16,6 +16,7 @@ import {
   featureId,
   itemDef,
   quantity,
+  matchesIngredient,
   itemId,
   researchDef,
   terrainDef,
@@ -172,6 +173,52 @@ const build = (key: string, label: string, hotkey: string, group: ToolDef['group
     group,
     hint: cost ? `${hint} · costs ${cost}` : hint,
   };
+};
+
+// How the colony stands with a faction, in a word.
+function relationOf(sim: Simulation, faction: number): string {
+  const f = FACTIONS[faction];
+  return f.hostile && truceDays(sim, f.id) > 0
+    ? 'Truce'
+    : f.hostile && atPeace(sim, f.id)
+      ? 'Paid off'
+      : alliance(sim)?.faction === f.id
+        ? 'Allied'
+        : standingLabel(goodwillOf(sim, f.id), f.hostile);
+}
+
+// Once a goal's research is done, its help moves on to the building or the making (it went on sending players to
+// Research for a project they already had).
+const AFTER_RESEARCH: Record<
+  string,
+  { research: string; how: string; tool?: string; screen?: ObjectiveView['screen'] }
+> = {
+  hearth: {
+    research: 'hearths',
+    how: 'Hearths are researched: build a stone hearth in your bedrooms.',
+    tool: 'hearth',
+  },
+  bow: {
+    research: 'archery',
+    how: 'Archery is researched: crafters make recurve bows at the crafting bench. Set a target in Production.',
+    screen: 'production',
+  },
+  sandbags: {
+    research: 'fortifications',
+    how: 'Fortifications are researched: build sandbags where you will fight.',
+    tool: 'sandbags',
+  },
+  power: { research: 'electricity', how: 'Electricity is researched: build a wood generator.', tool: 'woodGenerator' },
+  coldStore: {
+    research: 'refrigeration',
+    how: 'Refrigeration is researched: build an icebox, or a freezer in a sealed room.',
+    tool: 'icebox',
+  },
+  parkas: {
+    research: 'tailoring',
+    how: 'Tailoring is researched: crafters make parkas from leather. Set a target in Production.',
+    screen: 'production',
+  },
 };
 
 // For each goal: how to get it done, plus the tool to pick or the screen to open.
@@ -802,6 +849,8 @@ export interface BillView {
   // Skill a colonist needs to work it, e.g. "Cooking 6".
   minSkill: string | null;
   step: number;
+  // What the colony hasn't enough of for another batch, e.g. "leather (1 of 6)" (null: it has what it needs).
+  short: string | null;
 }
 
 export interface TradeLine {
@@ -1030,6 +1079,8 @@ export interface UiState {
     // which rises over the years).
     leader: { id: number; name: string; mood: number; spirits: 'good' | 'poor' | 'fair' } | null;
     electedOn: number;
+    // When the present leader was first chosen (older saves: the last vote).
+    leaderSince: number;
     standings: { name: string; votes: number }[];
     rations: Rations;
     hours: Hours;
@@ -1686,7 +1737,8 @@ export class GameController {
     return {
       open: tradeOpen(sim),
       faction: FACTIONS[caravan.faction].name,
-      relation: standingLabel(goodwill, false),
+      // (As the Factions screen has it: an ally is "Allied", not just "Neutral" by goodwill.)
+      relation: relationOf(sim, caravan.faction),
       goodwill,
       leavesIn: Math.max(0, Math.ceil((caravan.leaveAt - sim.tick) / TICKS_PER_HOUR)),
       silver: stock.get(silver) ?? 0,
@@ -1822,6 +1874,30 @@ export class GameController {
       this.publish();
     } catch (error) {
       console.error(error);
+    }
+  }
+
+  // A message from the interface itself (why a button is off, on a touch screen).
+  public hint(text: string): void {
+    this.notify(text);
+  }
+
+  // From the Prisoners screen: mark a raider lying wounded for capture (as the Capture tool dragged over them
+  // does), or look at them. (The screen listed them with no way to act but to find them on the map.)
+  public captureCaptive(id: number): void {
+    const p = this.sim.captives.find((o) => o.id === id);
+    if (p) {
+      const x = this.sim.world.xOf(p.tile);
+      const y = this.sim.world.yOf(p.tile);
+      this.command({ type: 'capture', rect: { x0: x, y0: y, x1: x, y1: y }, add: true });
+    }
+  }
+
+  public showCaptive(id: number): void {
+    const p = this.sim.captives.find((o) => o.id === id);
+    if (p) {
+      this.focusRequest = p.tile;
+      this.selectTile(p.tile);
     }
   }
 
@@ -2013,6 +2089,15 @@ export class GameController {
               : null,
           // Single items (bows) step by one; stackable goods by five.
           step: product.stackLimit === 1 ? 1 : 5,
+          // (A bill that stalls for want of materials used to say nothing at all.)
+          short: recipe.mend
+            ? null
+            : (recipe.ingredients
+                .map((ing) => {
+                  const have = totals.reduce((n, t) => n + (matchesIngredient(t.item, ing) ? t.total : 0), 0);
+                  return have < ing.count ? `${ingredientName(ing)} (${have} of ${ing.count})` : null;
+                })
+                .find((x) => x) ?? null),
         };
       }),
       alerts: this.alertsFor(totals),
@@ -2061,14 +2146,7 @@ export class GameController {
         id: f.id,
         name: f.name,
         description: f.description,
-        relation:
-          f.hostile && truceDays(sim, f.id) > 0
-            ? 'Truce'
-            : f.hostile && atPeace(sim, f.id)
-              ? 'Paid off'
-              : alliance(sim)?.faction === f.id
-                ? 'Allied'
-                : standingLabel(goodwillOf(sim, f.id), f.hostile),
+        relation: relationOf(sim, f.id),
         hostile: f.hostile,
         goodwill: goodwillOf(sim, f.id),
         giftGains: f.hostile ? [] : GIFT_SIZES.map((s) => giftGoodwill(sim, f.id, s)),
@@ -2180,7 +2258,12 @@ export class GameController {
           ? `${raid.musterUntil !== undefined ? ', gathering at the edge' : ', on their way'}: here ${inAbout(raid.contactAt - sim.tick)}`
           : '';
       alerts.push({
-        text: `Raid: ${raiders} raider${raiders > 1 ? 's' : ''} from ${FACTIONS[sim.enemies[0].faction].name}${coming}. Draft with Q.`,
+        // (Once everyone who can fight is drafted, it stops telling the player to draft them.)
+        text: `Raid: ${raiders} raider${raiders > 1 ? 's' : ''} from ${FACTIONS[sim.enemies[0].faction].name}${coming}. ${
+          sim.living().some((c) => !c.drafted && !c.health.downed && c.age >= DRAFT_AGE && !sim.inMentalBreak(c))
+            ? 'Draft with Q.'
+            : 'Everyone who can fight is drafted.'
+        }`,
         tone: 'danger',
         tile: sim.enemies.find((e) => !e.fleeing)?.tile,
       });
@@ -2298,6 +2381,35 @@ export class GameController {
             : `${cold.length} fire${cold.length > 1 ? 's have' : ' has'} gone out: colonists with Haul work bring wood`,
         tone: sim.season === 'Winter' || sim.outdoorTemperature() < 5 ? 'danger' : 'warn',
         tile: cold[0],
+      });
+    }
+    // A quarrel, an envoy or an ally's call for help waits on an answer from the Factions screen, and costs
+    // goodwill (or the alliance) if it goes unanswered: an alert for as long as it's open, not only a passing card.
+    const dueIn = (until: number) => {
+      const hours = Math.max(0, Math.ceil((until - sim.tick) / TICKS_PER_HOUR));
+      return { hours, left: hours > 24 ? `${Math.ceil(hours / 24)} days` : `${hours}h` };
+    };
+    const { dispute, envoy, call } = sim.diplomacy;
+    if (call) {
+      const { hours, left } = dueIn(call.until);
+      alerts.push({
+        text: `${FACTIONS[call.faction].name}, your allies, ask for help (${left} left): lend a colonist or send ${quantity(call.item, call.count)}, from Factions`,
+        tone: hours <= 24 ? 'danger' : 'warn',
+      });
+    }
+    if (dispute) {
+      const { hours, left } = dueIn(dispute.until);
+      alerts.push({
+        text: `${FACTIONS[dispute.a].name} and ${FACTIONS[dispute.b].name} are quarrelling and want your backing (${left} left): answer from Factions`,
+        tone: hours <= 24 ? 'warn' : 'calm',
+      });
+    }
+    if (envoy) {
+      const { hours, left } = dueIn(envoy.until);
+      alerts.push({
+        text: `An envoy from ${FACTIONS[envoy.faction].name} waits for an answer (${left} left): see Factions`,
+        tone: hours <= 24 ? 'warn' : 'calm',
+        tile: envoy.visitor?.tile,
       });
     }
     const request = sim.diplomacy.request;
@@ -2694,6 +2806,10 @@ export class GameController {
     if (this.sim.objectivesDone[id]) {
       return help;
     }
+    const after = AFTER_RESEARCH[id];
+    if (after && this.sim.isResearched(after.research)) {
+      return { how: after.how, tool: after.tool, screen: after.screen };
+    }
     // With a stove up, what holds meals back is raw food, not the stove the help kept asking for.
     if (id === 'meals' && this.sim.countBuilt((f) => featureDef(f).key === 'stove') > 0) {
       return {
@@ -2894,6 +3010,7 @@ export class GameController {
             }
           : null,
       electedOn: v.electedOn,
+      leaderSince: v.leaderSince ?? v.electedOn,
       standings: [...tally(sim).entries()]
         .map(([id, votes]) => ({ name: sim.colonists[id].name, votes }))
         .sort((a, b) => b.votes - a.votes),

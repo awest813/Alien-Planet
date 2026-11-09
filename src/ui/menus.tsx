@@ -13,7 +13,9 @@ function priceLabel(line: TradeLine): string {
   const prices = line.lots?.filter((l) => l.count > 0).map((l) => l.price) ?? [line.price];
   const lo = Math.min(...prices);
   const hi = Math.max(...prices);
-  return hi - lo < 0.05 ? lo.toFixed(1) : `${lo.toFixed(1)}–${hi.toFixed(1)} (worst first)`;
+  // (Cheap goods to two places: hay showed as "0.0 silver each".)
+  const fmt = (p: number) => (p < 0.1 ? p.toFixed(2) : p.toFixed(1));
+  return hi - lo < 0.05 ? fmt(lo) : `${fmt(lo)}–${fmt(hi)} (worst first)`;
 }
 import { ConfirmButton, Modal } from './screens';
 import { arrowKeys } from './common';
@@ -43,7 +45,17 @@ const saveDetails = (meta: SaveMeta) =>
 
 // Difficulty, map size and seed for a new colony.
 // `confirm`: what the start button asks first (nothing to lose: none).
-function NewColonyForm({ confirm, onStarted }: { confirm: string | null; onStarted: () => void }) {
+// `onBack`: a Back button beside Start (on a phone's title screen the Start row stays in view at the bottom, and a
+// Back below the form was under it, out of reach).
+function NewColonyForm({
+  confirm,
+  onStarted,
+  onBack,
+}: {
+  confirm: string | null;
+  onStarted: () => void;
+  onBack?: () => void;
+}) {
   const [seed, setSeed] = useState('');
   // Start from whatever the player chose last time.
   const last = controller.settings;
@@ -120,6 +132,7 @@ function NewColonyForm({ confirm, onStarted }: { confirm: string | null; onStart
       </div>
       <p className="choice-note">{MAP_KINDS.find((m) => m.key === mapKind)?.description}</p>
       <div className="row start-row">
+        {onBack && <button onClick={onBack}>Back</button>}
         <input
           placeholder="Seed (optional)"
           aria-label="Seed"
@@ -266,10 +279,8 @@ export function TitleScreen({ state, actions }: { state: UiState; actions: MenuA
                   : null
               }
               onStarted={actions.onPlay}
+              onBack={() => setView('main')}
             />
-            <div className="row end">
-              <button onClick={() => setView('main')}>Back</button>
-            </div>
           </>
         )}
         {view === 'load' && (
@@ -713,35 +724,50 @@ export function TradeScreen({ state, onClose }: { state: UiState; onClose: () =>
       );
     }
     return (
-      <table className="saves trade">
-        <tbody>
-          {list.map((line) => (
-            <tr key={line.item}>
-              <td>
-                {line.name}
-                <div className="muted small">
-                  {line.count} · {priceLabel(line)} silver each
-                </div>
-              </td>
-              <td className="qty">
-                <button aria-label={`Ten fewer ${line.name}`} onClick={() => change(line.item, line.count, -10)}>
-                  −10
-                </button>
-                <button aria-label={`One fewer ${line.name}`} onClick={() => change(line.item, line.count, -1)}>
-                  −
-                </button>
-                <span className="num">{picked[line.item] ?? 0}</span>
-                <button aria-label={`One more ${line.name}`} onClick={() => change(line.item, line.count, 1)}>
-                  +
-                </button>
-                <button aria-label={`Ten more ${line.name}`} onClick={() => change(line.item, line.count, 10)}>
-                  +10
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <>
+        {side === 'sell' && (
+          <p className="muted small">Only what's in your stockpiles can be sold: haul goods in first.</p>
+        )}
+        <table className="saves trade">
+          <tbody>
+            {list.map((line) => (
+              <tr key={line.item}>
+                <td>
+                  {line.name}
+                  <div className="muted small">
+                    {line.count} · {priceLabel(line)} silver each
+                  </div>
+                </td>
+                <td className="qty">
+                  <button aria-label={`Ten fewer ${line.name}`} onClick={() => change(line.item, line.count, -10)}>
+                    −10
+                  </button>
+                  <button aria-label={`One fewer ${line.name}`} onClick={() => change(line.item, line.count, -1)}>
+                    −
+                  </button>
+                  <span className="num">{picked[line.item] ?? 0}</span>
+                  <button aria-label={`One more ${line.name}`} onClick={() => change(line.item, line.count, 1)}>
+                    +
+                  </button>
+                  <button aria-label={`Ten more ${line.name}`} onClick={() => change(line.item, line.count, 10)}>
+                    +10
+                  </button>
+                  {/* All of it at once (a hundred potatoes took ten presses); again, none. */}
+                  <button
+                    aria-label={`All ${line.count} ${line.name}`}
+                    title={`All ${line.count}`}
+                    onClick={() =>
+                      set({ ...picked, [line.item]: (picked[line.item] ?? 0) >= line.count ? 0 : line.count })
+                    }
+                  >
+                    {(picked[line.item] ?? 0) >= line.count ? 'None' : 'All'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </>
     );
   };
   const toList = (picked: Record<number, number>) =>
@@ -749,7 +775,33 @@ export function TradeScreen({ state, onClose }: { state: UiState; onClose: () =>
       .map(([item, n]) => [Number(item), n] as [number, number])
       .filter(([, n]) => n > 0);
   return (
-    <Modal title={`Trade with ${trade.faction}`} onClose={onClose} wide>
+    <Modal
+      title={`Trade with ${trade.faction}`}
+      onClose={onClose}
+      wide
+      // The running balance and the deal stay in view at the bottom while the lists scroll (on a phone they were at
+      // the end of a long page).
+      footer={
+        <>
+          <span>
+            {balance > 0 ? `You pay ${balance} silver` : balance < 0 ? `You receive ${-balance} silver` : 'Even trade'}
+          </span>
+          {problem && <span className="tag warn">{problem}</span>}
+          <button
+            className="primary"
+            disabled={!!problem || (cost === 0 && income === 0)}
+            onClick={() => {
+              if (controller.trade(toList(buy), toList(sell))) {
+                setBuy({});
+                setSell({});
+              }
+            }}
+          >
+            Make the deal
+          </button>
+        </>
+      }
+    >
       <p className="muted">
         {trade.relation} (goodwill {trade.goodwill}) · leaving in {trade.leavesIn}h · your silver {trade.silver} · their
         silver {trade.traderSilver}. Better goodwill means better prices; trading builds it.
@@ -763,24 +815,6 @@ export function TradeScreen({ state, onClose }: { state: UiState; onClose: () =>
           <h3>Sell from your stockpiles</h3>
           {lines('sell')}
         </div>
-      </div>
-      <div className="row">
-        <span>
-          {balance > 0 ? `You pay ${balance} silver` : balance < 0 ? `You receive ${-balance} silver` : 'Even trade'}
-        </span>
-        {problem && <span className="tag warn">{problem}</span>}
-        <button
-          className="primary"
-          disabled={!!problem || (cost === 0 && income === 0)}
-          onClick={() => {
-            if (controller.trade(toList(buy), toList(sell))) {
-              setBuy({});
-              setSell({});
-            }
-          }}
-        >
-          Make the deal
-        </button>
       </div>
       {trade.art.length > 0 && <ArtForSale trade={trade} />}
     </Modal>

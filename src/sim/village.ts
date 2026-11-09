@@ -16,8 +16,9 @@ export type Hunting = 'all' | 'surplus';
 export interface Village {
   // The leader's colonist id (-1: none).
   leader: number;
-  // When the last vote was held.
+  // When the last vote was held, and when the present leader was first chosen (older saves: unknown).
   electedOn: number;
+  leaderSince?: number;
   rations: Rations;
   hours: Hours;
   // One day in six, nobody works.
@@ -121,6 +122,10 @@ export function elect(sim: Simulation): Colonist | null {
   const again = v.leader === winner.c.id;
   v.leader = winner.c.id;
   v.electedOn = sim.day;
+  // (Re-elected, they've led since they were first chosen; an older save never noted it, so from now.)
+  if (!again || v.leaderSince === undefined) {
+    v.leaderSince = sim.day;
+  }
   sim.stats.elections = (sim.stats.elections ?? 0) + 1;
   if (!again) {
     sim.addThought(winner.c, 'chosenLeader');

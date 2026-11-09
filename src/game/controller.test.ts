@@ -393,3 +393,51 @@ describe('fourth audit: a newcomer playing', () => {
     expect(d.silver + d.looseSilver).toBe(sim.stockOf(itemId('silver')));
   });
 });
+
+describe('mid-game: what the screens say', () => {
+  it("alerts an ally's call for help and a quarrel, and lights Factions, while they wait on an answer", () => {
+    const { sim } = colony('calls');
+    const friend = FACTIONS.findIndex((f) => !f.hostile);
+    const other = FACTIONS.findIndex((f, i) => i !== friend);
+    sim.diplomacy.call = { faction: friend, until: sim.tick + 30 * HOUR, item: itemId('wood'), count: 40 };
+    sim.diplomacy.dispute = { a: friend, b: other, about: 'grazing', until: sim.tick + 40 * HOUR };
+    const said = texts();
+    expect(said.some((t) => t.includes('ask for help') && t.includes('left'))).toBe(true);
+    expect(said.some((t) => t.includes('quarrelling'))).toBe(true);
+  });
+
+  it('moves goal help on once its research is done', () => {
+    const { sim } = colony('research');
+    controller.publish();
+    const power = () => controller.getState().objectives.find((o) => o.id === 'power')!;
+    expect(power().screen).toBe('research');
+    sim.research.done.push('electricity');
+    controller.publish();
+    expect(power().tool).toBe('woodGenerator');
+    expect(power().how).toMatch(/researched/);
+  });
+
+  it('says what a production bill is short of', () => {
+    const { sim } = colony('bills');
+    sim.research.done.push('tailoring');
+    controller.publish();
+    const view = controller.getState().bills.find((b) => /parka/i.test(b.name));
+    expect(view?.short).toMatch(/leather/i);
+  });
+
+  it('warns that raiders are already on colonists working by the edge they come from', () => {
+    const { sim } = colony('edge');
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    const w = sim.world;
+    // Everyone out by the west edge, where the raiders will come in.
+    for (const c of sim.colonists) {
+      c.tile = w.idx(2, w.yOf(c.tile));
+    }
+    const hostile = FACTIONS.findIndex((f) => f.hostile);
+    let tries = 0;
+    while (!spawnRaid(sim, hostile, 3) && tries++ < 3);
+    const raidLine = sim.log.map((l) => l.text).find((t) => t.startsWith('Raid!'))!;
+    const near = sim.enemies.some((e) => sim.colonists.some((c) => w.distance(c.tile, e.tile) <= 14));
+    expect(raidLine).toMatch(near ? /already on colonists/ : /will reach the colony/);
+  });
+});

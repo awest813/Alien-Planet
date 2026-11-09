@@ -1,3 +1,4 @@
+import { TOUCH } from './touch';
 import { useEffect, useRef, useState } from 'react';
 import { controller } from '../game/controller';
 import { helpSeen, markHelpSeen } from '../game/settings';
@@ -162,6 +163,24 @@ export function App() {
     };
     window.addEventListener('click', onClick);
     return () => window.removeEventListener('click', onClick);
+  }, []);
+
+  // On a touch screen there's no hovering to read why a button is off: a tap on one says it instead (from its
+  // tooltip). Found by position, since a disabled button gets no clicks of its own.
+  useEffect(() => {
+    if (!TOUCH) {
+      return;
+    }
+    const onUp = (e: PointerEvent) => {
+      const off = document
+        .elementsFromPoint(e.clientX, e.clientY)
+        .find((el): el is HTMLButtonElement => el instanceof HTMLButtonElement && el.disabled && !!el.title);
+      if (off) {
+        controller.hint(off.title);
+      }
+    };
+    window.addEventListener('pointerup', onUp, true);
+    return () => window.removeEventListener('pointerup', onUp, true);
   }, []);
 
   // Interface size: scale everything from the top-left corner and give it the room to fill.

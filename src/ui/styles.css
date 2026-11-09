@@ -211,7 +211,7 @@ input {
 
 kbd {
   margin-left: 6px;
-  font-size: 10px;
+  font-size: 11px;
   opacity: 0.55;
   font-family: inherit;
 }
@@ -337,6 +337,17 @@ kbd {
   white-space: nowrap;
 }
 
+/* The clock and the temperature keep their width as the day, season and weather change, so the speed buttons
+   after them stay put. */
+.clock {
+  min-width: 13.5em;
+}
+
+.temp {
+  min-width: 3.2em;
+  text-align: right;
+}
+
 .weather {
   font-size: 12px;
   padding: 1px 7px;
@@ -345,47 +356,48 @@ kbd {
   border: 1px solid var(--border);
 }
 
-/* On narrower desktops the top bar is crowded: the title goes and the weather shows as its icon
-   (its name stays in the tooltip), so the screen buttons keep to one row. */
-@media (max-width: 1500px) {
-  .topbar .title,
-  .weather-label,
-  .topbar .wide-only {
-    display: none;
-  }
-
-  .topbar {
-    column-gap: 10px;
-  }
-
-  .screens button {
-    padding-left: 7px;
-    padding-right: 7px;
-  }
+/* A crowded top bar steps down (TopBar measures it: the interface size makes the window's width a poor guide)
+   until its buttons keep to one row. First the title goes and the weather shows as its icon (its name stays
+   in the tooltip)... */
+.topbar.compact .title,
+.topbar.compact .weather-label,
+.topbar.compact .wide-only {
+  display: none;
 }
 
-/* Narrower still (a 1280 laptop): a little tighter all round, so the rain's icon or a third resource
-   (medicine, silver) doesn't push the screen buttons onto a second row in the middle of play. */
-@media (max-width: 1400px) {
-  .tb-time {
-    gap: 6px;
-  }
+.topbar.compact {
+  column-gap: 10px;
+}
 
-  .speeds button {
-    min-width: 28px;
-    padding-left: 4px;
-    padding-right: 4px;
-  }
+.topbar.compact .screens button {
+  padding-left: 7px;
+  padding-right: 7px;
+}
 
-  .screens button {
-    padding-left: 5px;
-    padding-right: 5px;
-  }
+/* ...then a little tighter all round, with food and three resources at most (the rest under "All items")... */
+.topbar.tight .tb-time {
+  gap: 6px;
+}
 
-  /* Food and three resources at most; the rest are under "All items". */
-  .tb-resources > span.res:nth-of-type(n + 5) {
-    display: none;
-  }
+.topbar.tight .speeds button {
+  min-width: 28px;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.topbar.tight .screens button {
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+.topbar.tight .tb-resources > span.res:nth-of-type(n + 5) {
+  display: none;
+}
+
+/* ...and at the last, two resources. (Narrower than that, the screen buttons take a second row: scrolled
+   sideways instead, the Menu went out of sight.) */
+.topbar.squeeze .tb-resources > span.res:nth-of-type(n + 4) {
+  display: none;
 }
 
 .speeds {
@@ -615,6 +627,7 @@ kbd {
 }
 
 .side .tabs {
+  flex-shrink: 0;
   margin-top: 0;
   align-items: center;
 }
@@ -640,10 +653,12 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* Expanded, a long list scrolls rather than pushing the next goal out of view. */
-  max-height: 220px;
+  /* Expanded, a long list scrolls rather than pushing the next goal out of view; in a short panel it gives way
+     (it never shrank, and on a small screen the goal and the tabs were pushed out of the panel). */
+  max-height: min(220px, 40%);
   overflow-y: auto;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-height: 0;
 }
 
 .alerts li {
@@ -803,6 +818,8 @@ kbd {
 }
 
 .modal {
+  /* Solid, so the map's sprites and names don't show through the tables. */
+  background: #10141c;
   width: 520px;
   max-width: calc(100% - 32px);
   /* Of the (possibly scaled) interface, not the window. */
@@ -949,10 +966,10 @@ button.brush.slot-W {
 
 /* The schedule's letters (W, R, S), so a slot doesn't rest on its colour alone. */
 .schedule .hour {
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1;
   text-align: center;
-  color: rgba(0, 0, 0, 0.6);
+  color: rgba(0, 0, 0, 0.8);
   font-weight: 700;
 }
 
@@ -1079,8 +1096,6 @@ button.brush.active {
   list-style: none;
   padding: 0;
   margin: 0;
-  max-height: 60vh;
-  overflow-y: auto;
 }
 
 .story li {
@@ -1139,10 +1154,19 @@ button.brush.active {
     z-index: 6;
   }
 
-  /* Notices along the bottom of the map, clear of a colonist's card at the top. */
+  /* Notices along the bottom of the map, clear of a colonist's card at the top: kept to the map's row (they used to
+     spill up over the top bar), above the card, and only the newest few. */
   .notices {
     grid-column: 1 / -1;
-    align-self: end;
+    align-self: stretch;
+    justify-content: flex-end;
+    min-height: 0;
+    overflow: hidden;
+    z-index: 7;
+  }
+
+  .notices > .notification:nth-last-child(n + 3) {
+    display: none;
   }
 
   .right-column {
@@ -1600,7 +1624,7 @@ button.primary:hover:not(:disabled) {
 }
 
 .next-goal .next-label {
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--accent);
@@ -1684,7 +1708,7 @@ button.primary:hover:not(:disabled) {
 }
 
 .work-grid .skill {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 400;
   color: var(--muted);
 }
@@ -2025,4 +2049,58 @@ button.big {
   .topbar .screens button {
     min-width: 32px;
   }
+}
+
+/* Dropdowns and checkboxes in the interface's own colours, not the browser's white. */
+select {
+  font: inherit;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  max-width: 100%;
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+/* A wide table that scrolls sideways fades at its edge, so it's plain there's more. */
+@media (max-width: 800px) {
+  .table-scroll {
+    mask-image: linear-gradient(to right, #000 92%, transparent);
+  }
+
+  .work-grid .priority {
+    width: 40px;
+  }
+}
+
+/* The narrowest phones: Production's and the saves' buttons wrap rather than run off the edge, and the top bar
+   keeps food and two resources. */
+@media (max-width: 400px) {
+  .saves td:last-child {
+    white-space: normal;
+  }
+
+  .target {
+    min-width: 44px;
+  }
+
+  .tb-resources > span.res:nth-of-type(n + 4) {
+    display: none;
+  }
+}
+
+.confirm-labels {
+  display: inline-grid;
+}
+
+.confirm-labels > span {
+  grid-area: 1 / 1;
+}
+
+.confirm-labels > .off {
+  visibility: hidden;
 }

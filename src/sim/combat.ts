@@ -336,18 +336,26 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
     // How long until they reach the colony: the walk, and on a small map a wait at the edge first. (A siege
     // party's camp keeps its own time.)
     const home = sim.homeTile() ?? sim.living()[0]?.tile ?? centre;
-    const walk = walkTicks(w, centre, home, raiderTilesPerTick(def.speed * (thieves ? 1.2 : 1)), ARRIVAL_RANGE);
-    const muster = camped ? 0 : musterTicks(walk);
+    // Colonists working out by that edge, close enough that the raiders won't wait (see holdingAtEdge): they're on
+    // them now, whatever the walk to the colony would be. (The warning used to promise hours.)
+    const party = sim.enemies.slice(-count);
+    const onThem =
+      !camped &&
+      sim.living().some((c) => !c.health.downed && party.some((e) => w.distance(c.tile, e.tile) <= MUSTER_ALERT + 2));
+    const walk = onThem
+      ? 0
+      : walkTicks(w, centre, home, raiderTilesPerTick(def.speed * (thieves ? 1.2 : 1)), ARRIVAL_RANGE);
+    const muster = camped || onThem ? 0 : musterTicks(walk);
     if (muster > 0) {
       sim.raid.musterUntil = sim.tick + muster;
     }
     if (!camped) {
       sim.raid.contactAt = sim.tick + walk + muster;
     }
-    const when = inAbout(walk + muster);
+    const when = onThem ? 'and are already on colonists working out that way' : inAbout(walk + muster);
     if (thieves) {
       sim.addLog(
-        `Thieves! ${count} from ${def.name} are slipping in from the ${side} to rob the stores, ${when}. Draft colonists to catch them.`,
+        `Thieves! ${count} from ${def.name} are slipping in from the ${side} to rob the stores, ${onThem ? when.replace(/^and /, '') : when}. Draft colonists to catch them.`,
         'danger',
         true,
       );
@@ -365,7 +373,7 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
       return true;
     }
     sim.addLog(
-      `Raid! ${count} raiders from ${def.name} are coming from the ${side}, and will reach the colony ${when}. ${wreckers > 0 ? `${wreckers === 1 ? 'One is' : `${wreckers} are`} making for the beacon. ` : ''}${firebrands > 0 ? `${firebrands === 1 ? 'One carries' : 'Two carry'} fire for the wooden walls. ` : ''}Draft your colonists.`,
+      `Raid! ${count} raiders from ${def.name} are coming from the ${side}, ${onThem ? when : `and will reach the colony ${when}`}. ${wreckers > 0 ? `${wreckers === 1 ? 'One is' : `${wreckers} are`} making for the beacon. ` : ''}${firebrands > 0 ? `${firebrands === 1 ? 'One carries' : 'Two carry'} fire for the wooden walls. ` : ''}Draft your colonists.`,
       'danger',
       true,
     );

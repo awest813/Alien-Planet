@@ -1,5 +1,5 @@
 import { TOUCH, forTouch } from './touch';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Alert,
   ColonistView,
@@ -46,14 +46,48 @@ const SPEEDS = [
 
 const formatPower = (watts: number) => (Math.abs(watts) >= 1000 ? `${(watts / 1000).toFixed(1)} kW` : `${watts} W`);
 
+// How tight the top bar must be to keep to one row: it measures itself after each render and steps down (compact,
+// tight, squeeze) while its last item has wrapped below the first; a window resize, a new interface size or a
+// new day start it over. On a phone it's laid out in rows on purpose, and kept compact.
+const FIT_LEVELS = ['', 'compact', 'compact tight', 'compact tight squeeze'];
+function useTopBarFit(state: UiState): { ref: React.RefObject<HTMLElement | null>; className: string } {
+  const ref = useRef<HTMLElement>(null);
+  const phone = () => window.innerWidth <= 720;
+  const [level, setLevel] = useState(() => (phone() ? 2 : 0));
+  useEffect(() => {
+    const reset = () => setLevel(phone() ? 2 : 0);
+    window.addEventListener('resize', reset);
+    return () => window.removeEventListener('resize', reset);
+  }, []);
+  // (Once a day it tries roomier again: a raid's extra buttons are gone by then.)
+  useEffect(() => setLevel(phone() ? 2 : 0), [state.settings.uiScale, state.day]);
+  useLayoutEffect(() => {
+    const bar = ref.current;
+    if (!bar || phone() || level >= FIT_LEVELS.length - 1) {
+      return;
+    }
+    const items = [...bar.children] as HTMLElement[];
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (first && last && last.offsetTop > first.offsetTop + first.offsetHeight / 2) {
+      setLevel(level + 1);
+    }
+  });
+  return { ref, className: FIT_LEVELS[level] };
+}
+
 export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Screen) => void }) {
   const p = state.power;
   const net = p.supply - p.demand;
   const anyFree = state.colonists.some(
     (c) => !c.dead && c.status !== 'Downed' && c.status !== 'Away' && !c.drafted && !c.inBreak && c.age >= DRAFT_AGE,
   );
+  const fit = useTopBarFit(state);
+  // Something from the neighbours waiting on an answer.
+  const d = state.diplomacy;
+  const waiting = !!(d.request || d.call || d.dispute || d.envoy);
   return (
-    <header className="panel topbar">
+    <header ref={fit.ref} className={`panel topbar ${fit.className}`}>
       <div className="tb-time">
         <span className="title">Colony Alpha</span>
         <span className="clock" title={`Year ${state.year}`}>
@@ -62,16 +96,6 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
         <span className="temp" title="Outdoor temperature">
           {state.outdoorTemp}°C
         </span>
-        {state.weather.icon && (
-          <span
-            className="weather"
-            role="img"
-            title={`Weather: ${state.weather.label}`}
-            aria-label={`Weather: ${state.weather.label}`}
-          >
-            {state.weather.icon} <span className="weather-label">{state.weather.label}</span>
-          </span>
-        )}
         <div className="speeds" role="group" aria-label="Game speed">
           {SPEEDS.map((s, index) => (
             <button
@@ -86,6 +110,17 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
             </button>
           ))}
         </div>
+        {/* (After the speeds, so they don't move as the weather comes and goes.) */}
+        {state.weather.icon && (
+          <span
+            className="weather"
+            role="img"
+            title={`Weather: ${state.weather.label}`}
+            aria-label={`Weather: ${state.weather.label}`}
+          >
+            {state.weather.icon} <span className="weather-label">{state.weather.label}</span>
+          </span>
+        )}
       </div>
       <div className="tb-resources">
         <FoodDays days={state.foodDays} />
@@ -135,15 +170,15 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
           Village
         </button>
         <button
-          className={state.diplomacy.request ? 'attention' : ''}
+          className={waiting ? 'attention' : ''}
           onClick={() => onOpen('factions')}
           title="Neighbours, their requests, gifts and tribute"
         >
-          Factions{state.diplomacy.request ? ' (!)' : ''}
+          Factions{waiting ? ' (!)' : ''}
         </button>
         {state.captives.length > 0 && (
           <button onClick={() => onOpen('prisoners')} title="Captured and wounded raiders">
-            Prisoners ({state.captives.filter((p) => p.state === 'prisoner').length})
+            Prisoners ({state.captives.length})
           </button>
         )}
         {state.trade && (
@@ -377,7 +412,8 @@ function ColonistCard({ c }: { c: ColonistView }) {
         </button>
       </div>
       <div className="activity">{c.activity}</div>
-      {c.drafted && (
+      {/* (No stances for someone lying downed.) */}
+      {c.drafted && c.status !== 'Downed' && (
         <div className="stance" role="group" aria-label="Combat stance">
           {STANCES.map((s) => (
             <button

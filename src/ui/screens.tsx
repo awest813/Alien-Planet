@@ -427,6 +427,9 @@ export function ProductionScreen({ state, onClose }: { state: UiState; onClose: 
                   {!bill.hasBench && <span className="tag warn">no {bill.bench} yet</span>}
                   {bill.locked && <span className="tag warn">🔒 needs {bill.locked}</span>}
                   {bill.minSkill && <span className="tag">needs {bill.minSkill}</span>}
+                  {bill.short && !bill.mend && bill.stock < bill.target && (
+                    <span className="tag warn">short of {bill.short}</span>
+                  )}
                 </div>
               </td>
               <td className="muted">{bill.mend ? `${bill.stock} worn` : `${bill.stock} in stock`}</td>
@@ -971,10 +974,20 @@ function Expeditions({ state }: { state: UiState }) {
       const able = now.filter((x) => d.travellers.some((t) => t.id === x && t.why === null));
       return able.includes(id) ? able.filter((x) => x !== id) : able.length < 3 ? [...able, id] : able;
     });
+  // Why Send is off, if it is (it used to be greyed out without a word).
+  const blocked = (): string | null =>
+    party.length === 0
+      ? 'Tick who goes (one to three)'
+      : !target.open
+        ? `${target.label} won't have them just now`
+        : d.silver < cost
+          ? `Supplies for ${party.length} cost ${cost} silver; the colony has ${d.silver} in storage`
+          : null;
   // Somebody grown has to mind the colony (as the colony insists).
   const staying = state.colonists.filter(
     (c) => !c.dead && c.status !== 'Away' && c.status !== 'Downed' && c.age >= DRAFT_AGE && !party.includes(c.id),
   ).length;
+  const sendBlocked = blocked() ?? (staying === 0 ? 'Someone has to stay and mind the colony' : null);
   return (
     <>
       <h3>Expeditions</h3>
@@ -1014,8 +1027,8 @@ function Expeditions({ state }: { state: UiState }) {
       </div>
       <div className="row">
         <button
-          disabled={party.length === 0 || !target.open || d.silver < cost || staying === 0}
-          title={staying === 0 && party.length > 0 ? 'Someone has to stay and mind the colony' : undefined}
+          disabled={!!sendBlocked}
+          title={sendBlocked ?? undefined}
           onClick={() => {
             controller.command({
               type: 'world',
@@ -1026,6 +1039,7 @@ function Expeditions({ state }: { state: UiState }) {
         >
           Send {party.length || ''} ({cost} silver)
         </button>
+        {sendBlocked && party.length > 0 && <span className="muted small">{sendBlocked}</span>}
       </div>
     </>
   );
@@ -1046,7 +1060,8 @@ export function VillageScreen({ state, onClose }: { state: UiState; onClose: () 
       <h3>Leader</h3>
       {v.leader ? (
         <p>
-          <b>{v.leader.name}</b>, chosen on day {v.electedOn}.{' '}
+          <b>{v.leader.name}</b>, leading since day {v.leaderSince}
+          {v.electedOn !== v.leaderSince ? ` (chosen again on day ${v.electedOn})` : ''}.{' '}
           <span className="muted">
             {v.leader.spirits === 'good'
               ? 'In good spirits: everyone feels in good hands.'
@@ -1174,6 +1189,17 @@ export function PrisonersScreen({ state, onClose }: { state: UiState; onClose: (
                   </td>
                   <td className="num">
                     {p.capture ? 'To be brought in' : 'Not marked for capture'} · dies in {p.hoursLeft}h
+                  </td>
+                  <td className="num">
+                    {!p.capture && <button onClick={() => controller.captureCaptive(p.id)}>Capture</button>}{' '}
+                    <button
+                      onClick={() => {
+                        controller.showCaptive(p.id);
+                        onClose();
+                      }}
+                    >
+                      Show me
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -1424,7 +1450,8 @@ export function ConfirmButton({
     if (!armed) {
       return;
     }
-    const timer = setTimeout(() => setArmed(false), 3000);
+    // (Six seconds: at three, a second click that came a moment late did nothing, without a word.)
+    const timer = setTimeout(() => setArmed(false), 6000);
     return () => clearTimeout(timer);
   }, [armed]);
   return (
@@ -1440,7 +1467,12 @@ export function ConfirmButton({
         }
       }}
     >
-      {armed ? confirm : label}
+      {/* Both labels take the same place, the other hidden, so arming it doesn't change its width and shove its
+          neighbours ("Save" to "Overwrite?"). */}
+      <span className="confirm-labels">
+        <span className={armed ? 'off' : ''}>{label}</span>
+        <span className={armed ? '' : 'off'}>{confirm}</span>
+      </span>
     </button>
   );
 }
