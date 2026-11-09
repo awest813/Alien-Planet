@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { featureId } from './defs';
 import { updateLifespans } from './lifespans';
-import { HAPPY_CHILDHOOD, HARD_CHILDHOOD, teacherFor, updatePlay } from './school';
+import { HAPPY_CHILDHOOD, HARD_CHILDHOOD, lessonBoards, teacherFor, tryLesson, updatePlay } from './school';
 import { Simulation } from './simulation';
 import { HOUR, clearAround, run } from './test-helpers';
 import { SKILL_KEYS, WORK_TYPES } from './types';
@@ -150,5 +150,30 @@ describe('childhood memories', () => {
     sim.dieOf(teacher, 'old age');
     expect(kid.thoughts.some((t) => t.key === 'parentDied')).toBe(true);
     expect(kid.childhood!.hard).toBeGreaterThanOrEqual(HARD_CHILDHOOD);
+  });
+});
+
+describe('two lesson boards', () => {
+  it('bring the teacher to the board the children went to, wherever the teacher has wandered since', () => {
+    const { sim, teacher, kids, hours } = classroom(31);
+    const w = sim.world;
+    const boardB = lessonBoards(sim)[0];
+    const boardA = w.idx(w.xOf(boardB) - 10, w.yOf(boardB));
+    w.setFeature(boardA, featureId('lessonBoard'));
+    expect(lessonBoards(sim)).toHaveLength(2);
+    hours(2);
+    for (const c of [teacher, ...kids]) {
+      sim.endJob(c);
+    }
+    // The teacher by board B as the children set off...
+    teacher.tile = w.neighbors(boardB).find((i) => w.isPassable(i))!;
+    for (const kid of kids) {
+      expect(tryLesson(sim, kid)).toBe(true);
+      expect(kid.job?.source).toBe(boardB);
+    }
+    // ...and over by board A by the time they go themselves.
+    teacher.tile = w.neighbors(boardA).find((i) => w.isPassable(i))!;
+    expect(tryLesson(sim, teacher)).toBe(true);
+    expect(teacher.job?.source).toBe(boardB);
   });
 });

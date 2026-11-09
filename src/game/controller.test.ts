@@ -322,7 +322,6 @@ describe('second audit: the interface', () => {
   it('says on the spot why a dealing with the wider world was refused', () => {
     controller.newColony('away');
     const sim = controller.sim;
-    sim.diplomacy.silver = 1000;
     controller.command({
       type: 'world',
       action: { kind: 'expedition', to: 0, purpose: 'salvage', colonists: sim.colonists.map((c) => c.id) },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { animalsAtDawn } from './animals';
 import { itemId } from './defs';
-import { Simulation } from './simulation';
+import { OBJECTIVES, Simulation } from './simulation';
 import { triggerEvent } from './storyteller';
 import { HOUR, clearAround, run } from './test-helpers';
 import { Animal } from './types';
@@ -73,5 +73,32 @@ describe('herds', () => {
     raider.path = [];
     run(sim, 120);
     expect(raider.hp).toBeLessThan(before);
+  });
+});
+
+describe('marks on an animal', () => {
+  it('are one or the other: a hunt mark comes off when taming is ordered, and once tamed', () => {
+    const sim = Simulation.newColony(3);
+    const w = sim.world;
+    const a = sim.animals.find((o) => !o.tame && !o.quarry && o.kind !== 'greatBeast')!;
+    const rect = { x0: w.xOf(a.tile), y0: w.yOf(a.tile), x1: w.xOf(a.tile), y1: w.yOf(a.tile) };
+    sim.apply({ type: 'hunt', rect, add: true });
+    expect(a.hunted).toBe(true);
+    sim.apply({ type: 'tame', rect, add: true });
+    expect(a.taming).toBe(true);
+    expect(a.hunted).toBe(false);
+    sim.apply({ type: 'hunt', rect, add: true });
+    expect(a.hunted).toBe(true);
+    expect(a.taming).toBe(false);
+  });
+});
+
+describe('the Prosperity goals on Peaceful', () => {
+  it("don't ask for a raider prisoner, since no raiders come", () => {
+    const peaceful = Simulation.newColony(3, 'peaceful');
+    const standard = Simulation.newColony(3);
+    const recruit = OBJECTIVES.find((o) => o.id === 'recruit')!;
+    expect(recruit.hidden?.(peaceful)).toBe(true);
+    expect(recruit.hidden?.(standard) ?? false).toBe(false);
   });
 });

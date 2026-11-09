@@ -127,10 +127,12 @@ export function tryLesson(sim: Simulation, c: Colonist): boolean {
   if (!pupil && !sim.living().some((o) => o.job?.type === 'lesson' && o.job.line === 0)) {
     return false;
   }
-  // Everyone to the board nearest the teacher, so they meet.
-  const board = [...boards].sort(
-    (a, b) => sim.world.distance(teacher.tile, a) - sim.world.distance(teacher.tile, b),
-  )[0];
+  // Everyone to one board, so they meet: the one a pupil is already making for, or else the one nearest the
+  // teacher. (Each choosing the board nearest where the teacher stood at the time split them between two.)
+  const taken = sim.living().find((o) => o.job?.type === 'lesson' && o.job.line === 0 && boards.includes(o.job.source));
+  const board =
+    taken?.job?.source ??
+    [...boards].sort((a, b) => sim.world.distance(teacher.tile, a) - sim.world.distance(teacher.tile, b))[0];
   const until = (SCHOOL_END - sim.hour) * TICKS_PER_HOUR;
   return sim.sendTo(c, 'lesson', seats(sim, board, c), {
     source: board,

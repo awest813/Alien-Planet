@@ -1493,12 +1493,20 @@ export class Simulation {
         // ones is a deliberate slaughter order.
         const spareTame = cmd.type === 'hunt' && cmd.add && inside.some((a) => !a.tame);
         for (const a of inside) {
+          // One mark or the other: an animal marked for taming and then hunting is hunted, and the other way round
+          // (a hunting mark left on an animal once tamed was a slaughter order for the new livestock).
           if (cmd.type === 'hunt') {
             a.hunted = cmd.add && !(spareTame && a.tame);
+            if (a.hunted) {
+              a.taming = false;
+            }
           } else {
             // Already-tame animals have nothing left to tame, and the great boar and the great beast
             // won't be tamed.
             a.taming = cmd.add && !a.tame && !a.quarry && a.kind !== 'greatBeast';
+            if (a.taming) {
+              a.hunted = false;
+            }
           }
         }
         if (cmd.type === 'hunt' && cmd.add) {
@@ -6824,6 +6832,7 @@ export class Simulation {
     if (useInspiration(this, c, 'tamingInspiration') || this.rng.chance(chance)) {
       animal.tame = true;
       animal.taming = false;
+      animal.hunted = false;
       animal.revengeOn = -1;
       animal.manhunter = false;
       this.stats.tamed++;
@@ -8349,6 +8358,8 @@ export const OBJECTIVES: ObjectiveDef[] = [
     label: 'Take a raider prisoner and win them over',
     phase: 5,
     check: (s) => (s.stats.recruited ?? 0) > 0,
+    // No raiders come on Peaceful, so no prisoners: the phase must be able to close without it.
+    hidden: (s) => s.story.difficulty === 'peaceful',
   },
   {
     id: 'secondWinter',
