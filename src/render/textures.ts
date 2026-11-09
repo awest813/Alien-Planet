@@ -15,8 +15,42 @@ import {
 export { Frames, TILE } from './tileset-layout';
 export const TILESET_KEY = 'tiles';
 export const TILESET_FAR_KEY = 'tiles-far';
+export const TILESET_GROUND_KEY = 'tiles-ground';
+// The padded copies' margin and spacing (see padded()). Equal, because Phaser's GPU tile layer steps from
+// tile to tile by the margin where it means the spacing.
+export const PAD_MARGIN = 2;
+export const PAD_SPACING = 2;
 
 type Ctx = CanvasRenderingContext2D;
+
+// A copy of the tileset with a pixel of border round every tile (in the gaps the margin and spacing leave),
+// the tile's own edge pixels copied outward.
+function padded(scene: Phaser.Scene, key: string, src: HTMLCanvasElement, clearFirst: boolean): void {
+  const step = TILE + PAD_SPACING;
+  const out = scene.textures.createCanvas(key, COLUMNS * step + PAD_MARGIN, ROWS * step + PAD_MARGIN)!;
+  const ctx = out.getContext();
+  ctx.imageSmoothingEnabled = false;
+  for (let frame = 0; frame < COLUMNS * ROWS; frame++) {
+    const sx = (frame % COLUMNS) * TILE;
+    const sy = Math.floor(frame / COLUMNS) * TILE;
+    const dx = (frame % COLUMNS) * step + PAD_MARGIN;
+    const dy = Math.floor(frame / COLUMNS) * step + PAD_MARGIN;
+    ctx.drawImage(src, sx, sy, TILE, TILE, dx, dy, TILE, TILE);
+    // Edges out by a pixel, then the corners.
+    ctx.drawImage(src, sx, sy, TILE, 1, dx, dy - 1, TILE, 1);
+    ctx.drawImage(src, sx, sy + TILE - 1, TILE, 1, dx, dy + TILE, TILE, 1);
+    ctx.drawImage(src, sx, sy, 1, TILE, dx - 1, dy, 1, TILE);
+    ctx.drawImage(src, sx + TILE - 1, sy, 1, TILE, dx + TILE, dy, 1, TILE);
+    ctx.drawImage(src, sx, sy, 1, 1, dx - 1, dy - 1, 1, 1);
+    ctx.drawImage(src, sx + TILE - 1, sy, 1, 1, dx + TILE, dy - 1, 1, 1);
+    ctx.drawImage(src, sx, sy + TILE - 1, 1, 1, dx - 1, dy + TILE, 1, 1);
+    ctx.drawImage(src, sx + TILE - 1, sy + TILE - 1, 1, 1, dx + TILE, dy + TILE, 1, 1);
+  }
+  if (clearFirst) {
+    ctx.clearRect(0, 0, step, step);
+  }
+  out.refresh();
+}
 
 // Everything is drawn procedurally so the prototype needs no art assets.
 export function createTextures(scene: Phaser.Scene): void {
@@ -127,12 +161,13 @@ export function createTextures(scene: Phaser.Scene): void {
     c.fillRect(0, 0, TILE, TILE);
   });
   texture.refresh();
-  // A copy for the GPU's far feature layer, whose shader draws an empty tile with the tileset's top-left
-  // pixel: cleared here, so empty tiles show the ground beneath instead of a blue square.
-  const far = scene.textures.createCanvas(TILESET_FAR_KEY, COLUMNS * TILE, ROWS * TILE)!;
-  far.getContext().drawImage(texture.canvas, 0, 0);
-  far.getContext().clearRect(0, 0, 1, 1);
-  far.refresh();
+  // Copies for the layers the GPU draws (the ground, and features far out), with each tile's edge copied
+  // into a pixel of border round it: at a fractional zoom the GPU samples a hair past a tile's edge, and
+  // without the border that's the next tile's art, a thin line across the whole map.
+  padded(scene, TILESET_GROUND_KEY, texture.canvas, false);
+  // The far feature layer's shader draws an empty tile from the first tile's corner: cleared in its copy,
+  // so empty tiles show the ground beneath instead of a blue square.
+  padded(scene, TILESET_FAR_KEY, texture.canvas, true);
   // The UI cuts item icons from the same art.
   setTilesetImage(texture.canvas.toDataURL());
 

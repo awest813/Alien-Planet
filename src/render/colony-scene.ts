@@ -8,7 +8,16 @@ import { ADULT, TEEN } from '../sim/lifespans';
 import { NIGHT_END, NIGHT_START } from '../sim/simulation';
 import { Animal, Colonist, Enemy } from '../sim/types';
 import { Designation, GROW_ZONE, World } from '../sim/world';
-import { Frames, TILE, TILESET_FAR_KEY, TILESET_KEY, createTextures } from './textures';
+import {
+  Frames,
+  PAD_MARGIN,
+  PAD_SPACING,
+  TILE,
+  TILESET_FAR_KEY,
+  TILESET_GROUND_KEY,
+  TILESET_KEY,
+  createTextures,
+} from './textures';
 import { TERRAIN_LANDS } from './tileset-layout';
 import { LightBuffer, LitTile, litTiles } from './lighting';
 import { auroraOn, eclipseOn } from '../sim/storyteller';
@@ -107,6 +116,9 @@ const PAN_SPEED = 700;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 5;
 
+// Dead and buried: no longer lying on the map.
+const buried = (c: Colonist): boolean => c.health.dead && !controller.sim.unburied.some((f) => f.id === c.id);
+
 const TOOL_COLORS: Record<string, number> = {
   designate: 0xffd166,
   cancel: 0xff5252,
@@ -114,6 +126,7 @@ const TOOL_COLORS: Record<string, number> = {
   build: 0x7fd0ff,
   hunt: 0xff5c5c,
   capture: 0xffa040,
+  tame: 0x8fe36b,
   forbid: 0xff6b6b,
   select: 0xffffff,
 };
@@ -474,14 +487,24 @@ export class ColonyScene extends Phaser.Scene {
     // The ground covers every tile and seldom changes (a season, ice on the water), so the GPU draws it from a
     // texture of tile indexes in one go. Drawn tile by tile like the other layers, it was the biggest part of a
     // zoomed-out frame on a slow phone.
-    map.createBlankLayer('terrain', tileset)!.destroy(false);
-    const ground = new Phaser.Tilemaps.TilemapGPULayer(this, map, map.getLayerIndex('terrain')!, tileset);
+    // (From a copy of the art with a border round each tile: see TILESET_GROUND_KEY.)
+    const groundTiles = map.addTilesetImage(
+      TILESET_GROUND_KEY,
+      TILESET_GROUND_KEY,
+      TILE,
+      TILE,
+      PAD_MARGIN,
+      PAD_SPACING,
+      0,
+    )!;
+    map.createBlankLayer('terrain', groundTiles)!.destroy(false);
+    const ground = new Phaser.Tilemaps.TilemapGPULayer(this, map, map.getLayerIndex('terrain')!, groundTiles);
     this.add.existing(ground.setDepth(0));
     // Zoomed far out, every tree and rock on the map is in view, and drawing them tile by tile was the
     // biggest part of a frame on a slow machine. Out there the GPU draws a copy of the layer instead (without
     // the seasonal tints, too small to see), brought up to date at most once a second.
     // (From its own copy of the art: see TILESET_FAR_KEY.)
-    const farTiles = map.addTilesetImage(TILESET_FAR_KEY, TILESET_FAR_KEY, TILE, TILE, 0, 0, 0)!;
+    const farTiles = map.addTilesetImage(TILESET_FAR_KEY, TILESET_FAR_KEY, TILE, TILE, PAD_MARGIN, PAD_SPACING, 0)!;
     map.createBlankLayer('featureFar', farTiles)!.destroy(false);
     const featureFar = new Phaser.Tilemaps.TilemapGPULayer(this, map, map.getLayerIndex('featureFar')!, farTiles);
     this.add.existing(featureFar.setDepth(3).setVisible(false));
@@ -841,7 +864,8 @@ export class ColonyScene extends Phaser.Scene {
       // A bob in the step when walking (not when crawling).
       pawn.root.setPosition(x, y + (moving && !downed ? -Math.abs(Math.sin(time / 90)) * 1.2 : 0));
       // Once the colony has boarded the ship, nobody is left on the map; an expedition is off it.
-      pawn.root.setVisible(!controller.sim.departed && c.away !== 'gone');
+      // The dead lie where they fell until they're buried.
+      pawn.root.setVisible(!controller.sim.departed && c.away !== 'gone' && !buried(c));
       (pawn.figure.getAt(0) as Phaser.GameObjects.Image).setTexture(stride(moving && !downed && !dead, time));
       pawn.root.setAlpha(dead ? 0.55 : 1);
       pawn.figure.setAngle(c.sleeping || dead || downed ? 90 : 0);
@@ -872,7 +896,7 @@ export class ColonyScene extends Phaser.Scene {
     const NAME_Y = -11;
     const LINE = 7;
     const LEVELS = 3;
-    const pawns = [...this.pawns.values()].sort((a, b) => a.root.x - b.root.x);
+    const pawns = [...this.pawns.values()].filter((p) => p.root.visible).sort((a, b) => a.root.x - b.root.x);
     const placed: { left: number; right: number; y: number; level: number }[] = [];
     for (const pawn of pawns) {
       const half = pawn.label.width / 2;
@@ -1257,7 +1281,8 @@ export class ColonyScene extends Phaser.Scene {
     const zoom = this.cameras.main.zoom;
     if (zoom < MARKER_ZOOM) {
       const r = 5 / zoom;
-      for (const c of sim.living()) {
+      // (Those setting off on a trip are still on the map, walking away.)
+      for (const c of sim.colonists.filter((o) => !o.health.dead && o.away !== 'gone')) {
         const { x, y } = this.pawnPosition(c);
         const color = Phaser.Display.Color.HexStringToColor(c.color).color;
         g.lineStyle(3 / zoom, 0x000000, 0.6).strokeCircle(x, y, r);
@@ -1298,7 +1323,7 @@ export class ColonyScene extends Phaser.Scene {
     p.clear();
     const tool = controller.tool;
     // Allowing is the friendly half of forbidding: green, not red.
-    const color = tool.kind === 'forbid' && !tool.on ? 0x8fe36b : TOOL_COLORS[tool.kind];
+    const color = tool.kind === 'forbid' && !tool.on ? 0x8fe36b : (TOOL_COLORS[tool.kind] ?? 0xffffff);
     if (this.drag) {
       for (const i of this.dragTiles(tool, this.drag.start, this.drag.end)) {
         const blocked = tool.kind === 'build' && !controller.sim.canPlaceBlueprint(i, tool.feature);
@@ -1321,6 +1346,9 @@ export class ColonyScene extends Phaser.Scene {
   // rosy dawn. An eclipse brings dusk in the middle of the day.
   private updateNight(): void {
     const sim = controller.sim;
+    // Over the whole view, whatever its size (a fixed rectangle fell short of a wide screen zoomed out).
+    const view = this.cameras.main.worldView;
+    this.night.setPosition(view.x - TILE * 2, view.y - TILE * 2).setSize(view.width + TILE * 4, view.height + TILE * 4);
     if (!controller.settings.dayNightLighting) {
       this.night.setFillStyle(0x0a1230, 0);
       this.drawGlow(0);
@@ -1507,6 +1535,16 @@ export class ColonyScene extends Phaser.Scene {
     return world.inBounds(x, y) ? world.idx(x, y) : null;
   }
 
+  // The tile under the pointer, or the nearest one on the map's edge when it's off the map: a drag carried past
+  // the edge reaches the edge rather than stopping where the pointer left.
+  private tileAtClamped(pointer: Phaser.Input.Pointer): number {
+    const world = controller.sim.world;
+    const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    const x = Phaser.Math.Clamp(Math.floor(point.x / TILE), 0, world.width - 1);
+    const y = Phaser.Math.Clamp(Math.floor(point.y / TILE), 0, world.height - 1);
+    return world.idx(x, y);
+  }
+
   private dragRect(a: number, b: number) {
     const world = controller.sim.world;
     return {
@@ -1573,7 +1611,7 @@ export class ColonyScene extends Phaser.Scene {
     let best: number | null = null;
     let bestDist = TILE * 0.75;
     for (const c of controller.sim.colonists) {
-      if (c.away === 'gone') {
+      if (c.away === 'gone' || buried(c)) {
         continue;
       }
       const { x, y } = this.pawnPosition(c);
@@ -1653,12 +1691,17 @@ export class ColonyScene extends Phaser.Scene {
       }
       const tile = this.tileAt(pointer);
       controller.setHover(tile, this.pickColonist(pointer));
-      if (this.drag && tile !== null) {
-        this.drag.end = tile;
+      if (this.drag) {
+        this.drag.end = this.tileAtClamped(pointer);
       }
     });
 
     const release = (pointer: Phaser.Input.Pointer) => {
+      // A finger lifted leaves nothing hovered (there's no pointer left over the map, and the hover card
+      // would cover a third of a phone's screen).
+      if (pointer.wasTouch) {
+        controller.setHover(null, null);
+      }
       if (this.pinch) {
         // Lifting either finger ends the pinch; nothing else happens until both are up.
         if (!this.input.pointer1.isDown && !this.input.pointer2.isDown) {
@@ -1705,7 +1748,10 @@ export class ColonyScene extends Phaser.Scene {
     this.input.on('gameout', () => controller.setHover(null));
 
     this.input.on('wheel', (pointer: Phaser.Input.Pointer, _objects: unknown, _dx: number, dy: number) => {
-      this.zoomAround(cam.zoom * (dy > 0 ? 1 / 1.15 : 1.15), pointer);
+      // (A sideways scroll on a trackpad is no zoom at all.)
+      if (dy !== 0) {
+        this.zoomAround(cam.zoom * (dy > 0 ? 1 / 1.15 : 1.15), pointer);
+      }
     });
   }
 
@@ -1822,8 +1868,21 @@ export class ColonyScene extends Phaser.Scene {
       controller.focusRequest = null;
       cam.centerOn((world.xOf(i) + 0.5) * TILE, (world.yOf(i) + 0.5) * TILE);
     }
+    // A new map, a load or a bigger window can raise the farthest zoom out: keep to it (otherwise the map sits
+    // small in an empty screen until the next scroll of the wheel).
+    if (cam.zoom < this.minZoom()) {
+      cam.setZoom(this.minZoom());
+    }
     this.fitBounds();
-    controller.cameraView = this.visibleTiles();
+    // What's actually on screen, in tiles (for the minimap's box and the sound), not the drawing margin.
+    const world = controller.sim.world;
+    const view = cam.worldView;
+    controller.cameraView = {
+      x0: Math.max(0, view.x / TILE),
+      y0: Math.max(0, view.y / TILE),
+      x1: Math.min(world.width, view.right / TILE),
+      y1: Math.min(world.height, view.bottom / TILE),
+    };
     const h = this.held;
     const dx = (h.has('d') || h.has('ArrowRight') ? 1 : 0) - (h.has('a') || h.has('ArrowLeft') ? 1 : 0);
     const dy = (h.has('s') || h.has('ArrowDown') ? 1 : 0) - (h.has('w') || h.has('ArrowUp') ? 1 : 0);

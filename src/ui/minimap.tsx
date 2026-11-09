@@ -89,7 +89,10 @@ export function Minimap() {
           dot(a.tile, '#ffd166', 3);
         }
       }
-      for (const c of sim.living()) {
+      for (const c of sim.colonists) {
+        if (c.health.dead || c.away === 'gone') {
+          continue;
+        }
         dot(c.tile, c.color, 4);
       }
       for (const e of sim.enemies) {
