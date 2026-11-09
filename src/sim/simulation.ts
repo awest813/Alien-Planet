@@ -8337,6 +8337,8 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'parkas',
     label: 'Dress everyone in a parka (research tailoring)',
     phase: 5,
+    // On the tundra everyone lands in one: nothing to do.
+    hidden: (s) => s.biome === 'tundra',
     check: (s) => s.living().length > 0 && s.living().every((c) => c.apparel?.item === itemId('parka')),
     progress: (s) => `${s.living().filter((c) => c.apparel?.item === itemId('parka')).length}/${s.living().length}`,
   },
@@ -8493,7 +8495,8 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'elder',
     label: 'See a colonist live to 65',
     phase: 7,
-    check: (s) => s.colonists.some((c) => c.age >= ELDER),
+    // Turning 65 here: a wanderer who joined at 70 ticked it off on day 2.
+    check: (s) => (s.stats.reachedElder ?? 0) > 0,
     progress: (s) => `oldest ${Math.floor(Math.max(0, ...s.living().map((c) => c.age)))}`,
   },
   {

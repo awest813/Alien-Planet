@@ -4,9 +4,9 @@ import { scarMove, scarWork } from './body';
 import { itemId } from './defs';
 import { griefMood, updateGrief } from './grief';
 import { damage, painOf } from './health';
-import { canWork } from './lifespans';
+import { ageBy, canWork } from './lifespans';
 import { DAYS_PER_YEAR } from './seasons';
-import { Simulation } from './simulation';
+import { OBJECTIVES, Simulation } from './simulation';
 import { HOUR, clearAround } from './test-helpers';
 import { WORK_TYPES } from './types';
 import { GOOD_LEADER_MOOD, bedroomExpectation, leaderBar, villageThoughts } from './village';
@@ -254,5 +254,18 @@ describe('audit fixes', () => {
     for (const key of ['childDied', 'parentDied', 'siblingDied', 'kinDied', 'friendDied']) {
       expect(after[key]).toBeLessThan(before[key]);
     }
+  });
+});
+
+describe('the goal of living to 65', () => {
+  it('needs someone to turn 65 here, not to arrive older', () => {
+    const sim = colony(49, 3);
+    const goal = OBJECTIVES.find((o) => o.label.includes('live to 65'))!;
+    sim.colonists[0].age = 70;
+    expect(goal.check(sim)).toBe(false);
+    const c = sim.colonists[1];
+    c.age = 64.999;
+    ageBy(sim, c, 24 * DAYS_PER_YEAR);
+    expect(goal.check(sim)).toBe(true);
   });
 });

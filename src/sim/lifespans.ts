@@ -208,6 +208,9 @@ export function ageBy(sim: Simulation, c: Colonist, hours: number): void {
 
 function birthday(sim: Simulation, c: Colonist): void {
   const age = Math.floor(c.age);
+  if (age === ELDER) {
+    sim.stats.reachedElder = (sim.stats.reachedElder ?? 0) + 1;
+  }
   if (age === TEEN) {
     for (const work of TEEN_WORK) {
       c.priorities[work] ||= 3;

@@ -597,6 +597,8 @@ export interface Stats {
   concerts?: number;
   // Evenings an elder told the old stories by the fire.
   storyNights?: number;
+  // Colonists who turned 65 here (not those who arrived older).
+  reachedElder?: number;
   // Times friends sent food when asked.
   aid?: number;
   // Crops trampled and livestock killed by raiders laying waste outside the walls.
