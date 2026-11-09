@@ -75,7 +75,8 @@ How the living simulation works:
   than can fight back, and a little more for a rich colony). Raiders who can't get in break walls and doors, and
   sappers dig through rock. Thieves slip in to grab the richest stack from the stores and run, more often the
   richer the colony; bring one down and they drop it. While the signal beacon transmits, a third of each raid
-  goes straight for it. Vermin spoil food left on the stockpile floor, mostly in winter (shelves, iceboxes and
+  goes straight for it. From the second year, raids against wooden walls bring firebrands who set them alight.
+  Vermin spoil food left on the stockpile floor, mostly in winter (shelves, iceboxes and
   frozen stores are safe).
 - **Late research:** later projects need a building standing to study (a smelter for steel, a kiln for glass)
   and materials from storage to finish: steelmaking, glassmaking (daylight for a field walled in as a room, so
@@ -90,7 +91,7 @@ How the living simulation works:
   retire. Grief for a spouse, child, parent or friend lasts weeks and returns on the anniversary; the colony
   expects more of its leader as the years pass, and the leader and elders want rooms of their own.
 - **The wider world:** the raiders have goodwill too: releasing or ransoming their people softens them,
-  starving them hardens them, and once they're soft enough they'll take a truce. A second friendly faction,
+  starving or executing them hardens them (an execution also weighs on every colonist for days), and once they're soft enough they'll take a truce. A second friendly faction,
   the Hollowstone Clans, trades iron, tools and stone and quarrels with the Meadow Kin: back one and the other
   takes it badly. Envoys offer alliances; an ally's fighters come to raids more often, and when they're raided
   they ask for a colonist or goods, and refusing ends the alliance. Send one to three colonists on an expedition

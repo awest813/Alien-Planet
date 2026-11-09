@@ -383,6 +383,9 @@ export interface Enemy {
   loot?: { item: number; count: number };
   // Sent to wreck the signal beacon while it's on the air.
   wrecker?: boolean;
+  // Carries fire: sets wooden walls and buildings alight (and when they may throw again).
+  firebrand?: boolean;
+  throwAt?: number;
 }
 
 // A raider who went down rather than dying: lying where they fell until captured (or until they die
@@ -470,6 +473,7 @@ export type Command =
   | { type: 'capture'; rect: Rect; add: boolean }
   // Let a prisoner go.
   | { type: 'release'; captive: number }
+  | { type: 'execute'; captive: number }
   // Lock (or unlock) a door: nobody passes a locked door, though raiders can break it down.
   | { type: 'lock'; tile: number; locked: boolean }
   // Forbid (or allow) the items in a rectangle: colonists leave forbidden items alone.
@@ -540,6 +544,7 @@ export interface Stats {
   siegesSeenOff?: number;
   // Silver's worth of goods thieves got away with, and food lost to vermin.
   stolen?: number;
+  executions?: number;
   verminLost?: number;
   // For the Mastery goals: thieves brought down, raids seen off with nobody down, winter harvests, and the
   // best quality anything has been crafted at.

@@ -125,6 +125,21 @@ describe("raiders' goodwill", () => {
     expect(ransom(sim, p.id)).not.toBeNull();
   });
 
+  it('an execution hardens their people for good, and weighs on everyone', () => {
+    const { sim } = colony(4);
+    const downed = captive(sim);
+    // Only a prisoner in a cell, not someone lying wounded.
+    sim.apply({ type: 'execute', captive: downed.id });
+    expect(sim.captives).toHaveLength(1);
+    const p = captive(sim, { state: 'prisoner' });
+    sim.apply({ type: 'execute', captive: p.id });
+    expect(sim.captives.map((q) => q.id)).not.toContain(p.id);
+    expect(goodwillOf(sim, RAIDERS[0])).toBe(HOSTILE_GOODWILL + HOSTILE_DEALINGS.executed);
+    expect(HOSTILE_DEALINGS.executed).toBeLessThan(HOSTILE_DEALINGS.starved);
+    expect(sim.living().every((c) => c.thoughts.some((t) => t.key === 'execution'))).toBe(true);
+    expect(sim.stats.executions).toBe(1);
+  });
+
   it('drifts back to where it started', () => {
     const { sim } = colony(4);
     sim.goodwill[RAIDERS[0]] = -20;

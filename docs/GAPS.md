@@ -19,14 +19,16 @@ with esbuild for speed (see ROADMAP).
   all work 3% (up to ten rounds); the test colony finishes 11 rounds by year 10.
 - **Goals reach 53–55 of 65 by year 10** in the test colony; the rest are niche or need a player's choices
   (masterwork crafts, winter greenhouses, all research).
-- **A walled, armed colony still rarely loses anyone to raids.** Deaths in ten-year Standard runs now come from
-  disease (the shaking sickness and grey flu, 1–2 a decade) rather than raids.
+- **A walled, armed colony still rarely loses anyone to raids.** From the second year, raids against wooden
+  walls bring firebrands who set them alight (stone doesn't burn), on top of sappers, thieves and wreckers; but in
+  ten-year runs the test colony, which now buys truces, sees only 19–25 raids and loses nobody to them.
 - **Separations are rare** (one in six ten-year runs). Mood is lower late (yearly average about 47–52, from
   52–56); breaks no longer come in bursts after a death (no new break within a day of the last: seed 7919 went
   from 9 breaks in ten years to 2, mean mood 48.8).
-- **Elders barely appear in ten years** (founders are 18–53), so ailments, care and retirement show little in the
-  usual runs; care is meals only.
-- **Some dealings are thin:** there's no execute action (so that can't harden raiders); returning expeditions
+- **Elders:** about one in ten new adults (founders and newcomers) is already 55–70, so most colonies know an elder
+  within ten years (one of two ten-year runs had one or two elders from year 1 and three deaths of old age; the
+  other's oldest reached 63). Care is meals only.
+- **Some dealings are thin:** returning expeditions
   simply appear at the map edge; the harness seldom buys settlers (its population is at the cap). Meadow Kin
   goodwill still ends at 100 in some runs. (Envoys now walk in, wait about the colony, and walk off home with the
   answer.)

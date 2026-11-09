@@ -615,5 +615,10 @@
     "label": "Jealous",
     "mood": -5,
     "hours": 24
+  },
+  "execution": {
+    "label": "A prisoner was put to death",
+    "mood": -8,
+    "hours": 144
   }
 }

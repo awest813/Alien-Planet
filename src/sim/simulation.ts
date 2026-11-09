@@ -176,7 +176,7 @@ import {
   WEDDING_OPINION,
 } from './gatherings';
 import { BeaconState, TRANSMIT_HOURS, chooseToStay, depart, freshBeacon, updateBeacon } from './beacon';
-import { FEED_BELOW, PRISONER_BED, TALK_TICKS, release, talk, updateCaptives, visitDue } from './prisoners';
+import { FEED_BELOW, PRISONER_BED, TALK_TICKS, execute, release, talk, updateCaptives, visitDue } from './prisoners';
 import { ADULT, CARER_HUNGER, DRAFT_AGE, ELDER, agePace, canWork, rollPast, updateLifespans } from './lifespans';
 import { inHospitalBed, isInfected, scarMove, scarWork } from './body';
 import {
@@ -1365,6 +1365,9 @@ export class Simulation {
       }
       case 'release':
         release(this, cmd.captive);
+        break;
+      case 'execute':
+        execute(this, cmd.captive);
         break;
       case 'lock':
         if (w.setLocked(cmd.tile, cmd.locked) && cmd.locked) {

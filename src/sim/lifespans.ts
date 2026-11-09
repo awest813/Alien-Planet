@@ -142,10 +142,17 @@ export const canRomance = (sim: Simulation, a: Colonist, b: Colonist): boolean =
 export const agePace = (c: Colonist): { work: number; move: number } =>
   c.age < TEEN ? { work: 0.6, move: 0.85 } : c.age >= ELDER ? { work: 0.85, move: 0.9 } : { work: 1, move: 1 };
 
+const OLDER_SHARE_FROM = 0.9;
+
 // A starting adult: an age, and a past that tilts their skills.
 export function rollPast(c: Colonist, rng: Rng): void {
-  // Mostly young adults (a settler's life suits them), now and then someone older.
-  c.age = 18 + 35 * rng.next() ** 1.6;
+  // Mostly young adults (a settler's life suits them), now and then someone older, and about one in ten
+  // already past their prime (55–70), so a colony knows elders well within ten years. (One draw either way.)
+  const u = rng.next();
+  c.age =
+    u >= OLDER_SHARE_FROM
+      ? 55 + 15 * ((u - OLDER_SHARE_FROM) / (1 - OLDER_SHARE_FROM))
+      : 18 + 35 * (u / OLDER_SHARE_FROM) ** 1.6;
   const pool = BACKSTORIES.filter((b) => !b.hidden);
   applyBackstory(c, rng.pick(pool).key);
 }

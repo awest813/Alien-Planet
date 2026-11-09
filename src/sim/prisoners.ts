@@ -161,6 +161,27 @@ export function release(sim: Simulation, id: number): boolean {
   return true;
 }
 
+// Puts a prisoner to death. Their people won't forget it (raids from them harden), and it sits heavily with
+// everyone in the colony for days.
+export function execute(sim: Simulation, id: number): boolean {
+  const p = sim.captives.find((q) => q.id === id && q.state === 'prisoner');
+  if (!p) {
+    return false;
+  }
+  remove(sim, p);
+  hostileDealing(sim, p.faction, 'executed');
+  sim.stats.executions = (sim.stats.executions ?? 0) + 1;
+  for (const c of sim.living()) {
+    sim.addThought(c, 'execution');
+  }
+  sim.addLog(
+    `${p.name} was put to death. The colony is subdued, and ${FACTIONS[p.faction].name} will not forget it.`,
+    'warn',
+    true,
+  );
+  return true;
+}
+
 // What a captive's people pay to have them back: more for a seasoned fighter, and for one kept fed in a cell.
 export const ransomPrice = (p: Captive): number =>
   Math.round((40 + p.skill * 8 + (p.state === 'prisoner' ? 20 : 0)) / 5) * 5;

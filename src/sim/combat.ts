@@ -6,6 +6,7 @@ import { MOVE_SPEED, TICKS_PER_HOUR } from './constants';
 import { FACTIONS, NONE, NORMAL_QUALITY, WeaponDef, featureDef, featureId, itemDef, itemId, weaponDef } from './defs';
 import { damage, painOf } from './health';
 import { fallWounded } from './prisoners';
+import { burnTime, ignite } from './weather';
 import { learn } from './skills';
 import { traitValue } from './social';
 import type { Simulation } from './simulation';
@@ -294,6 +295,12 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
     for (const e of sim.enemies.slice(-count).slice(0, wreckers)) {
       e.wrecker = true;
     }
+    // From the second year, against a colony behind wooden walls, some bring fire.
+    const firebrands =
+      !thieves && sim.day >= FIREBRANDS_FROM_DAY && woodenDefences(sim) ? Math.min(2, Math.floor(count / 4)) : 0;
+    for (const e of sim.enemies.slice(-count).slice(wreckers, wreckers + firebrands)) {
+      e.firebrand = true;
+    }
     if (thieves) {
       sim.addLog(
         `Thieves! ${count} from ${def.name} are slipping in from the ${side} to rob the stores. Draft colonists to catch them.`,
@@ -314,7 +321,7 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
       return true;
     }
     sim.addLog(
-      `Raid! ${count} raiders from ${def.name} are coming from the ${side}. ${wreckers > 0 ? `${wreckers === 1 ? 'One is' : `${wreckers} are`} making for the beacon. ` : ''}Draft your colonists.`,
+      `Raid! ${count} raiders from ${def.name} are coming from the ${side}. ${wreckers > 0 ? `${wreckers === 1 ? 'One is' : `${wreckers} are`} making for the beacon. ` : ''}${firebrands > 0 ? `${firebrands === 1 ? 'One carries' : 'Two carry'} fire for the wooden walls. ` : ''}Draft your colonists.`,
       'danger',
       true,
     );
@@ -641,6 +648,50 @@ function flee(sim: Simulation, e: Enemy, ally = false): void {
 
 const BEACON_FRAGILE = 4;
 
+const FIREBRANDS_FROM_DAY = 40;
+const THROW_RANGE = 4;
+const THROW_EVERY = TICKS_PER_HOUR * 2;
+// Whether the colony has wooden walls or doors a firebrand could set alight.
+function woodenDefences(sim: Simulation): boolean {
+  const w = sim.world;
+  for (const i of w.tilesWith('features')) {
+    const def = featureDef(w.feature[i]);
+    if (def.build && w.blocksRoom(i) && burnTime(sim, i) > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// A firebrand within throwing range of a wooden building sets it alight (then waits a while before the next).
+// It's their own turn otherwise: they still fight.
+function throwFire(sim: Simulation, e: Enemy): void {
+  if ((e.throwAt ?? 0) > sim.tick) {
+    return;
+  }
+  const w = sim.world;
+  const x0 = w.xOf(e.tile);
+  const y0 = w.yOf(e.tile);
+  for (let dy = -THROW_RANGE; dy <= THROW_RANGE; dy++) {
+    for (let dx = -THROW_RANGE; dx <= THROW_RANGE; dx++) {
+      const x = x0 + dx;
+      const y = y0 + dy;
+      if (!w.inBounds(x, y)) {
+        continue;
+      }
+      const i = w.idx(x, y);
+      if (w.feature[i] !== NONE && featureDef(w.feature[i]).build && burnTime(sim, i) > 0 && ignite(sim, i)) {
+        e.throwAt = sim.tick + THROW_EVERY;
+        sim.addLog(`${e.name} set the ${featureDef(w.feature[i]).name.toLowerCase()} alight!`, 'danger');
+        sim.events.push('fire');
+        return;
+      }
+    }
+  }
+  // Nothing in reach: look again in a little while.
+  e.throwAt = sim.tick + 20;
+}
+
 // A wrecker makes for the signal beacon and batters it down (it goes back on the build list). Returns false
 // once there's no beacon to get at; then they fight like any raider.
 function wreckBeacon(sim: Simulation, e: Enemy): boolean {
@@ -835,6 +886,9 @@ export function updateEnemies(sim: Simulation): void {
     }
     if (e.wrecker && wreckBeacon(sim, e)) {
       continue;
+    }
+    if (e.firebrand && !e.fleeing) {
+      throwFire(sim, e);
     }
     const target = targetFor(sim, e);
     if (!target && breach(sim, e)) {

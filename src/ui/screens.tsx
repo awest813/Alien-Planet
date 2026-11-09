@@ -1078,6 +1078,11 @@ export function PrisonersScreen({ state, onClose }: { state: UiState; onClose: (
                       confirm="Sell them back?"
                       onConfirm={() => controller.command({ type: 'world', action: { kind: 'ransom', captive: p.id } })}
                     />
+                    <ConfirmButton
+                      label="Execute"
+                      confirm="Put them to death? Everyone will take it hard"
+                      onConfirm={() => controller.command({ type: 'execute', captive: p.id })}
+                    />
                   </div>
                 </td>
               </tr>

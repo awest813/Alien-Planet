@@ -514,6 +514,7 @@ export const HOSTILE_DEALINGS = {
   recruited: -4,
   starved: -15,
   leftToDie: -1,
+  executed: -25,
 } as const;
 // Hostile feelings drift back to where they started, a point every few days.
 const HOSTILE_DRIFT_DAYS = 4;
