@@ -1385,7 +1385,8 @@
     "name": "Feeding trough",
     "feeds": {
       "item": "potatoes",
-      "capacity": 40
+      "capacity": 40,
+      "also": ["berries", "grain"]
     },
     "build": {
       "cost": [

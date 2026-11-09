@@ -96,7 +96,7 @@ import {
 } from './health';
 import { Pathfinder } from './pathfinding';
 import { PowerState, freshPower, updatePower } from './power';
-import { ResearchState, freshResearch, isAvailable, isResearched } from './research';
+import { ResearchState, freshResearch, isAvailable, isResearched, researchCost } from './research';
 import { DAYS_PER_YEAR, Season, daysUntilWinter, seasonDay, seasonOf, yearOf } from './seasons';
 import { emptyXp, learn, rollPassions, rustSkills, skillFactor } from './skills';
 import { PassRegions, Rooms, computePassRegions, computeRooms } from './regions';
@@ -313,6 +313,9 @@ const MASONRY_SPEED = 1.2;
 const IRRIGATION_YIELD = 1.25;
 // Steel tools (steelmaking) for miners and woodcutters; seed from the best plants (plant breeding).
 const STEEL_SPEED = 1.25;
+// Each round of further study (up to ten) speeds all work a little.
+const FURTHER_STUDY_SPEED = 0.03;
+const FURTHER_STUDY_ROUNDS = 10;
 const BREEDING_YIELD = 1.2;
 // With no raids to cost it time and stores, a peaceful colony's food would only pile up: its fields give a
 // little less, so food stays something to plan for.
@@ -1798,7 +1801,7 @@ export class Simulation {
       if (project) {
         return {
           tile: job.target,
-          ratio: Math.min(1, (this.research.progress[project.key] ?? 0) / project.cost),
+          ratio: Math.min(1, (this.research.progress[project.key] ?? 0) / researchCost(this.research, project)),
         };
       }
     }
@@ -4002,7 +4005,8 @@ export class Simulation {
       scarWork(c, this.isResearched('prosthetics')) *
       hoursSpeed(this.village) *
       (type === 'construct' && this.isResearched('masonry') ? MASONRY_SPEED : 1) *
-      ((type === 'mine' || type === 'chop') && this.isResearched('steelmaking') ? STEEL_SPEED : 1)
+      ((type === 'mine' || type === 'chop') && this.isResearched('steelmaking') ? STEEL_SPEED : 1) *
+      (1 + FURTHER_STUDY_SPEED * Math.min(FURTHER_STUDY_ROUNDS, this.research.further ?? 0))
     );
   }
 
@@ -4392,7 +4396,8 @@ export class Simulation {
   // Every stockpile tile and running-or-not icebox: zones plus buildings, without double counting.
   // Every tile that stores items (stockpile zones and iceboxes). Hauling asks for this constantly,
   // so it's kept until a zone or a building changes.
-  private storageTiles(): number[] {
+  // Every stockpile tile and storage building (cached until buildings or zones change).
+  public storageTiles(): number[] {
     const w = this.world;
     const key = `${w.featureVersion}/${this.zoneVersion}`;
     if (key === this.storageKey) {
@@ -4551,17 +4556,21 @@ export class Simulation {
     // Only somewhere whose fuel is to be had: an empty trough with no potatoes about mustn't keep the hauler
     // from the fires. (Looked up once per kind of fuel.)
     const onHand = new Map<number, boolean>();
-    const toHand = (item: number) => {
-      if (!onHand.has(item)) {
-        const found = this.nearestIn(
-          'items',
-          c.tile,
-          (i) => w.itemType[i] === item && this.regions.region[i] === region && !this.itemTaken(i, c),
-          1,
-        );
-        onHand.set(item, found.length > 0);
+    // (A trough takes more than one kind of feed.)
+    const takes = (fuel: { item: number; also?: number[] }, item: number) =>
+      item === fuel.item || !!fuel.also?.includes(item);
+    const sourceFor = (fuel: { item: number; also?: number[] }) =>
+      this.nearestIn(
+        'items',
+        c.tile,
+        (i) => takes(fuel, w.itemType[i]) && this.regions.region[i] === region && !this.itemTaken(i, c),
+        1,
+      )[0];
+    const toHand = (fuel: { item: number; also?: number[] }) => {
+      if (!onHand.has(fuel.item)) {
+        onHand.set(fuel.item, sourceFor(fuel) !== undefined);
       }
-      return onHand.get(item)!;
+      return onHand.get(fuel.item)!;
     };
     const generator = this.nearestIn(
       'buildings',
@@ -4577,7 +4586,7 @@ export class Simulation {
           w.fuel[i] < fuel.capacity * (urgentOnly ? 0.2 : 0.5) &&
           !this.isReserved(`f${i}`, c) &&
           this.hasWorkSpot(i, false, region) &&
-          toHand(fuel.item)
+          toHand(fuel)
         );
       },
       1,
@@ -4586,19 +4595,14 @@ export class Simulation {
       return false;
     }
     const fuel = fuelAt(generator)!;
-    const source = this.nearestIn(
-      'items',
-      c.tile,
-      (i) => w.itemType[i] === fuel.item && this.regions.region[i] === region && !this.itemTaken(i, c),
-      1,
-    )[0];
+    const source = sourceFor(fuel);
     const path = source !== undefined ? this.pathfinder.find(c.tile, [source]) : null;
     if (source === undefined || !path) {
       return false;
     }
     this.reserve(c, `f${generator}`);
     this.reserve(c, `i${source}`);
-    this.assign(c, this.makeJob('refuel', generator, { source, item: fuel.item }), path);
+    this.assign(c, this.makeJob('refuel', generator, { source, item: w.itemType[source] }), path);
     return true;
   }
 
@@ -6111,7 +6115,9 @@ export class Simulation {
     const hold = this.researchHold(current);
     if (
       hold.building ||
-      (project && hold.short.length > 0 && (this.research.progress[current] ?? 0) >= project.cost - 1)
+      (project &&
+        hold.short.length > 0 &&
+        (this.research.progress[current] ?? 0) >= researchCost(this.research, project) - 1)
     ) {
       return false;
     }
@@ -6150,13 +6156,26 @@ export class Simulation {
     }
     this.research.progress[project.key] = (this.research.progress[project.key] ?? 0) + this.workSpeed(c, 'research');
     learn(this, c, 'research');
+    const cost = researchCost(this.research, project);
     // Materials short: the work goes as far as it can, and waits there.
-    if (this.research.progress[project.key] >= project.cost && this.researchHold(project.key).short.length > 0) {
-      this.research.progress[project.key] = project.cost - 1;
+    if (this.research.progress[project.key] >= cost && this.researchHold(project.key).short.length > 0) {
+      this.research.progress[project.key] = cost - 1;
       this.endJob(c);
       return;
     }
-    if (this.research.progress[project.key] >= project.cost) {
+    // A round of further study: counted, and on to the next (dearer) round.
+    if (project.repeatable && this.research.progress[project.key] >= cost) {
+      this.research.further = (this.research.further ?? 0) + 1;
+      this.research.progress[project.key] = 0;
+      this.addLog(
+        `${project.name}: round ${this.research.further} complete. ${this.research.further <= FURTHER_STUDY_ROUNDS ? 'All work goes a little faster.' : 'The colony knows all it can for now, but study goes on.'}`,
+        'good',
+        true,
+      );
+      this.endJob(c);
+      return;
+    }
+    if (this.research.progress[project.key] >= cost) {
       this.useMaterials(project.key);
       this.research.done.push(project.key);
       this.research.current = null;
@@ -7981,8 +8000,9 @@ export const OBJECTIVES: ObjectiveDef[] = [
     id: 'allResearch',
     label: 'Learn every research project',
     phase: 8,
-    check: (s) => RESEARCH.every((r) => s.isResearched(r.key)),
-    progress: (s) => `${s.research.done.length}/${RESEARCH.length}`,
+    // (Further study is never done.)
+    check: (s) => RESEARCH.every((r) => r.repeatable || s.isResearched(r.key)),
+    progress: (s) => `${s.research.done.length}/${RESEARCH.filter((r) => !r.repeatable).length}`,
   },
   {
     id: 'decade',

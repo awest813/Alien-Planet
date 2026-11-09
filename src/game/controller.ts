@@ -23,7 +23,7 @@ import {
   type JoyKind,
   type ResearchDef,
 } from '../sim/defs';
-import { availableProjects, isAvailable } from '../sim/research';
+import { availableProjects, isAvailable, researchCost } from '../sim/research';
 import type { Biome, MapKind } from '../sim/biomes';
 import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, seasonOf, yearOf } from '../sim/seasons';
 import { ChronicleKind } from '../sim/chronicle';
@@ -921,7 +921,7 @@ function researchNeeds(sim: Simulation, p: ResearchDef): { needs?: string; held?
     return view;
   }
   const hold = sim.researchHold(p.key);
-  const nearlyDone = (sim.research.progress[p.key] ?? 0) >= p.cost - 1;
+  const nearlyDone = (sim.research.progress[p.key] ?? 0) >= researchCost(sim.research, p) - 1;
   if (hold.building) {
     view.held = `Build a ${building!.toLowerCase()} to study this.`;
   } else if (nearlyDone && hold.short.length > 0) {
@@ -1771,10 +1771,10 @@ export class GameController {
       daysUntilWinter: Math.ceil(daysUntilWinter(sim.totalHours)),
       research: RESEARCH.map((p) => ({
         key: p.key,
-        name: p.name,
+        name: p.repeatable && sim.research.further ? `${p.name} (round ${sim.research.further + 1})` : p.name,
         description: p.description,
-        cost: p.cost,
-        progress: Math.min(1, (sim.research.progress[p.key] ?? 0) / p.cost),
+        cost: researchCost(sim.research, p),
+        progress: Math.min(1, (sim.research.progress[p.key] ?? 0) / researchCost(sim.research, p)),
         done: sim.research.done.includes(p.key),
         available: isAvailable(sim.research, p),
         current: sim.research.current === p.key,
@@ -2257,7 +2257,7 @@ export class GameController {
     if (
       !researching &&
       sim.countFeature((f) => featureDef(f).researchStation) > 0 &&
-      availableProjects(sim.research).length > 0
+      availableProjects(sim.research).some((p) => !p.repeatable)
     ) {
       alerts.push({ text: 'No research project selected', tone: 'warn' });
     }
@@ -2437,7 +2437,7 @@ export class GameController {
     }
     // Blueprints waiting on materials the colony doesn't have.
     const outstanding = new Map<number, number>();
-    for (let i = 0; i < w.size; i++) {
+    for (const i of w.tilesWith('blueprints')) {
       for (const need of w.blueprintNeeds(i)) {
         outstanding.set(need.item, (outstanding.get(need.item) ?? 0) + need.count);
       }
@@ -2466,23 +2466,17 @@ export class GameController {
     // (Forbidden things were left out on purpose.)
     const looseTypes = new Map<number, number>();
     let loose = 0;
-    for (let i = 0; i < w.size; i++) {
+    for (const i of w.tilesWith('items')) {
       if (w.itemType[i] !== NONE && !sim.isStockpile(i) && !w.forbidden[i]) {
         looseTypes.set(w.itemType[i], (looseTypes.get(w.itemType[i]) ?? 0) + 1);
         loose++;
       }
     }
-    let room = false;
-    for (let i = 0; i < w.size && loose > 0 && !room; i++) {
-      if (sim.isStockpile(i)) {
-        for (const type of looseTypes.keys()) {
-          if (w.canHoldItem(i, type) && sim.storesItem(i, type)) {
-            room = true;
-            break;
-          }
-        }
-      }
-    }
+    const room =
+      loose > 0 &&
+      sim
+        .storageTiles()
+        .some((i) => [...looseTypes.keys()].some((type) => w.canHoldItem(i, type) && sim.storesItem(i, type)));
     if (!room && loose > 0 && anyStorage) {
       const [most] = [...looseTypes.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
       alerts.push({
@@ -2915,7 +2909,8 @@ export class GameController {
       details.push('Out of bloom until spring');
     }
     if (def?.feeds) {
-      details.push(`Feed ${Math.floor(w.fuel[i])}/${def.feeds.capacity} ${itemDef(def.feeds.item).name.toLowerCase()}`);
+      const kinds = [def.feeds.item, ...(def.feeds.also ?? [])].map((item) => itemDef(item).name.toLowerCase());
+      details.push(`Feed ${Math.floor(w.fuel[i])}/${def.feeds.capacity} (${kinds.join(', ')})`);
     }
     if (def?.burns) {
       const hours = Math.max(1, Math.round((w.fuel[i] / def.burns.perDay) * 24));

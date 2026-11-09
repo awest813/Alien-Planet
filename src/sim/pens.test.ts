@@ -151,6 +151,21 @@ describe('troughs', () => {
     expect(w.fuel[trough]).toBeGreaterThan(0);
   });
 
+  it('take berries or grain when there are no potatoes', () => {
+    const { sim, w, x, y, trough } = withPen(58);
+    sim.apply({ type: 'zone', rect: { x0: x - 6, y0: y - 6, x1: x - 3, y1: y - 3 }, zone: STOCKPILE_ZONE });
+    w.addItem(w.idx(x - 5, y - 5), itemId('berries'), 40);
+    w.addItem(w.idx(x - 4, y - 5), itemId('grain'), 40);
+    for (const c of sim.colonists) {
+      c.priorities.hauling = 1;
+      c.needs.food = 1;
+    }
+    for (let hour = 0; hour < 6 && w.fuel[trough] === 0; hour++) {
+      run(sim, HOUR);
+    }
+    expect(w.fuel[trough]).toBeGreaterThan(0);
+  });
+
   it('a field too big to be a pen is no pen, however many gates it has', () => {
     const sim = Simulation.newColony(31, 'standard', 96);
     const w = sim.world;

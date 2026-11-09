@@ -356,5 +356,13 @@
       }
     ],
     "description": "Fine files and gauges: everything crafted comes out a grade better."
+  },
+  {
+    "key": "furtherStudy",
+    "name": "Further study",
+    "cost": 20000,
+    "requires": ["engineering", "surgery"],
+    "repeatable": true,
+    "description": "There's always more to learn: each round makes all work a little faster (3%, up to ten rounds), and costs more than the last."
   }
 ]

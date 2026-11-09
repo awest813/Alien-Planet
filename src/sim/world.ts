@@ -78,6 +78,15 @@ export const DIRS: readonly [number, number][] = [
 
 // The tile grid. Every layer is a flat typed array indexed by `y * width + x`,
 // which keeps the world cheap to copy, save, and (later) hand to a Web Worker.
+// Features that decide where pens are, besides the fences themselves (which are walls to the map).
+const pennish = (f: number): boolean => {
+  if (f === NONE) {
+    return false;
+  }
+  const def = featureDef(f);
+  return def.key === 'gate' || !!def.feeds || !!def.bed;
+};
+
 export class World {
   public readonly size: number;
   public readonly terrain: Uint8Array;
@@ -133,6 +142,8 @@ export class World {
   };
   // Bumped whenever passability or room boundaries may have changed.
   public structureVersion = 0;
+  // Bumped when a gate, trough or bed comes or goes: what makes ground a pen (see pens.ts).
+  public penVersion = 0;
   // Bumped whenever any feature changes (furniture affects room stats).
   public featureVersion = 0;
 
@@ -345,6 +356,9 @@ export class World {
     // A fire is built with a first load of fuel; a generator starts empty.
     this.fuel[i] = f !== NONE ? (featureDef(f).burns?.capacity ?? 0) : 0;
     this.featureVersion++;
+    if (pennish(old) || pennish(f)) {
+      this.penVersion++;
+    }
     if (before !== this.isPassable(i) || roomBefore !== this.blocksRoom(i)) {
       this.structureVersion++;
     }

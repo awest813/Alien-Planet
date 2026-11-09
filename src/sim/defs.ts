@@ -123,7 +123,8 @@ export interface FeatureDef {
   // A drying rack: storage for meat, fish and berries, which dry on it into food that keeps.
   dries: boolean;
   // A feeding trough: haulers fill it with this, and tame animals in its pen eat from it.
-  feeds?: { item: number; capacity: number };
+  // A trough's feed: its usual item, and others it takes as well.
+  feeds?: { item: number; capacity: number; also?: number[] };
   // A hospital bed: patients heal faster, are tended better and catch fewer infections.
   hospital: boolean;
   // Radius of a sun lamp's light (crops grow beneath it day and night).
@@ -219,7 +220,7 @@ interface RawFeature {
   icebox?: boolean;
   shelf?: number;
   dries?: boolean;
-  feeds?: { item: string; capacity: number };
+  feeds?: { item: string; capacity: number; also?: string[] };
   hospital?: boolean;
   growLight?: number;
   bridge?: boolean;
@@ -363,7 +364,11 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   icebox: !!f.icebox,
   shelf: f.shelf ?? 0,
   dries: !!f.dries,
-  feeds: f.feeds && { item: resolveItem(f.feeds.item), capacity: f.feeds.capacity },
+  feeds: f.feeds && {
+    item: resolveItem(f.feeds.item),
+    capacity: f.feeds.capacity,
+    also: f.feeds.also?.map(resolveItem),
+  },
   hospital: !!f.hospital,
   growLight: f.growLight ?? 0,
   bridge: !!f.bridge,
@@ -564,6 +569,8 @@ export interface ResearchDef {
   // storage to finish.
   building?: string;
   materials?: { item: string; count: number }[];
+  // Studied again and again (each round costs more): never "done".
+  repeatable?: boolean;
 }
 
 export const RESEARCH: ResearchDef[] = researchJson.map((r) => ({ requires: [], ...r }));
@@ -617,7 +624,7 @@ export const COLONIST_COLORS: string[] = colonistsJson.colors;
 
 // What haulers keep a building topped up with, if anything: a generator's fuel, a fire's wood, a
 // trough's feed.
-export const fuelOf = (def: FeatureDef): { item: number; capacity: number } | undefined =>
+export const fuelOf = (def: FeatureDef): { item: number; capacity: number; also?: number[] } | undefined =>
   def.power?.fuel ?? def.burns ?? def.feeds;
 
 // Which skill (and work type) a bench uses: the stove and millstone are cooking, the rest crafting.

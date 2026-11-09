@@ -9,7 +9,6 @@ import { Animal } from './types';
 const GATE = featureId('gate');
 // Bigger than this, or open to the map edge, and it's not a pen but the open country.
 export const MAX_PEN = 400;
-const RECHECK_TICKS = 60;
 
 export interface Pen {
   tiles: number[];
@@ -19,8 +18,8 @@ export interface Pen {
 
 interface PenMap {
   structure: number;
+  // The world's penVersion it was worked out for.
   features: number;
-  tick: number;
   // Whether there are any gates at all (most colonies have none).
   gates: boolean;
   pens: Pen[];
@@ -42,13 +41,9 @@ export const troughFeed = (sim: Simulation, i: number): { item: number; capacity
 export function penMap(sim: Simulation): PenMap {
   const w = sim.world;
   const known = maps.get(sim);
-  // Fences going up or down change it at once; anything else (a gate, a trough, a bed) is noticed within
-  // a few minutes, since buildings and plants change all the time.
-  if (
-    known &&
-    known.structure === w.structureVersion &&
-    (known.features === w.featureVersion || sim.tick - known.tick < RECHECK_TICKS)
-  ) {
+  // Fences, gates, troughs and beds change it; nothing else does. (Worked out from the map alone, so a
+  // loaded game sees just what a continued one does.)
+  if (known && known.structure === w.structureVersion && known.features === w.penVersion) {
     return known;
   }
   const penOf = new Int32Array(w.size).fill(-1);
@@ -109,8 +104,7 @@ export function penMap(sim: Simulation): PenMap {
   }
   const map = {
     structure: w.structureVersion,
-    features: w.featureVersion,
-    tick: sim.tick,
+    features: w.penVersion,
     gates: gates.length > 0,
     pens,
     penOf,

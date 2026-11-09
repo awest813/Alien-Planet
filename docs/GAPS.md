@@ -13,9 +13,10 @@ with esbuild for speed (see ROADMAP).
 ## Still open
 
 - **The last research waits on materials.** Late projects need a building and materials as well as points, and
-  the test colony (`craft`) learns 37 of 44 by year 4. The other seven wait one point short for iron, stone and
-  stone blocks it never keeps in storage. A player who stockpiles them finishes, but the tree still ends: there's
-  no repeatable study for the last years.
+  the test colony (`craft`) learns 37 of 44 by year 4; the other seven wait one point short for iron, stone and
+  stone blocks it never keeps in storage (a player who stockpiles them finishes). Research no longer runs dry:
+  Further study (after engineering and surgery) can be studied round after round, each dearer and each speeding
+  all work 3% (up to ten rounds); the test colony finishes 11 rounds by year 10.
 - **Goals reach 53–55 of 65 by year 10** in the test colony; the rest are niche or need a player's choices
   (masterwork crafts, winter greenhouses, all research).
 - **A walled, armed colony still rarely loses anyone to raids.** Deaths in ten-year Standard runs now come from
@@ -31,13 +32,14 @@ with esbuild for speed (see ROADMAP).
   ends at 100 in some runs.
 - **The desert is the hardest land:** heat waves at the height of summer can kill several colonists before they
   get shelter. It may want gentler tuning.
-- **Pens:** troughs take only potatoes. (Fences that make no pen, and pens with no trough, now get an alert.)
+- **Pens:** troughs take potatoes, berries or grain, but nothing else (no hay). Fences that make no pen, and pens
+  with no trough, get an alert.
 - **Tundra is hard on a slow start:** trees are scarce, and a farming-first colony that hasn't finished its hut
   by the first cold can be lost (one of four sensible tundra colonies in a 36-day sample, on day 18).
 - **Drawing zoomed right out on a slow machine:** with 4× CPU throttling a desktop window showing the whole Large
   map takes about 28–31 ms a frame (phones about 14–16 ms). The feature layer (about 9 ms) can't use the GPU
-  layer, and rebuilding the interface's state costs about 8 ms each time it's published (5 times a second), of
-  which the alerts are about 6 ms.
+  layer. (Rebuilding the interface's state, 5 times a second, is down to about 2 ms on a busy Large map; the
+  alerts were 2.2 ms of it and are now 0.5 ms.)
 - **Testing:** the browser tests haven't run on GitHub yet, and the long-press hasn't been tried on a real
   iPhone. Performance is still checked by hand (`scripts/perf.ts`); it's too noisy for CI. Saves from before
   version 16 can't be loaded (the game says so).

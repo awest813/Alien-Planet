@@ -4,6 +4,7 @@ import { featureId, itemId, researchDef } from './defs';
 import { Simulation } from './simulation';
 import { HOUR, clearAround, outline, run } from './test-helpers';
 import { WORK_TYPES } from './types';
+import { isAvailable, researchCost } from './research';
 import { STOCKPILE_ZONE } from './world';
 
 // A colony set to study one late project, with everything before it already known and one colonist at
@@ -116,5 +117,22 @@ describe('late research', () => {
     };
     expect(grown(false)).toBe(0);
     expect(grown(true)).toBeGreaterThan(0);
+  });
+
+  it('further study goes on round after round, each dearer, each speeding work a little', () => {
+    const { sim, hours } = study('furtherStudy');
+    const project = researchDef('furtherStudy')!;
+    const speed = () =>
+      (sim as unknown as { workSpeed(c: unknown, t: string): number }).workSpeed(sim.colonists[0], 'construct');
+    const before = speed();
+    expect(researchCost(sim.research, project)).toBe(project.cost);
+    sim.research.progress.furtherStudy = project.cost - 30;
+    hours(3);
+    expect(sim.research.further).toBe(1);
+    expect(sim.research.current).toBe('furtherStudy');
+    expect(sim.isResearched('furtherStudy')).toBe(false);
+    expect(isAvailable(sim.research, project)).toBe(true);
+    expect(researchCost(sim.research, project)).toBe(project.cost * 1.5);
+    expect(speed()).toBeCloseTo(before * 1.03);
   });
 });
