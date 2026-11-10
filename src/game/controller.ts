@@ -1915,7 +1915,8 @@ export class GameController {
           seed: sim.seed,
           savedAt: Date.now(),
           version: SAVE_VERSION,
-          colonists: sim.living().length,
+          // (Counting anyone away on a trip: they're coming home.)
+          colonists: sim.headcount(),
           difficulty: sim.story.difficulty,
           mapSize: sim.world.width,
           biome: sim.biome,

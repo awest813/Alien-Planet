@@ -180,7 +180,7 @@ export function damage(sim: Simulation, c: Colonist, amount: number, kind: Damag
 }
 
 // Just over this illness: it can't be caught again for a while.
-const immune = (sim: Simulation, c: Colonist, key: string): boolean =>
+export const immune = (sim: Simulation, c: Colonist, key: string): boolean =>
   c.health.recovered?.key === key && c.health.recovered.until > sim.tick;
 
 export function infect(sim: Simulation, c: Colonist, key: string): void {
@@ -378,6 +378,7 @@ export function die(sim: Simulation, c: Colonist, cause: string): void {
   for (const other of sim.colonists.filter((o) => !o.health.dead)) {
     if (other.spouse === c.id) {
       other.spouse = -1;
+      other.strainedSince = undefined;
     }
     if (other.lover === c.id) {
       other.lover = -1;

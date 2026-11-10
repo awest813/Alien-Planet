@@ -370,16 +370,20 @@ export function deserialize(data: SaveData): Simulation {
   }
   world.structureVersion++;
 
-  const colonists: Colonist[] = data.colonists.map((saved) => ({
-    ...structuredClone(saved),
-    moveProgress: 0,
-    job: null,
-    reserved: [],
-    practicedAt: saved.practicedAt ?? {},
-    age: saved.age ?? 30,
-    backstory: saved.backstory ?? 'drifter',
-    parents: saved.parents ?? [],
-  }));
+  // (Defaults read from the copy, not the save: two games loaded from one save mustn't share a colonist's parts.)
+  const colonists: Colonist[] = data.colonists.map((saved) => {
+    const copy = structuredClone(saved);
+    return {
+      ...copy,
+      moveProgress: 0,
+      job: null,
+      reserved: [],
+      practicedAt: copy.practicedAt ?? {},
+      age: copy.age ?? 30,
+      backstory: copy.backstory ?? 'drifter',
+      parents: copy.parents ?? [],
+    };
+  });
   // Saves from before the Animals skill was tracked properly have no (or broken) progress for it.
   for (const c of colonists) {
     for (const key of SKILL_KEYS) {

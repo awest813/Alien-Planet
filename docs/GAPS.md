@@ -44,6 +44,26 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Fourth audit: saving and loading, the less-reviewed systems, and the interface** (three readers, each
+  finding first seen failing; a field-by-field save/load comparison every 3 hours over 20–40 days, eleven
+  ten-year runs checked hourly for broken ties, caravans and births, and 100 scripted players over 30 days in
+  every land: no crashes or broken rules):
+  - **Saves:** another tab holding the database open blocked its upgrade and every save, load and Quit to title
+    waited forever; one failed open broke saving until a reload. Both now give up with a reason and try again
+    next time, and a connection a newer tab needs is let go. A concert under way when the game was saved
+    vanished (not counted for the goal or the ending); it now counts as given. A slot's summary said "0
+    colonists" while everyone was away on a trip; deleting a slot takes its summary in the same step.
+  - **The colony's life:** illness events named colonists who were still immune and caught nothing (and spent
+    the threat's turn doing it); a widow carried the old marriage's rough patch into a new one, which could end
+    on its first bad morning; several couples could start expecting the same morning past the family room; a
+    raid over in under ten hours shortened the breather before the next threat.
+  - **The interface:** closing the pause menu (and other dialogs with a button that takes the focus) lost
+    keyboard focus; Resume left a game paused before the menu opened still paused; the pause banner showed
+    over the ending; a long numeric seed became 1.2e+23, which didn't give the map back; "1 more alerts", "1
+    colonists", "1 days of truce left" and the like.
+  - **Left as found:** a bed-rest patient is put to sleep by a load and wakes to go back to bed rest; a meal
+    being eaten is put away first after a load; a leader away on a trip still sets the colony's mood about its
+    leadership (read, not tested).
 - **Code audit of the simulation, the world's dealings and game flow** (three readers, each confirming with a
   test; 100 scripted players for 30 days before and after, no problems seen):
   - **Endings written down wrong:** a colony wiped out by a raid was recorded as having repelled it (21 of 30

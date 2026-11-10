@@ -235,12 +235,14 @@ function birthday(sim: Simulation, c: Colonist): void {
 function conceive(sim: Simulation): void {
   const living = sim.living();
   const room = populationFor(sim.world.width).maxColonists + FAMILY_ROOM;
-  const expecting = living.filter((c) => c.expectingUntil !== undefined).length;
+  let expecting = living.filter((c) => c.expectingUntil !== undefined).length;
   // (Those away on an expedition still count against the room.)
-  if (sim.headcount() + sim.infants.length + expecting >= room) {
-    return;
-  }
+  const full = () => sim.headcount() + sim.infants.length + expecting >= room;
   for (const a of living) {
+    // Checked couple by couple: two couples on one morning mustn't take the last place between them.
+    if (full()) {
+      return;
+    }
     const b = sim.colonists[a.spouse];
     if (
       !b ||
@@ -260,6 +262,7 @@ function conceive(sim: Simulation): void {
       const carrier = sim.rng.chance(0.5) ? a : b;
       carrier.expectingUntil = sim.tick + EXPECTING_DAYS * 24 * TICKS_PER_HOUR;
       carrier.expectingWith = carrier === a ? b.id : a.id;
+      expecting++;
       sim.addLog(`${a.name} and ${b.name} are expecting a child!`, 'good', true);
     }
   }

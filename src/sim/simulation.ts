@@ -425,6 +425,8 @@ export interface SimTimers {
   nextTactics?: [number, number][];
   nextShelterSearch?: [number, number][];
   shelterLogged?: [number, number][];
+  // A concert under way when the game was saved.
+  concert?: { player: number; tile: number; endsAt: number } | null;
 }
 
 // Moments the UI reacts to: raids, deaths and collapses pause the game.
@@ -781,6 +783,7 @@ export class Simulation {
       nextTactics: [...this.nextTactics],
       nextShelterSearch: [...this.nextShelterSearch],
       shelterLogged: [...this.shelterLogged],
+      concert: this.concert ? { ...this.concert } : null,
     };
   }
 
@@ -798,6 +801,12 @@ export class Simulation {
     this.nextTactics = new Map(timers.nextTactics ?? []);
     this.nextShelterSearch = new Map(timers.nextShelterSearch ?? []);
     this.shelterLogged = new Map(timers.shelterLogged ?? []);
+    // A concert under way is played to its end as the game loads (jobs aren't saved, so the audience has gone):
+    // it counts as given, and the player feels it.
+    const player = timers.concert ? this.colonists[timers.concert.player] : undefined;
+    if (player && !player.health.dead && !player.away) {
+      this.finishConcert(player);
+    }
     for (const c of this.living()) {
       if (c.sleeping) {
         this.reserve(c, `b${c.tile}`);
@@ -6172,6 +6181,9 @@ export class Simulation {
     }
     a.spouse = b.id;
     b.spouse = a.id;
+    // A new marriage starts without a rough patch, whatever the last one left (a widow's lingers otherwise).
+    a.strainedSince = undefined;
+    b.strainedSince = undefined;
     this.addThought(a, 'gotMarried');
     this.addThought(b, 'gotMarried');
     for (const c of guests) {

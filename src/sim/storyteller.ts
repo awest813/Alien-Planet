@@ -4,7 +4,7 @@ import { inAbout } from './arrivals';
 import { maybeSendAllies, spawnRaid, weaponScore } from './combat';
 import { TICKS_PER_HOUR, populationFor } from './constants';
 import { ANIMALS, FACTIONS, NONE, featureDef, isFood, itemDef, itemId, terrainDef } from './defs';
-import { damage, infect } from './health';
+import { damage, immune, infect } from './health';
 import { caravanArrives, caravanWeight, goodwillOf } from './trade';
 import { atPeace, onGoodTerms, pickRaider, raidPressure } from './diplomacy';
 import { breach, breachWeight } from './depths';
@@ -283,7 +283,7 @@ const EVENTS: EventDef[] = [
     threat: true,
     weight: (sim) => (sim.season === 'Winter' ? 1.2 : sim.season === 'Autumn' ? 0.3 : 0),
     run: (sim) => {
-      const healthy = sim.living().filter((c) => !c.health.disease);
+      const healthy = sim.living().filter((c) => !c.health.disease && !immune(sim, c, 'winterCough'));
       if (healthy.length < 2) {
         return false;
       }
@@ -305,7 +305,7 @@ const EVENTS: EventDef[] = [
     threat: true,
     weight: (sim) => (sim.season === 'Winter' ? 0.6 : 0),
     run: (sim) => {
-      const healthy = sim.living().filter((c) => !c.health.disease);
+      const healthy = sim.living().filter((c) => !c.health.disease && !immune(sim, c, 'greyFlu'));
       if (healthy.length < 2) {
         return false;
       }
@@ -328,7 +328,7 @@ const EVENTS: EventDef[] = [
     threat: true,
     weight: (sim) => (sim.living().length >= 4 ? 0.2 : 0),
     run: (sim) => {
-      const healthy = sim.living().filter((c) => !c.health.disease);
+      const healthy = sim.living().filter((c) => !c.health.disease && !immune(sim, c, 'shakingSickness'));
       if (healthy.length < 2) {
         return false;
       }
@@ -349,7 +349,7 @@ const EVENTS: EventDef[] = [
     threat: true,
     weight: () => 1.5,
     run: (sim) => {
-      const healthy = sim.living().filter((c) => !c.health.disease);
+      const healthy = sim.living().filter((c) => !c.health.disease && !immune(sim, c, 'marshFever'));
       if (healthy.length === 0) {
         return false;
       }
@@ -744,14 +744,18 @@ function weightOf(sim: Simulation, event: EventDef): number {
 // Called every tick; at most rolls once per in-game hour.
 export function updateStoryteller(sim: Simulation): void {
   const story = sim.story;
-  if (sim.tick % TICKS_PER_HOUR !== 0 || sim.tick - story.lastEventTick < EVENT_GAP) {
+  if (sim.tick % TICKS_PER_HOUR !== 0) {
     return;
   }
-  const chance = HOURLY_CHANCE * (story.difficulty === 'harsh' ? 1.3 : 1);
-  // A raid still going keeps pushing the breather back, so it counts from the raid's end.
+  // A raid still going keeps pushing the breather back, so it counts from the raid's end (a raid over within
+  // the gap after the last event too).
   if (sim.raid) {
     breather(sim);
   }
+  if (sim.tick - story.lastEventTick < EVENT_GAP) {
+    return;
+  }
+  const chance = HOURLY_CHANCE * (story.difficulty === 'harsh' ? 1.3 : 1);
   if (sim.living().length === 0 || sim.raid || sim.rng.next() >= chance) {
     return;
   }

@@ -302,6 +302,7 @@ function comeHome(sim: Simulation, e: Expedition): void {
     // Whoever they left behind who has since died.
     if (c.spouse >= 0 && sim.colonists[c.spouse]?.health.dead) {
       c.spouse = -1;
+      c.strainedSince = undefined;
     }
     // (They mourned when word reached them on the road.)
     if (c.lover >= 0 && sim.colonists[c.lover]?.health.dead) {
