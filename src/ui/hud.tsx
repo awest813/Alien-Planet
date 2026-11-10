@@ -75,7 +75,16 @@ function useTopBarFit(
     !!(state.diplomacy.request || state.diplomacy.call || state.diplomacy.dispute || state.diplomacy.envoy),
     state.weather.icon,
   ].join();
-  useEffect(() => setLevel(phone() ? 2 : 0), [state.settings.uiScale, state.day, content]);
+  // (Not when the bar first shows: this reset, batched with the first measure's step up, came to nothing, and the
+  // bar sat on two or three rows until something else redrew it.)
+  const fitFor = `${state.settings.uiScale}|${state.day}|${content}`;
+  const fittedFor = useRef(fitFor);
+  useEffect(() => {
+    if (fittedFor.current !== fitFor) {
+      fittedFor.current = fitFor;
+      setLevel(phone() ? 2 : 0);
+    }
+  }, [fitFor]);
   useLayoutEffect(() => {
     const bar = ref.current;
     if (!bar || phone() || level >= FIT_LEVELS.length - 1) {

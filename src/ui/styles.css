@@ -613,6 +613,11 @@ kbd {
 }
 
 /* ---------- Hover card ---------- */
+/* (Beside a colonist's or a tile's card, not over the bottom of it.) */
+.ui:has(.left-column .inspector) .hover-card {
+  left: calc(min(300px, 25vw) + var(--gap));
+}
+
 .hover-card {
   width: 260px;
   font-size: 12px;
@@ -647,8 +652,9 @@ kbd {
 .side-body {
   overflow-y: auto;
   min-height: 0;
-  /* The goals below give way before the alerts do (shrinking together, an alert was sliced in half). */
-  flex: 1 1 0;
+  /* As tall as the goals in it, and the first to give way when the panel runs short (shrinking with the alerts,
+     an alert was sliced in half; with no height of its own, it had none at all and the goals didn't show). */
+  flex: 0 1 auto;
 }
 
 .side-toggle {
@@ -1350,8 +1356,11 @@ button.link:focus-visible {
     overflow-x: auto;
     width: 100%;
     scrollbar-width: none;
-    /* The row scrolls sideways (Village, Factions and the Menu are past the edge): a fade says there's more. */
+    /* The row scrolls sideways (Village, Factions and the Menu are past the edge): a fade says there's more, and
+       room past Menu lets it scroll clear of the fade. */
     mask-image: linear-gradient(to right, #000 85%, transparent);
+    padding-right: 40px;
+    box-sizing: border-box;
   }
 
   /* Draft all stays at the row's start however it's scrolled: a raid's notice says to tap it, and it had been
@@ -1992,6 +2001,44 @@ button.big {
     display: none;
   }
 
+  /* The top bar too: no title, and the screens in one row that scrolls sideways (they wrapped to a third row). */
+  .topbar .title {
+    display: none;
+  }
+
+  .screens {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .screens button,
+  .arch-tools button {
+    flex-shrink: 0;
+  }
+
+  .arch-tools {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  /* A colonist's card stays over the build bar if it runs into it (its tabs were under the tools)... */
+  .ui > .left-column {
+    position: relative;
+    z-index: 6;
+  }
+
+  /* ...and has the build bar's room while it's open: a phone on its side left it one line. Closing the card
+     brings the bar back. (Not a tile's card: every tap on the map opens one.) */
+  .ui:has(.left-column .inspector:not(.tile-card)) > .bottom {
+    display: none;
+  }
+
+  .ui:has(.left-column .inspector:not(.tile-card)) {
+    grid-template-rows: auto auto minmax(0, 1fr) 0;
+  }
+
   /* A phone on its side: the card takes the map's full height (half of it left the card's body no room at all),
      and its body keeps a few lines whatever. */
   .left-column .inspector {
@@ -2156,7 +2203,7 @@ input[type='checkbox'] {
 /* The narrowest phones: Production's and the saves' buttons wrap rather than run off the edge, and the top bar
    keeps food and two resources. */
 @media (max-width: 720px) {
-  .saves td:last-child {
+  .saves td:last-child:not(:has(.target)) {
     white-space: normal;
   }
 }
@@ -2191,9 +2238,10 @@ input[type='checkbox'] {
   visibility: hidden;
 }
 
-/* Touch: a checkbox's label (an expedition's party) is a target big enough to tap, not just the box. */
+/* Touch: a checkbox's label (an expedition's party) is a target big enough to tap, not just the box. (Not a
+   setting's row, which is one already, and keeps its box at the end of the row.) */
 @media (pointer: coarse) {
-  .modal label:has(> input[type='checkbox']) {
+  .modal label:not(.setting):has(> input[type='checkbox']) {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -2217,7 +2265,8 @@ input[type='checkbox'] {
 
 /* A tablet: room for proper touch targets (most controls were 32px or less, the map's Hide 14px, the Story's
    year rows 16px). Phones keep 32px, where room is short. */
-@media (pointer: coarse) and (min-width: 721px) {
+/* (Not a phone on its side, wider than that but with no height to spare for bigger buttons.) */
+@media (pointer: coarse) and (min-width: 721px) and (min-height: 481px) {
   .speeds button,
   .arch-tabs button,
   .arch-tools button,
@@ -2243,9 +2292,21 @@ input[type='checkbox'] {
     align-items: center;
   }
 
-  .minimap-toggle {
+  .minimap-toggle,
+  .minimap-head button {
     min-width: 40px;
     min-height: 32px;
+  }
+
+  /* The small square ones (a card's ◎ and ✕, a dialog's ✕, the side panel's ▶, a trade's − and +). */
+  .modal button,
+  .inspector button,
+  .side button {
+    min-width: 40px;
+  }
+
+  .pause-banner {
+    min-height: 36px;
   }
 
   .colonists-table th .sort {

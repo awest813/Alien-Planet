@@ -96,6 +96,12 @@ export function App() {
   useEffect(() => {
     controller.modalOpen = anyScreen;
   }, [anyScreen]);
+  // A screen opened over the map: a toast about the map is dropped, and only what the screen says shows over it.
+  useEffect(() => {
+    if (screen !== null) {
+      controller.dropToast();
+    }
+  }, [screen]);
 
   // The title screen, help, settings and the pause menu stop the clock while they're open.
   const pausing =

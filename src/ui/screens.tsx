@@ -1,4 +1,4 @@
-import { TOUCH } from './touch';
+import { TOUCH, forTouch } from './touch';
 import { useEffect, useRef, useState } from 'react';
 import { ChronicleYear, UiState, controller } from '../game/controller';
 import { ChronicleKind } from '../sim/chronicle';
@@ -470,7 +470,7 @@ export function ProductionScreen({ onClose }: { onClose: () => void }) {
                   <button
                     className={bill.target > 0 ? 'active' : ''}
                     aria-pressed={bill.target > 0}
-                    title={bill.target > 0 ? 'Click to stop mending' : 'Click to start mending'}
+                    title={forTouch(bill.target > 0 ? 'Click to stop mending' : 'Click to start mending')}
                     onClick={() => set(bill.recipe, bill.target > 0 ? 0 : 1)}
                   >
                     {bill.target > 0 ? 'Mending: on' : 'Mending: off'}
@@ -530,26 +530,41 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
       </p>
       <details>
         <summary>Controls</summary>
-        <ul className="help-steps">
-          <li>
-            <kbd>Space</kbd> pauses, <kbd>1</kbd>–<kbd>3</kbd> set the speed, <kbd>Q</kbd> drafts everyone (or the
-            selected colonist) to fight, <kbd>Esc</kbd> backs out (and opens the menu for saves and settings).
-          </li>
-          <li>
-            <kbd>W</kbd>
-            <kbd>A</kbd>
-            <kbd>S</kbd>
-            <kbd>D</kbd> or right-drag pans, the wheel zooms, the minimap moves the view, <kbd>Tab</kbd> jumps from
-            colonist to colonist, <kbd>H</kbd> brings the view back to the colony.
-          </li>
-          <li>Tool hotkeys are shown on their buttons; hover a button to see what it does and costs.</li>
-        </ul>
+        {TOUCH ? (
+          <ul className="help-steps">
+            <li>
+              Tap a colonist or a tile to see it; with a drafted colonist selected, tap where they should go. Drag to
+              move the view (two fingers while a tool is in hand), pinch to zoom.
+            </li>
+            <li>
+              The top bar pauses and sets the speed; <b>Draft all</b> shows there when there's a fight. <b>Menu</b> has
+              saves, settings and this help.
+            </li>
+            <li>Tap a tool's button to see what it does and costs, then tap or drag on the map to use it.</li>
+          </ul>
+        ) : (
+          <ul className="help-steps">
+            <li>
+              <kbd>Space</kbd> pauses, <kbd>1</kbd>–<kbd>3</kbd> set the speed, <kbd>Q</kbd> drafts everyone (or the
+              selected colonist) to fight, <kbd>Esc</kbd> backs out (and opens the menu for saves and settings).
+            </li>
+            <li>
+              <kbd>W</kbd>
+              <kbd>A</kbd>
+              <kbd>S</kbd>
+              <kbd>D</kbd> or right-drag pans, the wheel zooms, the minimap moves the view, <kbd>Tab</kbd> jumps from
+              colonist to colonist, <kbd>H</kbd> brings the view back to the colony.
+            </li>
+            <li>Tool hotkeys are shown on their buttons; hover a button to see what it does and costs.</li>
+          </ul>
+        )}
       </details>
       <details>
         <summary>The screen</summary>
         <ul className="help-steps">
           <li>
-            <b>Colonist bar</b> (top): click a colonist to inspect their needs, health, social life and skills.
+            <b>Colonist bar</b> (top): {TOUCH ? 'tap' : 'click'} a colonist to inspect their needs, health, social life
+            and skills.
           </li>
           <li>
             <b>Build bar</b> (bottom): orders, zones and buildings in tabs. 🔒 means research comes first.
@@ -558,7 +573,7 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
             <b>Work, Schedule, Production, Research</b> (top bar): who does what, when they sleep, what gets made, and
             what to learn next.
           </li>
-          <li>Click any tile in Select mode for its details; 🌡 shows temperatures on the map.</li>
+          <li>{TOUCH ? 'Tap' : 'Click'} any tile in Select mode for its details; 🌡 shows temperatures on the map.</li>
         </ul>
       </details>
       <details>
@@ -566,7 +581,16 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
         <ul className="help-steps">
           <li>
             Raiders pause the game, and the warning says when they'll reach the colony (on a small map they gather at
-            the edge first). Press <kbd>Q</kbd> to draft everyone (or a selected colonist).
+            the edge first).{' '}
+            {TOUCH ? (
+              <>
+                Tap <b>Draft all</b> in the top bar to draft everyone (or Draft on a selected colonist's card).
+              </>
+            ) : (
+              <>
+                Press <kbd>Q</kbd> to draft everyone (or a selected colonist).
+              </>
+            )}
           </li>
           <li>
             Walls keep raiders out, but not off the fields: some go for the crops and the animals outside. Meet them, or
@@ -646,9 +670,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
           <li>Floors make rooms nicer, roofs keep the rain off open shelters, tool kits make workers faster.</li>
           <li>
             Campfires, hearths and torches burn wood, which haulers bring: keep a woodpile for winter. A fire in the
-            open warms the tiles around it, somewhere to huddle before there's a roof. Click a stockpile to choose what
-            it takes and its priority (haulers move things up to higher ones). Shelves fit three stacks on a tile; lock
-            a door from its card to keep everyone out; <b>Forbid</b> items to keep everyone's hands off them.
+            open warms the tiles around it, somewhere to huddle before there's a roof. {TOUCH ? 'Tap' : 'Click'} a
+            stockpile to choose what it takes and its priority (haulers move things up to higher ones). Shelves fit
+            three stacks on a tile; lock a door from its card to keep everyone out; <b>Forbid</b> items to keep
+            everyone's hands off them.
           </li>
           <li>
             Blood, rubble and tracked-in dirt make rooms uglier, spoil cooking and tending, and sour moods: give someone{' '}
@@ -749,7 +774,7 @@ export function FactionsScreen({ onClose }: { onClose: () => void }) {
                 onClick={() => controller.command({ type: 'fulfilRequest' })}
                 title="They collect it from your stockpiles"
               >
-                Send {r.count} ({r.have} stored)
+                Send {r.count} ({r.have} in stockpiles)
               </button>
             ) : (
               <span className="muted small">
@@ -949,7 +974,7 @@ function WorldNews({ state }: { state: Pick<UiState, 'diplomacy'> }) {
           </p>
           <div className="row">
             <button disabled={d.call.have < d.call.count} onClick={() => world({ kind: 'call', answer: 'goods' })}>
-              Send the goods ({d.call.have} stored)
+              Send the goods ({d.call.have} in stockpiles)
             </button>
             {lender && (
               <>

@@ -2019,6 +2019,15 @@ export class GameController {
     }
   }
 
+  // A screen opened: what the toast said was about the map behind it. (On a phone, a toast shows over a dialog,
+  // and an old one, "New colony founded", sat on Settings' buttons.)
+  public dropToast(): void {
+    if (this.toast) {
+      this.toast = null;
+      this.publish();
+    }
+  }
+
   private notify(text: string): void {
     this.toast = text;
     // Long enough to read: a long one (a siege's instructions, why a button is off) went in two and a half seconds.

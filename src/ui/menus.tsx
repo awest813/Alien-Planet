@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { TOUCH } from './touch';
 import { SAVE_SLOTS, UiState, controller, slotLabel, TradeLine } from '../game/controller';
 import { SaveMeta } from '../game/save-store';
 import {
@@ -638,6 +639,16 @@ const CONTROLS: [string, string][] = [
   ['Letter keys', 'Tools: hover a button in the bottom bar to see its key'],
 ];
 
+// The same on a touch screen, by gesture (the keys and the mouse buttons mean nothing there).
+const TOUCH_CONTROLS: [string, string][] = [
+  ['Tap', 'Select a colonist or a tile; with a drafted colonist selected, send them there'],
+  ['Drag', 'Move the view (with a tool in hand, two fingers)'],
+  ['Pinch', 'Zoom'],
+  ['Hold', 'A Work cell: lower its priority'],
+  ['⏸ / ▶', 'Pause or resume, and the game speed (top bar)'],
+  ['Menu', 'Save, load, settings and help'],
+];
+
 const pickSettings = fields('settings', 'mapSoftened');
 
 export function SettingsScreen({ onClose }: { onClose: () => void }) {
@@ -714,7 +725,7 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
       <h3>Controls</h3>
       <table className="summary">
         <tbody>
-          {CONTROLS.map(([key, what]) => (
+          {(TOUCH ? TOUCH_CONTROLS : CONTROLS).map(([key, what]) => (
             <tr key={key}>
               <td>
                 <kbd>{key}</kbd>

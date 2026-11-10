@@ -789,14 +789,14 @@ export class ColonyScene extends Phaser.Scene {
     }
     if (!label) {
       // A small badge in the tile's corner, so the item itself still shows.
-      label = this.add
-        .text((world.xOf(i) + 1) * TILE, (world.yOf(i) + 1) * TILE, '', {
-          fontFamily: 'monospace',
-          fontSize: '5px',
-          color: '#ffffff',
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          padding: { x: 1, y: 0 },
-        })
+      label = this.mapText((world.xOf(i) + 1) * TILE, (world.yOf(i) + 1) * TILE, '', {
+        // (Not monospace: its dotted zero read as an 8.)
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '5px',
+        color: '#ffffff',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        padding: { x: 1, y: 0 },
+      })
         .setOrigin(1, 1)
         .setResolution(6)
         .setDepth(4.5)
@@ -835,30 +835,27 @@ export class ColonyScene extends Phaser.Scene {
     const head = this.add.image(0, 0, 'pawn-head');
     const figure = this.add.container(0, 0, [legs, body, head]);
     const carry = this.add.image(5, 3, TILESET_KEY, Frames.item(1)).setScale(0.55).setVisible(false);
-    const label = this.add
-      .text(0, -11, c.name, {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '6px',
-        color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 2,
-      })
+    const label = this.mapText(0, -11, c.name, {
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '6px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 2,
+    })
       .setOrigin(0.5, 1)
       .setResolution(4)
       // Names go on their own layer, above every figure, so a neighbour never hides one.
       .setDepth(Depth.PAWNS + 0.5);
-    const zzz = this.add
-      .text(6, -6, 'z', { fontFamily: 'monospace', fontSize: '6px', color: '#cfe3ff' })
+    const zzz = this.mapText(6, -6, 'z', { fontFamily: 'monospace', fontSize: '6px', color: '#cfe3ff' })
       .setResolution(4)
       .setVisible(false);
-    const alert = this.add
-      .text(0, -18, '!', {
-        fontFamily: 'monospace',
-        fontSize: '8px',
-        color: '#ff7a5c',
-        stroke: '#000000',
-        strokeThickness: 2,
-      })
+    const alert = this.mapText(0, -18, '!', {
+      fontFamily: 'monospace',
+      fontSize: '8px',
+      color: '#ff7a5c',
+      stroke: '#000000',
+      strokeThickness: 2,
+    })
       .setOrigin(0.5, 1)
       .setResolution(4)
       .setVisible(false);
@@ -1024,14 +1021,13 @@ export class ColonyScene extends Phaser.Scene {
         const envoy = envoyIds.has(v.id);
         const body = this.add.image(0, 0, 'pawn-body').setTint(envoy ? 0x4a6fa5 : 0x5f9a4a);
         const head = this.add.image(0, 0, 'pawn-head');
-        const label = this.add
-          .text(0, -11, v.name, {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '6px',
-            color: envoy ? '#ffd98a' : '#9fe38a',
-            stroke: '#000000',
-            strokeThickness: 2,
-          })
+        const label = this.mapText(0, -11, v.name, {
+          fontFamily: 'system-ui, sans-serif',
+          fontSize: '6px',
+          color: envoy ? '#ffd98a' : '#9fe38a',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
           .setOrigin(0.5, 1)
           .setResolution(4);
         trader = this.add.container(0, 0, [legs, body, head, label]).setDepth(Depth.PAWNS);
@@ -1138,14 +1134,13 @@ export class ColonyScene extends Phaser.Scene {
         this.raiders.set(e.id, raider);
         this.raiderLabels.set(
           e.id,
-          this.add
-            .text(0, 0, e.name, {
-              fontFamily: 'system-ui, sans-serif',
-              fontSize: '6px',
-              color: allies.has(e.id) ? '#8fe0d8' : '#ff8a8a',
-              stroke: '#000000',
-              strokeThickness: 2,
-            })
+          this.mapText(0, 0, e.name, {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '6px',
+            color: allies.has(e.id) ? '#8fe0d8' : '#ff8a8a',
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
             .setOrigin(0.5, 1)
             .setResolution(4)
             .setDepth(Depth.PAWNS + 0.5),
@@ -1194,14 +1189,13 @@ export class ColonyScene extends Phaser.Scene {
       if (!captive) {
         const body = this.add.image(0, 0, 'pawn-body');
         const head = this.add.image(0, 0, 'raider-head');
-        const label = this.add
-          .text(0, -7, p.name, {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '6px',
-            color: '#ffb070',
-            stroke: '#000000',
-            strokeThickness: 2,
-          })
+        const label = this.mapText(0, -7, p.name, {
+          fontFamily: 'system-ui, sans-serif',
+          fontSize: '6px',
+          color: '#ffb070',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
           .setOrigin(0.5, 1)
           .setResolution(4);
         // Lying down as a downed colonist does (legs and all, turned the same way), the label kept upright.
@@ -1997,6 +1991,15 @@ export class ColonyScene extends Phaser.Scene {
 
   // The world point in the middle of the view, and the view's size, as of last frame.
   private lastView = { w: 0, h: 0, x: 0, y: 0 };
+
+  // Text on the map: drawn at a higher resolution than it shows (setResolution) and smoothed when shrunk to fit.
+  // (The map's pixel art is scaled crisp, nearest pixel: so was the text, which dropped thin strokes at the usual
+  // zoom on an ordinary screen: "Isla" read "Is a", and a 0 read as an 8.)
+  private mapText(x: number, y: number, text: string, style: Phaser.Types.GameObjects.Text.TextStyle) {
+    const label = this.add.text(x, y, text, style);
+    label.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
+    return label;
+  }
 
   // Canvas pixels to the page's, as of last frame.
   private lastPx = 0;

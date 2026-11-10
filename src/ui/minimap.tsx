@@ -1,3 +1,4 @@
+import { TOUCH } from './touch';
 import { useEffect, useRef, useState } from 'react';
 import { controller } from '../game/controller';
 import { NONE, featureDef, terrainDef } from '../sim/defs';
@@ -148,7 +149,7 @@ export function Minimap() {
         width={SIZE * 2}
         height={SIZE * 2}
         style={{ width: SIZE, height: SIZE }}
-        aria-label="Minimap: click to move the view"
+        aria-label={TOUCH ? 'Minimap: tap to move the view' : 'Minimap: click to move the view'}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           panTo(e);
