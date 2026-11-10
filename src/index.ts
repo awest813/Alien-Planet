@@ -5,16 +5,18 @@ import { createRoot } from 'react-dom/client';
 import { sound } from './game/audio';
 import { controller } from './game/controller';
 import { ColonyScene } from './render/colony-scene';
+import { FrameWatch, SHARPNESS_AUTO, autoSharpness, canvasRatio } from './render/sharpness';
 import { triggerEvent } from './sim/storyteller';
 import { App } from './ui/App';
 import './ui/styles.css';
 
 // Phaser draws the world; React draws the management UI on top of it.
 //
-// On a sharp (high-density) screen the canvas has that many more pixels than the page gives it, and is shown at
-// the page's size: drawn at the page's resolution, the browser blew it up and the map looked soft. (At most
-// twice: three times over, a phone's GPU paints more than twice the pixels again for little to see.)
-const pixelRatio = () => Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+// On a sharp (high-density) screen the canvas has more pixels than the page gives it, and is shown at the page's
+// size: drawn at the page's resolution, the browser blew it up and the map looked soft. How many more is the
+// "Map sharpness" setting's (render/sharpness.ts); Auto drops to the page's resolution if the frames run slow.
+let frames = new FrameWatch();
+const pixelRatio = () => canvasRatio(controller.settings.mapSharpness, window.devicePixelRatio, autoSharpness.slow);
 let ratio = pixelRatio();
 const pageSize = () => {
   const box = document.getElementById('game')!.getBoundingClientRect();
@@ -55,6 +57,36 @@ const fit = () => {
 };
 new ResizeObserver(fit).observe(document.getElementById('game')!);
 window.addEventListener('resize', fit);
+
+// The setting changed (and a fresh pick of Auto gives sharp another try).
+let setting = controller.settings.mapSharpness;
+controller.subscribe(() => {
+  if (controller.settings.mapSharpness !== setting) {
+    setting = controller.settings.mapSharpness;
+    if (setting === SHARPNESS_AUTO) {
+      autoSharpness.slow = false;
+      frames = new FrameWatch();
+    }
+  }
+  fit();
+});
+
+// Auto, drawing sharp: watch for slow frames. (Timed by the clock: Phaser's own frame time is smoothed, and said
+// 17 ms for frames a quarter of a second apart.)
+let lastStep = performance.now();
+game.events.on(Phaser.Core.Events.STEP, () => {
+  const now = performance.now();
+  const delta = now - lastStep;
+  lastStep = now;
+  if (autoSharpness.slow || ratio <= 1 || controller.settings.mapSharpness !== SHARPNESS_AUTO || document.hidden) {
+    return;
+  }
+  if (frames.frame(delta)) {
+    autoSharpness.slow = true;
+    fit();
+    controller.hint('The map is drawn less sharply to keep the game running smoothly (Settings: Map sharpness).');
+  }
+});
 
 createRoot(document.getElementById('ui')!).render(createElement(App));
 

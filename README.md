@@ -22,8 +22,9 @@ died, a summary shows how the colony fared.
 
 **Settings** (remembered in the browser): autosave, pausing on raids and on deaths or collapses, sound (off by
 default, with volume sliders for music and for ambience and alerts), day and night lighting, interface
-size, how long notifications stay, camera speed, name labels, the minimap, a list of controls, and a way to
-see the welcome help again.
+size, how long notifications stay, camera speed, map sharpness on high-density screens (Auto starts sharp and
+drops to fast if the game runs slowly), name labels, the minimap, a list of controls, and a way to see the
+welcome help again.
 
 | Action                | Input                                                   |
 | --------------------- | ------------------------------------------------------- |

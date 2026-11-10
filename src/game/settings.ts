@@ -22,6 +22,8 @@ export interface Settings {
   noticeSeconds: number;
   // Keyboard panning speed, as a multiple of normal.
   panSpeed: number;
+  // How sharp the map is drawn on a high-density screen: 0 auto, 1 fast, 2 sharp (render/sharpness.ts).
+  mapSharpness: number;
   // Sound, off until the player turns it on, and its volumes (0..1).
   sound: boolean;
   masterVolume: number;
@@ -64,6 +66,7 @@ export const DEFAULT_SETTINGS: Settings = {
   dayNightLighting: true,
   noticeSeconds: 8,
   panSpeed: 1,
+  mapSharpness: 0,
   sound: false,
   masterVolume: 0.7,
   musicVolume: 0.8,
@@ -93,6 +96,12 @@ export const PAN_SPEEDS = [
   { value: 1.6, label: 'Fast' },
 ];
 
+export const MAP_SHARPNESS = [
+  { value: 0, label: 'Auto' },
+  { value: 2, label: 'Sharp' },
+  { value: 1, label: 'Fast' },
+];
+
 const KEY = 'colony-alpha:settings';
 
 export function loadSettings(): Settings {
@@ -118,6 +127,7 @@ export function loadSettings(): Settings {
   settings.uiScale = snap(settings.uiScale, UI_SCALES, DEFAULT_SETTINGS.uiScale);
   settings.noticeSeconds = snap(settings.noticeSeconds, NOTICE_TIMES, DEFAULT_SETTINGS.noticeSeconds);
   settings.panSpeed = snap(settings.panSpeed, PAN_SPEEDS, DEFAULT_SETTINGS.panSpeed);
+  settings.mapSharpness = snap(settings.mapSharpness, MAP_SHARPNESS, DEFAULT_SETTINGS.mapSharpness);
   for (const key of ['masterVolume', 'musicVolume', 'effectsVolume'] as const) {
     const v = settings[key];
     settings[key] = Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : DEFAULT_SETTINGS[key];

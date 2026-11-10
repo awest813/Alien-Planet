@@ -1998,8 +1998,17 @@ export class ColonyScene extends Phaser.Scene {
   // The world point in the middle of the view, and the view's size, as of last frame.
   private lastView = { w: 0, h: 0, x: 0, y: 0 };
 
+  // Canvas pixels to the page's, as of last frame.
+  private lastPx = 0;
+
   private updateCamera(delta: number): void {
     const cam = this.cameras.main;
+    // The canvas went sharper or less so (the Map sharpness setting, the browser zoomed, another screen): the
+    // map stays the size it was on screen.
+    if (this.lastPx > 0 && this.px !== this.lastPx) {
+      cam.setZoom((cam.zoom * this.px) / this.lastPx);
+    }
+    this.lastPx = this.px;
     // A resize (a phone turned on its side) keeps the same spot in the middle: the scroll is kept from the top-left
     // corner otherwise, and the colony went off the edge of the screen.
     if (this.lastView.w > 0 && (cam.width !== this.lastView.w || cam.height !== this.lastView.h)) {

@@ -1485,6 +1485,11 @@ button.primary:hover:not(:disabled) {
   flex: 1;
 }
 
+/* A line under a setting saying what its choices do. */
+.setting-note {
+  margin: 4px 0 6px;
+}
+
 /* A setting that's a sentence: the box beside the start of it, rather than across the card from its end. */
 .setting.check-first {
   justify-content: flex-start;

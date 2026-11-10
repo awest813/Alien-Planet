@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { SAVE_SLOTS, UiState, controller, slotLabel, TradeLine } from '../game/controller';
 import { SaveMeta } from '../game/save-store';
-import { DEFAULT_SETTINGS, NOTICE_TIMES, PAN_SPEEDS, Settings, UI_SCALES, forgetHelp } from '../game/settings';
+import {
+  DEFAULT_SETTINGS,
+  MAP_SHARPNESS,
+  NOTICE_TIMES,
+  PAN_SPEEDS,
+  Settings,
+  UI_SCALES,
+  forgetHelp,
+} from '../game/settings';
+import { SHARPNESS_AUTO, autoSharpness } from '../render/sharpness';
 import { SAVE_VERSION } from '../sim/serialize';
 import { MAP_SIZE, MAP_SIZES } from '../sim/simulation';
 import { DIFFICULTIES, Difficulty } from '../sim/storyteller';
@@ -665,6 +674,22 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
         onChange={(v) => set({ noticeSeconds: v })}
       />
       <Choice label="Camera speed" value={s.panSpeed} options={PAN_SPEEDS} onChange={(v) => set({ panSpeed: v })} />
+      {/* (Only a sharp screen has the choice: elsewhere the map is drawn one pixel to one already.) */}
+      {window.devicePixelRatio > 1 && (
+        <>
+          <Choice
+            label="Map sharpness"
+            value={s.mapSharpness}
+            options={MAP_SHARPNESS}
+            onChange={(v) => set({ mapSharpness: v })}
+          />
+          <p className="muted small setting-note">
+            {s.mapSharpness === SHARPNESS_AUTO && autoSharpness.slow
+              ? 'Auto has switched to Fast: the game was running slowly. Pick Sharp to keep it sharp anyway.'
+              : 'Sharp uses more battery. Auto starts sharp and switches to Fast if the game runs slowly.'}
+          </p>
+        </>
+      )}
       <Toggle label="Names over colonists and raiders" value={s.showNames} onChange={(v) => set({ showNames: v })} />
       <Toggle label="Minimap" value={s.showMinimap} onChange={(v) => set({ showMinimap: v })} />
       <Toggle label="Lightning flashes" value={s.lightningFlashes} onChange={(v) => set({ lightningFlashes: v })} />
