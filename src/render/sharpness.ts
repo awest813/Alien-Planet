@@ -20,12 +20,12 @@ export function canvasRatio(setting: number, deviceRatio: number, slow: boolean)
   return Math.min(MOST, Math.max(1, deviceRatio || 1));
 }
 
-// Watches frame times for Auto: slow is under about 35 frames a second, on average over a few seconds, twice
-// running (not one busy moment: a map being built, a save loading). The first seconds don't count, nor a frame
+// Watches frame times for Auto: slow is under about 28 frames a second (not 30: a phone saving its battery holds
+// the browser to 30, and that's no reason to blur the map), on average over a few seconds, twice running (not one busy moment: a map being built, a save loading). The first seconds don't count, nor a frame
 // after a long gap (the tab in the background, the machine asleep).
 const WARM_UP_MS = 5000;
 const WINDOW_MS = 3000;
-const SLOW_FRAME_MS = 1000 / 35;
+const SLOW_FRAME_MS = 1000 / 28;
 const GAP_MS = 1000;
 
 export class FrameWatch {

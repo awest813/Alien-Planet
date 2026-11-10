@@ -44,21 +44,29 @@ const game = new Phaser.Game({
 // window moved to another screen).
 const fit = () => {
   const next = pixelRatio();
-  if (next !== ratio) {
-    ratio = next;
-    game.scale.setZoom(1 / ratio);
-  }
   const page = pageSize();
-  const width = Math.round(page.width * ratio);
-  const height = Math.round(page.height * ratio);
-  if (game.scale.width !== width || game.scale.height !== height) {
+  const width = Math.round(page.width * next);
+  const height = Math.round(page.height * next);
+  if (next !== ratio || game.scale.width !== width || game.scale.height !== height) {
+    ratio = next;
     game.scale.resize(width, height);
+    // (After the resize, and every time: it's what sets the canvas's size on the page. A resize alone leaves that
+    // as it was when the zoom is 1, and going from sharp to fast showed the map at twice the size, a quarter of
+    // it on screen.)
+    game.scale.setZoom(1 / ratio);
   }
 };
 new ResizeObserver(fit).observe(document.getElementById('game')!);
 window.addEventListener('resize', fit);
+// The density can change with no resize (the window dragged to another screen): a media query for the present
+// density says when it stops matching.
+const watchDensity = () =>
+  window
+    .matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+    .addEventListener('change', () => (fit(), watchDensity()), { once: true });
+watchDensity();
 
-// The setting changed (and a fresh pick of Auto gives sharp another try).
+// The setting changed (and switching back to Auto from Sharp or Fast gives sharp another try).
 let setting = controller.settings.mapSharpness;
 controller.subscribe(() => {
   if (controller.settings.mapSharpness !== setting) {

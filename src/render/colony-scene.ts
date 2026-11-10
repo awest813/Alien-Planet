@@ -2009,6 +2009,12 @@ export class ColonyScene extends Phaser.Scene {
       cam.setZoom((cam.zoom * this.px) / this.lastPx);
     }
     this.lastPx = this.px;
+    // The view panned by keys or the minimap, a colonist walking up to a still mouse: the hover card is about
+    // what's under it now. (setHover does nothing if that's the same.)
+    const pointer = this.input.activePointer;
+    if (this.game.input.isOver && !pointer.wasTouch && !this.pan && !this.pinch) {
+      controller.setHover(this.tileAt(pointer), this.pickColonist(pointer));
+    }
     // A resize (a phone turned on its side) keeps the same spot in the middle: the scroll is kept from the top-left
     // corner otherwise, and the colony went off the edge of the screen.
     if (this.lastView.w > 0 && (cam.width !== this.lastView.w || cam.height !== this.lastView.h)) {

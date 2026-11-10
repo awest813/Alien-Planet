@@ -10,7 +10,7 @@ import {
   UI_SCALES,
   forgetHelp,
 } from '../game/settings';
-import { SHARPNESS_AUTO, autoSharpness } from '../render/sharpness';
+import { SHARPNESS_AUTO } from '../render/sharpness';
 import { SAVE_VERSION } from '../sim/serialize';
 import { MAP_SIZE, MAP_SIZES } from '../sim/simulation';
 import { DIFFICULTIES, Difficulty } from '../sim/storyteller';
@@ -638,7 +638,7 @@ const CONTROLS: [string, string][] = [
   ['Letter keys', 'Tools: hover a button in the bottom bar to see its key'],
 ];
 
-const pickSettings = fields('settings');
+const pickSettings = fields('settings', 'mapSoftened');
 
 export function SettingsScreen({ onClose }: { onClose: () => void }) {
   const state = useUi(pickSettings);
@@ -684,7 +684,7 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
             onChange={(v) => set({ mapSharpness: v })}
           />
           <p className="muted small setting-note">
-            {s.mapSharpness === SHARPNESS_AUTO && autoSharpness.slow
+            {s.mapSharpness === SHARPNESS_AUTO && state.mapSoftened
               ? 'Auto has switched to Fast: the game was running slowly. Pick Sharp to keep it sharp anyway.'
               : 'Sharp uses more battery. Auto starts sharp and switches to Fast if the game runs slowly.'}
           </p>

@@ -114,6 +114,7 @@ import { Difficulty, coldSnapOn, eclipseOn, heatWaveOn } from '../sim/storytelle
 import { SaveMeta, deleteSave, listSaves, readSave, writeSave } from './save-store';
 import { Settings, loadSettings, storeSettings } from './settings';
 import { share } from './share';
+import { autoSharpness } from '../render/sharpness';
 
 export type Tool =
   | { kind: 'select' }
@@ -1140,6 +1141,8 @@ export interface UiState {
   // For the closing summary.
   legacy: { label: string; value: string | number }[];
   settings: Settings;
+  // The Map sharpness setting's Auto has found the game slow and drawn the map less sharply.
+  mapSoftened: boolean;
   // Whether the player is playing this colony (false for the backdrop behind the title screen).
   inPlay: boolean;
   // The most recent save this version can load, for Continue.
@@ -2245,6 +2248,7 @@ export class GameController {
       beaconHours: sim.beacon.hours,
       legacy: this.legacySummary(),
       settings: this.settings,
+      mapSoftened: autoSharpness.slow,
       inPlay: this.inPlay,
       latestSave: this.latestSave(),
       weather: { label: weatherDef(sim).label, icon: weatherDef(sim).icon },

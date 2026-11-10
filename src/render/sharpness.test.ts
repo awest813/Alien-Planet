@@ -19,8 +19,9 @@ describe('map sharpness', () => {
     expect(canvasRatio(SHARPNESS_SHARP, 0, false)).toBe(1);
   });
 
-  it('stays sharp at a smooth frame rate', () => {
+  it('stays sharp at a smooth frame rate, or held to 30 a second', () => {
     expect(run(new FrameWatch(), 60000, 16.7)).toBe(false);
+    expect(run(new FrameWatch(), 60000, 33.4)).toBe(false);
   });
 
   it('gives up sharpness when the frames stay slow', () => {
