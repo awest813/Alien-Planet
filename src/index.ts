@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { sound } from './game/audio';
 import { controller } from './game/controller';
 import { ColonyScene } from './render/colony-scene';
-import { FrameWatch, SHARPNESS_AUTO, autoSharpness, canvasRatio } from './render/sharpness';
+import { SHARPNESS_AUTO, autoSharpness, canvasRatio, retrySharp } from './render/sharpness';
 import { triggerEvent } from './sim/storyteller';
 import { App } from './ui/App';
 import './ui/styles.css';
@@ -15,7 +15,6 @@ import './ui/styles.css';
 // On a sharp (high-density) screen the canvas has more pixels than the page gives it, and is shown at the page's
 // size: drawn at the page's resolution, the browser blew it up and the map looked soft. How many more is the
 // "Map sharpness" setting's (render/sharpness.ts); Auto drops to the page's resolution if the frames run slow.
-let frames = new FrameWatch();
 const pixelRatio = () => canvasRatio(controller.settings.mapSharpness, window.devicePixelRatio, autoSharpness.slow);
 let ratio = pixelRatio();
 const pageSize = () => {
@@ -66,14 +65,14 @@ const watchDensity = () =>
     .addEventListener('change', () => (fit(), watchDensity()), { once: true });
 watchDensity();
 
-// The setting changed (and switching back to Auto from Sharp or Fast gives sharp another try).
+// The setting changed (and switching back to Auto from Sharp or Fast gives sharp another try; so does the button
+// for it in Settings).
 let setting = controller.settings.mapSharpness;
 controller.subscribe(() => {
   if (controller.settings.mapSharpness !== setting) {
     setting = controller.settings.mapSharpness;
     if (setting === SHARPNESS_AUTO) {
-      autoSharpness.slow = false;
-      frames = new FrameWatch();
+      retrySharp();
     }
   }
   fit();
@@ -89,7 +88,7 @@ game.events.on(Phaser.Core.Events.STEP, () => {
   if (autoSharpness.slow || ratio <= 1 || controller.settings.mapSharpness !== SHARPNESS_AUTO || document.hidden) {
     return;
   }
-  if (frames.frame(delta)) {
+  if (autoSharpness.watch.frame(delta)) {
     autoSharpness.slow = true;
     fit();
     controller.hint('The map is drawn less sharply to keep the game running smoothly (Settings: Map sharpness).');

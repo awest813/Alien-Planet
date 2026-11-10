@@ -7,9 +7,6 @@ export const SHARPNESS_AUTO = 0;
 export const SHARPNESS_FAST = 1;
 export const SHARPNESS_SHARP = 2;
 
-// What Auto has found this visit: whether the frames ran slow and it dropped to fast.
-export const autoSharpness = { slow: false };
-
 // (Three times over, as some phones are, is more than twice the pixels again for little to see.)
 const MOST = 2;
 
@@ -54,4 +51,13 @@ export class FrameWatch {
     this.frames = 0;
     return this.slowWindows >= 2;
   }
+}
+
+// What Auto has found this visit: whether the frames ran slow and it dropped to fast, and its watch on them.
+export const autoSharpness = { slow: false, watch: new FrameWatch() };
+
+// Auto, try sharp again (the player asked, from Settings): it watches the frames afresh.
+export function retrySharp(): void {
+  autoSharpness.slow = false;
+  autoSharpness.watch = new FrameWatch();
 }
