@@ -1496,6 +1496,15 @@ export class Simulation {
             w.markDirty(i);
           }
         });
+        // Anyone already on their way to a stack just forbidden turns back (they took it anyway).
+        if (cmd.on) {
+          for (const c of this.living()) {
+            const from = c.job?.source ?? -1;
+            if (from >= 0 && w.forbidden[from] === 1 && c.reserved.includes(`i${from}`)) {
+              this.endJob(c);
+            }
+          }
+        }
         break;
       case 'hunt':
       case 'tame': {
@@ -2387,13 +2396,13 @@ export class Simulation {
     return terrain === ICE || terrainDef(terrain).key.endsWith('Water');
   }
 
-  // A building lost to fire or raiders goes straight back on the build list.
+  // A building lost to fire or raiders goes straight back on the build list (true if it did).
   // Not if it was marked for taking down anyway (the mark goes with it), and not while raiders are
   // still about: builders would walk into the breach.
-  public rebuild(i: number, feature: number): void {
+  public rebuild(i: number, feature: number): boolean {
     // A work of art is gone for good: nobody can carve the same piece again.
     if (featureDef(feature).art) {
-      return;
+      return false;
     }
     const w = this.world;
     if (w.designation[i] !== Designation.NONE) {
@@ -2401,16 +2410,18 @@ export class Simulation {
       w.designation[i] = Designation.NONE;
       w.markDirty(i);
       if (unwanted) {
-        return;
+        return false;
       }
     }
     if (this.raid) {
       this.pendingRebuilds.push([i, feature]);
-      return;
+      return true;
     }
     if (w.feature[i] === NONE && (w.blueprint[i] === NONE || !w.blueprintBlocks(i))) {
       this.placeBlueprint(i, feature);
+      return true;
     }
+    return false;
   }
 
   // Once a raid's over, the breaches go back on the build list.
@@ -3592,10 +3603,10 @@ export class Simulation {
     c.breakKind = 'daze';
     w.setFeature(i, NONE);
     w.addFilth(i, Filth.RUBBLE, 2);
-    this.rebuild(i, f);
+    const again = this.rebuild(i, f);
     this.stats.smashed = (this.stats.smashed ?? 0) + 1;
     this.addLog(
-      `${c.name} smashed ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name} in a rage. It's marked for rebuilding.`,
+      `${c.name} smashed ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name} in a rage.${again ? " It's marked for rebuilding." : ''}`,
       'warn',
       true,
     );
@@ -3609,7 +3620,8 @@ export class Simulation {
     if (home === undefined) {
       return undefined;
     }
-    const region = this.regionOf(home);
+    // (The middle of the colony may be a wall or a stove, in no region at all: the walkable tile nearest it.)
+    const region = this.regionOf(this.world.isPassable(home) ? home : (this.world.nearestPassable(home) ?? home));
     return this.nearest(
       home,
       (i) =>
@@ -6453,9 +6465,13 @@ export class Simulation {
       this.nearestIn('buildings', c.tile, (i) => isBed(i) && this.isIndoors(i) && free(i), 1)[0] ??
       this.nearest(c.tile, (i) => w.feature[i] === NONE && w.isPassable(i) && this.isIndoors(i) && free(i), 1)[0] ??
       this.nearestIn('buildings', c.tile, (i) => isBed(i) && free(i), 1)[0] ??
-      c.tile;
+      // Where they stand, unless that's someone else's bed (a doctor who'd just tended the sleeper lay down
+      // on top of them, and took the bed's reservation with them when they got up).
+      (free(c.tile) ? c.tile : (w.neighbors(c.tile).find((n) => w.isPassable(n) && free(n)) ?? c.tile));
     const path = this.pathfinder.find(c.tile, [spot]) ?? [];
-    this.reserve(c, `b${spot}`);
+    if (!this.isReserved(`b${spot}`, c)) {
+      this.reserve(c, `b${spot}`);
+    }
     c.restTicks = 0;
     c.restOutside = 0;
     c.restCold = 0;
@@ -7336,11 +7352,31 @@ export class Simulation {
     if (!this.isIndoors(p.tile) || this.world.fire[p.tile] > 0) {
       return true;
     }
-    // Already indoors: only worth moving if there's somewhere comfortable indoors to take them.
-    if (this.comfortableFor(p, p.tile)) {
-      return false;
-    }
     const region = this.regionOf(p.tile);
+    // Already indoors and comfortable: only worth moving off the floor into a free bed (someone who collapsed
+    // in the hut was tended where they lay, beside empty hospital beds).
+    if (this.comfortableFor(p, p.tile)) {
+      const here = this.world.feature[p.tile];
+      if (here !== NONE && featureDef(here).bed) {
+        return false;
+      }
+      const taken = new Set(this.living().map((o) => o.tile));
+      return (
+        this.nearestIn(
+          'buildings',
+          p.tile,
+          (i) =>
+            this.world.feature[i] !== NONE &&
+            !!featureDef(this.world.feature[i]).bed &&
+            this.regions.region[i] === region &&
+            !taken.has(i) &&
+            !this.isReserved(`b${i}`, p) &&
+            this.isIndoors(i) &&
+            this.comfortableFor(p, i),
+          1,
+        ).length > 0
+      );
+    }
     return (
       this.nearest(
         p.tile,
@@ -7368,17 +7404,21 @@ export class Simulation {
     const occupied = new Set(this.living().map((o) => o.tile));
     const open = (i: number) =>
       w.isPassable(i) && this.regions.region[i] === region && !occupied.has(i) && !this.isReserved(`b${i}`, c);
-    const bed = this.nearestIn(
-      'buildings',
-      patient.tile,
-      (i) =>
-        w.feature[i] !== NONE &&
-        featureDef(w.feature[i]).bed &&
-        open(i) &&
-        this.isIndoors(i) &&
-        this.comfortableFor(patient, i),
-      1,
-    )[0];
+    const bedFor = (hospital: boolean) =>
+      this.nearestIn(
+        'buildings',
+        patient.tile,
+        (i) =>
+          w.feature[i] !== NONE &&
+          featureDef(w.feature[i]).bed &&
+          (!hospital || this.isHospitalBed(i)) &&
+          open(i) &&
+          this.isIndoors(i) &&
+          this.comfortableFor(patient, i),
+        1,
+      )[0];
+    // A hospital bed first: the worst hurt were laid in whichever bed was nearest, and never healed in one.
+    const bed = bedFor(true) ?? bedFor(false);
     if (bed !== undefined) {
       return bed;
     }
@@ -7406,6 +7446,10 @@ export class Simulation {
       (o) =>
         o !== c &&
         !o.health.downed &&
+        // (Not a drafted doctor, who's holding the line and won't come, nor one too cold or hot to.)
+        !o.drafted &&
+        o.health.hypothermia <= 0.5 &&
+        o.health.heatstroke <= 0.5 &&
         o.priorities.doctor > 0 &&
         canWork(o, 'doctor') &&
         !this.inMentalBreak(o) &&

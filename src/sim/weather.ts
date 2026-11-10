@@ -158,7 +158,7 @@ const FIRE_SPREAD = 0.04;
 // In the rain, the chance per hour that a fire is put out (leaving what was burning standing).
 const RAIN_DOUSE = 2;
 // Things that don't burn when the fire under them burns out.
-const FIREPROOF = new Set(['stone', 'stoneBlocks', 'silver']);
+const FIREPROOF = new Set(['stone', 'stoneBlocks', 'silver', 'iron', 'ironOre', 'bricks', 'clay']);
 
 // Advances every fire by `hours`: burning down what's on fire, spreading to neighbours (fast in
 // a drought), scorching anyone standing in the flames. Rain stops the spread and soon puts it out.
@@ -222,8 +222,9 @@ function burnOut(sim: Simulation, tile: number): void {
     // back on the build list.
     if (!def.natural && !def.crop) {
       w.addFilth(tile, Filth.RUBBLE, 2);
-      sim.rebuild(tile, feature);
-      sim.addLog(`Fire destroyed a ${def.name.toLowerCase()}. It's marked for rebuilding.`, 'warn');
+      // (Said only if it is: a sculpture is gone for good, and so is anything that was to come down anyway.)
+      const again = sim.rebuild(tile, feature);
+      sim.addLog(`Fire destroyed a ${def.name.toLowerCase()}.${again ? " It's marked for rebuilding." : ''}`, 'warn');
     }
   }
   w.markDirty(tile);

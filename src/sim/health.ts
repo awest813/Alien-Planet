@@ -374,7 +374,8 @@ export function die(sim: Simulation, c: Colonist, cause: string): void {
   sim.events.push('death');
   // Thoughts for everyone left behind, by how close they were (worked out before the widowed are freed).
   mourn(sim, c);
-  for (const other of sim.living()) {
+  // (Those away on the road too: they came home still tied to the dead, and never loved again.)
+  for (const other of sim.colonists.filter((o) => !o.health.dead)) {
     if (other.spouse === c.id) {
       other.spouse = -1;
     }
