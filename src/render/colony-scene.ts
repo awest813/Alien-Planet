@@ -1950,11 +1950,7 @@ export class ColonyScene extends Phaser.Scene {
       } else if (key === 'h') {
         controller.focusHome();
       } else if (key === 'q') {
-        if (controller.selectedColonist !== null) {
-          controller.toggleDraft(controller.selectedColonist);
-        } else {
-          controller.toggleDraftAll();
-        }
+        controller.draftKey();
       } else {
         const tool = TOOLS.find((t) => t.hotkey === key);
         if (tool) {

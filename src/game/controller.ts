@@ -1627,8 +1627,26 @@ export class GameController {
     if (draft && this.toast?.includes('Press Q')) {
       this.toast = null;
     }
-    for (const c of able) {
+    // (Standing down takes in a drafted colonist who has since collapsed: left drafted, they got up and stood
+    // about doing nothing.)
+    for (const c of draft ? able : this.sim.living().filter((c) => c.drafted)) {
       this.command({ type: 'draft', colonist: c.id, drafted: draft });
+    }
+  }
+
+  // The Q key: the selected colonist if they can be drafted (or stood down), otherwise everyone. A selection
+  // who has died, collapsed or is a child would swallow the key in the middle of a raid.
+  public draftKey(): void {
+    const c = this.selectedColonist === null ? undefined : this.sim.colonists[this.selectedColonist];
+    const can =
+      c &&
+      !c.health.dead &&
+      !c.away &&
+      (c.drafted || (!c.health.downed && c.age >= DRAFT_AGE && !this.sim.inMentalBreak(c)));
+    if (c && can) {
+      this.toggleDraft(c.id);
+    } else {
+      this.toggleDraftAll();
     }
   }
 
@@ -2322,7 +2340,7 @@ export class GameController {
       // The story is over: nothing more to say about the beacon.
     } else if (sim.beacon.landed) {
       alerts.push({
-        text: 'The ship is waiting beside the beacon: board it, or stay (Legacy goal)',
+        text: 'The ship is waiting beside the beacon: board it, or stay (Ship, on the top bar)',
         // (Not calm: it waits only so long, and a calm alert sorted under "more".)
         tone: 'warn',
         tile: beacon,

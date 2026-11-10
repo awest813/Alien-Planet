@@ -32,6 +32,7 @@ export function Modal({
   closeButton?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
+  const downOnBackdrop = useRef(false);
   // Keyboard focus moves into the dialog when it opens (unless a button in it already took it), Tab keeps it
   // there, and on closing it goes back to wherever it was.
   useEffect(() => {
@@ -72,7 +73,13 @@ export function Modal({
     };
   }, []);
   return (
-    <div className="modal-backdrop" onClick={closable ? onClose : undefined}>
+    <div
+      className="modal-backdrop"
+      // A click on the backdrop closes the dialog, but only one that began there: a slider or a text selection
+      // dragged past the panel's edge and let go over the backdrop is a click on it too, to the browser.
+      onPointerDown={(e) => (downOnBackdrop.current = e.target === e.currentTarget)}
+      onClick={closable ? (e) => e.target === e.currentTarget && downOnBackdrop.current && onClose() : undefined}
+    >
       <div
         ref={panel}
         role="dialog"

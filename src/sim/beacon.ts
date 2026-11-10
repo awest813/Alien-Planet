@@ -101,7 +101,9 @@ export function chooseToStay(
   sim: Simulation,
   why = 'The colony has chosen to stay. The ship lifts off without them.',
 ): void {
-  sim.beacon = { hours: 0, choice: 'stay' };
+  // The beacon falls quiet until the player signals again: left transmitting, it started over at once, raiders
+  // and all (and a ship nobody answered, with a party away, came back every week).
+  sim.beacon = { hours: 0, choice: 'stay', silent: true };
   sim.addLog(why, 'info', true);
 }
 

@@ -1405,8 +1405,6 @@ export class Simulation {
             }
           } else {
             chooseToStay(this);
-            // The beacon falls quiet until the player signals again (it started over at once, raiders and all).
-            this.beacon.silent = true;
           }
         }
         break;

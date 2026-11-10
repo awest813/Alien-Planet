@@ -1087,8 +1087,14 @@ export function updateEnemies(sim: Simulation): void {
       // Nobody left to fight: leave. Everyone downed is a defeat; nobody reachable, a withdrawal.
       // (Only once the last of them gives up: one raider cut off from everyone isn't the raid withdrawing,
       // and an outcome stops allies setting off.)
-      if (sim.raid && !sim.raid.outcome && !sim.enemies.some((o) => o !== e && o.hp > 0 && !o.fleeing)) {
-        sim.raid.outcome = sim.living().some((c) => !c.health.downed) ? 'withdrew' : 'overrun';
+      // (Nobody standing is a defeat at once, whoever notices: left to the last raider, the others' leaving
+      // looked like their nerve breaking, and a colony wiped out was written down as a raid repelled.)
+      if (sim.raid && !sim.raid.outcome) {
+        if (!sim.living().some((c) => !c.health.downed)) {
+          sim.raid.outcome = 'overrun';
+        } else if (!sim.enemies.some((o) => o !== e && o.hp > 0 && !o.fleeing)) {
+          sim.raid.outcome = 'withdrew';
+        }
       }
       e.fleeing = true;
       e.path = [];
@@ -1175,16 +1181,19 @@ export function updateEnemies(sim: Simulation): void {
         e.path = [];
       }
       raid.outcome ??= broken ? 'repelled' : 'withdrew';
-      sim.addLog(
-        broken
-          ? raid.thieves
-            ? 'The thieves are running for it!'
-            : 'The raiders are fleeing!'
-          : raid.arrivedTick === undefined
-            ? 'The raiders turned back before reaching the colony.'
-            : 'The raiders are giving up and leaving.',
-        broken ? 'good' : 'info',
-      );
+      // (Raiders walking away from a colony they've flattened aren't fleeing; the end of the raid says it.)
+      if (raid.outcome !== 'overrun') {
+        sim.addLog(
+          broken
+            ? raid.thieves
+              ? 'The thieves are running for it!'
+              : 'The raiders are fleeing!'
+            : raid.arrivedTick === undefined
+              ? 'The raiders turned back before reaching the colony.'
+              : 'The raiders are giving up and leaving.',
+          broken ? 'good' : 'info',
+        );
+      }
     }
   }
   sim.enemies = sim.enemies.filter((e) => e.hp > 0);
@@ -1198,7 +1207,8 @@ export function updateEnemies(sim: Simulation): void {
     const standing = sim.living().filter((c) => !c.health.downed);
     // Every raider fell without the raid breaking first: that's a win too.
     const outcome = raid.outcome ?? (standing.length > 0 ? 'repelled' : 'overrun');
-    if (raid.siege && outcome !== 'overrun') {
+    // (Beaten, not bought off: a siege paid to go away, or one that gave up, wasn't seen off.)
+    if (raid.siege && outcome === 'repelled') {
       sim.stats.siegesSeenOff = (sim.stats.siegesSeenOff ?? 0) + 1;
     }
     if (raid.thieves) {
@@ -1473,11 +1483,13 @@ export function maybeSendAllies(sim: Simulation): void {
     return;
   }
   // They mean to get there when the raiders do (against a siege, for the attack, not to storm the camp
-  // alone), so they set off a walk from the nearest edge ahead of that.
+  // alone), so they reach the nearest edge a walk ahead of that.
   const contact = raid.siege && !raid.siege.attacking ? raid.siege.attackAt : (raid.contactAt ?? sim.tick);
   const home = sim.homeTile() ?? sim.living()[0]?.tile;
   const walk = home === undefined ? 0 : fromEdgeTicks(sim.world, home, raiderTilesPerTick(1));
-  const from = Math.max(sim.tick, contact - walk);
+  // (For a siege still in its camp they reach the edge as the attack begins: a walk early, they went
+  // straight for the camp and fought it alone.)
+  const from = Math.max(sim.tick, besieging(sim) ? contact : contact - walk);
   // Hired, they come for sure, on time, and in strength.
   if (fightersHired(sim)) {
     raid.allies = Math.max(3, Math.min(5, Math.round(raid.initial / 2)));

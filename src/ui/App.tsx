@@ -62,7 +62,8 @@ export function App() {
 
   const actions: MenuActions = {
     // A new player gets the welcome help as their first colony starts.
-    onPlay: () => setScreen(helpSeen() ? null : 'help'),
+    // (A game loaded with the ship waiting opens on its choice: this runs after the effect below, and closed it.)
+    onPlay: () => setScreen(controller.getState().ship === 'landed' ? 'ship' : helpSeen() ? null : 'help'),
     onSettings: openFromMenu('settings'),
     onHelp: openFromMenu('help'),
     onStory: () => setScreen('story'),
@@ -190,10 +191,9 @@ export function App() {
       return;
     }
     const onUp = (e: PointerEvent) => {
-      const off = document
-        .elementsFromPoint(e.clientX, e.clientY)
-        .find((el): el is HTMLButtonElement => el instanceof HTMLButtonElement && el.disabled && !!el.title);
-      if (off) {
+      // (Only the button on top: one hidden behind a dialog said its piece when the dialog was tapped.)
+      const off = document.elementFromPoint(e.clientX, e.clientY)?.closest('button');
+      if (off?.disabled && off.title) {
         controller.hint(off.title);
       }
     };
@@ -240,7 +240,7 @@ export function App() {
           </div>
           <Notices paused={state.speed === 0 && !screen && !state.fallen} />
           {state.fallen && !screen && <FallenScreen actions={actions} />}
-          {departed && !state.fallen && <DepartedScreen actions={actions} />}
+          {departed && !state.fallen && !screen && <DepartedScreen actions={actions} />}
           {screen === 'ship' && !departed && <ShipScreen onClose={close} />}
           {screen === 'menu' && <PauseMenu onClose={close} actions={actions} />}
           {screen === 'work' && <WorkScreen onClose={close} />}

@@ -116,6 +116,7 @@ const pickTopBar = (s: UiState) => ({
     'trade',
     'weather',
     'settings',
+    'ship',
   )(s),
   // Someone who could still be drafted.
   anyFree: s.colonists.some(
@@ -244,6 +245,12 @@ export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
             onClick={() => onOpen('trade')}
           >
             Trade
+          </button>
+        )}
+        {/* The ship waits a day: its choice stays one click away after the dialog is closed. */}
+        {state.ship === 'landed' && (
+          <button className="primary" onClick={() => onOpen('ship')} title="The ship is waiting: board it, or stay">
+            Ship
           </button>
         )}
         <button onClick={() => onOpen('help')} title="How to play" aria-label="How to play">

@@ -117,7 +117,15 @@ function standDownAfterPack(sim: Simulation): void {
     sim.story.beastHunt = false;
     sim.addLog('Colonists stand down.', 'info');
   } else {
-    sim.addLog('The maddened animals are dealt with. Colonists stand down.', 'good', true);
+    // (Dealt with only if someone's left standing: a pack that ran out of colonists to maul has just gone.)
+    const standing = sim.living().some((c) => !c.health.downed);
+    sim.addLog(
+      standing
+        ? 'The maddened animals are dealt with. Colonists stand down.'
+        : 'The maddened animals have gone, leaving the colony for dead.',
+      standing ? 'good' : 'danger',
+      true,
+    );
   }
   if (!sim.raid) {
     for (const c of sim.living()) {
@@ -211,11 +219,20 @@ function stalk(sim: Simulation, a: Animal): boolean {
 
 // The nearest colonist a raging animal can reach and still has to bring down.
 function nearestPrey(sim: Simulation, a: Animal): Colonist | undefined {
+  const w = sim.world;
   const region = sim.regionOf(a.tile);
-  return sim
+  const prey = sim
     .living()
     .filter((c) => !c.health.downed && sim.regionOf(c.tile) === region)
-    .sort((x, y) => sim.world.distance(a.tile, x.tile) - sim.world.distance(a.tile, y.tile))[0];
+    .sort((x, y) => w.distance(a.tile, x.tile) - w.distance(a.tile, y.tile));
+  // Animals don't pass gates, so someone inside a pen is out of reach: the next nearest, then (a whole pack
+  // gave up and went home because the nearest colonist was in with the sheep).
+  const blocked = gateFilter(sim, a);
+  return blocked
+    ? prey.find((c) =>
+        sim.pathfinder.find(a.tile, [c.tile, ...w.neighbors(c.tile).filter((n) => w.isPassable(n))], blocked),
+      )
+    : prey[0];
 }
 
 // A beast a neighbour wants dealt with: a great boar, far tougher than most, that roams the valley
@@ -734,9 +751,15 @@ export function updateAnimals(sim: Simulation): void {
       } else if (a.path.length === 0 || sim.tick % 30 === 0) {
         pathTo(sim, a, [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))]);
         if (a.path.length === 0) {
-          a.revengeOn = -1;
-          a.leaving ||= !!a.manhunter;
-          a.manhunter = false;
+          // Out of reach (behind a pen's gate, say): someone else if there is anyone, or it gives up.
+          const next = a.manhunter ? nearestPrey(sim, a) : undefined;
+          if (next && next !== target) {
+            a.revengeOn = next.id;
+          } else {
+            a.revengeOn = -1;
+            a.leaving ||= !!a.manhunter;
+            a.manhunter = false;
+          }
         }
       }
     } else if (a.tame && guard(sim, a)) {

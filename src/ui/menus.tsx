@@ -362,7 +362,11 @@ export function PauseMenu({ onClose, actions }: { onClose: () => void; actions: 
       )}
       {view === 'saves' && (
         <>
-          <SaveSlots state={state} manage onLoaded={onClose} />
+          <SaveSlots
+            state={state}
+            manage
+            onLoaded={() => (controller.getState().ship === 'landed' ? actions.onPlay() : onClose())}
+          />
           <p className="muted">
             {state.settings.autosave
               ? 'The game autosaves every dawn and when you leave the page.'

@@ -472,3 +472,35 @@ describe('a maddened pack on its way', () => {
     expect(line).toMatch(/coming, gathering at the edge/);
   });
 });
+
+describe('drafting with Q', () => {
+  it('drafts everyone when the selected colonist cannot be drafted', () => {
+    const { sim } = colony('q-dead');
+    controller.selectedColonist = 0;
+    sim.colonists[0].health.downed = true;
+    controller.draftKey();
+    expect(sim.colonists.map((c) => c.drafted)).toEqual([false, true, true]);
+    // With someone able selected, the key is theirs alone.
+    controller.selectedColonist = 1;
+    controller.draftKey();
+    expect(sim.colonists.map((c) => c.drafted)).toEqual([false, false, true]);
+  });
+
+  it('stands down a drafted colonist who has since collapsed', () => {
+    const { sim } = colony('q-downed');
+    controller.selectedColonist = null;
+    controller.toggleDraftAll();
+    expect(sim.colonists.every((c) => c.drafted)).toBe(true);
+    sim.colonists[0].health.downed = true;
+    controller.toggleDraftAll();
+    expect(sim.colonists.map((c) => c.drafted)).toEqual([false, false, false]);
+  });
+});
+
+describe('the ship waiting', () => {
+  it('says where its choice is found once the dialog is closed', () => {
+    const { sim } = colony('ship-waits');
+    sim.beacon.landed = true;
+    expect(texts().some((t) => t.includes('Ship, on the top bar'))).toBe(true);
+  });
+});
