@@ -1589,6 +1589,14 @@ export class GameController {
     }
   }
 
+  // The pause menu's Resume: the clock runs once the menu closes, even if the game was paused before it opened
+  // (by the player, a raid or a load). A new colony still waits for its first orders.
+  public resumeAfterHold(): void {
+    if (this.heldSpeed === 0 && !this.notStarted) {
+      this.heldSpeed = this.resumeSpeed;
+    }
+  }
+
   public releasePause(): void {
     if (this.heldSpeed !== null) {
       const speed = this.heldSpeed;
@@ -1773,8 +1781,14 @@ export class GameController {
     // Offer the same choices next time.
     this.setSettings({ newDifficulty: difficulty, newMapSize: size, newBiome: biome, newMap: map });
     const trimmed = seedText.trim();
+    // A number typed as the seed is used as it is, if it fits the generator's 32 bits; anything else (words, or
+    // digits too long to keep exactly) is hashed, so the seed shown is always one that gives this map again.
     const seed =
-      trimmed === '' ? Math.floor(Math.random() * 1e9) : /^\d+$/.test(trimmed) ? Number(trimmed) : hashSeed(trimmed);
+      trimmed === ''
+        ? Math.floor(Math.random() * 1e9)
+        : /^\d{1,10}$/.test(trimmed) && Number(trimmed) <= 0xffffffff
+          ? Number(trimmed)
+          : hashSeed(trimmed);
     this.replaceSim(Simulation.newColony(seed, difficulty, size, { biome, map }));
     this.inPlay = true;
     // The clock waits for the player: there's a deadline (the first nightfall), and reading the goals and

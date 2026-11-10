@@ -617,7 +617,8 @@ export function askForFood(sim: Simulation, faction: number): string | null {
     return `${f.name} would help a closer friend (goodwill ${AID_GOODWILL} needed).`;
   }
   if (aidDays(sim) > 0) {
-    return `They sent food not long ago (again in ${aidDays(sim)} days).`;
+    const wait = aidDays(sim);
+    return `They sent food not long ago (again in ${wait} day${wait === 1 ? '' : 's'}).`;
   }
   const home = sim.homeTile();
   if (home === undefined) {
@@ -657,7 +658,8 @@ export function buySettler(sim: Simulation, faction: number): string | null {
     return `${f.name} won't send one of their own to a colony they hardly know (goodwill ${SETTLER_GOODWILL} needed).`;
   }
   if (settlerDays(sim) > 0) {
-    return `Nobody else is ready to leave for a while (${settlerDays(sim)} days).`;
+    const wait = settlerDays(sim);
+    return `Nobody else is ready to leave for a while (${wait} day${wait === 1 ? '' : 's'}).`;
   }
   const cost = settlerCost(sim);
   if (colonyStock(sim, itemId('silver')) < cost) {

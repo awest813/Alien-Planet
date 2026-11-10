@@ -44,7 +44,7 @@ export interface MenuActions {
 const saveDetails = (meta: SaveMeta) =>
   [
     `Day ${meta.day}, ${String(meta.hour).padStart(2, '0')}:00`,
-    meta.colonists !== undefined ? `${meta.colonists} colonists` : null,
+    meta.colonists !== undefined ? `${meta.colonists} colonist${meta.colonists === 1 ? '' : 's'}` : null,
     DIFFICULTIES.find((d) => d.key === meta.difficulty)?.label ?? null,
     meta.biome && meta.biome !== 'temperate' ? (BIOME_LIST.find((b) => b.key === meta.biome)?.label ?? null) : null,
     meta.mapSize !== undefined
@@ -331,6 +331,7 @@ export function PauseMenu({ onClose, actions }: { onClose: () => void; actions: 
   const state = useUi(pickPause);
   const [view, setView] = useMenuView<'saves' | 'new'>();
   const current = DIFFICULTIES.find((d) => d.key === state.difficulty);
+  const living = state.colonists.filter((c) => !c.dead).length;
   return (
     <Modal
       title="Paused"
@@ -339,14 +340,21 @@ export function PauseMenu({ onClose, actions }: { onClose: () => void; actions: 
       footer={view !== 'main' && <button onClick={() => setView('main')}>Back</button>}
     >
       <p className="muted">
-        Day {state.day} · {state.colonists.filter((c) => !c.dead).length} colonists · {current?.label} ·{' '}
+        Day {state.day} · {living} colonist{living === 1 ? '' : 's'} · {current?.label} ·{' '}
         {BIOME_LIST.find((b) => b.key === state.biome)?.label} ·{' '}
         {MAP_SIZES.find((m) => m.size === state.mapSize)?.label ?? `${state.mapSize}×${state.mapSize}`} map · seed{' '}
         {state.seed}
       </p>
       {view === 'main' && (
         <div className="title-buttons">
-          <button className="primary" autoFocus onClick={onClose}>
+          <button
+            className="primary"
+            autoFocus
+            onClick={() => {
+              controller.resumeAfterHold();
+              onClose();
+            }}
+          >
             Resume
           </button>
           <button onClick={() => setView('saves')}>Save or load</button>

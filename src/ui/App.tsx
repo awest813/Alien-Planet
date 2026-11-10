@@ -238,7 +238,7 @@ export function App() {
             <HoverCard />
             <Architect />
           </div>
-          <Notices paused={state.speed === 0 && !screen && !state.fallen} />
+          <Notices paused={state.speed === 0 && !screen && !state.fallen && !departed} />
           {state.fallen && !screen && <FallenScreen actions={actions} />}
           {departed && !state.fallen && !screen && <DepartedScreen actions={actions} />}
           {screen === 'ship' && !departed && <ShipScreen onClose={close} />}

@@ -122,6 +122,7 @@ const pickTopBar = (s: UiState) => ({
   anyFree: s.colonists.some(
     (c) => !c.dead && c.status !== 'Downed' && c.status !== 'Away' && !c.drafted && !c.inBreak && c.age >= DRAFT_AGE,
   ),
+  anyDrafted: s.colonists.some((c) => !c.dead && c.drafted),
 });
 
 const pickClock = fields('night', 'season', 'day', 'time', 'year');
@@ -208,7 +209,7 @@ export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
         )}
       </div>
       <nav className="screens">
-        {(state.raid || state.animalsAttacking) && (
+        {(state.raid || state.animalsAttacking) && (anyFree || state.anyDrafted) && (
           <button
             className="danger draft-all"
             onClick={() => controller.toggleDraftAll()}
@@ -923,7 +924,7 @@ export function SidePanel({ onOpen }: { onOpen: (screen: Screen) => void }) {
         className="panel side-toggle"
         onClick={() => setOpen(true)}
         title="Show alerts and goals"
-        aria-label={`Show alerts and goals (${state.alerts.length} alerts)`}
+        aria-label={`Show alerts and goals (${state.alerts.length} alert${state.alerts.length === 1 ? '' : 's'})`}
       >
         ◀ {state.alerts.length > 0 && <span className={`badge ${danger ? 'danger' : ''}`}>{state.alerts.length}</span>}
       </button>
@@ -943,7 +944,9 @@ export function SidePanel({ onOpen }: { onOpen: (screen: Screen) => void }) {
           {alerts.length > ALERTS_SHOWN && (
             <li className="more">
               <button className="link" onClick={() => setAllAlerts(!allAlerts)}>
-                {allAlerts ? 'Show fewer' : `${alerts.length - ALERTS_SHOWN} more alerts`}
+                {allAlerts
+                  ? 'Show fewer'
+                  : `${alerts.length - ALERTS_SHOWN} more alert${alerts.length - ALERTS_SHOWN === 1 ? '' : 's'}`}
               </button>
             </li>
           )}

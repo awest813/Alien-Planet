@@ -247,3 +247,18 @@ test('a drag that ends outside a dialog does not close it', async ({ page }) => 
   await expect(dialog).toBeHidden();
   expect(errors).toEqual([]);
 });
+
+test('keyboard focus goes back to the Menu button when the pause menu closes', async ({ page }) => {
+  const errors = watchErrors(page);
+  await startColony(page);
+  const menu = page.locator('.screens button', { hasText: /^Menu$/ });
+  await menu.focus();
+  await page.keyboard.press('Enter');
+  const paused = page.getByRole('dialog', { name: 'Paused' });
+  await expect(paused).toBeVisible();
+  // Resume, which has the focus as the menu opens, isn't where it goes back to.
+  await page.keyboard.press('Escape');
+  await expect(paused).toBeHidden();
+  await expect(menu).toBeFocused();
+  expect(errors).toEqual([]);
+});

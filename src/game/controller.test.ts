@@ -504,3 +504,31 @@ describe('the ship waiting', () => {
     expect(texts().some((t) => t.includes('Ship, on the top bar'))).toBe(true);
   });
 });
+
+describe('fourth audit: the interface', () => {
+  it('keeps a long numeric seed as typed text, so typing it again gives the same map', () => {
+    controller.newColony('123456789012345678901234');
+    const long = controller.getState().seed;
+    expect(Number.isSafeInteger(long)).toBe(true);
+    controller.newColony(String(long));
+    expect(controller.getState().seed).toBe(long);
+    controller.newColony('4242');
+    expect(controller.getState().seed).toBe(4242);
+  });
+
+  it("runs the clock on the pause menu's Resume even if the game was paused before it opened", () => {
+    controller.newColony('resume');
+    controller.setSpeed(2);
+    controller.setSpeed(0);
+    controller.holdPause();
+    controller.resumeAfterHold();
+    controller.releasePause();
+    expect(controller.getState().speed).toBe(2);
+    // A new colony's clock still waits for its first orders.
+    controller.newColony('resume');
+    controller.holdPause();
+    controller.resumeAfterHold();
+    controller.releasePause();
+    expect(controller.getState().speed).toBe(0);
+  });
+});

@@ -33,13 +33,16 @@ export function Modal({
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const downOnBackdrop = useRef(false);
+  // Where keyboard focus was as the dialog opened, read on its first render: by the time an effect runs, a button
+  // in the dialog with autoFocus (the pause menu's Resume) has taken it. (Only keyboard focus: a button clicked
+  // with the mouse shouldn't take the focus back and with it Tab and Space from the game.)
+  const [before] = useState(() => {
+    const active = document.activeElement;
+    return active instanceof HTMLElement && active.matches(':focus-visible') ? active : null;
+  });
   // Keyboard focus moves into the dialog when it opens (unless a button in it already took it), Tab keeps it
   // there, and on closing it goes back to wherever it was.
   useEffect(() => {
-    // (Only keyboard focus: a button clicked with the mouse shouldn't take the focus back and with it Tab and
-    // Space from the game.)
-    const active = document.activeElement;
-    const before = active instanceof HTMLElement && active.matches(':focus-visible') ? active : null;
     if (!panel.current?.contains(document.activeElement)) {
       panel.current?.focus();
     }
@@ -71,7 +74,7 @@ export function Modal({
         before.focus({ preventScroll: true });
       }
     };
-  }, []);
+  }, [before]);
   return (
     <div
       className="modal-backdrop"
@@ -486,6 +489,7 @@ export function ProductionScreen({ onClose }: { onClose: () => void }) {
               ) : (
                 <td>
                   <button
+                    disabled={bill.target <= 0}
                     onClick={() => set(bill.recipe, bill.target - bill.step)}
                     aria-label={`Keep ${bill.step} fewer ${bill.name}`}
                   >
@@ -833,8 +837,16 @@ export function FactionsScreen({ onClose }: { onClose: () => void }) {
               <td className="num">
                 {f.relation}
                 <div className="muted small">goodwill {f.goodwill}</div>
-                {f.peaceDays > 0 && <div className="muted small">{f.peaceDays} days of peace left</div>}
-                {f.truceDays > 0 && <div className="muted small">{f.truceDays} days of truce left</div>}
+                {f.peaceDays > 0 && (
+                  <div className="muted small">
+                    {f.peaceDays} day{f.peaceDays === 1 ? '' : 's'} of peace left
+                  </div>
+                )}
+                {f.truceDays > 0 && (
+                  <div className="muted small">
+                    {f.truceDays} day{f.truceDays === 1 ? '' : 's'} of truce left
+                  </div>
+                )}
               </td>
               <td>
                 {f.hostile ? (
@@ -886,7 +898,7 @@ export function FactionsScreen({ onClose }: { onClose: () => void }) {
                           (f.goodwill ?? 0) < d.aid.goodwill
                             ? `They'd help a closer friend (goodwill ${d.aid.goodwill} needed)`
                             : d.aid.waitDays > 0
-                              ? `Friends sent food not long ago (again in ${d.aid.waitDays} days)`
+                              ? `Friends sent food not long ago (again in ${d.aid.waitDays} day${d.aid.waitDays === 1 ? '' : 's'})`
                               : `Three days' food for everyone, for ${d.aid.cost} goodwill`
                         }
                       >
@@ -909,7 +921,9 @@ export function FactionsScreen({ onClose }: { onClose: () => void }) {
                           Hire fighters: {d.hireCost} silver
                         </button>
                         {d.hiredDaysLeft > 0 && (
-                          <span className="muted small">Fighters hired for {d.hiredDaysLeft} more days</span>
+                          <span className="muted small">
+                            Fighters hired for {d.hiredDaysLeft} more day{d.hiredDaysLeft === 1 ? '' : 's'}
+                          </span>
                         )}
                       </div>
                     )}
@@ -931,7 +945,7 @@ export function FactionsScreen({ onClose }: { onClose: () => void }) {
                               : f.goodwill < d.settler.goodwill
                                 ? `They won't send one of their own below goodwill ${d.settler.goodwill}`
                                 : d.settler.waitDays > 0
-                                  ? `Nobody else is ready to leave for ${d.settler.waitDays} days`
+                                  ? `Nobody else is ready to leave for ${d.settler.waitDays} day${d.settler.waitDays === 1 ? '' : 's'}`
                                   : d.silver < d.settler.cost
                                     ? `The colony has ${d.silver} silver in storage of the ${d.settler.cost} it would take`
                                     : 'A willing settler comes to join the colony'
@@ -969,8 +983,9 @@ function WorldNews({ state }: { state: Pick<UiState, 'diplomacy'> }) {
       <h3>Neighbours' news</h3>
       {d.alliance && (
         <p>
-          Allied with <b>{d.alliance.faction}</b> for {d.alliance.daysLeft} more days: their fighters come to your raids
-          more readily, and they will ask for help when raided.
+          Allied with <b>{d.alliance.faction}</b> for {d.alliance.daysLeft} more day
+          {d.alliance.daysLeft === 1 ? '' : 's'}: their fighters come to your raids more readily, and they will ask for
+          help when raided.
         </p>
       )}
       {d.call && (
