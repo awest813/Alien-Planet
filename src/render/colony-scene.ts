@@ -236,10 +236,17 @@ export class ColonyScene extends Phaser.Scene {
     }
     // Zoomed far out, text shrinks to a few pixels: names and stack counts are left off until it reads again.
     const readable = this.cameras.main.zoom >= READABLE_ZOOM;
-    if (readable !== this.labelsReadable) {
-      this.labelsReadable = readable;
-      this.itemLabels.forEach((label) => label.setVisible(readable));
-    }
+    this.labelsReadable = readable;
+    // Stack counts only where the camera looks: each is a text with a texture of its own, and drawn whether on
+    // screen or not, a big colony's hundreds of them were most of a frame (paused or not).
+    const view = this.cameras.main.worldView;
+    const left = view.x - TILE;
+    const right = view.right + TILE;
+    const top = view.y - TILE;
+    const bottom = view.bottom + TILE;
+    this.itemLabels.forEach((label) =>
+      label.setVisible(readable && label.x >= left && label.x <= right && label.y >= top && label.y <= bottom),
+    );
     const world = controller.sim.world;
     this.syncDirty(world);
     this.syncSeason(world);

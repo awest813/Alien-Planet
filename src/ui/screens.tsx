@@ -85,7 +85,12 @@ export function Modal({
         <div className="modal-head">
           <h2>{title}</h2>
           {closable && (
-            <button className="modal-x" onClick={onClose} aria-label="Close (Esc)" title="Close (Esc)">
+            <button
+              className="modal-x"
+              onClick={onClose}
+              aria-label={TOUCH ? 'Close' : 'Close (Esc)'}
+              title={TOUCH ? 'Close' : 'Close (Esc)'}
+            >
               ✕
             </button>
           )}
@@ -1402,6 +1407,15 @@ function History({ history }: { history: UiState['history'] }) {
 }
 
 export function StoryScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+  // Keys for the events by what they are, numbering any repeats: the newest comes first, so a key by position moved
+  // under every row each time something happened.
+  const seen = new Map<string, number>();
+  const storyKeys = state.story.map((e) => {
+    const base = `${e.day}:${e.hour}:${e.text}`;
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    return `${base}:${n}`;
+  });
   return (
     <Modal title="The story so far" onClose={onClose}>
       <h3>History</h3>
@@ -1420,7 +1434,7 @@ export function StoryScreen({ state, onClose }: { state: UiState; onClose: () =>
       <h3>Events</h3>
       <ul className="story">
         {state.story.map((entry, index) => (
-          <li key={index} className={entry.tone}>
+          <li key={storyKeys[index]} className={entry.tone}>
             <span className="muted">
               Day {entry.day}, {String(entry.hour).padStart(2, '0')}:00
             </span>{' '}

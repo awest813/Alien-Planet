@@ -678,7 +678,7 @@ function TileCard({ t, onClose }: { t: TileView; onClose?: () => void }) {
       {t.animal && <div>{t.animal}</div>}
       {t.items && <div>{t.items}</div>}
       {t.details.map((d) => (
-        <div key={d}>{d}</div>
+        <div key={d}>{forTouch(d)}</div>
       ))}
       {t.orders.map((o) => (
         <div key={o} className="muted">

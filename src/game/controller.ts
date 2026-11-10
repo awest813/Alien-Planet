@@ -741,6 +741,8 @@ const WORK_NAMES: Partial<Record<keyof Priorities, string>> = {
 // Roughly how much nutrition a colonist eats per day.
 const DAILY_NUTRITION = 1.4;
 export const TICKS_PER_SECOND = 20;
+// The most of a frame the simulation may take (see frame()).
+const STEP_BUDGET_MS = 12;
 export const SAVE_SLOTS = ['autosave', 'slot-1', 'slot-2', 'slot-3'];
 
 export const slotLabel = (slot: string): string => (slot === 'autosave' ? 'Autosave' : `Slot ${slot.slice(5)}`);
@@ -1393,9 +1395,17 @@ export class GameController {
     const deltaMs = Math.min(now - this.lastFrame, 1000);
     this.lastFrame = now;
     this.accumulator += (deltaMs / 1000) * TICKS_PER_SECOND * SPEEDS[this.speedIndex];
+    // A time budget for the simulation in one frame: a slow frame at the top speed with a big colony ran every tick
+    // owed in one go, the next frame slower still. What's left over is dropped (beyond a few ticks), so the game
+    // runs a little slower than asked on a machine that can't keep up, rather than stalling.
+    const budget = now + STEP_BUDGET_MS;
     while (this.accumulator >= 1) {
       this.sim.step();
       this.accumulator--;
+      if (performance.now() > budget) {
+        this.accumulator = Math.min(this.accumulator, 2);
+        break;
+      }
     }
     for (const event of this.sim.events.splice(0)) {
       if (event === 'raid' || event === 'manhunters') {
@@ -1454,8 +1464,10 @@ export class GameController {
       this.fallen = true;
       this.setSpeed(0);
     }
+    let changed = false;
     if (this.toast && (this.toastTimer -= deltaMs) <= 0) {
       this.toast = null;
+      changed = true;
     }
     this.collectNotifications(now);
     if (this.settings.sound) {
@@ -1463,7 +1475,11 @@ export class GameController {
     }
     this.sinceUiUpdate += deltaMs;
     this.sinceHoverUpdate += deltaMs;
-    if (this.sinceUiUpdate >= 200 || (this.hoverChanged && this.sinceHoverUpdate >= 80)) {
+    // Five times a second while the clock runs; paused, nothing moves but what the player does (which publishes
+    // at once) and the notices' timers, so once a second is plenty (it rebuilt the whole interface five times a
+    // second for nothing).
+    const every = this.speedIndex === 0 ? 1000 : 200;
+    if (changed || this.sinceUiUpdate >= every || (this.hoverChanged && this.sinceHoverUpdate >= 80)) {
       this.sinceUiUpdate = 0;
       this.sinceHoverUpdate = 0;
       this.hoverChanged = false;
@@ -1966,6 +1982,20 @@ export class GameController {
 
   private buildState(): UiState {
     const sim = this.sim;
+    // For the bills, once (they scanned every item on the map, and every building, one bill at a time):
+    // the worn clothing waiting to be mended (only worked out if there's a mending bill), and the benches built.
+    let wornCount: number | undefined;
+    const worn = () =>
+      (wornCount ??= [...sim.world.tilesWith('items')].filter(
+        (i) => !!itemDef(sim.world.itemType[i]).apparel && sim.world.fresh[i] < MENDABLE,
+      ).length);
+    const benches = new Set<string>();
+    for (const t of sim.buildingTiles()) {
+      const bench = featureDef(sim.world.feature[t]).workbench;
+      if (bench) {
+        benches.add(bench);
+      }
+    }
     const hour = sim.hour;
     const hh = Math.floor(hour);
     const mm = Math.floor((hour - hh) * 60);
@@ -2104,22 +2134,18 @@ export class GameController {
         const recipe = RECIPES[bill.recipe];
         const input = recipe.ingredients.map((ing) => `${ing.count} ${ingredientName(ing)}`).join(' + ');
         const product = itemDef(recipe.product.item);
-        // Mending's "stock" is the worn clothing waiting for it.
-        const worn = [...sim.world.tilesWith('items')].filter(
-          (i) => !!itemDef(sim.world.itemType[i]).apparel && sim.world.fresh[i] < MENDABLE,
-        ).length;
         return {
           recipe: bill.recipe,
           name: recipe.name,
           product: product.name,
           target: bill.target,
-          stock: recipe.mend ? worn : totals[recipe.product.item - 1].total,
+          stock: recipe.mend ? worn() : totals[recipe.product.item - 1].total,
           mend: recipe.mend,
           recipeText: recipe.mend
             ? `${input} → mended`
             : `${input} → ${recipe.product.count} ${product.name.toLowerCase()}`,
           bench: BENCH_NAMES[recipe.bench],
-          hasBench: sim.countBuilt((f) => featureDef(f).workbench === recipe.bench) > 0,
+          hasBench: benches.has(recipe.bench),
           minSkill:
             recipe.minSkill > 0 ? `${recipe.bench === 'cooking' ? 'Cooking' : 'Crafting'} ${recipe.minSkill}` : null,
           locked:

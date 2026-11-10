@@ -452,9 +452,9 @@ kbd {
   pointer-events: none;
 }
 
-/* A phone with a big colony: one row that scrolls sideways, rather than rows of names over half the map. The ☰
-   overview stays in reach at the end. */
-@media (max-width: 720px) {
+/* A phone (or a tablet) with a big colony: one row that scrolls sideways, rather than rows of names over half the
+   map. The ☰ overview stays in reach at the end. */
+@media (max-width: 720px), (pointer: coarse) {
   .colonist-bar {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -2207,4 +2207,43 @@ input[type='checkbox'] {
   font-weight: 600;
   color: inherit;
   white-space: nowrap;
+}
+
+/* A tablet: room for proper touch targets (most controls were 32px or less, the map's Hide 14px, the Story's
+   year rows 16px). Phones keep 32px, where room is short. */
+@media (pointer: coarse) and (min-width: 721px) {
+  .speeds button,
+  .arch-tabs button,
+  .arch-tools button,
+  .screens button,
+  .tb-resources button,
+  .modal button,
+  .inspector button,
+  .side button,
+  .side-toggle,
+  .colonist-bar .chip {
+    min-height: 40px;
+  }
+
+  .schedule .hour {
+    height: 34px;
+    min-width: 30px;
+  }
+
+  button.link,
+  .modal summary {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .minimap-toggle {
+    min-width: 40px;
+    min-height: 32px;
+  }
+
+  .colonists-table th .sort {
+    min-width: 44px;
+    min-height: 36px;
+  }
 }
