@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { populationFor } from './constants';
-import { featureId } from './defs';
+import { featureId, itemId } from './defs';
+import { infect } from './health';
 import { FAMILY_ROOM, updateLifespans } from './lifespans';
 import { deserialize, serialize } from './serialize';
 import { START_HOUR, Simulation } from './simulation';
 import { checkMarriages } from './social';
 import { triggerEvent, updateStoryteller } from './storyteller';
+import { WORK_TYPES } from './types';
+import { villageThoughts } from './village';
 import { HOUR, clearAround, run } from './test-helpers';
 
 // Found by the fourth audit (less-reviewed systems, and saving and loading), each first seen failing.
@@ -154,4 +157,94 @@ describe('loading a game', () => {
     expect(copy.stats.concerts).toBe(1);
     expect(copy.log.some((l) => l.text.endsWith('concert is over.'))).toBe(true);
   }, 60000);
+});
+
+// What the fourth audit read and left as found, since fixed.
+describe('after a load', () => {
+  // A cleared patch, everyone fed, rested and idle, no events.
+  function quiet(seed: number) {
+    const sim = Simulation.newColony(seed);
+    const { x, y } = clearAround(sim, 14);
+    sim.weather = { kind: 'clear', until: Number.MAX_SAFE_INTEGER };
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    sim.temperatureAt = () => 18;
+    for (const c of sim.colonists) {
+      c.needs.food = 1;
+      c.needs.rest = 1;
+      c.needs.joy = 0.6;
+      for (const work of WORK_TYPES) {
+        c.priorities[work] = 0;
+      }
+      c.schedule.fill('A');
+    }
+    return { sim, w: sim.world, x, y };
+  }
+  const reload = (sim: Simulation) => {
+    const copy = deserialize(structuredClone(serialize(sim)));
+    copy.temperatureAt = () => 18;
+    return copy;
+  };
+
+  it('a patient on bed rest stays on bed rest', () => {
+    const { sim, w, x, y } = quiet(21);
+    w.setFeature(w.idx(x + 2, y), featureId('bed'));
+    const [patient] = sim.colonists;
+    infect(sim, patient, 'winterCough');
+    for (let t = 0; t < HOUR * 2 && !(patient.job?.type === 'rest' && patient.sleeping); t++) {
+      sim.step();
+    }
+    expect(patient.job?.type).toBe('rest');
+    expect(patient.sleeping).toBe(true);
+    const copy = reload(sim);
+    expect(copy.colonists[0].job?.type).toBe('rest');
+  });
+
+  it('someone eating finishes the meal, but a hauler with a stack of food is no eater', () => {
+    const { sim } = quiet(22);
+    const [eater, hauler] = sim.colonists;
+    eater.needs.food = 0.1;
+    eater.carrying = { item: itemId('meal'), count: 1 };
+    hauler.needs.food = 0.1;
+    hauler.carrying = { item: itemId('berries'), count: 40 };
+    const copy = reload(sim);
+    const [e, h] = copy.colonists;
+    expect(e.job?.type).toBe('eat');
+    expect(h.job).toBeNull();
+    for (let t = 0; t < HOUR && e.carrying; t++) {
+      copy.step();
+    }
+    expect(e.carrying).toBeNull();
+    expect(e.needs.food).toBeGreaterThan(0.5);
+  });
+
+  it('guests at a gathering under way go straight back to it', () => {
+    const { sim, w, x, y } = quiet(23);
+    sim.tick = (2 * 24 + 18 - START_HOUR) * HOUR;
+    sim.syncClock();
+    sim.gathering = {
+      kind: 'party',
+      tile: w.idx(x, y + 2),
+      startsAt: sim.tick,
+      endsAt: sim.tick + HOUR * 3,
+      host: sim.colonists[0].id,
+    };
+    run(sim, HOUR / 2);
+    expect(sim.colonists.every((c) => c.job?.gathering)).toBe(true);
+    const copy = reload(sim);
+    expect(copy.colonists.every((c) => c.job?.gathering)).toBe(true);
+  });
+});
+
+describe('a leader away on a trip', () => {
+  it("doesn't lift or lower anyone's spirits", () => {
+    const sim = Simulation.newColony(24);
+    const [leader, other] = sim.colonists;
+    sim.village.leader = leader.id;
+    leader.mood = 95;
+    expect(villageThoughts(sim, other).some((k) => k.startsWith('wellLed'))).toBe(true);
+    leader.away = 'gone';
+    expect(villageThoughts(sim, other).some((k) => k.startsWith('wellLed'))).toBe(false);
+    leader.mood = 5;
+    expect(villageThoughts(sim, other)).not.toContain('poorlyLed');
+  });
 });

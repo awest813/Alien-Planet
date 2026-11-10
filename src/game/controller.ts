@@ -1113,7 +1113,8 @@ export interface UiState {
   village: {
     // `spirits`: how the colony takes the leader's mood (by the same bar as the well- and poorly-led thoughts,
     // which rises over the years).
-    leader: { id: number; name: string; mood: number; spirits: 'good' | 'poor' | 'fair' } | null;
+    // ('away': on a trip, so their mood counts for nothing until they're back.)
+    leader: { id: number; name: string; mood: number; spirits: 'good' | 'poor' | 'fair' | 'away' } | null;
     electedOn: number;
     // When the present leader was first chosen (older saves: the last vote).
     leaderSince: number;
@@ -3203,8 +3204,9 @@ export class GameController {
               id: leader.id,
               name: leader.name,
               mood: Math.round(leader.mood),
-              spirits:
-                leader.mood >= GOOD_LEADER_MOOD + leaderBar(sim)
+              spirits: leader.away
+                ? 'away'
+                : leader.mood >= GOOD_LEADER_MOOD + leaderBar(sim)
                   ? 'good'
                   : leader.mood < POOR_LEADER_MOOD + leaderBar(sim)
                     ? 'poor'

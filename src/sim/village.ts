@@ -206,7 +206,8 @@ export function villageThoughts(sim: Simulation, c: Colonist): string[] {
   const v = sim.village;
   const keys: string[] = [];
   const leader = sim.colonists[v.leader];
-  if (leader && !leader.health.dead && leader !== c && c.age >= ADULT) {
+  // (Not while the leader is away on a trip: out of sight, they lift nobody's spirits and weigh on nobody's.)
+  if (leader && !leader.health.dead && !leader.away && leader !== c && c.age >= ADULT) {
     const bar = leaderBar(sim);
     if (leader.mood >= GOOD_LEADER_MOOD + bar) {
       keys.push(sim.isResearched('civics') ? 'wellLedCivic' : 'wellLed');

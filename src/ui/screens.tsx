@@ -1156,11 +1156,13 @@ export function VillageScreen({ onClose }: { onClose: () => void }) {
           <b>{v.leader.name}</b>, leading since day {v.leaderSince}
           {v.electedOn !== v.leaderSince ? ` (chosen again on day ${v.electedOn})` : ''}.{' '}
           <span className="muted">
-            {v.leader.spirits === 'good'
-              ? 'In good spirits: everyone feels in good hands.'
-              : v.leader.spirits === 'poor'
-                ? 'Struggling, and it shows: the colony feels it too.'
-                : 'Holding up.'}
+            {v.leader.spirits === 'away'
+              ? 'Away on a trip: the colony gets by without them until they return.'
+              : v.leader.spirits === 'good'
+                ? 'In good spirits: everyone feels in good hands.'
+                : v.leader.spirits === 'poor'
+                  ? 'Struggling, and it shows: the colony feels it too.'
+                  : 'Holding up.'}
           </span>
         </p>
       ) : (

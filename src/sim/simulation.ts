@@ -810,10 +810,23 @@ export class Simulation {
     for (const c of this.living()) {
       if (c.sleeping) {
         this.reserve(c, `b${c.tile}`);
-        c.job = this.makeJob('sleep', c.tile);
+        // A patient on bed rest stays on it (asleep, they'd wake rested and go straight back to bed).
+        c.job = needsBedRest(c)
+          ? this.makeJob('rest', c.tile, { wait: TICKS_PER_HOUR * 4 })
+          : this.makeJob('sleep', c.tile);
+      } else if (this.eatingWhenSaved(c)) {
+        // Someone in the middle of a meal finishes it, rather than putting it in storage and going back for it.
+        this.assign(c, this.makeJob('eat', -1, { item: c.carrying!.item, stage: 2 }), []);
+        this.headToTable(c, c.job!);
       }
     }
     this.coldStores = this.storageTiles().filter((i) => this.isColdStore(i)).length;
+    // A gathering under way: its guests (whose jobs weren't saved either) go back to it before anything else
+    // can catch their eye.
+    const g = this.gathering;
+    if (g?.started && this.tick < g.endsAt && !this.raid) {
+      this.inviteGuests(g);
+    }
   }
   private lampTiles: number[] = [];
   private gridVersion = -1;
@@ -5385,21 +5398,7 @@ export class Simulation {
       const wanted = def.category === 'meal' ? 1 : Math.max(1, Math.ceil((1 - c.needs.food) / def.nutrition));
       c.carrying = w.pickUp(job.source, wanted);
       this.release(c, `i${job.source}`);
-      // Find a table to eat at.
-      const region = this.regionOf(c.tile);
-      const table = this.nearestIn(
-        'buildings',
-        c.tile,
-        (i) => w.feature[i] !== NONE && featureDef(w.feature[i]).table && this.hasWorkSpot(i, false, region),
-        1,
-      )[0];
-      const path =
-        table !== undefined && w.distance(c.tile, table) < 30
-          ? this.pathfinder.find(c.tile, this.workSpots(table, false, region))
-          : null;
-      job.target = path ? table : -1;
-      job.stage = 2;
-      c.path = path ?? [];
+      this.headToTable(c, job);
       return;
     }
 
@@ -5433,6 +5432,38 @@ export class Simulation {
     if (c.needs.food < STILL_HUNGRY) {
       this.tryEat(c);
     }
+  }
+
+  // Food in hand: off to the nearest table to eat it (or eaten where they stand, with no table near).
+  private headToTable(c: Colonist, job: Job): void {
+    const w = this.world;
+    const region = this.regionOf(c.tile);
+    const table = this.nearestIn(
+      'buildings',
+      c.tile,
+      (i) => w.feature[i] !== NONE && featureDef(w.feature[i]).table && this.hasWorkSpot(i, false, region),
+      1,
+    )[0];
+    const path =
+      table !== undefined && w.distance(c.tile, table) < 30
+        ? this.pathfinder.find(c.tile, this.workSpots(table, false, region))
+        : null;
+    job.target = path ? table : -1;
+    job.stage = 2;
+    c.path = path ?? [];
+  }
+
+  // Jobs aren't saved: whether a colonist loaded holding food was eating it. They're hungry, and hold no more
+  // than they'd have taken for a meal (a hauler with a stack of berries, or someone fed and carrying a meal
+  // to a patient, wasn't).
+  private eatingWhenSaved(c: Colonist): boolean {
+    const held = c.carrying;
+    if (!held || !isFood(held.item) || c.drafted || c.needs.food >= Math.max(rationsEatBelow(this.village), 0.15)) {
+      return false;
+    }
+    const def = itemDef(held.item);
+    const wanted = def.category === 'meal' ? 1 : Math.max(1, Math.ceil((1 - c.needs.food) / def.nutrition));
+    return held.count <= wanted;
   }
 
   // A badly cooked meal, raw meat or fish can make someone sick for a while. Skilled cooks rarely
@@ -6002,7 +6033,6 @@ export class Simulation {
       this.planParty();
       return;
     }
-    const def = GATHERINGS[g.kind];
     // A raid calls it off, planned or under way.
     if (this.raid) {
       this.endGathering(true);
@@ -6039,6 +6069,12 @@ export class Simulation {
       this.endGathering(false);
       return;
     }
+    this.inviteGuests(g);
+  }
+
+  // Everyone who may come to a gathering under way and isn't there yet heads for it.
+  private inviteGuests(g: Gathering): void {
+    const def = GATHERINGS[g.kind];
     for (const c of this.living()) {
       if (c.job?.gathering || !this.mayAttend(c, def.rite)) {
         continue;

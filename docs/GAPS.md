@@ -61,9 +61,11 @@ with esbuild for speed (see ROADMAP).
     keyboard focus; Resume left a game paused before the menu opened still paused; the pause banner showed
     over the ending; a long numeric seed became 1.2e+23, which didn't give the map back; "1 more alerts", "1
     colonists", "1 days of truce left" and the like.
-  - **Left as found:** a bed-rest patient is put to sleep by a load and wakes to go back to bed rest; a meal
-    being eaten is put away first after a load; a leader away on a trip still sets the colony's mood about its
-    leadership (read, not tested).
+  - **And what was left as found, since fixed:** a patient on bed rest was put to sleep by a load, woke rested
+    and went straight back to bed rest; someone mid-meal put it in storage after a load and walked back for it;
+    guests at a gathering lost their place on a load and could take up work before being called back (left
+    from the audit before); a leader away on a trip still lifted or soured everyone's mood (the Village screen
+    now says they're away).
 - **Code audit of the simulation, the world's dealings and game flow** (three readers, each confirming with a
   test; 100 scripted players for 30 days before and after, no problems seen):
   - **Endings written down wrong:** a colony wiped out by a raid was recorded as having repelled it (21 of 30
@@ -80,7 +82,8 @@ with esbuild for speed (see ROADMAP).
     too; two colonists can't share a bed; forbidding a stack turns back whoever was fetching it; Q and "Stand
     down all" cover the selected colonist who can't be drafted and the drafted one who has collapsed; a dialog
     doesn't close when a slider is dragged out of it.
-  - **Left as found:** guests at a party who pick up work after a load aren't called back (read, not tested).
+  - **Left as found:** guests at a party who pick up work after a load aren't called back (fixed in the fourth
+    audit).
 - **Map generation audited** (576 maps: every land, layout and size, 12 seeds each):
   - **Poor landings:** the colony landed on the dry tile nearest the middle, which could be wedged between rock
     and a river (7 open tiles within 6 of it, on a Tiny tundra river) or on the water's edge (70 of 576). A
