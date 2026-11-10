@@ -44,6 +44,23 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Code audit of the simulation, the world's dealings and game flow** (three readers, each confirming with a
+  test; 100 scripted players for 30 days before and after, no problems seen):
+  - **Endings written down wrong:** a colony wiped out by a raid was recorded as having repelled it (21 of 30
+    overrun colonies in a 40-seed sample: the first raiders to find nobody standing walked off, which looked
+    like their nerve breaking); a siege bought off with tribute counted as seen off; a pack that left everyone
+    down was "dealt with". Each now says what happened.
+  - **The ship:** a second ship couldn't be boarded once its dialog was closed (there's a Ship button on the top
+    bar while it waits), a game loaded with it waiting didn't show the choice, and a ship nobody answered set
+    the beacon transmitting again at once, raiders and all.
+  - **The downed:** rescuers pass a nearer bed for a free hospital bed, lift someone who collapsed indoors off
+    the floor, and a drafted doctor no longer keeps a downed colonist from crawling to shelter.
+  - **Smaller:** a maddened pack whose nearest colonist is in a pen goes for someone it can reach; fighters
+    sent against a siege arrive as it attacks; iron, ore, bricks and clay don't burn; someone away is widowed
+    too; two colonists can't share a bed; forbidding a stack turns back whoever was fetching it; Q and "Stand
+    down all" cover the selected colonist who can't be drafted and the drafted one who has collapsed; a dialog
+    doesn't close when a slider is dragged out of it.
+  - **Left as found:** guests at a party who pick up work after a load aren't called back (read, not tested).
 - **Map generation audited** (576 maps: every land, layout and size, 12 seeds each):
   - **Poor landings:** the colony landed on the dry tile nearest the middle, which could be wedged between rock
     and a river (7 open tiles within 6 of it, on a Tiny tundra river) or on the water's edge (70 of 576). A

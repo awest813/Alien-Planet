@@ -205,3 +205,45 @@ test('right-click on the Work grid still lowers a priority', async ({ page }) =>
   await expect(cell).toHaveAttribute('aria-label', before);
   expect(errors).toEqual([]);
 });
+
+test('a waiting ship stays one click away after its dialog is closed', async ({ page }) => {
+  const errors = watchErrors(page);
+  await startColony(page, 'ship');
+  // The ship set down beside the beacon (playing out the weeks to it would take a while).
+  await page.evaluate(() => {
+    const colony = (
+      window as unknown as {
+        colony: { sim: { tick: number; beacon: { landed?: boolean; landsAt?: number } }; publish: () => void };
+      }
+    ).colony;
+    colony.sim.beacon.landed = true;
+    colony.sim.beacon.landsAt = colony.sim.tick;
+    colony.publish();
+  });
+  const ship = page.getByRole('dialog', { name: 'The ship has landed' });
+  await expect(ship).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(ship).toBeHidden();
+  await page.locator('.screens button', { hasText: /^Ship$/ }).click();
+  await expect(ship).toBeVisible();
+  await page.keyboard.press('Escape');
+  expect(errors).toEqual([]);
+});
+
+test('a drag that ends outside a dialog does not close it', async ({ page }) => {
+  const errors = watchErrors(page);
+  await startColony(page);
+  await page.locator('.screens button', { hasText: 'Work' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Work priorities' });
+  const box = (await dialog.boundingBox())!;
+  // Pressed on the dialog's heading, let go over the backdrop: a slider overshot, or text selected.
+  await page.mouse.move(box.x + box.width / 2, box.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y - 60, { steps: 4 });
+  await page.mouse.up();
+  await expect(dialog).toBeVisible();
+  // A click on the backdrop itself still closes it.
+  await page.mouse.click(box.x + box.width / 2, box.y - 60);
+  await expect(dialog).toBeHidden();
+  expect(errors).toEqual([]);
+});
