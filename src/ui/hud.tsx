@@ -1,5 +1,5 @@
 import { TOUCH, forTouch } from './touch';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Alert,
   ColonistView,
@@ -16,7 +16,7 @@ import { PHASE_NAMES } from '../sim/simulation';
 import type { Stance } from '../sim/types';
 import { STORAGE_GROUPS, StockpilePriority } from '../sim/world';
 import { DRAFT_AGE } from '../sim/lifespans';
-import { Bar, arrowKeys, moodColor } from './common';
+import { Bar, arrowKeys, fields, moodColor, useHover, useUi } from './common';
 
 // The always-on game HUD: top bar, colonist bar, inspector, side panel, and architect menu.
 
@@ -52,7 +52,12 @@ const formatPower = (watts: number) => (Math.abs(watts) >= 1000 ? `${(watts / 10
 // (The last: squeezed and still on two rows, it goes back to merely compact and lets them be two, rather than
 // lose the title, the weather and the resources for nothing.)
 const FIT_LEVELS = ['', 'compact', 'compact tight', 'compact tight squeeze', 'compact'];
-function useTopBarFit(state: UiState): { ref: React.RefObject<HTMLElement | null>; className: string } {
+function useTopBarFit(
+  state: Pick<
+    UiState,
+    'raid' | 'animalsAttacking' | 'trade' | 'captives' | 'diplomacy' | 'weather' | 'settings' | 'day'
+  >,
+): { ref: React.RefObject<HTMLElement | null>; className: string } {
   const ref = useRef<HTMLElement>(null);
   const phone = () => window.innerWidth <= 720;
   const [level, setLevel] = useState(() => (phone() ? 2 : 0));
@@ -86,12 +91,45 @@ function useTopBarFit(state: UiState): { ref: React.RefObject<HTMLElement | null
   return { ref, className: FIT_LEVELS[level] };
 }
 
-export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Screen) => void }) {
+// (The clock, which changes most often, is a panel of its own.)
+const pickTopBar = (s: UiState) => ({
+  ...fields(
+    'animalsAttacking',
+    'captives',
+    'day',
+    'diplomacy',
+    'foodDays',
+    'outdoorTemp',
+    'power',
+    'raid',
+    'resources',
+    'speed',
+    'trade',
+    'weather',
+    'settings',
+  )(s),
+  // Someone who could still be drafted.
+  anyFree: s.colonists.some(
+    (c) => !c.dead && c.status !== 'Downed' && c.status !== 'Away' && !c.drafted && !c.inBreak && c.age >= DRAFT_AGE,
+  ),
+});
+
+const pickClock = fields('night', 'season', 'day', 'time', 'year');
+
+function Clock() {
+  const state = useUi(pickClock);
+  return (
+    <span className="clock" title={`Year ${state.year}`}>
+      {state.night ? '☾' : '☀'} {state.season} · Day {state.day} · {state.time}
+    </span>
+  );
+}
+
+export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
+  const state = useUi(pickTopBar);
   const p = state.power;
   const net = p.supply - p.demand;
-  const anyFree = state.colonists.some(
-    (c) => !c.dead && c.status !== 'Downed' && c.status !== 'Away' && !c.drafted && !c.inBreak && c.age >= DRAFT_AGE,
-  );
+  const anyFree = state.anyFree;
   const fit = useTopBarFit(state);
   // Something from the neighbours waiting on an answer.
   const d = state.diplomacy;
@@ -100,9 +138,7 @@ export function TopBar({ state, onOpen }: { state: UiState; onOpen: (screen: Scr
     <header ref={fit.ref} className={`panel topbar ${fit.className}`}>
       <div className="tb-time">
         <span className="title">Colony Alpha</span>
-        <span className="clock" title={`Year ${state.year}`}>
-          {state.night ? '☾' : '☀'} {state.season} · Day {state.day} · {state.time}
-        </span>
+        <Clock />
         <span className="temp" title="Outdoor temperature">
           {state.outdoorTemp}°C
         </span>
@@ -225,7 +261,7 @@ function FoodDays({ days }: { days: number }) {
 }
 
 // Every item the colony has, in a dropdown from the top bar.
-function AllResources({ state }: { state: UiState }) {
+function AllResources({ state }: { state: Pick<UiState, 'resources'> }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLSpanElement>(null);
   // Esc or a click anywhere else folds the list away.
@@ -276,7 +312,13 @@ function AllResources({ state }: { state: UiState }) {
   );
 }
 
-function statusIcons(c: ColonistView): { icon: string; title: string }[] {
+// What a colonist's chip shows.
+type ChipView = Pick<
+  ColonistView,
+  'id' | 'name' | 'color' | 'activity' | 'mood' | 'dead' | 'status' | 'bleeding' | 'inBreak' | 'drafted' | 'sleeping'
+>;
+
+function statusIcons(c: ChipView): { icon: string; title: string }[] {
   if (c.dead) {
     return [{ icon: '☠', title: 'Dead' }];
   }
@@ -305,47 +347,70 @@ function statusIcons(c: ColonistView): { icon: string; title: string }[] {
   return icons;
 }
 
-export function ColonistBar({ state, onOpen }: { state: UiState; onOpen: (screen: Screen) => void }) {
+const pickColonistBar = (s: UiState) => ({
+  selectedColonist: s.selectedColonist,
+  colonists: s.colonists.map(
+    (c): ChipView => ({
+      id: c.id,
+      name: c.name,
+      color: c.color,
+      activity: c.activity,
+      mood: c.mood,
+      dead: c.dead,
+      status: c.status,
+      bleeding: c.bleeding,
+      inBreak: c.inBreak,
+      drafted: c.drafted,
+      sleeping: c.sleeping,
+    }),
+  ),
+});
+
+// One colonist's chip, redrawn only when what it shows changes (one colonist's mood, not the whole bar).
+const Chip = memo(function Chip({ c, selected }: { c: ChipView; selected: boolean }) {
+  return (
+    <button
+      className={`chip ${selected ? 'selected' : ''} ${c.dead ? 'dead' : ''}`}
+      aria-pressed={selected}
+      onClick={() => controller.selectColonist(selected ? null : c.id, !selected)}
+      title={`${c.name}: ${c.activity}`}
+      // (The mood bar and the status icons only show; a screen reader gets them in words.)
+      aria-label={[
+        c.name,
+        c.dead ? 'dead' : `mood ${c.mood}`,
+        ...statusIcons(c).map((s) => s.title),
+        c.dead ? '' : c.activity,
+      ]
+        .filter(Boolean)
+        .join(', ')}
+    >
+      <span className="swatch" style={{ background: c.color }} />
+      <span className="chip-name">{c.name}</span>
+      {!c.dead && (
+        <span className="chip-mood" title={`Mood ${c.mood}`}>
+          <span style={{ width: `${c.mood}%`, background: moodColor(c.mood) }} />
+        </span>
+      )}
+      {statusIcons(c).map((s) => (
+        <span key={s.icon} className="chip-icon" title={s.title}>
+          {s.icon}
+        </span>
+      ))}
+    </button>
+  );
+});
+
+export function ColonistBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
+  const state = useUi(pickColonistBar);
   return (
     <div className="colonist-bar" role="toolbar" aria-label="Colonists">
       {/* (Not the dead: they kept full chips among the living, and a big colony's bar ran to two rows. The
           Colonists screen remembers them.) */}
       {state.colonists
         .filter((c) => !c.dead)
-        .map((c) => {
-          const selected = state.selectedColonist === c.id;
-          return (
-            <button
-              key={c.id}
-              className={`chip ${selected ? 'selected' : ''} ${c.dead ? 'dead' : ''}`}
-              aria-pressed={selected}
-              onClick={() => controller.selectColonist(selected ? null : c.id, !selected)}
-              title={`${c.name}: ${c.activity}`}
-              // (The mood bar and the status icons only show; a screen reader gets them in words.)
-              aria-label={[
-                c.name,
-                c.dead ? 'dead' : `mood ${c.mood}`,
-                ...statusIcons(c).map((s) => s.title),
-                c.dead ? '' : c.activity,
-              ]
-                .filter(Boolean)
-                .join(', ')}
-            >
-              <span className="swatch" style={{ background: c.color }} />
-              <span className="chip-name">{c.name}</span>
-              {!c.dead && (
-                <span className="chip-mood" title={`Mood ${c.mood}`}>
-                  <span style={{ width: `${c.mood}%`, background: moodColor(c.mood) }} />
-                </span>
-              )}
-              {statusIcons(c).map((s) => (
-                <span key={s.icon} className="chip-icon" title={s.title}>
-                  {s.icon}
-                </span>
-              ))}
-            </button>
-          );
-        })}
+        .map((c) => (
+          <Chip key={c.id} c={c} selected={state.selectedColonist === c.id} />
+        ))}
       <button
         className="chip"
         onClick={() => onOpen('colonists')}
@@ -361,8 +426,14 @@ export function ColonistBar({ state, onOpen }: { state: UiState; onOpen: (screen
 
 type InspectorTab = 'overview' | 'health' | 'social' | 'skills';
 
-export function Inspector({ state }: { state: UiState }) {
-  const colonist = state.colonists.find((c) => c.id === state.selectedColonist);
+const pickInspector = (s: UiState) => ({
+  colonist: s.colonists.find((c) => c.id === s.selectedColonist),
+  selectedTile: s.selectedTile,
+});
+
+export function Inspector() {
+  const state = useUi(pickInspector);
+  const colonist = state.colonist;
   if (colonist) {
     return <ColonistCard c={colonist} />;
   }
@@ -755,12 +826,12 @@ function StockpileSettings({ s }: { s: NonNullable<TileView['stockpile']> }) {
 }
 
 // Follows the mouse over the map: whatever is under the cursor.
-export function HoverCard({ state }: { state: UiState }) {
-  const tile = state.hover;
-  if (!tile) {
+export function HoverCard() {
+  const hover = useHover();
+  if (!hover) {
     return null;
   }
-  const colonist = state.colonists.find((c) => c.id === state.hoverColonist);
+  const { tile, colonist } = hover;
   return (
     <div className="panel hover-card">
       {colonist && (
@@ -788,7 +859,13 @@ type SideTab = 'goals' | 'log';
 // Alerts shown before the rest fold behind "more".
 const ALERTS_SHOWN = 3;
 
-export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: Screen) => void }) {
+const pickSidePanel = (s: UiState) => ({
+  ...fields('alerts', 'log', 'objectives', 'toolId')(s),
+  afternoon: parseInt(s.time, 10) >= 12,
+});
+
+export function SidePanel({ onOpen }: { onOpen: (screen: Screen) => void }) {
+  const state = useUi(pickSidePanel);
   const [tab, setTab] = useState<SideTab>('goals');
   // Starts folded away on small screens, where it would cover the map.
   const [open, setOpen] = useState(() => window.innerWidth > 720);
@@ -822,8 +899,7 @@ export function SidePanel({ state, onOpen }: { state: UiState; onOpen: (screen: 
   const openGoals = phases[0]?.objectives.filter((o) => !o.done && !o.failed) ?? [];
   // From midday, a shelter still to plan comes first, whatever order the player took the goals in (one who
   // skipped the stockpile was still being asked for it as night came with the walls unbuilt).
-  const hour = parseInt(state.time, 10);
-  const shelterFirst = openGoals.find((o) => o.id === 'shelter' && !o.underway && hour >= 12);
+  const shelterFirst = openGoals.find((o) => o.id === 'shelter' && !o.underway && state.afternoon);
   const next = shelterFirst ?? openGoals.find((o) => (o.tool || o.screen) && !o.underway) ?? openGoals[0];
   if (!open) {
     return (
@@ -1051,7 +1127,10 @@ function NextGoal({
 // Build and order tools, grouped into tabs.
 // A phone or tablet: the map is moved with a finger rather than a mouse.
 
-export function Architect({ state }: { state: UiState }) {
+const pickArchitect = fields('lockedTools', 'overlay', 'toolId');
+
+export function Architect() {
+  const state = useUi(pickArchitect);
   const current = TOOLS.find((t) => t.id === state.toolId);
   const [group, setGroup] = useState<ToolGroup>('orders');
   // The tool under the mouse: its description shows in the hint line until the mouse leaves.
@@ -1161,7 +1240,10 @@ export function Architect({ state }: { state: UiState }) {
   );
 }
 
-export function Notices({ state, paused = false }: { state: UiState; paused?: boolean }) {
+const pickNotices = fields('notStarted', 'notifications', 'toast');
+
+export function Notices({ paused = false }: { paused?: boolean }) {
+  const state = useUi(pickNotices);
   return (
     <div className="notices" aria-live="polite">
       {paused && (

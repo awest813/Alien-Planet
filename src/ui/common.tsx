@@ -1,8 +1,39 @@
-import { useSyncExternalStore } from 'react';
-import { UiState, controller } from '../game/controller';
+import { useRef, useSyncExternalStore } from 'react';
+import { HoverView, UiState, controller } from '../game/controller';
+import { share } from '../game/share';
 import { ScheduleSlot, WorkTypeKey } from '../sim/types';
 
-export const useUiState = (): UiState => useSyncExternalStore(controller.subscribe, controller.getState);
+// The part of the interface's state a panel shows, picked out by `pick`: the panel redraws only when that part
+// changes (a clock ticking over doesn't redraw the work grid). What `pick` gives back is compared by value, so it
+// may build a new object or list each time.
+export function useUi<T>(pick: (state: UiState) => T): T {
+  const cache = useRef<{ state: UiState; pick: (state: UiState) => T; value: T } | null>(null);
+  const snapshot = (): T => {
+    const state = controller.getState();
+    const last = cache.current;
+    if (last && last.state === state && last.pick === pick) {
+      return last.value;
+    }
+    const value = share(last?.value as T, pick(state), true);
+    cache.current = { state, pick, value };
+    return value;
+  };
+  return useSyncExternalStore(controller.subscribe, snapshot);
+}
+
+// A pick of some of the state's fields as they are, for useUi.
+export function fields<K extends keyof UiState>(...keys: K[]): (state: UiState) => Pick<UiState, K> {
+  return (state) => {
+    const out = {} as Pick<UiState, K>;
+    for (const key of keys) {
+      out[key] = state[key];
+    }
+    return out;
+  };
+}
+
+// What the mouse is over (a store of its own: the mouse moves far more often than anything else changes).
+export const useHover = (): HoverView | null => useSyncExternalStore(controller.subscribeHover, controller.getHover);
 
 export const WORK_LABELS: Record<WorkTypeKey, string> = {
   doctor: 'Doctor',

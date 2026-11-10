@@ -107,6 +107,8 @@ const terrainVariant = (x: number, y: number) => {
 const POOR_ART = 4;
 const SEASON_INDEX: Record<string, number> = { Spring: 0, Summer: 1, Autumn: 2, Winter: 3 };
 
+// Zooms here are as the player sees them, in the page's pixels: on a sharp screen the canvas has more pixels
+// than that (index.ts), and the camera's own zoom is this many times bigger (see `px`).
 // Below this zoom, map text (names, stack counts) is too small to read.
 const READABLE_ZOOM = 0.9;
 // Below this, colonists and raiders get a marker the size of a few screen pixels.
@@ -224,9 +226,20 @@ export class ColonyScene extends Phaser.Scene {
     // Above the tiles and night shading, below colonists.
     this.heatmap = this.add.graphics().setDepth(Depth.NIGHT + 2);
     this.water = this.add.graphics().setDepth(Depth.WATER);
-    this.cameras.main.setZoom(2);
+    this.cameras.main.setZoom(2 * this.px);
     this.setupPointer();
     this.setupKeyboard();
+  }
+
+  // Canvas pixels to one of the page's: 2 on a sharp (high-density) screen, where the canvas is drawn at its full
+  // resolution and scaled down to fit (it was drawn at the page's and blown up, and looked soft).
+  private get px(): number {
+    return 1 / (this.scale.zoom || 1);
+  }
+
+  // The camera's zoom as the player sees it.
+  private get viewZoom(): number {
+    return this.cameras.main.zoom / this.px;
   }
 
   public update(time: number, delta: number): void {
@@ -235,7 +248,7 @@ export class ColonyScene extends Phaser.Scene {
       this.buildWorld();
     }
     // Zoomed far out, text shrinks to a few pixels: names and stack counts are left off until it reads again.
-    const readable = this.cameras.main.zoom >= READABLE_ZOOM;
+    const readable = this.viewZoom >= READABLE_ZOOM;
     this.labelsReadable = readable;
     // Stack counts only where the camera looks: each is a text with a texture of its own, and drawn whether on
     // screen or not, a big colony's hundreds of them were most of a frame (paused or not).
@@ -254,7 +267,7 @@ export class ColonyScene extends Phaser.Scene {
       this.groundChanged = false;
       this.layers.terrain.generateLayerDataTexture();
     }
-    const far = this.cameras.main.zoom < MARKER_ZOOM;
+    const far = this.viewZoom < MARKER_ZOOM;
     if (far && this.featuresChanged && (!this.featuresFar || time - this.featuresSyncedAt > 1000)) {
       this.featuresChanged = false;
       this.featuresSyncedAt = time;
@@ -368,7 +381,8 @@ export class ColonyScene extends Phaser.Scene {
     }
     const cam = this.cameras.main;
     const v = cam.worldView;
-    const s = 1 / cam.zoom;
+    // (One of the page's pixels, in the world.)
+    const s = this.px / cam.zoom;
     const frac = (n: number) => n - Math.floor(n);
     if (kind === 'rain' || kind === 'storm') {
       if (kind === 'storm') {
@@ -1292,7 +1306,8 @@ export class ColonyScene extends Phaser.Scene {
 
     // Zoomed far out (a Large map whole), figures are specks: a ring in each colonist's colour, and a red dot for
     // each raider, about the same size on screen however far out, show where everyone is.
-    const zoom = this.cameras.main.zoom;
+    // (Sized in the page's pixels, by the zoom in those.)
+    const zoom = this.viewZoom;
     if (zoom < MARKER_ZOOM) {
       const r = 5 / zoom;
       // (Those setting off on a trip are still on the map, walking away.)
@@ -1781,7 +1796,7 @@ export class ColonyScene extends Phaser.Scene {
       if (this.pan) {
         const dx = pointer.x - this.pan.x;
         const dy = pointer.y - this.pan.y;
-        if (Math.abs(dx) + Math.abs(dy) > 4) {
+        if (Math.abs(dx) + Math.abs(dy) > 4 * this.px) {
           this.pan.moved = true;
         }
         cam.setScroll(this.pan.scrollX - dx / cam.zoom, this.pan.scrollY - dy / cam.zoom);
@@ -1857,7 +1872,7 @@ export class ColonyScene extends Phaser.Scene {
   private zoomAround(target: number, at: { x: number; y: number }): void {
     const cam = this.cameras.main;
     const oldZoom = cam.zoom;
-    const zoom = Phaser.Math.Clamp(target, this.minZoom(), MAX_ZOOM);
+    const zoom = Phaser.Math.Clamp(target, this.minZoom(), MAX_ZOOM * this.px);
     const worldX = cam.scrollX + cam.width / 2 + (at.x - cam.width / 2) / oldZoom;
     const worldY = cam.scrollY + cam.height / 2 + (at.y - cam.height / 2) / oldZoom;
     cam.setZoom(zoom);
@@ -1973,7 +1988,11 @@ export class ColonyScene extends Phaser.Scene {
   private minZoom(): number {
     const world = controller.sim.world;
     const cam = this.cameras.main;
-    return Math.min(MIN_ZOOM, cam.width / ((world.width + 4) * TILE), cam.height / ((world.height + 4) * TILE));
+    return Math.min(
+      MIN_ZOOM * this.px,
+      cam.width / ((world.width + 4) * TILE),
+      cam.height / ((world.height + 4) * TILE),
+    );
   }
 
   // The world point in the middle of the view, and the view's size, as of last frame.
@@ -2014,7 +2033,7 @@ export class ColonyScene extends Phaser.Scene {
     const dx = (h.has('d') || h.has('ArrowRight') ? 1 : 0) - (h.has('a') || h.has('ArrowLeft') ? 1 : 0);
     const dy = (h.has('s') || h.has('ArrowDown') ? 1 : 0) - (h.has('w') || h.has('ArrowUp') ? 1 : 0);
     if (dx !== 0 || dy !== 0) {
-      const step = (PAN_SPEED * controller.settings.panSpeed * delta) / 1000 / cam.zoom;
+      const step = (PAN_SPEED * this.px * controller.settings.panSpeed * delta) / 1000 / cam.zoom;
       cam.setScroll(cam.scrollX + dx * step, cam.scrollY + dy * step);
     }
   }

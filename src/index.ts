@@ -10,6 +10,17 @@ import { App } from './ui/App';
 import './ui/styles.css';
 
 // Phaser draws the world; React draws the management UI on top of it.
+//
+// On a sharp (high-density) screen the canvas has that many more pixels than the page gives it, and is shown at
+// the page's size: drawn at the page's resolution, the browser blew it up and the map looked soft. (At most
+// twice: three times over, a phone's GPU paints more than twice the pixels again for little to see.)
+const pixelRatio = () => Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+let ratio = pixelRatio();
+const pageSize = () => {
+  const box = document.getElementById('game')!.getBoundingClientRect();
+  return { width: Math.max(1, Math.round(box.width)), height: Math.max(1, Math.round(box.height)) };
+};
+const start = pageSize();
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
@@ -19,12 +30,31 @@ const game = new Phaser.Game({
   audio: { noAudio: true },
   roundPixels: true,
   scale: {
-    mode: Phaser.Scale.RESIZE,
-    width: '100%',
-    height: '100%',
+    mode: Phaser.Scale.NONE,
+    width: Math.round(start.width * ratio),
+    height: Math.round(start.height * ratio),
+    zoom: 1 / ratio,
   },
   scene: [ColonyScene],
 });
+
+// Follows the page's size (a window resized, a phone turned) and its pixel density (the browser zoomed, the
+// window moved to another screen).
+const fit = () => {
+  const next = pixelRatio();
+  if (next !== ratio) {
+    ratio = next;
+    game.scale.setZoom(1 / ratio);
+  }
+  const page = pageSize();
+  const width = Math.round(page.width * ratio);
+  const height = Math.round(page.height * ratio);
+  if (game.scale.width !== width || game.scale.height !== height) {
+    game.scale.resize(width, height);
+  }
+};
+new ResizeObserver(fit).observe(document.getElementById('game')!);
+window.addEventListener('resize', fit);
 
 createRoot(document.getElementById('ui')!).render(createElement(App));
 

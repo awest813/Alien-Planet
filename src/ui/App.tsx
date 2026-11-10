@@ -1,8 +1,8 @@
 import { TOUCH } from './touch';
 import { useEffect, useRef, useState } from 'react';
-import { controller } from '../game/controller';
+import { UiState, controller } from '../game/controller';
 import { helpSeen, markHelpSeen } from '../game/settings';
-import { useUiState } from './common';
+import { useUi } from './common';
 import { Architect, ColonistBar, HoverCard, Inspector, Notices, Screen, SidePanel, TopBar } from './hud';
 import {
   DepartedScreen,
@@ -31,8 +31,18 @@ import {
 // Layout: top bar and colonist bar across the top, inspector on the left, alerts and goals on
 // the right, the architect menu along the bottom, and the map showing through the middle. Before
 // a colony is under way, the title screen sits over the map instead.
+// (Each panel and screen watches the part of the state it shows; the App only what decides which are up.)
+const pickApp = (s: UiState) => ({
+  inPlay: s.inPlay,
+  ship: s.ship,
+  fallen: s.fallen,
+  speed: s.speed,
+  uiScale: s.settings.uiScale,
+  showMinimap: s.settings.showMinimap,
+});
+
 export function App() {
-  const state = useUiState();
+  const state = useUi(pickApp);
   const onTitle = !state.inPlay;
   const [screen, setScreen] = useState<Screen>(null);
   // Settings and help opened from the pause menu go back to it when closed, not to the game.
@@ -186,7 +196,7 @@ export function App() {
   }, []);
 
   // Interface size: scale everything from the top-left corner and give it the room to fill.
-  const scale = state.settings.uiScale;
+  const scale = state.uiScale;
   const scaled =
     scale === 1
       ? undefined
@@ -203,43 +213,43 @@ export function App() {
     <div className="ui" style={scaled}>
       {onTitle ? (
         <>
-          <TitleScreen state={state} actions={actions} />
+          <TitleScreen actions={actions} />
           {/* Load and save messages ("older version", "could not be loaded") show here too. */}
-          <Notices state={state} />
+          <Notices />
         </>
       ) : (
         <>
-          <TopBar state={state} onOpen={setScreen} />
-          <ColonistBar state={state} onOpen={setScreen} />
+          <TopBar onOpen={setScreen} />
+          <ColonistBar onOpen={setScreen} />
           <div className="left-column">
-            <Inspector state={state} />
+            <Inspector />
           </div>
           <div className="right-column">
-            <SidePanel state={state} onOpen={setScreen} />
-            {state.settings.showMinimap && <Minimap />}
+            <SidePanel onOpen={setScreen} />
+            {state.showMinimap && <Minimap />}
           </div>
           <div className="bottom">
-            <HoverCard state={state} />
-            <Architect state={state} />
+            <HoverCard />
+            <Architect />
           </div>
-          <Notices state={state} paused={state.speed === 0 && !screen && !state.fallen} />
-          {state.fallen && !screen && <FallenScreen state={state} actions={actions} />}
-          {departed && !state.fallen && <DepartedScreen state={state} actions={actions} />}
-          {screen === 'ship' && !departed && <ShipScreen state={state} onClose={close} />}
-          {screen === 'menu' && <PauseMenu state={state} onClose={close} actions={actions} />}
-          {screen === 'work' && <WorkScreen state={state} onClose={close} />}
-          {screen === 'schedule' && <ScheduleScreen state={state} onClose={close} />}
-          {screen === 'production' && <ProductionScreen state={state} onClose={close} />}
-          {screen === 'research' && <ResearchScreen state={state} onClose={close} />}
-          {screen === 'story' && <StoryScreen state={state} onClose={close} />}
-          {screen === 'prisoners' && <PrisonersScreen state={state} onClose={close} />}
-          {screen === 'village' && <VillageScreen state={state} onClose={close} />}
-          {screen === 'factions' && <FactionsScreen state={state} onClose={close} />}
-          {screen === 'colonists' && <ColonistsScreen state={state} onClose={close} />}
-          {screen === 'trade' && <TradeScreen state={state} onClose={close} />}
+          <Notices paused={state.speed === 0 && !screen && !state.fallen} />
+          {state.fallen && !screen && <FallenScreen actions={actions} />}
+          {departed && !state.fallen && <DepartedScreen actions={actions} />}
+          {screen === 'ship' && !departed && <ShipScreen onClose={close} />}
+          {screen === 'menu' && <PauseMenu onClose={close} actions={actions} />}
+          {screen === 'work' && <WorkScreen onClose={close} />}
+          {screen === 'schedule' && <ScheduleScreen onClose={close} />}
+          {screen === 'production' && <ProductionScreen onClose={close} />}
+          {screen === 'research' && <ResearchScreen onClose={close} />}
+          {screen === 'story' && <StoryScreen onClose={close} />}
+          {screen === 'prisoners' && <PrisonersScreen onClose={close} />}
+          {screen === 'village' && <VillageScreen onClose={close} />}
+          {screen === 'factions' && <FactionsScreen onClose={close} />}
+          {screen === 'colonists' && <ColonistsScreen onClose={close} />}
+          {screen === 'trade' && <TradeScreen onClose={close} />}
         </>
       )}
-      {screen === 'settings' && <SettingsScreen state={state} onClose={close} />}
+      {screen === 'settings' && <SettingsScreen onClose={close} />}
       {screen === 'help' && <HelpScreen onClose={close} />}
     </div>
   );

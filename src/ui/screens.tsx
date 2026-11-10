@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChronicleYear, UiState, controller } from '../game/controller';
 import { ChronicleKind } from '../sim/chronicle';
 import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey, WorldAction } from '../sim/types';
-import { Bar, SLOT_LABELS, WORK_LABELS, moodColor } from './common';
+import { Bar, SLOT_LABELS, WORK_LABELS, fields, moodColor, useUi } from './common';
 import { ADULT, DRAFT_AGE, RETIRED_WORK, TEEN, TEEN_WORK } from '../sim/lifespans';
 import { Hours, Hunting, POLICY_TEXT, Rations } from '../sim/village';
 
@@ -182,7 +182,23 @@ function useLongPress() {
   });
 }
 
-export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+// (Not their needs or what they're doing: the grid stays put while the colony works.)
+const pickWork = (s: UiState) => ({
+  colonists: s.colonists.map((c) => ({
+    id: c.id,
+    name: c.name,
+    color: c.color,
+    age: c.age,
+    stage: c.stage,
+    retired: c.retired,
+    dead: c.dead,
+    priorities: c.priorities,
+    skillList: c.skillList.map(({ key, label, level, passion }) => ({ key, label, level, passion })),
+  })),
+});
+
+export function WorkScreen({ onClose }: { onClose: () => void }) {
+  const state = useUi(pickWork);
   // Left click raises the number (1 → 4 → off → 1); right click (or a long press) goes the other way.
   const forward = (value: number) => (value === 0 ? 1 : value === 4 ? 0 : value + 1);
   const back = (value: number) => (value === 0 ? 4 : value === 1 ? 0 : value - 1);
@@ -289,7 +305,13 @@ export function WorkScreen({ state, onClose }: { state: UiState; onClose: () => 
   );
 }
 
-export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+const pickSchedule = (s: UiState) => ({
+  colonists: s.colonists.map((c) => ({ id: c.id, name: c.name, color: c.color, dead: c.dead, schedule: c.schedule })),
+  hour: parseInt(s.time, 10),
+});
+
+export function ScheduleScreen({ onClose }: { onClose: () => void }) {
+  const state = useUi(pickSchedule);
   const [brush, setBrush] = useState<ScheduleSlot>('W');
   const [painting, setPainting] = useState(false);
   const paint = (colonist: number, hour: number) =>
@@ -325,7 +347,7 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
       apply();
     }
   };
-  const now = parseInt(state.time, 10);
+  const now = state.hour;
   return (
     <Modal title="Schedule" onClose={onClose} wide>
       <div className="row">
@@ -415,7 +437,10 @@ export function ScheduleScreen({ state, onClose }: { state: UiState; onClose: ()
   );
 }
 
-export function ProductionScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+const pickProduction = fields('bills');
+
+export function ProductionScreen({ onClose }: { onClose: () => void }) {
+  const state = useUi(pickProduction);
   const set = (recipe: number, target: number) => controller.command({ type: 'bill', recipe, target });
   return (
     <Modal title="Production" onClose={onClose} medium>
@@ -642,7 +667,10 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
 
 const researchRank = (p: UiState['research'][number]) => (p.current ? 0 : p.done ? 3 : p.available ? 1 : 2);
 
-export function ResearchScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+const pickResearch = fields('research', 'researchBench');
+
+export function ResearchScreen({ onClose }: { onClose: () => void }) {
+  const state = useUi(pickResearch);
   return (
     <Modal title="Research" onClose={onClose}>
       <p className="muted">
@@ -694,7 +722,15 @@ export function ResearchScreen({ state, onClose }: { state: UiState; onClose: ()
 }
 
 // The neighbours: a favour they've asked, gifts to win them over, and tribute to keep raiders away.
-export function FactionsScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+const pickFactions = (s: UiState) => ({
+  ...fields('diplomacy', 'factions')(s),
+  // Who could go on an expedition.
+  colonists: s.colonists.map((c) => ({ id: c.id, name: c.name, age: c.age, dead: c.dead, status: c.status })),
+});
+type FactionsState = ReturnType<typeof pickFactions>;
+
+export function FactionsScreen({ onClose }: { onClose: () => void }) {
+  const state = useUi(pickFactions);
   const d = state.diplomacy;
   const r = d.request;
   const left = (hours: number) => (hours > 24 ? `${Math.ceil(hours / 24)} days left` : `${hours}h left`);
@@ -886,7 +922,7 @@ export function FactionsScreen({ state, onClose }: { state: UiState; onClose: ()
 }
 
 // Quarrels between the neighbours, an envoy's offer, an ally's call for help.
-function WorldNews({ state }: { state: UiState }) {
+function WorldNews({ state }: { state: Pick<UiState, 'diplomacy'> }) {
   const d = state.diplomacy;
   const world = (action: WorldAction) => controller.command({ type: 'world', action });
   const [lend, setLend] = useState<number | null>(null);
@@ -968,7 +1004,7 @@ function WorldNews({ state }: { state: UiState }) {
 }
 
 // Parties away, and sending a new one.
-function Expeditions({ state }: { state: UiState }) {
+function Expeditions({ state }: { state: FactionsState }) {
   const d = state.diplomacy;
   const [dest, setDest] = useState(0);
   const [chosen, setChosen] = useState<number[]>([]);
@@ -1053,7 +1089,10 @@ function Expeditions({ state }: { state: UiState }) {
 }
 
 // The colony's leader (chosen by vote each season) and the policies it lives by.
-export function VillageScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+const pickVillage = fields('village');
+
+export function VillageScreen({ onClose }: { onClose: () => void }) {
+  const state = useUi(pickVillage);
   const v = state.village;
   const set = (policy: { rations?: Rations; hours?: Hours; restDays?: boolean; hunting?: Hunting }) =>
     controller.command({ type: 'policy', ...policy });
@@ -1122,7 +1161,10 @@ export function VillageScreen({ state, onClose }: { state: UiState; onClose: () 
 }
 
 // Raiders lying wounded and the prisoners held, with how each is doing, and a way to let one go.
-export function PrisonersScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+const pickPrisoners = fields('captives');
+
+export function PrisonersScreen({ onClose }: { onClose: () => void }) {
+  const state = useUi(pickPrisoners);
   const held = state.captives.filter((p) => p.state === 'prisoner');
   const lying = state.captives.filter((p) => p.state === 'downed');
   return (
@@ -1406,7 +1448,10 @@ function History({ history }: { history: UiState['history'] }) {
   );
 }
 
-export function StoryScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+const pickStory = fields('chronicle', 'festivals', 'history', 'story');
+
+export function StoryScreen({ onClose }: { onClose: () => void }) {
+  const state = useUi(pickStory);
   // Keys for the events by what they are, numbering any repeats: the newest comes first, so a key by position moved
   // under every row each time something happened.
   const seen = new Map<string, number>();
@@ -1524,7 +1569,10 @@ function familyLine(c: UiState['colonists'][number]): string {
     .join(' · ');
 }
 
-export function ColonistsScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+const pickColonists = fields('colonists', 'selectedColonist');
+
+export function ColonistsScreen({ onClose }: { onClose: () => void }) {
+  const state = useUi(pickColonists);
   const [sort, setSort] = useState<{ by: ColonistSort; up: boolean }>({ by: 'name', up: true });
   const health = (c: UiState['colonists'][number]) =>
     c.status === 'Downed' ? 0 : c.bleeding ? 1 : c.status !== 'Healthy' || c.disease ? 2 : 3;

@@ -113,6 +113,7 @@ import {
 import { Difficulty, coldSnapOn, eclipseOn, heatWaveOn } from '../sim/storyteller';
 import { SaveMeta, deleteSave, listSaves, readSave, writeSave } from './save-store';
 import { Settings, loadSettings, storeSettings } from './settings';
+import { share } from './share';
 
 export type Tool =
   | { kind: 'select' }
@@ -799,6 +800,12 @@ export interface ColonistView {
   recentRecreation: string;
 }
 
+// Under the mouse: the tile, and the colonist there, if any.
+export interface HoverView {
+  tile: TileView;
+  colonist: { name: string; color: string; mood: number; activity: string } | null;
+}
+
 // A story event shown briefly as a card, so major moments aren't missed.
 export interface Notification {
   id: number;
@@ -1119,8 +1126,6 @@ export interface UiState {
   // Maddened animals (a pack, cave crawlers, the great beast) hunting colonists: a fight too, for the
   // "Draft all" button.
   animalsAttacking: boolean;
-  hover: TileView | null;
-  hoverColonist: number | null;
   selectedTile: TileView | null;
   power: PowerView;
   overlay: Overlay;
@@ -1217,7 +1222,7 @@ export class GameController {
     this.sim = Simulation.newColony(Math.floor(Math.random() * 1e9));
     this.focusRequest = this.sim.colonists[0].tile;
     this.storySeen = this.sim.storyLog.length;
-    this.state = this.buildState();
+    this.state = share(undefined, this.buildState());
     this.refreshSaves();
     this.applySound();
     // Leaving the page (closing the tab, switching away on a phone) saves the colony.
@@ -1376,9 +1381,45 @@ export class GameController {
 
   public getState = (): UiState => this.state;
 
+  // Each publish builds the whole interface's state afresh, but keeps the parts that came out the same (see
+  // share.ts), and wakes the interface only when something did change: paused, or with the colony at rest,
+  // most publishes change nothing. (The hover card has a store of its own, below: the mouse moving over the map
+  // redrew every panel.)
   public publish(): void {
-    this.state = this.buildState();
-    this.listeners.forEach((listener) => listener());
+    const next = share(this.state, this.buildState());
+    if (next !== this.state) {
+      this.state = next;
+      this.listeners.forEach((listener) => listener());
+    }
+    this.publishHover();
+  }
+
+  // What the mouse is over, for the hover card.
+  private hover: HoverView | null = null;
+  private readonly hoverListeners = new Set<() => void>();
+
+  public subscribeHover = (listener: () => void): (() => void) => {
+    this.hoverListeners.add(listener);
+    return () => this.hoverListeners.delete(listener);
+  };
+
+  public getHover = (): HoverView | null => this.hover;
+
+  private publishHover(): void {
+    const tile = this.hoverTile;
+    const who = this.hoverColonist === null ? undefined : this.state.colonists.find((c) => c.id === this.hoverColonist);
+    const built: HoverView | null =
+      tile === null
+        ? null
+        : {
+            tile: this.describeTile(tile),
+            colonist: who ? { name: who.name, color: who.color, mood: who.mood, activity: who.activity } : null,
+          };
+    const next = share(this.hover, built);
+    if (next !== this.hover) {
+      this.hover = next;
+      this.hoverListeners.forEach((listener) => listener());
+    }
   }
 
   // Fraction of the way to the next tick, for smooth rendering between ticks.
@@ -1479,11 +1520,15 @@ export class GameController {
     // at once) and the notices' timers, so once a second is plenty (it rebuilt the whole interface five times a
     // second for nothing).
     const every = this.speedIndex === 0 ? 1000 : 200;
-    if (changed || this.sinceUiUpdate >= every || (this.hoverChanged && this.sinceHoverUpdate >= 80)) {
+    if (changed || this.sinceUiUpdate >= every) {
       this.sinceUiUpdate = 0;
       this.sinceHoverUpdate = 0;
       this.hoverChanged = false;
       this.publish();
+    } else if (this.hoverChanged && this.sinceHoverUpdate >= 80) {
+      this.sinceHoverUpdate = 0;
+      this.hoverChanged = false;
+      this.publishHover();
     }
   }
 
@@ -2175,8 +2220,6 @@ export class GameController {
         sim.enemies.length > 0
           ? { faction: FACTIONS[sim.enemies[0].faction].name, remaining: sim.enemies.filter((e) => !e.fleeing).length }
           : null,
-      hover: this.hoverTile === null ? null : this.describeTile(this.hoverTile),
-      hoverColonist: this.hoverColonist,
       selectedTile: this.selectedTile === null ? null : this.describeTile(this.selectedTile),
       power: {
         hasGrid: sim.power.supply > 0 || sim.power.demand > 0 || sim.power.capacity > 0,

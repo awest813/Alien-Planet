@@ -341,6 +341,7 @@ kbd {
    after them stay put. */
 .clock {
   min-width: 13.5em;
+  font-variant-numeric: tabular-nums;
 }
 
 .temp {

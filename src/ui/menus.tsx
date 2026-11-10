@@ -18,7 +18,7 @@ function priceLabel(line: TradeLine): string {
   return hi - lo < 0.05 ? fmt(lo) : `${fmt(lo)}–${fmt(hi)} (worst first)`;
 }
 import { ConfirmButton, Modal } from './screens';
-import { arrowKeys } from './common';
+import { arrowKeys, fields, useUi } from './common';
 
 // What a menu can ask the app to do.
 export interface MenuActions {
@@ -155,7 +155,15 @@ function NewColonyForm({
 }
 
 // The save slots: load only (from the title screen), or save, load and delete (in a game).
-function SaveSlots({ state, manage, onLoaded }: { state: UiState; manage: boolean; onLoaded: () => void }) {
+function SaveSlots({
+  state,
+  manage,
+  onLoaded,
+}: {
+  state: Pick<UiState, 'saves'>;
+  manage: boolean;
+  onLoaded: () => void;
+}) {
   const savesBySlot = new Map(state.saves.map((s) => [s.slot, s]));
   const load = async (slot: string) => {
     if (await controller.load(slot)) {
@@ -244,7 +252,10 @@ function useMenuView<V extends string>(): [V | 'main', (view: V | 'main') => voi
 }
 
 // The first thing a player sees: carry on, start fresh, or load.
-export function TitleScreen({ state, actions }: { state: UiState; actions: MenuActions }) {
+const pickTitle = fields('latestSave', 'saves');
+
+export function TitleScreen({ actions }: { actions: MenuActions }) {
+  const state = useUi(pickTitle);
   const [view, setView] = useMenuView<'new' | 'load'>();
   const latest = state.latestSave;
   return (
@@ -304,7 +315,10 @@ export function TitleScreen({ state, actions }: { state: UiState; actions: MenuA
 }
 
 // Esc or the Menu button: the game is paused behind it.
-export function PauseMenu({ state, onClose, actions }: { state: UiState; onClose: () => void; actions: MenuActions }) {
+const pickPause = fields('biome', 'colonists', 'day', 'difficulty', 'mapSize', 'seed', 'settings', 'saves');
+
+export function PauseMenu({ onClose, actions }: { onClose: () => void; actions: MenuActions }) {
+  const state = useUi(pickPause);
   const [view, setView] = useMenuView<'saves' | 'new'>();
   const current = DIFFICULTIES.find((d) => d.key === state.difficulty);
   return (
@@ -352,7 +366,10 @@ export function PauseMenu({ state, onClose, actions }: { state: UiState; onClose
 }
 
 // Everyone has died: how it went, and where to go next.
-export function FallenScreen({ state, actions }: { state: UiState; actions: MenuActions }) {
+const pickFallen = fields('colonists', 'day', 'objectives', 'stats', 'saves');
+
+export function FallenScreen({ actions }: { actions: MenuActions }) {
+  const state = useUi(pickFallen);
   const [view, setView] = useMenuView<'new' | 'load'>();
   const goals = state.objectives.filter((o) => o.done).length;
   const stats = [
@@ -416,7 +433,10 @@ function useConfirm(): { armed: boolean; ready: boolean; arm: () => void; disarm
   return { armed, ready, arm: () => setArmed(true), disarm: () => setArmed(false) };
 }
 
-export function ShipScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+const pickShip = fields('beaconHours', 'colonists', 'ship');
+
+export function ShipScreen({ onClose }: { onClose: () => void }) {
+  const state = useUi(pickShip);
   const confirm = useConfirm();
   if (state.ship !== 'landed') {
     return (
@@ -484,7 +504,10 @@ export function ShipScreen({ state, onClose }: { state: UiState; onClose: () => 
 }
 
 // The end of a colony's story, by its own choice.
-export function DepartedScreen({ state, actions }: { state: UiState; actions: MenuActions }) {
+const pickDeparted = fields('legacy');
+
+export function DepartedScreen({ actions }: { actions: MenuActions }) {
+  const state = useUi(pickDeparted);
   const [view, setView] = useMenuView<'new'>();
   return (
     <Modal title="The colony's story ends" onClose={() => undefined} closable={false}>
@@ -606,7 +629,10 @@ const CONTROLS: [string, string][] = [
   ['Letter keys', 'Tools: hover a button in the bottom bar to see its key'],
 ];
 
-export function SettingsScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+const pickSettings = fields('settings');
+
+export function SettingsScreen({ onClose }: { onClose: () => void }) {
+  const state = useUi(pickSettings);
   const [helpReset, setHelpReset] = useState(false);
   const s = state.settings;
   const set = (patch: Partial<Settings>) => controller.setSettings(patch);
@@ -678,7 +704,10 @@ export function SettingsScreen({ state, onClose }: { state: UiState; onClose: ()
 
 // Buying from and selling to a visiting caravan. Quantities are picked on both sides and the
 // deal settles the difference in silver.
-export function TradeScreen({ state, onClose }: { state: UiState; onClose: () => void }) {
+const pickTrade = fields('trade');
+
+export function TradeScreen({ onClose }: { onClose: () => void }) {
+  const state = useUi(pickTrade);
   const [buy, setBuy] = useState<Record<number, number>>({});
   const [sell, setSell] = useState<Record<number, number>>({});
   const trade = state.trade;
