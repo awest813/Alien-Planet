@@ -626,6 +626,14 @@ export function woundEnemy(sim: Simulation, e: Enemy, amount: number, by: string
   }
 }
 
+// A charge's path that still ends beside its target (who hasn't moved off from it) needs no new search: on a big
+// map a search for each raider every 30 ticks was most of what a raid cost. (A step blocked on the way clears the
+// path, and that searches again. An archer's post is rethought whatever: cover changes.)
+function stillLeadsTo(w: World, e: Enemy, target: number, ranged: boolean): boolean {
+  const end = e.path[e.path.length - 1];
+  return !ranged && end !== undefined && chebyshev(w, end, target) <= 1;
+}
+
 function moveEnemy(sim: Simulation, e: Enemy, ally = false): void {
   const w = sim.world;
   const next = e.path[0];
@@ -1132,7 +1140,7 @@ export function updateEnemies(sim: Simulation): void {
       }
       continue;
     }
-    if (e.path.length === 0 || e.repathAt <= sim.tick) {
+    if (e.path.length === 0 || (e.repathAt <= sim.tick && !stillLeadsTo(w, e, target.tile, ranged))) {
       e.repathAt = sim.tick + (ranged ? POST_RETHINK : 30);
       // Archers close to within reach and pick a firing position; melee fighters charge.
       const post =
@@ -1617,7 +1625,7 @@ export function updateAllies(sim: Simulation): void {
       }
       continue;
     }
-    if (a.path.length === 0 || a.repathAt <= sim.tick) {
+    if (a.path.length === 0 || (a.repathAt <= sim.tick && !stillLeadsTo(w, a, target.tile, false))) {
       a.repathAt = sim.tick + 30;
       a.path =
         sim.pathfinder.find(a.tile, [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))]) ?? [];

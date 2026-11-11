@@ -333,12 +333,30 @@ export class World {
   }
 
   // The nearest tile that can be walked on and leads somewhere (not an isolated scrap of bridge).
+  // Whether there's a step to take from `i`: an open tile beside it, or a diagonal one with neither corner blocked
+  // (as the pathfinder walks: an open diagonal between two walls is no way out).
+  public canLeave(i: number): boolean {
+    const x = this.xOf(i);
+    const y = this.yOf(i);
+    for (let d = 0; d < 8; d++) {
+      const nx = x + DIRS[d][0];
+      const ny = y + DIRS[d][1];
+      if (!this.inBounds(nx, ny) || !this.isPassable(this.idx(nx, ny))) {
+        continue;
+      }
+      if (d < 4 || (this.isPassable(this.idx(nx, y)) && this.isPassable(this.idx(x, ny)))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public nearestPassable(from: number): number | undefined {
     let best: number | undefined;
     let bestDistance = Infinity;
     for (let i = 0; i < this.size; i++) {
       const d = this.distance(from, i);
-      if (d < bestDistance && this.isPassable(i) && this.neighbors(i).some((n) => this.isPassable(n))) {
+      if (d < bestDistance && this.isPassable(i) && this.canLeave(i)) {
         best = i;
         bestDistance = d;
       }

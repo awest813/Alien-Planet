@@ -44,22 +44,57 @@ export class Pathfinder {
     }
     const gx = goals.map((goal) => world.xOf(goal));
     const gy = goals.map((goal) => world.yOf(goal));
-    const heuristic = (i: number): number => {
-      const x = world.xOf(i);
-      const y = world.yOf(i);
-      let best = Infinity;
-      for (let k = 0; k < gx.length; k++) {
-        const dx = Math.abs(x - gx[k]);
-        const dy = Math.abs(y - gy[k]);
-        // Floors make a step as cheap as 0.8, so scale down to stay a lower bound.
-        const h = (Math.max(dx, dy) + (SQRT2 - 1) * Math.min(dx, dy)) * MIN_STEP_COST;
-        if (h < best) {
-          best = h;
+    // Goals in a tight cluster (someone and the tiles round them, the usual case): the distance to the box round
+    // them, which is never more than to the nearest of them (so still a lower bound) and at most a step less, at
+    // the cost of one goal rather than nine.
+    const few = goals.length > 2 && goals.length <= 9;
+    const x0 = few ? Math.min(...gx) : 0;
+    const x1 = few ? Math.max(...gx) : Infinity;
+    const y0 = few ? Math.min(...gy) : 0;
+    const y1 = few ? Math.max(...gy) : Infinity;
+    if (few && x1 - x0 <= 2 && y1 - y0 <= 2) {
+      return this.search(
+        start,
+        (i: number): number => {
+          const x = world.xOf(i);
+          const y = world.yOf(i);
+          const dx = x < x0 ? x0 - x : x > x1 ? x - x1 : 0;
+          const dy = y < y0 ? y0 - y : y > y1 ? y - y1 : 0;
+          return (Math.max(dx, dy) + (SQRT2 - 1) * Math.min(dx, dy)) * MIN_STEP_COST;
+        },
+        gen,
+        blocked,
+      );
+    }
+    return this.search(
+      start,
+      (i: number): number => {
+        const x = world.xOf(i);
+        const y = world.yOf(i);
+        let best = Infinity;
+        for (let k = 0; k < gx.length; k++) {
+          const dx = Math.abs(x - gx[k]);
+          const dy = Math.abs(y - gy[k]);
+          // Floors make a step as cheap as 0.8, so scale down to stay a lower bound.
+          const h = (Math.max(dx, dy) + (SQRT2 - 1) * Math.min(dx, dy)) * MIN_STEP_COST;
+          if (h < best) {
+            best = h;
+          }
         }
-      }
-      return best;
-    };
+        return best;
+      },
+      gen,
+      blocked,
+    );
+  }
 
+  private search(
+    start: number,
+    heuristic: (i: number) => number,
+    gen: number,
+    blocked?: (i: number) => boolean,
+  ): number[] | null {
+    const world = this.world;
     this.heap = [];
     this.keys = [];
     this.g[start] = 0;

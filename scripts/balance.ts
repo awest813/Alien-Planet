@@ -51,6 +51,8 @@ import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { mutualOpinion } from '../src/sim/social';
 import { Difficulty, foodDays } from '../src/sim/storyteller';
 import { Designation, GROW_ZONE, STOCKPILE_ZONE } from '../src/sim/world';
+import { serialize } from '../src/sim/serialize';
+import { writeFileSync } from 'node:fs';
 
 const days = Number(process.argv[2] ?? 20);
 const seeds = Number(process.argv[3] ?? 8);
@@ -540,8 +542,25 @@ function play(seed: number): Result {
           }
         }
       }
+      // SAVE_RAID=day:file saves the colony as the first raid from that day arrives (for scripts/perf.ts from=file).
+      if (saveRaid && sim.raid && sim.enemies.length > 0 && sim.day >= saveRaid.day) {
+        writeFileSync(saveRaid.file, JSON.stringify(serialize(sim)));
+        console.log(`saved day ${sim.day}, ${sim.enemies.length} raiders, to ${saveRaid.file}`);
+        process.exit(0);
+      }
+      const stepped = performance.now();
       for (let i = 0; i < 20; i++) {
         sim.step();
+      }
+      if (perf) {
+        const ms = performance.now() - stepped;
+        const line = (perfDays[sim.day] ??= { ms: 0, ticks: 0, raidMs: 0, raidTicks: 0 });
+        line.ms += ms;
+        line.ticks += 20;
+        if (sim.raid) {
+          line.raidMs += ms;
+          line.raidTicks += 20;
+        }
       }
     }
 
@@ -1431,6 +1450,12 @@ Simulation.prototype.addLog = function (this: Simulation, text, tone, story) {
 };
 
 const starvingDoing: Record<string, number> = {};
+// With PERF=1: the simulation's own time (not the autoplayer's), by day, and in the hours a raid was on.
+const perf = !!process.env.PERF;
+const saveRaid = process.env.SAVE_RAID
+  ? { day: Number(process.env.SAVE_RAID.split(':')[0]), file: process.env.SAVE_RAID.split(':').slice(1).join(':') }
+  : null;
+let perfDays: Record<number, { ms: number; ticks: number; raidMs: number; raidTicks: number }> = {};
 // Colonist-hours spent on each kind of recreation (a building, or a walk).
 const joyTime: Record<string, number> = {};
 // Colonist-hours spent cleaning, and mess left indoors at the end of each run.
@@ -1444,7 +1469,26 @@ const onlySeed = Number(process.argv.find((a) => a.startsWith('seed='))?.slice(5
 const startAt = Number(process.argv.find((a) => a.startsWith('start='))?.slice(6) ?? 0);
 const seedList = onlySeed ? [onlySeed] : Array.from({ length: seeds }, (_, s) => (startAt + s + 1) * 7919);
 for (const seed of seedList) {
+  perfDays = {};
   const r = play(seed);
+  if (perf) {
+    const per = (ms: number, ticks: number) => (ticks > 0 ? ((ms / ticks) * 1000).toFixed(0) : '-');
+    const days = Object.entries(perfDays);
+    const all = days.reduce((n, [, d]) => ({ ms: n.ms + d.ms, ticks: n.ticks + d.ticks }), { ms: 0, ticks: 0 });
+    const raids = days.reduce((n, [, d]) => ({ ms: n.ms + d.raidMs, ticks: n.ticks + d.raidTicks }), {
+      ms: 0,
+      ticks: 0,
+    });
+    const worst = days
+      .filter(([, d]) => d.raidTicks >= 200)
+      .map(([day, d]) => `d${day} ${per(d.raidMs, d.raidTicks)}`)
+      .sort((a, b) => Number(b.split(' ')[1]) - Number(a.split(' ')[1]))
+      .slice(0, 5);
+    console.log(
+      `  perf (ms per 1,000 ticks): all ${per(all.ms, all.ticks)}, raids on ${per(raids.ms, raids.ticks)}; ` +
+        `by day ${days.map(([day, d]) => `${day}:${per(d.ms, d.ticks)}`).join(' ')}; worst raids ${worst.join(', ')}`,
+    );
+  }
   results.push(r);
   messIndoors += r.mess;
   console.log(

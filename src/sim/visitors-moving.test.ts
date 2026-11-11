@@ -76,3 +76,39 @@ describe('traders packing up', () => {
     expect(w.size).toBeGreaterThan(0);
   });
 });
+
+describe('boxed in by what was built', () => {
+  it('a colonist left with no step to take is put where they can walk from', () => {
+    // Walls on three sides and the last side built up round a colonist in a corner, an open diagonal the only gap
+    // (no way out: a diagonal step between two walls isn't taken). They stood there a month, starving.
+    const sim = Simulation.newColony(5);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 12);
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    sim.weather = { kind: 'clear', until: Number.MAX_SAFE_INTEGER };
+    const c = sim.colonists[1];
+    const cx = x + 4;
+    const cy = y + 4;
+    c.tile = w.idx(cx, cy);
+    c.path = [];
+    sim.apply({ type: 'draft', colonist: c.id, drafted: true });
+    const wall = featureId('woodWall');
+    for (const [dx, dy] of [
+      [1, 0],
+      [0, 1],
+      [1, 1],
+      [-1, 1],
+      [1, -1],
+      [0, -1],
+    ]) {
+      w.setFeature(w.idx(cx + dx, cy + dy), wall);
+    }
+    sim.apply({ type: 'build', feature: wall, tiles: [w.idx(cx - 1, cy)] });
+    for (let t = 0; t < HOUR * 12 && w.feature[w.idx(cx - 1, cy)] !== wall; t++) {
+      sim.step();
+    }
+    expect(w.feature[w.idx(cx - 1, cy)]).toBe(wall);
+    expect(w.isPassable(c.tile)).toBe(true);
+    expect(w.canLeave(c.tile)).toBe(true);
+  });
+});

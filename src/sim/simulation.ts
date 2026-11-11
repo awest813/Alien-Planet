@@ -4498,6 +4498,9 @@ export class Simulation {
           w.dropItemNear(t, displaced.item, displaced.count, displaced.fresh, displaced.quality);
         }
         this.pushColonistsOff(t);
+        if (!w.isPassable(t)) {
+          this.rescueStranded();
+        }
         this.stats.built++;
         const def = featureDef(f);
         // A new shaft starts at the surface, marked for digging (Cancel it to stop the miners). One rebuilt
@@ -4527,9 +4530,12 @@ export class Simulation {
 
   // Anyone left in deep water or marooned on a scrap of bridge (after part of it was taken down)
   // scrambles back to the nearest dry ground.
+  // Anyone left with no step to take (a bridge taken down under them, or boxed into a corner by what was built
+  // round them) is put on the nearest ground they can walk from. (Boxed in by a hearth and a banner against two
+  // walls, a colonist stood a month in the one tile, starving, with food a room away.)
   private rescueStranded(): void {
     const w = this.world;
-    const stranded = (i: number) => !w.isPassable(i) || !w.neighbors(i).some((n) => w.isPassable(n));
+    const stranded = (i: number) => !w.isPassable(i) || !w.canLeave(i);
     for (const body of [...this.living(), ...this.enemies, ...this.allies, ...this.animals]) {
       if (!stranded(body.tile)) {
         continue;
