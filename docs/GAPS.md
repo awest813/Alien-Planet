@@ -29,20 +29,39 @@ with esbuild for speed (see ROADMAP).
   goodwill still ends at 100 in some runs (though high goodwill can now be spent: friends send three days' food
   for 20 goodwill when asked). (Envoys walk in, wait about the colony, and walk off home with the
   answer; a returning expedition is seen on the road two hours out.)
-- **Islands and the tundra run hungry:** in a 48-day sweep of every land and layout (five seeds each, Tiny and
-  Medium) no colony is lost, but islands starve 3–8 times as many colonist-hours as valleys (little room to
-  farm) and have the most breaks, and the tundra's cool summers grow less (Tiny tundra valleys about 2,400
-  hours, from 990, though with fewer deaths). Fishing helps islands most: the harness now builds four spots
-  there.
-- **A busy colony's simulation slows during raids.** On a Medium map `scripts/perf.ts` gives about 39 ms per
-  1,000 ticks at day 8 (budget 60), and two busy 41-day crafting colonies ran at 30–58 ms through day 40 (from
-  95–100 with over a thousand items lying about), but up to 68 ms in days with a raid on. What's left is spread
-  thin: pathfinding, colonists choosing work, combat. At top speed even 100 ms per 1,000 ticks is only about 8
-  ms of each second.
-- **Testing:** the long-press hasn't been tried on a real iPhone. Performance is still checked by hand (`scripts/perf.ts`); it's too noisy for CI. Saves from before
-  version 16 can't be loaded (the game says so).
+- **Islands still run hungrier than valleys:** since this pass an island landing brings a week's rations and a
+  fishing spot, and the colony fishes before its hut is up, so islands starve about half the hours they did
+  (48 days, five seeds, Tiny: desert 4,329 to 1,983 colonist-hours, temperate 1,959 to 973, forest 1,214 to
+  782, tundra 2,154 to 1,865), but that's still 5-8 times a valley's (109-367). What's left is the island
+  itself: little room to farm, and the timber across the water, so building eats the hours sowing needs. The
+  tundra's valleys no longer starve more than others (268 hours, from about 2,400).
+- **A busy colony's simulation still slows during raids, though less.** Three raids saved from 41-day crafting
+  colonies on a Medium map (saved with `SAVE_RAID=day:file`, timed with `perf.ts from=file`) ran at 67-88 ms per 1,000 ticks and now run at 48-74 (budget 60). Path searches are now about a
+  third of the worst raid (allies chasing raiders across a big map); the rest is spread thin. At top speed even
+  100 ms per 1,000 ticks is only about 8 ms of each second.
+- **Testing:** the long-press hasn't been tried on a real iPhone. Timings are still checked by hand
+  (`scripts/perf.ts`; `PERF=1` with `scripts/balance.ts` prints them by day and for raid hours), but a test now
+  counts path searches, which a seeded colony makes the same every run. Saves from before version 16 can't be
+  loaded (the game says so).
 
 ## Closed in this pass
+
+- **Finishing the gap list** (each found in a balance run or a timed raid, and fixed with a test):
+  - **Raids were slow on big maps:** a charging raider or ally searched for a new path every 30 ticks even
+    while the one it had still led to its target; it keeps it now, and the pathfinder's estimate for a cluster
+    of goals costs one goal, not nine (the same paths). Three saved Medium-map raids: 67-75, 74-82 and 84-88 ms
+    per 1,000 ticks to 57-60, 71-74 and 48-58.
+  - **A colonist boxed in by what was built round them** (walls on two sides, a hearth and a banner on the
+    others, a diagonal between walls the only gap) stood there a month, starving, with food a room away: the
+    stranded check counted any open neighbour, and only ran when something was taken down.
+  - **Island colonies starved by their lake:** the colony's provider waited for a roof over everyone before
+    fishing, and on a desert island the hut took two weeks. See Still open for the numbers.
+  - **Locked out of the beds:** four of five colonists in a desert river colony froze in a cold snap outside
+    the only room, its door opening onto rock and the fifth inside with the beds; the alert for beds out of
+    reach only spoke when nobody could get to them. It names who can't now. (The harness had built the door
+    onto the rock; it looks first now.)
+  - **The old-save tests loaded a blank map:** a save through JSON keeps each layer as {"0": …}, which loaded
+    as empty; the two old saves had been tested on a world with no terrain, buildings or items.
 
 - **Fifth audit: the less-reviewed systems, the game and drawing layer, and the interface on a phone** (two
   readers, each finding first seen failing in a test or in the browser):
