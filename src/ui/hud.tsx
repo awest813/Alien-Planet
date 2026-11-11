@@ -191,7 +191,8 @@ export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
         <Weather weather={state.weather} phone />
         <FoodDays days={state.foodDays} />
         {state.resources
-          .filter((r) => r.total > 0 && KEY_RESOURCES.includes(r.name))
+          // (Wood even at none: it went from the bar while an alert asked for more of it.)
+          .filter((r) => (r.total > 0 || r.name === 'Wood') && KEY_RESOURCES.includes(r.name))
           .map((r) => (
             <span key={r.name} className="res res-item" title={`${r.name}: ${r.stored} stored, ${r.total} in total`}>
               <i className="icon" style={itemIconStyle(r.item)} aria-hidden />

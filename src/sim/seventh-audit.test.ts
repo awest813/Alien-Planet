@@ -69,3 +69,29 @@ describe('the seventh audit', () => {
     expect(sim.log.some((e) => e.text.includes('have arrived'))).toBe(false);
   });
 });
+
+describe('a shelter with a fire in its corner', () => {
+  it('still counts as shelter', () => {
+    // (The room's first tile in the scan held the campfire, in no walkable region: no shelter, the goal stuck, and
+    // "the walls leave a gap" every evening.)
+    const sim = Simulation.newColony(6);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 12);
+    for (let ty = y; ty <= y + 4; ty++) {
+      for (let tx = x; tx <= x + 4; tx++) {
+        if (tx === x || ty === y || tx === x + 4 || ty === y + 4) {
+          w.setFeature(w.idx(tx, ty), featureId('woodWall'));
+        }
+      }
+    }
+    w.setFeature(w.idx(x + 2, y + 4), featureId('door'));
+    // The top-left tile inside, first in the scan.
+    w.setFeature(w.idx(x + 1, y + 1), featureId('campfire'));
+    const inside = w.idx(x + 2, y + 2);
+    sim.colonists[0].tile = inside;
+    expect(sim.hasShelter()).toBe(true);
+    // The hut itself counts (not only some other enclosed spot on the map that shares its ground).
+    const counted = (sim as unknown as { shelterRegions: { regions: Set<number> } }).shelterRegions.regions;
+    expect(counted.has(sim.regionOf(inside))).toBe(true);
+  });
+});

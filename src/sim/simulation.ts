@@ -1785,8 +1785,14 @@ export class Simulation {
         if (room < 0 || counted.has(room) || !this.rooms.enclosed[room] || this.rooms.sizes[room] < 4) {
           continue;
         }
+        // (Its walkable ground: the room's first tile in the scan can hold a campfire or a stove, in no region, and
+        // a hut with a fire in its corner counted as no shelter at all, the goal stuck and the alarm up nightly.)
+        const region = this.regions.region[i];
+        if (region < 0) {
+          continue;
+        }
         counted.add(room);
-        regions.add(this.regions.region[i]);
+        regions.add(region);
       }
       this.shelterRegions = { version: this.world.structureVersion, regions };
     }
@@ -2623,6 +2629,12 @@ export class Simulation {
     animalsAtDawn(this);
     spreadWildPlants(this);
     this.planDay();
+  }
+
+  // The open phase's goals, looked at now: an order given while the clock is stopped (a stockpile zone marked out)
+  // read "under way" until it ran again.
+  public checkGoalsNow(): void {
+    this.checkObjectives(true);
   }
 
   // `currentOnly`: just the goals of the phase now open.

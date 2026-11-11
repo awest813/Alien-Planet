@@ -1301,6 +1301,12 @@ button.brush.active {
     z-index: 5;
   }
 
+  /* With the goals drawer open, it's over the notices (the pause banner and a run of "Goal complete" cards hid the
+     next goal and its Use button); they show beside it. */
+  .ui:has(.right-column .side) .right-column {
+    z-index: 8;
+  }
+
   /* New colony on a phone: the choices two to a row, and only the chosen one says more, so the whole form fits
      in a screen or two instead of fourteen full-width cards; the seed and Start stay in reach at the bottom. */
   .difficulties,

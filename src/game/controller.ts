@@ -266,7 +266,9 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     how: 'Drag a potato field over soil or grass (sand grows them slowly).',
     tool: 'growPotatoes',
   },
-  harvest: { how: 'Potatoes take a few days to ripen; growers harvest them on their own.' },
+  harvest: {
+    how: 'Potatoes ripen in a day or two (longer on sand, or in the cold); growers harvest them on their own.',
+  },
   meals: { how: 'Build a stove from granite (mine rock for it); cooks turn raw food into meals.', tool: 'stove' },
   rec: { how: 'Build a horseshoe pin so colonists have something to do for fun.', tool: 'horseshoePin' },
   heat: { how: 'Build a campfire inside a bedroom.', tool: 'campfire' },
@@ -1583,6 +1585,9 @@ export class GameController {
     const before = this.sim.log[this.sim.log.length - 1];
     const stories = this.sim.storyCount;
     this.sim.apply(cmd);
+    if (SPEEDS[this.speedIndex] === 0) {
+      this.sim.checkGoalsNow();
+    }
     // Dealings with the neighbours say how they went on the spot (the Factions screen is open over the log),
     // unless it's news the notifications show already.
     const said = this.sim.log[this.sim.log.length - 1];
@@ -2760,7 +2765,9 @@ export class GameController {
             ? ` (${walls} ${walls === 1 ? 'wall or door' : 'walls and doors'} still to build)`
             : this.wallsLeak()
               ? ': the walls are up but leave a gap (over water, or a missing piece): wall it up'
-              : ': plan walls and a door'
+              : this.roomShut()
+                ? ': the room is closed in but nobody can get into it: is something built across the door?'
+                : ': plan walls and a door'
         }`,
         tone: left <= 2 ? 'danger' : 'warn',
       });
@@ -2773,7 +2780,9 @@ export class GameController {
           text: `${outside} colonist${outside > 1 ? 's are' : ' is'} sleeping outside: cold and miserable. ${
             this.wallsLeak()
               ? 'The walls leave a gap (over water, or a missing piece): wall it up to close the room'
-              : 'Build a shelter with beds'
+              : this.roomShut()
+                ? 'Nobody can get into the room: is something built across the door?'
+                : 'Build a shelter with beds'
           }`,
           tone: 'warn',
         });
@@ -2928,7 +2937,7 @@ export class GameController {
     if (!room && loose > 0 && storage.length > 0) {
       const [most] = [...looseTypes.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
       alerts.push({
-        text: `Stockpiles are full: ${loose} stacks lying outside, mostly ${itemDef(most).name.toLowerCase()}. Drag out another stockpile (Z)`,
+        text: `Stockpiles are full: ${loose} ${loose === 1 ? 'stack' : 'stacks'} lying outside, mostly ${itemDef(most).name.toLowerCase()}. Drag out another stockpile (Z)`,
         tone: 'warn',
       });
     }
@@ -3032,6 +3041,22 @@ export class GameController {
     if (this.sim.objectivesDone[id]) {
       return help;
     }
+    if (id === 'shelter' && this.roomShut()) {
+      return {
+        how: 'The room is closed in, but nobody can get into it: something built just inside or outside the door blocks the way. Deconstruct it (R), or put the door somewhere else.',
+        tool: 'deconstruct',
+      };
+    }
+    // Cloth: the bench, then the weaving, then the armchair (it kept offering a second bench to the end).
+    if (id === 'cloth' && this.sim.countBuilt((f) => featureDef(f).key === 'craftingBench') > 0) {
+      const cloth = this.sim.resourceTotals().find((r) => r.item === itemId('cloth'))?.total ?? 0;
+      return cloth >= 6
+        ? { how: 'There is cloth enough: build an armchair (6 cloth and 10 wood).', tool: 'armchair' }
+        : {
+            how: `The bench is up: crafters weave cotton into cloth there (Production: Weave cloth). ${cloth} of the 6 cloth an armchair takes; cotton comes from a harvest.`,
+            tool: 'growCotton',
+          };
+    }
     if (id === 'shelter' && this.wallsLeak()) {
       return {
         how: 'The walls and door are up, but they leave a gap (over water, or a missing piece), so the room is open. Find it and wall it up.',
@@ -3073,9 +3098,31 @@ export class GameController {
 
   // Walls and a door built, nothing left to build, and still no closed room: there's a gap somewhere (a wall
   // outline dragged over water leaves one, without a word). The help used to say "plan walls and a door".
+  // A built door opening into a closed-in room (not a pocket among the rocks, which every map can have).
+  private doorRoom(): boolean {
+    const sim = this.sim;
+    const w = sim.world;
+    return sim.buildingTiles().some(
+      (d) =>
+        !!featureDef(w.feature[d]).door &&
+        w.neighbors(d, false).some((n) => {
+          const room = sim.roomAt(n);
+          return !!room && room.enclosed && room.size >= 4;
+        }),
+    );
+  }
+
+  // No shelter anyone can get to, but a room closed in with a door: the way in is blocked (a campfire just inside).
+  private roomShut(): boolean {
+    return !this.sim.hasShelter() && this.doorRoom();
+  }
+
   private wallsLeak(): boolean {
     const sim = this.sim;
-    if (sim.hasShelter()) {
+    // (A room that's closed in, but nobody can get to it, isn't a gap in the walls: its door is blocked, a campfire
+    // just inside say, and "wall it up" sent the player looking for a hole that wasn't there. The alert for beds
+    // out of reach says what's wrong.)
+    if (sim.hasShelter() || this.doorRoom()) {
       return false;
     }
     const w = sim.world;
