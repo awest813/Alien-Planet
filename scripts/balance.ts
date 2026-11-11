@@ -396,7 +396,21 @@ function play(seed: number): Result {
       }
     }
     sim.apply({ type: 'build', feature: featureId('woodWall'), tiles: walls });
-    sim.apply({ type: 'build', feature: featureId('door'), tiles: [at(hut.x + 4, hut.y + 6)] });
+    // The door on the side with ground to walk out onto (a door onto a rock sealed one colony's only room, and four
+    // of its five froze outside it in a cold snap); failing both, the rock outside it mined.
+    const outside = (y: number) => (w.inBounds(hut.x + 4, y) ? at(hut.x + 4, y) : -1);
+    const below = outside(hut.y + 7);
+    const above = outside(hut.y - 1);
+    const doorY = below >= 0 && w.isPassable(below) ? hut.y + 6 : above >= 0 && w.isPassable(above) ? hut.y : hut.y + 6;
+    sim.apply({ type: 'build', feature: featureId('door'), tiles: [at(hut.x + 4, doorY)] });
+    const out = doorY === hut.y ? above : below;
+    if (out >= 0 && !w.isPassable(out)) {
+      sim.apply({
+        type: 'designate',
+        rect: { x0: hut.x + 4, y0: w.yOf(out), x1: hut.x + 4, y1: w.yOf(out) },
+        kind: 'mine',
+      });
+    }
     sim.apply({
       type: 'build',
       feature: featureId('bed'),

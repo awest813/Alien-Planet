@@ -36,6 +36,14 @@ describe('alerts', () => {
     expect(texts().some((t) => t.startsWith('Nobody can get to the beds'))).toBe(false);
     w.setFeature(w.idx(x + 4, y + 2), featureId('rock'));
     expect(texts().some((t) => t.startsWith('Nobody can get to the beds'))).toBe(true);
+    // One shut in with the bed, the rest out in the cold: it says who's locked out. (It said nothing, and in a
+    // test colony four of five froze outside the door in a cold snap.)
+    const [inside, ...outside] = sim.living();
+    inside.tile = w.idx(x + 3, y - 1);
+    expect(texts().some((t) => t.startsWith('Nobody can get to the beds'))).toBe(false);
+    const names = outside.map((c) => c.name);
+    const listed = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+    expect(texts()).toContain(`${listed} can't get to a bed: check the way in (is the door blocked?)`);
   });
 
   it('say when nobody can get to a blueprint, or a colonist is shut in', () => {

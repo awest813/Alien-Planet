@@ -179,6 +179,11 @@ const build = (key: string, label: string, hotkey: string, group: ToolDef['group
 
 // Family first (a wife listed as a "lover", a daughter with no label at all), and how they get on beside it when
 // it's a friendship or a quarrel.
+// "Ada", "Ada and Oren", "Ada, Oren and Calla".
+function listNames(names: string[]): string {
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
 function kinLabel(c: Colonist, o: Colonist): string | null {
   const kin =
     c.spouse === o.id
@@ -2775,18 +2780,23 @@ export class GameController {
       const missing = alive - beds;
       alerts.push({ text: `${missing} colonist${missing > 1 ? 's' : ''} without a bed`, tone: 'warn' });
     }
-    // Beds nobody can get to: a door opening onto rock, say, or a room walled in on every side.
+    // Beds nobody can get to: a door opening onto rock, say, or a room walled in on every side. And beds only
+    // some can get to: one colonist walled in with them, the rest locked out (four of five froze outside so in a
+    // test colony, and this said nothing, since the beds weren't out of everyone's reach).
     if (beds > 0) {
       const bedTiles = sim.buildingTiles().filter((i) => featureDef(sim.world.feature[i]).bed);
-      const regions = new Set(
-        sim
-          .living()
-          .filter((c) => !c.health.downed)
-          .map((c) => sim.regionOf(c.tile)),
-      );
-      if (regions.size > 0 && !bedTiles.some((i) => regions.has(sim.regionOf(i)))) {
+      const bedRegions = new Set(bedTiles.map((i) => sim.regionOf(i)));
+      const standing = sim.living().filter((c) => !c.health.downed);
+      const shut = standing.filter((c) => !bedRegions.has(sim.regionOf(c.tile)));
+      if (shut.length > 0 && shut.length === standing.length) {
         alerts.push({
           text: 'Nobody can get to the beds: check the way in (is the door blocked, or the room walled in?)',
+          tone: 'danger',
+          tile: bedTiles[0],
+        });
+      } else if (shut.length > 0) {
+        alerts.push({
+          text: `${listNames(shut.map((c) => c.name))} can't get to a bed: check the way in (is the door blocked?)`,
           tone: 'danger',
           tile: bedTiles[0],
         });
