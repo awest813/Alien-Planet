@@ -38,7 +38,7 @@ import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
-import { DOWNED_TICKS, persuasion, ransomPrice, roomToJoin } from '../sim/prisoners';
+import { DOWNED_TICKS, persuasion, ransomBlocked, ransomPrice, roomToJoin } from '../sim/prisoners';
 import { DRAFT_AGE, ELDER, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans';
 import { LEGEND } from '../sim/minds';
 import { PART_LABELS, SCAR_LABELS, isInfected, scarsOf } from '../sim/body';
@@ -179,6 +179,12 @@ const build = (key: string, label: string, hotkey: string, group: ToolDef['group
 
 // Family first (a wife listed as a "lover", a daughter with no label at all), and how they get on beside it when
 // it's a friendship or a quarrel.
+// Time left on a deadline: hours under two days, then whole days, rounded down (rounded up, 25 hours read "2
+// days", and a player could plan on a day they didn't have).
+export function timeLeft(hours: number): string {
+  return hours < 48 ? `${hours}h` : `${Math.floor(hours / 24)} days`;
+}
+
 // "Ada", "Ada and Oren", "Ada, Oren and Calla".
 function listNames(names: string[]): string {
   return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
@@ -858,8 +864,9 @@ export interface CaptiveView {
   talksLeft: number;
   // The colony is full: they can't join until there's room.
   noRoom: boolean;
-  // Silver their people would pay to have them back.
+  // Silver their people would pay to have them back, and why they won't just now (their people are attacking).
   ransom: number;
+  ransomBlocked: string | null;
 }
 
 export interface PowerView {
@@ -906,6 +913,8 @@ export interface TradeLine {
 
 export interface TradeView {
   open: boolean;
+  // Packing up and walking off (not open, and not "on their way" either).
+  leaving: boolean;
   faction: string;
   relation: string;
   goodwill: number;
@@ -1079,6 +1088,8 @@ export interface ResearchView {
   done: boolean;
   available: boolean;
   current: boolean;
+  // Further study: goes on for ever, and is never "learned".
+  repeatable: boolean;
   requires: string[];
   // What a late project needs besides points ("A smelter standing; 40 iron to finish"), and what's
   // holding it back right now, if anything.
@@ -1893,6 +1904,7 @@ export class GameController {
     }
     return {
       open: tradeOpen(sim),
+      leaving: caravan.leaving,
       faction: FACTIONS[caravan.faction].name,
       // (As the Factions screen has it: an ally is "Allied", not just "Neutral" by goodwill.)
       relation: relationOf(sim, caravan.faction),
@@ -2133,6 +2145,7 @@ export class GameController {
         done: sim.research.done.includes(p.key),
         available: isAvailable(sim.research, p),
         current: sim.research.current === p.key,
+        repeatable: !!p.repeatable,
         requires: p.requires.map((r) => researchDef(r)?.name ?? r),
         ...researchNeeds(sim, p),
       })),
@@ -2572,7 +2585,7 @@ export class GameController {
     // goodwill (or the alliance) if it goes unanswered: an alert for as long as it's open, not only a passing card.
     const dueIn = (until: number) => {
       const hours = Math.max(0, Math.ceil((until - sim.tick) / TICKS_PER_HOUR));
-      return { hours, left: hours > 24 ? `${Math.ceil(hours / 24)} days` : `${hours}h` };
+      return { hours, left: timeLeft(hours) };
     };
     const { dispute, envoy, call } = sim.diplomacy;
     if (call) {
@@ -2600,7 +2613,7 @@ export class GameController {
     const request = sim.diplomacy.request;
     if (request) {
       const hours = Math.max(0, Math.ceil((request.until - sim.tick) / TICKS_PER_HOUR));
-      const left = hours > 24 ? `${Math.ceil(hours / 24)} days` : `${hours}h`;
+      const left = timeLeft(hours);
       const quarry = request.kind === 'hunt' ? sim.animals.find((a) => a.id === request.quarry) : undefined;
       alerts.push({
         text:
@@ -2744,7 +2757,7 @@ export class GameController {
       alerts.push({
         text: `No shelter yet, and night falls in ${left}h${
           walls > 0
-            ? ` (${walls} walls and doors still to build)`
+            ? ` (${walls} ${walls === 1 ? 'wall or door' : 'walls and doors'} still to build)`
             : this.wallsLeak()
               ? ': the walls are up but leave a gap (over water, or a missing piece): wall it up'
               : ': plan walls and a door'
@@ -3326,6 +3339,7 @@ export class GameController {
       talksLeft: Math.ceil(p.resistance / Math.max(0.3, Math.max(...sim.living().map(persuasion), 0.3))),
       noRoom: !roomToJoin(sim),
       ransom: ransomPrice(p),
+      ransomBlocked: ransomBlocked(sim, p),
     }));
   }
 
@@ -3553,9 +3567,12 @@ export class GameController {
       details.push(`Cooked with ${qualityLabel(w.quality[i]).toLowerCase()} skill`);
     }
     if (item !== NONE && itemDef(item).shelfLife !== undefined) {
-      const frozen = sim.temperatureAt(i) <= 0 || (sim.isIcebox(i) && sim.power.powered);
+      // (On a drying rack it dries instead, and keeps for months.)
+      const rate = sim.spoilRate(i);
       details.push(
-        frozen ? `Fresh for ${w.fresh[i].toFixed(1)} days (not spoiling)` : `Fresh for ${w.fresh[i].toFixed(1)} days`,
+        rate <= 0
+          ? `Fresh for ${w.fresh[i].toFixed(1)} days (not spoiling)`
+          : `Fresh for ${(w.fresh[i] / rate).toFixed(1)} days`,
       );
     }
     const room = sim.roomAt(i);

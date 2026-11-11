@@ -37,7 +37,12 @@ describe('stories by the fire across a save', () => {
     // Well into the telling (past the half hour that counts).
     run(sim, HOUR);
     expect(sim.storyCircle).not.toBeNull();
-    const copy = deserialize(structuredClone(serialize(sim)));
+    const saved = serialize(sim);
+    const copy = deserialize(structuredClone(saved));
+    // Loading leaves the game as it was saved, the circle still going (counted as told on the spot, a save and a
+    // load changed the game).
+    expect(serialize(copy)).toEqual(saved);
+    expect(copy.storyCircle).toEqual(sim.storyCircle);
     run(sim, HOUR * 2);
     run(copy, HOUR * 2);
     expect(sim.stats.storyNights).toBe(1);

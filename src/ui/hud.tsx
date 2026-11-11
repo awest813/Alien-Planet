@@ -251,7 +251,13 @@ export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
           <button
             className={state.trade.open ? 'primary' : ''}
             disabled={!state.trade.open}
-            title={state.trade.open ? `Trade with ${state.trade.faction}` : 'Traders are on their way'}
+            title={
+              state.trade.open
+                ? `Trade with ${state.trade.faction}`
+                : state.trade.leaving
+                  ? 'The traders are packing up'
+                  : 'Traders are on their way'
+            }
             onClick={() => onOpen('trade')}
           >
             Trade

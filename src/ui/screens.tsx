@@ -1,6 +1,6 @@
 import { TOUCH, forTouch } from './touch';
 import { useEffect, useRef, useState } from 'react';
-import { ChronicleYear, UiState, controller } from '../game/controller';
+import { ChronicleYear, UiState, controller, timeLeft } from '../game/controller';
 import { ChronicleKind } from '../sim/chronicle';
 import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey, WorldAction } from '../sim/types';
 import { Bar, SLOT_LABELS, WORK_LABELS, fields, moodColor, useUi } from './common';
@@ -458,56 +458,62 @@ export function ProductionScreen({ onClose }: { onClose: () => void }) {
         Colonists keep making each product until the colony holds the target amount (bows, clothes and tool kits already
         in use don't count, so the target is how many spares to keep).
       </p>
-      <table className="saves">
-        <tbody>
-          {state.bills.map((bill) => (
-            <tr key={bill.recipe}>
-              <td>
-                {bill.name}
-                <div className="muted small">
-                  {bill.recipeText} at a {bill.bench}
-                  {!bill.hasBench && <span className="tag warn">no {bill.bench} yet</span>}
-                  {bill.locked && <span className="tag warn">🔒 needs {bill.locked}</span>}
-                  {bill.minSkill && <span className="tag">needs {bill.minSkill}</span>}
-                  {bill.short && !bill.mend && bill.stock < bill.target && (
-                    <span className="tag warn">short of {bill.short}</span>
-                  )}
-                </div>
-              </td>
-              <td className="muted">{bill.mend ? `${bill.stock} worn` : `${bill.stock} in stock`}</td>
-              {bill.mend ? (
+      <div className="production-list">
+        <table className="saves production">
+          <tbody>
+            {state.bills.map((bill) => (
+              <tr key={bill.recipe}>
                 <td>
-                  <button
-                    className={bill.target > 0 ? 'active' : ''}
-                    aria-pressed={bill.target > 0}
-                    title={forTouch(bill.target > 0 ? 'Click to stop mending' : 'Click to start mending')}
-                    onClick={() => set(bill.recipe, bill.target > 0 ? 0 : 1)}
-                  >
-                    {bill.target > 0 ? 'Mending: on' : 'Mending: off'}
-                  </button>
+                  {bill.name}
+                  <div className="muted small">
+                    {bill.recipeText} at a {bill.bench}
+                    {!bill.hasBench && <span className="tag warn">no {bill.bench} yet</span>}
+                    {bill.locked && <span className="tag warn">🔒 needs {bill.locked}</span>}
+                    {bill.minSkill && <span className="tag">needs {bill.minSkill}</span>}
+                    {bill.short && !bill.mend && bill.stock < bill.target && (
+                      <span className="tag warn">short of {bill.short}</span>
+                    )}
+                  </div>
                 </td>
-              ) : (
-                <td>
-                  <button
-                    disabled={bill.target <= 0}
-                    onClick={() => set(bill.recipe, bill.target - bill.step)}
-                    aria-label={`Keep ${bill.step} fewer ${bill.name}`}
-                  >
-                    −{bill.step}
-                  </button>
-                  <span className="target">Keep {bill.target}</span>
-                  <button
-                    onClick={() => set(bill.recipe, bill.target + bill.step)}
-                    aria-label={`Keep ${bill.step} more ${bill.name}`}
-                  >
-                    +{bill.step}
-                  </button>
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                <td className="muted">{bill.mend ? `${bill.stock} worn` : `${bill.stock} in stock`}</td>
+                {bill.mend ? (
+                  <td>
+                    <button
+                      className={bill.target > 0 ? 'active' : ''}
+                      aria-pressed={bill.target > 0}
+                      title={forTouch(bill.target > 0 ? 'Click to stop mending' : 'Click to start mending')}
+                      onClick={() => set(bill.recipe, bill.target > 0 ? 0 : 1)}
+                    >
+                      {bill.target > 0 ? 'Mending: on' : 'Mending: off'}
+                    </button>
+                  </td>
+                ) : (
+                  <td>
+                    <span className="bill-controls">
+                      <button
+                        className="less"
+                        disabled={bill.target <= 0}
+                        onClick={() => set(bill.recipe, bill.target - bill.step)}
+                        aria-label={`Keep ${bill.step} fewer ${bill.name}`}
+                      >
+                        −{bill.step}
+                      </button>
+                      <span className="target">Keep {bill.target}</span>
+                      <button
+                        className="more"
+                        onClick={() => set(bill.recipe, bill.target + bill.step)}
+                        aria-label={`Keep ${bill.step} more ${bill.name}`}
+                      >
+                        +{bill.step}
+                      </button>
+                    </span>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Modal>
   );
 }
@@ -713,7 +719,9 @@ export function ResearchScreen({ onClose }: { onClose: () => void }) {
         {state.researchBench
           ? 'Pick a project; colonists with Research work study it at the research bench, a few hundred points an hour each.'
           : 'Build a research bench (the Production tab of the build bar at the bottom) first, then pick a project.'}{' '}
-        {state.research.filter((p) => p.done).length} of {state.research.length} projects learned.
+        {/* (Not counting Further study, which goes on for ever: the count stopped one short of "all".) */}
+        {state.research.filter((p) => p.done).length} of {state.research.filter((p) => !p.repeatable).length} projects
+        learned.
       </p>
       <ul className="research">
         {[...state.research]
@@ -769,7 +777,7 @@ export function FactionsScreen({ onClose }: { onClose: () => void }) {
   const state = useUi(pickFactions);
   const d = state.diplomacy;
   const r = d.request;
-  const left = (hours: number) => (hours > 24 ? `${Math.ceil(hours / 24)} days left` : `${hours}h left`);
+  const left = (hours: number) => `${timeLeft(hours)} left`;
   return (
     <Modal title="Factions" onClose={onClose}>
       <h3>Request</h3>
@@ -977,7 +985,7 @@ function WorldNews({ state }: { state: Pick<UiState, 'diplomacy'> }) {
   if (!d.dispute && !d.envoy && !d.call && !d.alliance) {
     return null;
   }
-  const left = (hours: number) => (hours > 24 ? `${Math.ceil(hours / 24)} days left` : `${hours}h left`);
+  const left = (hours: number) => `${timeLeft(hours)} left`;
   return (
     <>
       <h3>Neighbours' news</h3>
@@ -1259,6 +1267,9 @@ export function PrisonersScreen({ onClose }: { onClose: () => void }) {
                     <ConfirmButton
                       label={`Ransom: ${p.ransom} silver`}
                       confirm="Sell them back?"
+                      // (Offered while their people were attacking, and refused when pressed.)
+                      disabled={!!p.ransomBlocked}
+                      title={p.ransomBlocked ?? undefined}
                       onConfirm={() => controller.command({ type: 'world', action: { kind: 'ransom', captive: p.id } })}
                     />
                     <ConfirmButton
@@ -1548,11 +1559,14 @@ export function ConfirmButton({
   disabled,
   grave,
   className,
+  title,
 }: {
   label: string;
   confirm: string;
   onConfirm: () => void;
   disabled?: boolean;
+  // Why it's disabled, say.
+  title?: string;
   // Extra classes (Start colony stays a big primary button).
   className?: string;
   // Drawn in the danger colour before it's even armed (an execution, not a quiet "set free").
@@ -1571,6 +1585,7 @@ export function ConfirmButton({
     <button
       className={`${armed ? 'active danger' : grave ? 'danger' : ''} ${className ?? ''}`}
       disabled={disabled}
+      title={title}
       onClick={() => {
         if (armed) {
           setArmed(false);

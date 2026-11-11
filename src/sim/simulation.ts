@@ -836,20 +836,9 @@ export class Simulation {
     if (player && !player.health.dead && !player.away) {
       this.finishConcert(player);
     }
-    // Stories by the fire, the same way: an evening half an hour into the telling counts as told (it was lost,
-    // and with the next one two days off, the evening went uncounted).
-    const circle = timers.storyCircle;
-    const teller = circle ? this.colonists[circle.teller] : undefined;
-    if (
-      circle &&
-      teller &&
-      !teller.health.dead &&
-      !teller.away &&
-      this.tick >= circle.endsAt - STORY_TICKS + TICKS_PER_HOUR / 2
-    ) {
-      this.addThought(teller, 'toldStories');
-      this.stats.storyNights = (this.stats.storyNights ?? 0) + 1;
-    }
+    // Stories by the fire go on where they were: the teller back to the fire, and whoever's free round it. (Lost on
+    // a load, the evening went uncounted, with the next two days off. Counted as told on the spot, a save and a
+    // load changed the game.)
     for (const c of this.living()) {
       if (c.sleeping) {
         this.reserve(c, `b${c.tile}`);
@@ -869,6 +858,15 @@ export class Simulation {
     const g = this.gathering;
     if (g?.started && this.tick < g.endsAt && !this.raid) {
       this.inviteGuests(g);
+    }
+    const circle = timers.storyCircle;
+    const teller = circle ? this.colonists[circle.teller] : undefined;
+    if (circle && teller && !teller.health.dead && !teller.away && this.tick < circle.endsAt) {
+      const region = this.regionOf(teller.tile);
+      const listeners = this.living().filter(
+        (o) => o !== teller && this.freeForStories(o) && this.regionOf(o.tile) === region,
+      );
+      this.seatStoryCircle(teller, circle.fire, listeners, circle.endsAt);
     }
   }
   private lampTiles: number[] = [];
@@ -2364,11 +2362,22 @@ export class Simulation {
       : this.isStockpile(i) && this.isIndoors(i) && this.temperatureAt(i) <= 0;
   }
 
+  // How fast food on a tile spoils, in days of freshness lost a day: 1 when warm, half when cool, none when frozen,
+  // in a running icebox or drying on a rack (less again once preserving is known). (The tile card reads it too:
+  // it gave the freshness as days left whatever the pace, so cool food outlasted what it said.)
+  public spoilRate(i: number): number {
+    const item = this.world.itemType[i];
+    if ((this.power.powered && this.isIcebox(i)) || (this.isDryingRack(i) && driedFrom(item) !== undefined)) {
+      return 0;
+    }
+    const temp = this.temperatureAt(i);
+    return (temp <= 0 ? 0 : temp <= 10 ? 0.5 : 1) * (this.isResearched('preserving') ? PRESERVING_RATE : 1);
+  }
+
   // Perishable food loses freshness: fast when warm, slowly when cool, not at all when frozen
   // or in a running icebox. Stacks that run out rot away.
   private updateSpoilage(hours: number): void {
     const w = this.world;
-    const preserving = this.isResearched('preserving');
     this.coldStores = this.storageTiles().filter((i) => this.isColdStore(i)).length;
     // Copied, because rotting food is removed from the list as it goes.
     for (const i of [...w.tilesWith('items')]) {
@@ -2392,9 +2401,7 @@ export class Simulation {
         }
         continue;
       }
-      const temp = this.temperatureAt(i);
-      const rate = (temp <= 0 ? 0 : temp <= 10 ? 0.5 : 1) * (preserving ? PRESERVING_RATE : 1);
-      w.fresh[i] -= (rate * hours) / 24;
+      w.fresh[i] -= (this.spoilRate(i) * hours) / 24;
       if (w.fresh[i] <= 0) {
         this.rotted += w.itemCount[i];
         w.takeItem(i, w.itemCount[i]);
@@ -5909,16 +5916,7 @@ export class Simulation {
     ) {
       return;
     }
-    const offDuty = (c: Colonist) =>
-      !c.drafted &&
-      !c.sleeping &&
-      !c.health.downed &&
-      !this.inMentalBreak(c) &&
-      this.slotOf(c) !== 'W' &&
-      this.slotOf(c) !== 'S' &&
-      (!c.job || c.job.type === 'joy' || c.job.type === 'wander') &&
-      !c.job?.listening &&
-      !c.job?.gathering;
+    const offDuty = (c: Colonist) => this.freeForStories(c);
     const elders = this.living().filter((c) => c.age >= ELDER && offDuty(c));
     if (elders.length === 0) {
       return;
@@ -5939,28 +5937,55 @@ export class Simulation {
     if (fire === undefined || listeners.length === 0) {
       return;
     }
-    const spots = this.workSpots(fire, false, region);
-    const path = this.pathfinder.find(teller.tile, spots);
-    if (!path) {
+    if (!this.seatStoryCircle(teller, fire, listeners, this.tick + STORY_TICKS)) {
       return;
     }
-    this.endJob(teller);
-    this.assign(teller, this.makeJob('joy', fire, { telling: true, wait: STORY_TICKS + TICKS_PER_HOUR }), path);
-    this.storyCircle = { teller: teller.id, fire, endsAt: this.tick + STORY_TICKS };
     this.story.storiesAt = this.tick + STORY_GAP_TICKS;
     const fireName = featureDef(w.feature[fire]).name.toLowerCase();
     this.addLog(`${teller.name} is telling the old stories by the ${fireName}. Anyone free is welcome.`, 'good');
+  }
+
+  // Free to tell stories, or to listen: off duty and not busy with anything that matters more.
+  private freeForStories(c: Colonist): boolean {
+    return (
+      !c.drafted &&
+      !c.sleeping &&
+      !c.health.downed &&
+      !this.inMentalBreak(c) &&
+      this.slotOf(c) !== 'W' &&
+      this.slotOf(c) !== 'S' &&
+      (!c.job || c.job.type === 'joy' || c.job.type === 'wander') &&
+      !c.job?.listening &&
+      !c.job?.gathering
+    );
+  }
+
+  // The teller to the fire and the listeners round it, until `endsAt`; a circle under way when the game was saved
+  // picks up where it was (the time already spent counts towards the evening). Returns whether the teller can get
+  // there.
+  private seatStoryCircle(teller: Colonist, fire: number, listeners: Colonist[], endsAt: number): boolean {
+    const region = this.regionOf(teller.tile);
+    const path = this.pathfinder.find(teller.tile, this.workSpots(fire, false, region));
+    if (!path) {
+      return false;
+    }
+    const spent = Math.max(0, this.tick - (endsAt - STORY_TICKS));
+    const wait = endsAt - this.tick + TICKS_PER_HOUR;
+    this.endJob(teller);
+    this.assign(teller, this.makeJob('joy', fire, { telling: true, wait, progress: spent }), path);
+    this.storyCircle = { teller: teller.id, fire, endsAt };
     for (const o of listeners) {
       const was = o.job;
       this.endJob(o);
       const there = this.pathToGather(o, fire, region);
       if (there) {
         this.reserve(o, `l${there.at(-1) ?? o.tile}`);
-        this.assign(o, this.makeJob('joy', fire, { hearing: true, wait: STORY_TICKS + TICKS_PER_HOUR }), there);
+        this.assign(o, this.makeJob('joy', fire, { hearing: true, wait, progress: spent }), there);
       } else if (was) {
         this.findJob(o);
       }
     }
+    return true;
   }
 
   // The teller's best craft: what the children listening pick up.

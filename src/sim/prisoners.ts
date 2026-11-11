@@ -186,6 +186,13 @@ export function execute(sim: Simulation, id: number): boolean {
 export const ransomPrice = (p: Captive): number =>
   Math.round((40 + p.skill * 8 + (p.state === 'prisoner' ? 20 : 0)) / 5) * 5;
 
+// Why a captive can't be sold back just now (their people are attacking), or null.
+export function ransomBlocked(sim: Simulation, p: Captive): string | null {
+  return sim.enemies.some((e) => e.faction === p.faction && e.hp > 0 && !e.fleeing)
+    ? `Not while ${FACTIONS[p.faction].name} are attacking.`
+    : null;
+}
+
 // Sells a captive back to their own people: silver for the colony, and a little less bad blood (less than
 // letting them go for nothing). Returns why not, if it can't be done.
 export function ransom(sim: Simulation, id: number): string | null {
@@ -193,9 +200,9 @@ export function ransom(sim: Simulation, id: number): string | null {
   if (!p) {
     return 'Nobody by that name is held.';
   }
-  const f = FACTIONS[p.faction];
-  if (sim.enemies.some((e) => e.faction === p.faction && e.hp > 0 && !e.fleeing)) {
-    return `Not while ${f.name} are attacking.`;
+  const blocked = ransomBlocked(sim, p);
+  if (blocked) {
+    return blocked;
   }
   const price = ransomPrice(p);
   remove(sim, p);
@@ -203,7 +210,7 @@ export function ransom(sim: Simulation, id: number): string | null {
   const home = sim.homeTile() ?? p.tile;
   sim.world.dropItemNear(home, itemId('silver'), price);
   sim.stats.ransomed = (sim.stats.ransomed ?? 0) + 1;
-  sim.addLog(`${f.name} paid ${price} silver to have ${p.name} back.`, 'good', true);
+  sim.addLog(`${FACTIONS[p.faction].name} paid ${price} silver to have ${p.name} back.`, 'good', true);
   return null;
 }
 

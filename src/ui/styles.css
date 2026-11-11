@@ -1019,6 +1019,47 @@ button.brush.active {
   font-variant-numeric: tabular-nums;
 }
 
+/* Production: when the dialog itself is narrow (a phone, or a larger interface size, which the window's width doesn't
+   show), each recipe takes the width, with its stock and controls on a line beneath. Side by side, the controls ran
+   off the dialog's edge. */
+.production-list {
+  container-type: inline-size;
+}
+
+@container (max-width: 400px) {
+  .production tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding: 4px 0;
+  }
+
+  .production td:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* A production target's controls: fewer, the target, more. */
+.bill-controls {
+  display: inline-grid;
+  grid-template-columns: auto auto auto;
+  grid-template-areas: 'less keep more';
+  align-items: center;
+}
+
+.bill-controls .less {
+  grid-area: less;
+}
+
+.bill-controls .target {
+  grid-area: keep;
+}
+
+.bill-controls .more {
+  grid-area: more;
+}
+
 .saves {
   width: 100%;
   border-collapse: collapse;
