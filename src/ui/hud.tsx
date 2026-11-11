@@ -967,23 +967,26 @@ export function SidePanel({ onOpen }: { onOpen: (screen: Screen) => void }) {
           )}
         </ul>
       )}
-      <div className="tabs" role="tablist" onKeyDown={(e) => arrowKeys(e)}>
-        <button
-          role="tab"
-          aria-selected={tab === 'goals'}
-          className={tab === 'goals' ? 'active' : ''}
-          onClick={() => setTab('goals')}
-        >
-          Goals
-        </button>
-        <button
-          role="tab"
-          aria-selected={tab === 'log'}
-          className={tab === 'log' ? 'active' : ''}
-          onClick={() => setTab('log')}
-        >
-          Log
-        </button>
+      {/* (The Hide button beside the tabs, not among them: a tab list holds only tabs.) */}
+      <div className="tabs">
+        <div className="tab-list" role="tablist" onKeyDown={(e) => arrowKeys(e)}>
+          <button
+            role="tab"
+            aria-selected={tab === 'goals'}
+            className={tab === 'goals' ? 'active' : ''}
+            onClick={() => setTab('goals')}
+          >
+            Goals
+          </button>
+          <button
+            role="tab"
+            aria-selected={tab === 'log'}
+            className={tab === 'log' ? 'active' : ''}
+            onClick={() => setTab('log')}
+          >
+            Log
+          </button>
+        </div>
         <span className="spacer" />
         <button onClick={() => setOpen(false)} title="Hide panel" aria-label="Hide panel">
           ▶
@@ -1266,7 +1269,7 @@ export function Architect() {
           <span className="muted">
             {TOUCH
               ? ' · Drag to move the map, pinch to zoom, tap to inspect.'
-              : ' · Right-drag or WASD pans, the wheel zooms, right-click drops the tool.'}
+              : ' · Right-drag or WASD pans, the wheel zooms, right-click drops the tool; from the keyboard, arrows and Enter.'}
           </span>
         )}
       </div>

@@ -140,7 +140,8 @@ h4 {
 }
 
 h3,
-h4 {
+h4,
+.title-panel h2 {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -178,6 +179,24 @@ button.active {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-ink);
+}
+
+/* High-contrast (forced colours) mode drops background colours, and with them which option is chosen (the speed, the
+   tool, the difficulty, every tab) and the fill of every bar: the system's highlight shows them instead. */
+@media (forced-colors: active) {
+  button.active,
+  [aria-pressed='true'],
+  [aria-selected='true'],
+  [aria-checked='true'] {
+    forced-color-adjust: none;
+    background: Highlight;
+    border-color: Highlight;
+    color: HighlightText;
+  }
+
+  .bar-fill {
+    forced-color-adjust: none;
+  }
 }
 
 button:disabled {
@@ -316,6 +335,11 @@ kbd {
 .tabs button {
   padding: 3px 8px;
   font-size: 12px;
+}
+
+.tab-list {
+  display: flex;
+  gap: 2px;
 }
 
 /* ---------- Top bar ---------- */
@@ -997,13 +1021,18 @@ button.brush.slot-W {
   color: var(--accent-ink);
 }
 
-/* The schedule's letters (W, R, S), so a slot doesn't rest on its colour alone. */
+/* The schedule's letters (W, R, S), so a slot doesn't rest on its colour alone: white on the darker slots, black on
+   Work's yellow (dark letters on every slot were 2.6:1 on Sleep's blue, under the 4.5 text needs). */
 .schedule .hour {
   font-size: 11px;
   line-height: 1;
   text-align: center;
-  color: rgba(0, 0, 0, 0.8);
+  color: #fff;
   font-weight: 700;
+}
+
+.schedule .hour.slot-W {
+  color: #000;
 }
 
 button.brush.active {

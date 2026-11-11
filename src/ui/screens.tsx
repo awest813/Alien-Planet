@@ -9,6 +9,31 @@ import { Hours, Hunting, POLICY_TEXT, Rations } from '../sim/village';
 
 // Full-screen dialogs opened from the top bar.
 
+// Tab and Shift+Tab go round the controls in `box` and no further.
+export function trapTab(box: HTMLElement, e: KeyboardEvent): void {
+  if (e.key !== 'Tab') {
+    return;
+  }
+  const items = [
+    ...box.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), summary, [tabindex="0"], a[href]',
+    ),
+  ].filter((el) => el.offsetParent !== null);
+  if (items.length === 0) {
+    return;
+  }
+  const first = items[0];
+  const last = items[items.length - 1];
+  const at = document.activeElement;
+  if (!box.contains(at) || (e.shiftKey ? at === first || at === box : at === last)) {
+    e.preventDefault();
+    (e.shiftKey ? last : first).focus();
+  }
+}
+
+// The last thing with keyboard focus outside every dialog when one opened (the Menu button, say).
+let outsideOpener: HTMLElement | null = null;
+
 export function Modal({
   title,
   onClose,
@@ -38,7 +63,11 @@ export function Modal({
   // with the mouse shouldn't take the focus back and with it Tab and Space from the game.)
   const [before] = useState(() => {
     const active = document.activeElement;
-    return active instanceof HTMLElement && active.matches(':focus-visible') ? active : null;
+    const keyboard = active instanceof HTMLElement && active.matches(':focus-visible') ? active : null;
+    if (keyboard && !keyboard.closest('.modal-backdrop')) {
+      outsideOpener = keyboard;
+    }
+    return keyboard;
   });
   // Keyboard focus moves into the dialog when it opens (unless a button in it already took it), Tab keeps it
   // there, and on closing it goes back to wherever it was.
@@ -47,31 +76,18 @@ export function Modal({
       panel.current?.focus();
     }
     const onKey = (e: KeyboardEvent) => {
-      const box = panel.current;
-      if (e.key !== 'Tab' || !box) {
-        return;
-      }
-      const items = [
-        ...box.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), input:not(:disabled), select:not(:disabled), summary, [tabindex="0"], a[href]',
-        ),
-      ].filter((el) => el.offsetParent !== null);
-      if (items.length === 0) {
-        return;
-      }
-      const first = items[0];
-      const last = items[items.length - 1];
-      const at = document.activeElement;
-      if (!box.contains(at) || (e.shiftKey ? at === first || at === box : at === last)) {
-        e.preventDefault();
-        (e.shiftKey ? last : first).focus();
+      if (panel.current) {
+        trapTab(panel.current, e);
       }
     };
     document.addEventListener('keydown', onKey, true);
     return () => {
       document.removeEventListener('keydown', onKey, true);
-      if (before && before !== document.body && document.contains(before)) {
-        before.focus({ preventScroll: true });
+      // (Opened from a dialog that has gone since (the pause menu back from Settings), the button outside every
+      // dialog that started it all: focus fell to the page, and with it Tab and the keys.)
+      const target = before && !document.contains(before) ? outsideOpener : before;
+      if (target && target !== document.body && document.contains(target)) {
+        target.focus({ preventScroll: true });
       }
     };
   }, [before]);
@@ -225,7 +241,9 @@ export function WorkScreen({ onClose }: { onClose: () => void }) {
         <table className="grid work-grid">
           <thead>
             <tr>
-              <th />
+              <th>
+                <span className="sr-only">Colonist</span>
+              </th>
               {WORK_TYPES.map((work) => (
                 <th key={work}>{WORK_LABELS[work]}</th>
               ))}
@@ -358,6 +376,33 @@ export function ScheduleScreen({ onClose }: { onClose: () => void }) {
     }
   };
   const now = state.hour;
+  // The grid is one stop for Tab, with the arrows (and Home, End) going from hour to hour and row to row: every
+  // hour its own stop, three colonists took a hundred presses of Tab to get past it. Row 0 is Everyone.
+  const [cursor, setCursor] = useState({ row: 0, hour: now });
+  const rows = living.length + 1;
+  const at = { row: Math.min(cursor.row, rows - 1), hour: cursor.hour };
+  const moveCursor = (e: React.KeyboardEvent<HTMLElement>) => {
+    const step: Record<string, [number, number]> = {
+      ArrowLeft: [0, -1],
+      ArrowRight: [0, 1],
+      ArrowUp: [-1, 0],
+      ArrowDown: [1, 0],
+    };
+    const [dr, dh] = step[e.key] ?? [0, 0];
+    const hour = e.key === 'Home' ? 0 : e.key === 'End' ? 23 : Math.max(0, Math.min(23, at.hour + dh));
+    const row = Math.max(0, Math.min(rows - 1, at.row + dr));
+    if (!(e.key in step) && e.key !== 'Home' && e.key !== 'End') {
+      return;
+    }
+    e.preventDefault();
+    setCursor({ row, hour });
+    e.currentTarget.querySelector<HTMLElement>(`td[data-row="${row}"][data-hour="${hour}"]`)?.focus();
+  };
+  const cellFocus = (row: number, hour: number) => ({
+    tabIndex: row === at.row && hour === at.hour ? 0 : -1,
+    'data-row': row,
+    onFocus: () => setCursor({ row, hour }),
+  });
   return (
     <Modal title="Schedule" onClose={onClose} wide>
       <div className="row">
@@ -386,13 +431,16 @@ export function ScheduleScreen({ onClose }: { onClose: () => void }) {
             }
           }}
           onPointerMove={(e) => painting && paintAt(e.clientX, e.clientY)}
+          onKeyDown={moveCursor}
           onPointerUp={stop}
           onPointerCancel={stop}
           onPointerLeave={stop}
         >
           <thead>
             <tr>
-              <th />
+              <th>
+                <span className="sr-only">Colonist</span>
+              </th>
               {Array.from({ length: 24 }, (_, h) => (
                 <th key={h} className={h === now ? 'now' : ''} title={h === now ? 'Now' : undefined}>
                   {h}
@@ -410,14 +458,14 @@ export function ScheduleScreen({ onClose }: { onClose: () => void }) {
                   title={`${hour}:00 · set for everyone`}
                   data-who="all"
                   data-hour={hour}
-                  tabIndex={0}
+                  {...cellFocus(0, hour)}
                   role="button"
                   aria-label={`Everyone, ${hour}:00: set to ${SLOT_LABELS[brush]}`}
                   onKeyDown={(e) => onCellKey(e, () => paintAll(hour))}
                 />
               ))}
             </tr>
-            {living.map((c) => (
+            {living.map((c, k) => (
               <tr key={c.id}>
                 <td className="row-label">
                   <span className="swatch" style={{ background: c.color }} /> {c.name}
@@ -429,7 +477,7 @@ export function ScheduleScreen({ onClose }: { onClose: () => void }) {
                     title={`${hour}:00 ${SLOT_LABELS[slot]}`}
                     data-who={c.id}
                     data-hour={hour}
-                    tabIndex={0}
+                    {...cellFocus(k + 1, hour)}
                     role="button"
                     aria-label={`${c.name}, ${hour}:00: ${SLOT_LABELS[slot]}`}
                     onKeyDown={(e) => onCellKey(e, () => paint(c.id, hour))}
@@ -498,7 +546,10 @@ export function ProductionScreen({ onClose }: { onClose: () => void }) {
                       >
                         −{bill.step}
                       </button>
-                      <span className="target">Keep {bill.target}</span>
+                      {/* (Said aloud as it changes: the button's own name stays "Keep 5 more ...".) */}
+                      <span className="target" aria-live="polite">
+                        Keep {bill.target}
+                      </span>
                       <button
                         className="more"
                         onClick={() => set(bill.recipe, bill.target + bill.step)}

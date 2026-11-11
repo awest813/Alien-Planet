@@ -206,6 +206,12 @@ export class ColonyScene extends Phaser.Scene {
   private roomsVersion = -1;
   private readonly held = new Set<string>();
   private drag: { start: number; end: number } | null = null;
+  // Orders from the keyboard: the tile in the middle of the view is the cursor (shown as the hovered tile), the
+  // arrows move the view under it, and Enter starts an area there and Enter again marks it (twice on the spot, one
+  // tile). With the Select tool, Enter inspects it. (Without a pointer there was no way to give an order at all.)
+  private keyMode = false;
+  private keyDrag = false;
+  private keyHover: number | null = null;
   private pan: { x: number; y: number; scrollX: number; scrollY: number; moved: boolean; button: number } | null = null;
   // Two fingers on a touch screen: the gap between them when the pinch began, and the zoom then.
   private pinch: { distance: number; zoom: number; x: number; y: number } | null = null;
@@ -247,6 +253,7 @@ export class ColonyScene extends Phaser.Scene {
 
   public update(time: number, delta: number): void {
     controller.frame();
+    this.followKeyCursor();
     if (controller.simVersion !== this.builtFor) {
       this.buildWorld();
     }
@@ -1568,6 +1575,58 @@ export class ColonyScene extends Phaser.Scene {
 
   // ---- Input ----
 
+  // The tile in the middle of the view: the keyboard's cursor.
+  private centreTile(): number {
+    const world = controller.sim.world;
+    const view = this.cameras.main.worldView;
+    const x = Phaser.Math.Clamp(Math.floor(view.centerX / TILE), 0, world.width - 1);
+    const y = Phaser.Math.Clamp(Math.floor(view.centerY / TILE), 0, world.height - 1);
+    return world.idx(x, y);
+  }
+
+  // While the keyboard is in use: the cursor follows the middle of the view, and so does an area being marked.
+  private followKeyCursor(): void {
+    if (this.keyDrag && (controller.tool.kind === 'select' || !this.drag)) {
+      // (The tool was put down, Esc say: the area goes with it.)
+      this.keyDrag = false;
+      this.drag = null;
+    }
+    if (!this.keyMode || controller.modalOpen) {
+      return;
+    }
+    const tile = this.centreTile();
+    if (this.keyDrag && this.drag) {
+      this.drag.end = tile;
+    }
+    if (tile !== this.keyHover) {
+      this.keyHover = tile;
+      controller.setHover(tile, null);
+    }
+  }
+
+  // Enter, from the keyboard: inspect the tile in the middle of the view, or start (then mark) an area there.
+  private keyEnter(): void {
+    this.keyMode = true;
+    const tile = this.centreTile();
+    if (controller.tool.kind === 'select') {
+      const someone = controller.sim.living().find((c) => c.tile === tile);
+      if (someone) {
+        controller.selectColonist(someone.id);
+      } else {
+        controller.selectTile(tile);
+      }
+      return;
+    }
+    if (this.keyDrag && this.drag) {
+      this.applyDrag(this.drag.start, tile);
+      this.drag = null;
+      this.keyDrag = false;
+    } else {
+      this.drag = { start: tile, end: tile };
+      this.keyDrag = true;
+    }
+  }
+
   private tileAt(pointer: Phaser.Input.Pointer): number | null {
     const world = controller.sim.world;
     const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
@@ -1779,6 +1838,8 @@ export class ColonyScene extends Phaser.Scene {
     });
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      this.keyMode = false;
+      this.keyHover = null;
       if (this.pinch) {
         if (this.input.pointer1.isDown && this.input.pointer2.isDown) {
           const mid = {
@@ -1954,6 +2015,10 @@ export class ColonyScene extends Phaser.Scene {
         return;
       }
       this.held.add(key);
+      // The arrows show the keyboard's cursor (WASD don't: they're for panning with a hand on the mouse).
+      if (key.startsWith('Arrow')) {
+        this.keyMode = true;
+      }
       // Holding a toggle key mustn't flicker it.
       if (event.repeat && (key === ' ' || key === 'q' || key === 'Tab')) {
         event.preventDefault();
@@ -1964,7 +2029,10 @@ export class ColonyScene extends Phaser.Scene {
         this.held.delete(key);
         return;
       }
-      if (key === ' ') {
+      if (key === 'Enter') {
+        event.preventDefault();
+        this.keyEnter();
+      } else if (key === ' ') {
         event.preventDefault();
         controller.togglePause();
       } else if (key === '1' || key === '2' || key === '3') {

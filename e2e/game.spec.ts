@@ -262,3 +262,52 @@ test('keyboard focus goes back to the Menu button when the pause menu closes', a
   await expect(menu).toBeFocused();
   expect(errors).toEqual([]);
 });
+
+test('focus goes back to the Menu button after Settings and back, then Resume', async ({ page }) => {
+  // (The menu, reopened from Settings, remembered a button in Settings, gone by then: focus fell to the page.)
+  const errors = watchErrors(page);
+  await startColony(page);
+  const menu = page.locator('.screens button', { hasText: /^Menu$/ });
+  await menu.focus();
+  await page.keyboard.press('Enter');
+  const paused = page.getByRole('dialog', { name: 'Paused' });
+  await paused.getByRole('button', { name: 'Settings' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(paused).toBeVisible();
+  await paused.getByRole('button', { name: 'Resume' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(paused).toBeHidden();
+  await expect(menu).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
+test('orders can be given on the map from the keyboard alone', async ({ page }) => {
+  // The tile in the middle of the view is the cursor: Enter starts an area, the arrows stretch it, Enter marks it.
+  const errors = watchErrors(page);
+  await startColony(page);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  const zoned = () =>
+    page.evaluate(() => {
+      const w = (window as unknown as { colony: { sim: { world: { size: number; zone: Uint8Array } } } }).colony.sim
+        .world;
+      let n = 0;
+      for (let i = 0; i < w.size; i++) {
+        n += w.zone[i] ? 1 : 0;
+      }
+      return n;
+    });
+  expect(await zoned()).toBe(0);
+  await page.keyboard.press('z');
+  await page.keyboard.press('Enter');
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(400);
+  await page.keyboard.up('ArrowRight');
+  await page.keyboard.down('ArrowDown');
+  await page.waitForTimeout(400);
+  await page.keyboard.up('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect.poll(zoned).toBeGreaterThan(1);
+  expect(errors).toEqual([]);
+});

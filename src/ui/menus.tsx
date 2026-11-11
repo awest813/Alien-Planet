@@ -27,7 +27,7 @@ function priceLabel(line: TradeLine): string {
   const fmt = (p: number) => (p < 0.1 ? p.toFixed(2) : p.toFixed(1));
   return hi - lo < 0.05 ? fmt(lo) : `${fmt(lo)}–${fmt(hi)} (worst first)`;
 }
-import { ConfirmButton, Modal } from './screens';
+import { ConfirmButton, Modal, trapTab } from './screens';
 import { arrowKeys, fields, useUi } from './common';
 
 // What a menu can ask the app to do.
@@ -268,9 +268,21 @@ export function TitleScreen({ actions }: { actions: MenuActions }) {
   const state = useUi(pickTitle);
   const [view, setView] = useMenuView<'new' | 'load'>();
   const latest = state.latestSave;
+  // Tab stays on the title screen, as in any dialog (it went off to the page after the last button), unless a
+  // dialog has opened over it (Settings, How to play).
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (panel.current && !document.querySelector('.modal-backdrop')) {
+        trapTab(panel.current, e);
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, []);
   return (
     <div className="title-screen">
-      <div className="panel title-panel" role="dialog" aria-modal="true" aria-label="Colony Alpha">
+      <div ref={panel} className="panel title-panel" role="dialog" aria-modal="true" aria-label="Colony Alpha">
         <h1>Colony Alpha</h1>
         <p className="muted tagline">A handful of colonists, a strange valley, and a winter coming.</p>
         {view === 'main' && (
@@ -297,7 +309,7 @@ export function TitleScreen({ actions }: { actions: MenuActions }) {
         )}
         {view === 'new' && (
           <>
-            <h3>New colony</h3>
+            <h2>New colony</h2>
             {/* The new colony takes over the autosave slot once it's under way. */}
             <NewColonyForm
               confirm={
@@ -312,7 +324,7 @@ export function TitleScreen({ actions }: { actions: MenuActions }) {
         )}
         {view === 'load' && (
           <>
-            <h3>Load game</h3>
+            <h2>Load game</h2>
             <SaveSlots state={state} manage={false} onLoaded={actions.onPlay} />
             <div className="row end">
               <button onClick={() => setView('main')}>Back</button>
@@ -642,6 +654,10 @@ const CONTROLS: [string, string][] = [
   ['1 · 2 · 3', 'Game speed'],
   ['W A S D / arrows', 'Move the view (or drag with the right mouse button)'],
   ['Mouse wheel', 'Zoom'],
+  [
+    'Enter',
+    'Without a mouse: the tile in the middle of the view is the cursor (move the view with the arrows). Enter inspects it, or with a tool, starts an area there; Enter again marks it',
+  ],
   ['Tab', 'Jump to the next colonist'],
   ['F6 / Shift+Tab', 'Move keyboard focus into the interface (then Tab between buttons)'],
   ['H', 'Back to the colony'],
