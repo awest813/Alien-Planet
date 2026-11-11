@@ -22,6 +22,10 @@ describe('saves from earlier versions', () => {
       const sim = deserialize(structuredClone(data));
       expect(sim.living().length).toBe(data.colonists.filter((c) => !c.health.dead).length);
       expect(sim.day).toBeGreaterThan(1);
+      // The map itself (a layer through JSON is {"0": …}, which loaded as an empty map, and every test here passed
+      // on a blank world).
+      expect([...sim.world.terrain]).toEqual(Object.values(data.layers.terrain));
+      expect(new Set(sim.world.terrain).size).toBeGreaterThan(2);
       // What's new since starts out sensibly.
       expect(sim.chronicle.length).toBeGreaterThan(0);
       expect(sim.allies).toEqual([]);

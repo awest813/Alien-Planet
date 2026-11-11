@@ -329,7 +329,16 @@ export function deserialize(data: SaveData): Simulation {
     throw new Error(`Unsupported save version ${data.version}`);
   }
   const world = new World(data.width, data.height);
-  const layers = data.layers;
+  // (A save that's been through JSON, as the old saves the tests load have, has each layer as {"0": …, "1": …}:
+  // TypedArray.set takes that as empty, and the map loaded blank. Its values, in order, are the layer.)
+  const layers = Object.fromEntries(
+    Object.entries(data.layers).map(([key, layer]) => [
+      key,
+      layer && typeof layer === 'object' && !ArrayBuffer.isView(layer) && !Array.isArray(layer)
+        ? Object.values(layer as Record<string, number>)
+        : layer,
+    ]),
+  ) as SaveData['layers'];
   world.terrain.set(layers.terrain);
   world.feature.set(layers.feature);
   world.designation.set(layers.designation);
