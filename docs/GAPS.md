@@ -46,6 +46,26 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Sixth audit: the systems the last two read least, and the interface** (two readers, each finding first seen
+  failing in a test or the browser; a busy day-37 Medium colony looked at on a desktop, a tablet and a phone; 100
+  scripted players over 120 days):
+  - **A crash:** a maddened pack, or the great beast waking, crashed the game when everyone it could reach was in
+    a pen (animals don't pass gates). It doesn't come.
+  - **The colony's life:** a child born in the colony took their first steps with a short bow, and shot at
+    animals with it; a tended wound kept someone off an expedition until it healed; "one baby at a time" held
+    only one of a couple; the great beast's fury ran out early on a small map (its wait at the edge came off it).
+  - **Saving:** stories by the fire under way at a save were counted as told on loading (the fifth audit's fix),
+    so a save and a load changed the game: the scripted player who reloads every three hours saw it ten times.
+    The circle carries on where it was instead.
+  - **The interface:** Production's + buttons ran off a phone's dialog (a target could be lowered but not raised);
+    deadlines rounded up (25 hours read "2 days"); the tile card's freshness ignored how fast food spoils there;
+    Ransom was offered while the prisoner's people attacked, then refused; the only grown-up at home was offered
+    to lend, then refused; traders packing up were "on their way"; an expedition past its day was "back in about
+    0 days"; the Research screen never reached all learned; "1 walls and doors still to build".
+  - **Left as found:** the All items list on a 360px phone starts 4px off the left edge; keyboard focus after
+    Menu, Settings, Back and Resume goes to the page, not back to the Menu button (not tested); goods sold to
+    traders and bought back, the island hunger and the raid speed are as above.
+
 - **Finishing the gap list** (each found in a balance run or a timed raid, and fixed with a test):
   - **Raids were slow on big maps:** a charging raider or ally searched for a new path every 30 ticks even
     while the one it had still led to its target; it keeps it now, and the pathfinder's estimate for a cluster

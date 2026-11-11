@@ -41,4 +41,18 @@ describe('controls that would be refused', () => {
     // The screen can tell, and disables the button with the reason.
     expect(shown.ransomBlocked).toMatch(/^Not while .* attacking/);
   });
+
+  it("doesn't offer to lend or send the only grown-up at home", () => {
+    // (Offered, they were refused: "Someone has to stay and mind the colony.")
+    controller.newColony('lend-the-last');
+    const sim = controller.sim;
+    const [grown, ...rest] = sim.living();
+    for (const c of rest) {
+      c.age = 10;
+    }
+    controller.publish();
+    const shown = controller.getState().diplomacy.travellers;
+    expect(shown.map((t) => t.id)).toEqual([grown.id]);
+    expect(shown[0].why).toBe('the only one to mind the colony');
+  });
 });

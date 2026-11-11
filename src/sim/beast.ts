@@ -21,7 +21,7 @@ const NAMES = ['Old Thornhide', 'the Grey Ravager', 'Ashjaw', 'the Hollow King',
 // From the second year; how much tougher it is each time it returns; how long its fury lasts.
 const FIRST_DAY = 36;
 const GROWTH = 0.35;
-const FURY_HOURS = 20;
+export const FURY_HOURS = 20;
 
 // The calendar year (as the chronicle and the top bar count them).
 const year = (sim: Simulation) => yearOf(sim.totalHours);
@@ -46,7 +46,8 @@ export function beastWakes(sim: Simulation): boolean {
   a.name = b.name;
   a.toughness = 1 + GROWTH * b.seen;
   a.hp *= a.toughness;
-  a.revengeUntil = sim.tick + FURY_HOURS * TICKS_PER_HOUR;
+  // (From when it sets off: on a small map it gathers itself at the edge first, and that came off its fury.)
+  a.revengeUntil = Math.max(sim.tick, a.musterUntil ?? 0) + FURY_HOURS * TICKS_PER_HOUR;
   b.seen++;
   b.lastYear = year(sim);
   const Name = b.name[0].toUpperCase() + b.name.slice(1);

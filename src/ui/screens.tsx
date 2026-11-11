@@ -1096,8 +1096,9 @@ function Expeditions({ state }: { state: FactionsState }) {
       </p>
       {d.expeditions.map((e, k) => (
         <p key={k}>
-          <b>{e.who}</b>: {e.leaving ? 'setting off for' : 'away at'} {e.where}, back in about {e.daysLeft} day
-          {e.daysLeft === 1 ? '' : 's'}.
+          <b>{e.who}</b>: {e.leaving ? 'setting off for' : 'away at'} {e.where},{' '}
+          {/* (Past the day they were due, it read "back in about 0 days".) */}
+          {e.daysLeft <= 0 ? 'back any time now' : `back in about ${e.daysLeft} day${e.daysLeft === 1 ? '' : 's'}`}.
         </p>
       ))}
       <div className="row">

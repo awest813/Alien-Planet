@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { manhuntersArrive } from './animals';
+import { FURY_HOURS, beastWakes } from './beast';
 import { featureId } from './defs';
 import { Simulation } from './simulation';
 import { triggerEvent } from './storyteller';
@@ -48,5 +49,17 @@ describe('a maddened pack', () => {
     });
     expect(() => triggerEvent(sim, 'manhunters')).not.toThrow();
     expect(() => triggerEvent(sim, 'greatBeast')).not.toThrow();
+  });
+});
+
+describe('the great beast', () => {
+  it('rages its full time from when it sets off, not from when it appears', () => {
+    // (On a small map it gathers itself at the edge first, and that time came off its fury.)
+    const sim = Simulation.newColony(2, 'standard', 64);
+    clearAround(sim, 10);
+    expect(beastWakes(sim)).toBe(true);
+    const beast = sim.animals[sim.animals.length - 1];
+    expect(beast.musterUntil).toBeGreaterThan(sim.tick);
+    expect(beast.revengeUntil - beast.musterUntil!).toBe(FURY_HOURS * HOUR);
   });
 });

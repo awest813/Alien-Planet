@@ -3223,10 +3223,17 @@ export class GameController {
           open: true,
         },
       ],
+      // (The only grown-up at home can't go: someone has to mind the colony. Offered to lend, they were refused.)
       travellers: sim
         .living()
         .filter((c) => c.age >= DRAFT_AGE)
-        .map((c) => ({ id: c.id, name: c.name, why: cannotGo(sim, c) })),
+        .map((c, _k, grown) => ({
+          id: c.id,
+          name: c.name,
+          why:
+            cannotGo(sim, c) ??
+            (grown.filter((o) => !o.health.downed).length <= 1 ? 'the only one to mind the colony' : null),
+        })),
       supplies: { trade: party(0), salvage: party(1) },
     };
   }
