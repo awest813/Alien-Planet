@@ -149,6 +149,9 @@ export class ColonyScene extends Phaser.Scene {
   // Raiders' and allies' names, on the names' own layer above every figure (as colonists' are).
   private raiderLabels = new Map<number, Phaser.GameObjects.Text>();
   private labelsReadable = true;
+  // The last lightning strike drawn (the sim's tick of it), and when on the page's clock it struck.
+  private lightningSeen = -1;
+  private lightningAt = -Infinity;
   // Raiders lying wounded and prisoners, by id.
   private captives = new Map<number, Phaser.GameObjects.Container>();
   private traders = new Map<number, Phaser.GameObjects.Container>();
@@ -398,10 +401,18 @@ export class ColonyScene extends Phaser.Scene {
           frac(hash2(k, 5, 13) + now * (kind === 'storm' ? 0.0014 : 0.001) * (0.8 + 0.4 * hash2(k, 7, 17))) * v.height;
         g.fillRect(x, y, s, 7 * s);
       }
-      // Lightning: a white flash that fades over a second of game time.
-      const age = sim.tick - sim.lastLightning;
-      if (controller.settings.lightningFlashes && sim.lastLightning >= 0 && age < 20) {
-        g.fillStyle(0xffffff, 0.45 * (1 - age / 20)).fillRect(v.x, v.y, v.width, v.height);
+      // Lightning: a white flash that fades over a second, of real time: a strike often starts a fire, which pauses
+      // the game, and a flash timed by the game's ticks stayed on, washing out the map just when the fire was to be
+      // found. (A strike is seen when it's new, here and in the last 20 ticks: not one long past, on a load.)
+      if (sim.lastLightning !== this.lightningSeen) {
+        this.lightningSeen = sim.lastLightning;
+        if (sim.lastLightning >= 0 && sim.tick - sim.lastLightning < 20) {
+          this.lightningAt = this.time.now;
+        }
+      }
+      const age = this.time.now - this.lightningAt;
+      if (controller.settings.lightningFlashes && age < 1000) {
+        g.fillStyle(0xffffff, 0.45 * (1 - age / 1000)).fillRect(v.x, v.y, v.width, v.height);
       }
     } else if (kind === 'snow') {
       g.fillStyle(0xffffff, 0.85);

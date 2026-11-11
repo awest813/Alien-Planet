@@ -1427,8 +1427,29 @@ export class GameController {
   }
 
   // Fraction of the way to the next tick, for smooth rendering between ticks.
+  // (Paused too: the fraction stays where it was, so a walking colonist doesn't snap back to the last whole tick when
+  // the clock stops, and forward again when it starts.)
   public get tickFraction(): number {
-    return SPEEDS[this.speedIndex] > 0 ? this.accumulator : 0;
+    return Math.min(1, this.accumulator);
+  }
+
+  // An event that will stop the clock (see frame()): the frame's ticks stop there, so a long frame (the tab back
+  // from the background, a hitch) doesn't play on for up to a third of an hour past the death or the raid.
+  private pausesFor(event: string): boolean {
+    switch (event) {
+      case 'fire':
+      case 'death':
+      case 'collapse':
+        return this.settings.pauseOnEmergency;
+      case 'raid':
+      case 'raidNear':
+      case 'manhunters':
+        return this.settings.pauseOnRaid;
+      case 'shipLanded':
+        return true;
+      default:
+        return false;
+    }
   }
 
   // ---- Called every render frame by the Phaser scene ----
@@ -1447,6 +1468,9 @@ export class GameController {
     while (this.accumulator >= 1) {
       this.sim.step();
       this.accumulator--;
+      if (this.sim.events.some((event) => this.pausesFor(event)) || this.sim.headcount() === 0) {
+        break;
+      }
       if (performance.now() > budget) {
         this.accumulator = Math.min(this.accumulator, 2);
         break;
