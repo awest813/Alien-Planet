@@ -44,6 +44,26 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Fifth audit: the less-reviewed systems, the game and drawing layer, and the interface on a phone** (two
+  readers, each finding first seen failing in a test or in the browser):
+  - **Pausing:** a lightning flash faded by game ticks, so when its fire paused the game the map stayed washed
+    out under it (it fades over a second of real time now); a long frame (the tab back from the background) ran
+    every tick owed before looking at what had happened, so the colony played on past a death or raid that
+    should have stopped it; pausing snapped walking colonists back to the last whole tick.
+  - **The colony's life:** stories by the fire under way when the game was saved were lost (now counted as told,
+    as a concert is); a teacher good at one thing only taught their second best skill, at nothing, every other
+    hour; an envoy standing in a doorway that was locked (or walled over) stayed shut in it until answered;
+    traders and envoys who'd said their goodbyes stood about for up to three hours first, and no new caravan
+    could come while they did.
+  - **On a phone:** the weather chip (a heat wave, a storm) took a row of the top bar to itself.
+  - **Checked and sound:** no listeners, scene objects or textures left behind over three new colonies; the
+    map's sharpness and pixel density keep the zoom and the clicks right; settings apply when changed; 60
+    random trades created or lost nothing; power and pens never go negative; every colonist field is saved.
+  - **Left as found:** a pixel-density change to a fractional ratio (a browser zoomed to 110%) may go unnoticed
+    until a resize; on a phone with an interface size other than Normal the build bar may sit under the
+    browser's address bar; the keys follow the letter typed, so WASD doesn't pan on a non-Latin keyboard; goods
+    sold to traders come back as new if bought back.
+
 - **Fourth audit: saving and loading, the less-reviewed systems, and the interface** (three readers, each
   finding first seen failing; a field-by-field save/load comparison every 3 hours over 20–40 days, eleven
   ten-year runs checked hourly for broken ties, caravans and births, and 100 scripted players over 30 days in

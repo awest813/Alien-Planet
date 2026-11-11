@@ -76,10 +76,12 @@ export function teacherFor(sim: Simulation): Colonist | undefined {
     .sort((a, b) => Number(!!b.retired) - Number(!!a.retired) || bestSkill(b) - bestSkill(a) || a.id - b.id)[0];
 }
 
-// What's taught this hour: the teacher's best skills, by turns.
+// What's taught this hour: the teacher's two best skills, by turns, of those they're good enough to teach (a teacher
+// good at one thing only taught their second best, at nothing, half the time). (teacherFor makes sure of one.)
 function subject(sim: Simulation, teacher: Colonist): SkillKey {
   const best = [...SKILL_KEYS].sort((a, b) => teacher.skills[b] - teacher.skills[a]);
-  return best[Math.floor(sim.totalHours) % 2];
+  const teachable = best.slice(0, 2).filter((k) => teacher.skills[k] >= TEACHER_SKILL);
+  return teachable.length > 0 ? teachable[Math.floor(sim.totalHours) % teachable.length] : best[0];
 }
 
 // Tiles to stand on for a lesson at `board`.

@@ -427,6 +427,8 @@ export interface SimTimers {
   shelterLogged?: [number, number][];
   // A concert under way when the game was saved.
   concert?: { player: number; tile: number; endsAt: number } | null;
+  // Stories by a fire under way when the game was saved.
+  storyCircle?: { teller: number; fire: number; endsAt: number } | null;
 }
 
 // Moments the UI reacts to: raids, deaths and collapses pause the game.
@@ -697,7 +699,7 @@ export class Simulation {
   private noGatherUntil = new Map<number, number>();
   // An evening concert under way: who's playing, at which instrument, until when.
   public concert: { player: number; tile: number; endsAt: number } | null = null;
-  // An elder telling stories by a fire (not saved: a loaded game simply starts without one).
+  // An elder telling stories by a fire (saved with the timers: a load ends it, counted as told; see resumeAfterLoad).
   public storyCircle: { teller: number; fire: number; endsAt: number } | null = null;
   // Finished sculptures by tile.
   public artworks = new Map<number, Artwork>();
@@ -784,6 +786,7 @@ export class Simulation {
       nextShelterSearch: [...this.nextShelterSearch],
       shelterLogged: [...this.shelterLogged],
       concert: this.concert ? { ...this.concert } : null,
+      storyCircle: this.storyCircle ? { ...this.storyCircle } : null,
     };
   }
 
@@ -806,6 +809,20 @@ export class Simulation {
     const player = timers.concert ? this.colonists[timers.concert.player] : undefined;
     if (player && !player.health.dead && !player.away) {
       this.finishConcert(player);
+    }
+    // Stories by the fire, the same way: an evening half an hour into the telling counts as told (it was lost,
+    // and with the next one two days off, the evening went uncounted).
+    const circle = timers.storyCircle;
+    const teller = circle ? this.colonists[circle.teller] : undefined;
+    if (
+      circle &&
+      teller &&
+      !teller.health.dead &&
+      !teller.away &&
+      this.tick >= circle.endsAt - STORY_TICKS + TICKS_PER_HOUR / 2
+    ) {
+      this.addThought(teller, 'toldStories');
+      this.stats.storyNights = (this.stats.storyNights ?? 0) + 1;
     }
     for (const c of this.living()) {
       if (c.sleeping) {
@@ -4556,7 +4573,15 @@ export class Simulation {
         p.tile = inside;
       }
     }
-    const theirs = [...this.enemies, ...this.allies, ...this.animals, ...(this.caravan?.visitors ?? [])];
+    // (An envoy, waiting or on the way home, too: one shut in a locked door stayed there until answered.)
+    const theirs = [
+      ...this.enemies,
+      ...this.allies,
+      ...this.animals,
+      ...(this.caravan?.visitors ?? []),
+      ...(this.diplomacy.envoy?.visitor ? [this.diplomacy.envoy.visitor] : []),
+      ...(this.diplomacy.departing ?? []),
+    ];
     for (const e of theirs) {
       const to = 'tame' in e && e.tame ? inside : outside;
       if (e.tile === t && to !== undefined) {

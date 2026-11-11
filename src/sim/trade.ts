@@ -207,8 +207,11 @@ export function updateCaravan(sim: Simulation): void {
   const home = sim.homeTile() ?? caravan.visitors[0]?.tile;
   if (!caravan.leaving && sim.tick >= caravan.leaveAt) {
     caravan.leaving = true;
+    // (Off at once: a trader resting stood about for up to three hours after packing up, and no new caravan could
+    // come while they did.)
     for (const v of caravan.visitors) {
       v.path = [];
+      v.restUntil = 0;
     }
     sim.addLog(`The traders from ${FACTIONS[caravan.faction].name} are packing up.`, 'info');
   }

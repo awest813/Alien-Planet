@@ -213,6 +213,9 @@ export function answerEnvoy(sim: Simulation, accept: boolean): string | null {
   d.envoy = null;
   // They set off home, answer in hand.
   if (envoy.visitor) {
+    // (Straight off: not the rest of a stroll about the colony first.)
+    envoy.visitor.path = [];
+    envoy.visitor.restUntil = 0;
     (d.departing ??= []).push(envoy.visitor);
   }
   if (!accept) {
