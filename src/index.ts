@@ -58,11 +58,15 @@ const fit = () => {
 new ResizeObserver(fit).observe(document.getElementById('game')!);
 window.addEventListener('resize', fit);
 // The density can change with no resize (the window dragged to another screen): a media query for the present
-// density says when it stops matching.
-const watchDensity = () =>
+// density says when it stops matching. (A narrow range round it, not the exact figure: a fractional density, 1.1
+// at 110%, is 1.100000023841858 to the page, and a browser that rounds it differently would never match the
+// exact query, so never say when it changed.)
+const watchDensity = () => {
+  const dpr = window.devicePixelRatio;
   window
-    .matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+    .matchMedia(`(min-resolution: ${dpr - 0.005}dppx) and (max-resolution: ${dpr + 0.005}dppx)`)
     .addEventListener('change', () => (fit(), watchDensity()), { once: true });
+};
 watchDensity();
 
 // The setting changed (and switching back to Auto from Sharp or Fast gives sharp another try; so does the button

@@ -1907,6 +1907,20 @@ export class ColonyScene extends Phaser.Scene {
   }
 
   private setupKeyboard(): void {
+    // The key, as the shortcuts name it: the letter typed (so the hotkeys follow the letters on a French or German
+    // keyboard), or on a keyboard that doesn't type Latin letters (Russian, Greek, Hebrew…) the key in the same
+    // place on an English one: there, WASD and every tool letter did nothing.
+    const keyOf = (event: KeyboardEvent): string => {
+      const key = event.key;
+      if (key.length !== 1) {
+        return key;
+      }
+      if (/^[\x20-\x7e]$/.test(key)) {
+        return key.toLowerCase();
+      }
+      const physical = /^(?:Key([A-Z])|Digit([0-9]))$/.exec(event.code);
+      return physical ? (physical[1] ?? physical[2]).toLowerCase() : key.toLowerCase();
+    };
     const isTyping = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       return !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
@@ -1916,7 +1930,7 @@ export class ColonyScene extends Phaser.Scene {
       if (isTyping(event) || event.ctrlKey || event.metaKey || event.altKey || controller.modalOpen) {
         return;
       }
-      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+      const key = keyOf(event);
       // Escape is handled by the interface (close screens, drop the tool, open the menu).
       if (key === 'Escape') {
         return;
@@ -1971,8 +1985,13 @@ export class ColonyScene extends Phaser.Scene {
       }
     };
     const onUp = (event: KeyboardEvent) => {
-      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-      this.held.delete(key);
+      // (On a Mac, a key let go while Cmd is down sends no keyup: a pan key held as Cmd went down panned on until
+      // the window lost focus. Letting go of Cmd lets go of everything.)
+      if (event.key === 'Meta') {
+        this.held.clear();
+        return;
+      }
+      this.held.delete(keyOf(event));
     };
     const onBlur = () => this.held.clear();
     window.addEventListener('keydown', onDown);

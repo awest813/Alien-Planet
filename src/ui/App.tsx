@@ -1,5 +1,5 @@
 import { TOUCH } from './touch';
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { UiState, controller } from '../game/controller';
 import { helpSeen, markHelpSeen } from '../game/settings';
 import { useUi } from './common';
@@ -206,17 +206,19 @@ export function App() {
   const scaled =
     scale === 1
       ? undefined
-      : {
+      : ({
           transform: `scale(${scale})`,
           transformOrigin: '0 0',
+          // (Its height in the stylesheet, where it can be the height under a phone's address bar: 100vh is the
+          // height with the bar hidden, and the build bar sat under it.)
+          '--ui-scale': scale,
           width: `${100 / scale}vw`,
-          height: `${100 / scale}vh`,
           right: 'auto',
           bottom: 'auto',
-        };
+        } as CSSProperties);
 
   return (
-    <div className="ui" style={scaled}>
+    <div className={scaled ? 'ui scaled' : 'ui'} style={scaled}>
       {onTitle ? (
         <>
           <TitleScreen actions={actions} />

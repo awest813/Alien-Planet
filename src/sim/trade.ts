@@ -309,6 +309,23 @@ export function lotsValue(lots: { count: number; price: number }[], count: numbe
   return total;
 }
 
+// Of `count` sold from these lots (worst first), how many were as good as new: full price, at `base` each.
+function asNewCount(lots: { count: number; price: number }[], count: number, base: number): number {
+  let left = count;
+  let n = 0;
+  for (const lot of lots) {
+    const taken = Math.min(left, lot.count);
+    if (lot.price >= base - 1e-9) {
+      n += taken;
+    }
+    left -= taken;
+    if (left <= 0) {
+      break;
+    }
+  }
+  return n;
+}
+
 function mergeLines(lines: [number, number][]): [number, number][] {
   const total = new Map<number, number>();
   for (const [item, count] of lines) {
@@ -359,11 +376,17 @@ export function applyTrade(sim: Simulation, buy: [number, number][], sell: [numb
         count,
         lots.get(item)!.map((l) => l.tile),
       );
+      // What was as good as new joins their wares (so a sale can be bought back); what was worn, spoiling or
+      // poorly made goes in their packs. (Their wares are sold as new: a worn tunic or a spoiling meal came back
+      // fresh.)
+      const asNew = asNewCount(lots.get(item)!, count, price.sell(item));
       const line = caravan.stock.find((s) => s.item === item);
-      if (line) {
-        line.count += count;
+      if (asNew <= 0) {
+        // (Nothing to add.)
+      } else if (line) {
+        line.count += asNew;
       } else {
-        caravan.stock.push({ item, count });
+        caravan.stock.push({ item, count: asNew });
       }
     }
   }

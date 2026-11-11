@@ -59,10 +59,15 @@ with esbuild for speed (see ROADMAP).
   - **Checked and sound:** no listeners, scene objects or textures left behind over three new colonies; the
     map's sharpness and pixel density keep the zoom and the clicks right; settings apply when changed; 60
     random trades created or lost nothing; power and pens never go negative; every colonist field is saved.
-  - **Left as found:** a pixel-density change to a fractional ratio (a browser zoomed to 110%) may go unnoticed
-    until a resize; on a phone with an interface size other than Normal the build bar may sit under the
-    browser's address bar; the keys follow the letter typed, so WASD doesn't pan on a non-Latin keyboard; goods
-    sold to traders come back as new if bought back.
+  - **And what was left as found, since fixed:** the watch on the screen's pixel density asked for the exact
+    figure, which a browser rounding a fractional density (1.1 at 110%) differently would never match, so never
+    say when it changed (it's a narrow range now); at an interface size other than Normal the interface was as
+    tall as the page with a phone's address bar hidden, so the build bar could sit under the bar (it's the
+    height under it now); the keys followed the letter typed, so on a Russian or Greek keyboard WASD didn't pan
+    and no tool letter worked (a key that isn't a Latin letter counts as the one in its place on an English
+    keyboard); on a Mac a pan key held as Cmd went down panned on (letting go of Cmd lets go of every key); and
+    goods sold to traders joined their wares as new, so a worn tunic or a spoiling meal came back good as new
+    (only what was as good as new joins them; the rest goes in their packs).
 
 - **Fourth audit: saving and loading, the less-reviewed systems, and the interface** (three readers, each
   finding first seen failing; a field-by-field save/load comparison every 3 hours over 20–40 days, eleven

@@ -180,6 +180,20 @@ describe('selling by condition', () => {
     expect(lotsValue(lots, 2)).toBeCloseTo(lots[0].price + lots[1].price);
   });
 
+  it("a worn piece sold isn't sold back as new; a sound one is", () => {
+    // (Their wares are sold as new: a worn tunic sold to them came back on their table good as new.)
+    const { sim, w, x, y } = market(5);
+    const tunic = itemId('tunic');
+    const offered = () => sim.caravan!.stock.find((s) => s.item === tunic)?.count ?? 0;
+    w.addItem(w.idx(x - 2, y + 5), tunic, 1, 0.1);
+    w.addItem(w.idx(x - 1, y + 5), tunic, 1, 1);
+    const before = offered();
+    expect(applyTrade(sim, [], [[tunic, 1]])).toBeNull();
+    expect(offered()).toBe(before);
+    expect(applyTrade(sim, [], [[tunic, 1]])).toBeNull();
+    expect(offered()).toBe(before + 1);
+  });
+
   it('food about to spoil sells for half', () => {
     const { w, x, y } = market(6);
     const meal = itemId('meal');

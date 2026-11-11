@@ -55,6 +55,13 @@ body {
   pointer-events: none;
 }
 
+/* At an interface size other than Normal (App scales it): the page's height, under a phone's address bar where
+   the browser knows it (dvh), or failing that 100vh. */
+.ui.scaled {
+  height: calc(100vh / var(--ui-scale));
+  height: calc(100dvh / var(--ui-scale));
+}
+
 .ui > .topbar {
   grid-column: 1 / -1;
   grid-row: 1;
