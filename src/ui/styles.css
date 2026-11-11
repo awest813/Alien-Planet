@@ -1405,6 +1405,22 @@ button.link:focus-visible {
     display: none;
   }
 
+  /* All items opens under the whole top bar, across its width (under its button, it started off the screen's left
+     edge on a 360px phone). */
+  .topbar {
+    position: relative;
+  }
+
+  .topbar .res-more {
+    position: static;
+  }
+
+  .topbar .res-list {
+    left: 0;
+    right: 0;
+    min-width: 0;
+  }
+
   .weather.phone-only {
     display: inline;
   }
