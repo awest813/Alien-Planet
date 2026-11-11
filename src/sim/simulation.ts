@@ -316,6 +316,32 @@ const OBJECTIVE_TICKS = 40;
 const TILE_KEYS = new Set([...'iwbdxsljfc'].map((ch) => ch.charCodeAt(0)));
 // The tile in a key like `i1234`, read in place (this runs for every candidate in every search, and slicing
 // out a new string each time adds up). NaN when the rest isn't all digits (an id key such as `fd12`).
+// The nearest empty dry ground beside open water, walking from `from` (a fishing spot's place).
+function nearestShore(world: World, from: number): number | undefined {
+  const seen = new Uint8Array(world.size);
+  const queue = [from];
+  seen[from] = 1;
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q];
+    if (
+      i !== from &&
+      world.feature[i] === NONE &&
+      world.itemType[i] === NONE &&
+      terrainDef(world.terrain[i]).buildable &&
+      world.neighbors(i).some((n) => world.isFishable(n))
+    ) {
+      return i;
+    }
+    for (const n of world.neighbors(i, false)) {
+      if (!seen[n] && world.isPassable(n)) {
+        seen[n] = 1;
+        queue.push(n);
+      }
+    }
+  }
+  return undefined;
+}
+
 function keyTile(key: string): number {
   let n = 0;
   for (let k = 1; k < key.length; k++) {
@@ -913,8 +939,11 @@ export class Simulation {
       }
       colonists.push(c);
     }
-    // Survival rations to tide the colony over until the first harvest.
-    world.dropItemNear(spawn, itemId('meal'), 4 * landing);
+    // Survival rations to tide the colony over until the first harvest: on an island, where the fields are small
+    // and the timber's across the water, a week's. (Island colonies starved 7-40 times the hours a valley did,
+    // most of it in the first three weeks, everyone carrying wood instead of sowing.)
+    const island = land.map === 'island';
+    world.dropItemNear(spawn, itemId('meal'), (island ? 7 : 4) * landing);
     // On the tundra they land in parkas, with a tunic each for the summer.
     if (biome === 'tundra') {
       world.dropItemNear(spawn, itemId('tunic'), landing);
@@ -923,6 +952,14 @@ export class Simulation {
     world.dropItemNear(spawn, itemId('silver'), 100);
     // Timber salvaged from the landing: enough for a door and a bed or two, to make the first night easier.
     world.dropItemNear(spawn, itemId('wood'), SALVAGED_WOOD);
+    // And on an island a fishing spot on the shore nearest the landing, rigged from the boat: the lake is what
+    // feeds an island colony, and this says so.
+    if (island) {
+      const spot = nearestShore(world, spawn);
+      if (spot !== undefined) {
+        world.setFeature(spot, featureId('fishingSpot'));
+      }
+    }
     const sim = new Simulation(world, colonists, seed, rng);
     sim.story = freshStory(difficulty);
     sim.biome = biome;
@@ -3369,7 +3406,7 @@ export class Simulation {
     // else. (Hunting comes late in the order; an island colony starved beside its lake, everyone busy with
     // everything but the fishing spots. Sending everyone was worse: nothing got built or hauled.)
     // (Fishing first: a catch is surer than a chase after scarce game.)
-    if (this.providers().includes(c.id) && (this.tryFish(c) || this.tryHunt(c))) {
+    if (this.providers().includes(c.id) && (this.tryFish(c) || (c.id !== this.fisherOnly && this.tryHunt(c)))) {
       return true;
     }
     const order = this.workOrder();
@@ -3414,9 +3451,13 @@ export class Simulation {
   private providers(): readonly number[] {
     if (this.tick >= this.providersAt) {
       this.providersAt = this.tick + SLOW_TICKS;
-      // (Not before there's a roof to sleep under: the first hut comes before the fishing.)
-      if (foodDays(this) >= PROVIDE_BELOW_DAYS || !this.hasShelter()) {
+      // (Not before there's a roof to sleep under: the first hut comes before the fishing. But only for the first
+      // couple of days: on a desert island, short of wood, the hut took two weeks, and the colony starved by its
+      // lake waiting for it.)
+      const days = foodDays(this);
+      if (days >= PROVIDE_BELOW_DAYS || (!this.hasShelter() && this.day < 3)) {
         this.providerIds = [];
+        this.fisherOnly = -1;
       } else {
         const able = this.living()
           .filter(
@@ -3430,13 +3471,18 @@ export class Simulation {
               !this.inMentalBreak(c),
           )
           .sort((a, b) => b.skills.animals - a.skills.animals || a.id - b.id);
-        this.providerIds = able.slice(0, this.living().length >= 7 ? 2 : 1).map((c) => c.id);
+        // Two in a big colony. With under half a day's food left, a second to fish (one fishing all day feeds three
+        // or four), but not to hunt: off chasing game, they starved a valley colony worse than staying in the fields.
+        const big = this.living().length >= 7;
+        this.providerIds = able.slice(0, big || days < 0.5 ? 2 : 1).map((c) => c.id);
+        this.fisherOnly = !big && this.providerIds.length > 1 ? this.providerIds[1] : -1;
       }
     }
     return this.providerIds;
   }
   private providersAt = 0;
   private providerIds: number[] = [];
+  private fisherOnly = -1;
   private cachedWorkOrder: readonly WorkTypeKey[] = WORK_TYPES;
 
   private tryWorkType(c: Colonist, work: WorkTypeKey): boolean {

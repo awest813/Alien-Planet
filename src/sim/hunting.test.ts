@@ -244,8 +244,59 @@ describe('the colony provider', () => {
       (sim as unknown as { providersAt: number }).providersAt = 0;
       return providers();
     };
-    expect(after()).toEqual([sim.colonists[0].id]);
+    // (With nothing at all to eat there's a second, to fish: the first is the best hunter who can go.)
+    expect(after()[0]).toBe(sim.colonists[0].id);
     sim.colonists[0].sleeping = true;
-    expect(after()).toEqual([sim.colonists[1].id]);
+    expect(after()[0]).toBe(sim.colonists[1].id);
+  });
+
+  it("fishes without a hut from the third day (a desert island's hut took two weeks)", () => {
+    const { sim, w } = field(47);
+    for (let i = 0; i < w.size; i++) {
+      if (w.itemType[i] !== 0 && itemDef(w.itemType[i]).nutrition > 0) {
+        w.takeItem(i, w.itemCount[i]);
+      }
+    }
+    sim.colonists.forEach((c, k) => {
+      c.priorities.hunting = 3;
+      c.skills.animals = 12 - k;
+    });
+    expect(sim.hasShelter()).toBe(false);
+    const providers = () => {
+      (sim as unknown as { providersAt: number }).providersAt = 0;
+      return (sim as unknown as { providers(): number[] }).providers();
+    };
+    // The first night's hut comes first...
+    expect(providers()).toEqual([]);
+    // ...but not for two weeks.
+    sim.tick += 2 * 24 * HOUR;
+    sim.syncClock();
+    expect(providers().length).toBeGreaterThan(0);
+  });
+
+  it('sends a second, with under half a day of food, to fish but not to hunt', () => {
+    // (Off after game, the second starved a valley colony worse than staying in the fields; at a fishing spot,
+    // they fed an island one.)
+    const { sim, w, x, y } = field(48);
+    for (const i of outline(w, x - 6, y - 6, x - 2, y - 2)) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    w.setFeature(w.idx(x - 4, y - 2), featureId('door'));
+    for (let i = 0; i < w.size; i++) {
+      if (w.itemType[i] !== 0 && itemDef(w.itemType[i]).nutrition > 0) {
+        w.takeItem(i, w.itemCount[i]);
+      }
+    }
+    sim.colonists.forEach((c, k) => {
+      c.priorities.hunting = 3;
+      c.skills.animals = k < 2 ? 12 - k : 0;
+      c.needs.food = 1;
+      c.job = null;
+    });
+    place(sim, 'deer', w.idx(x + 8, y), { hunted: true });
+    run(sim, 60);
+    // No fishing spot: the best hunter hunts, and the second stays at their work.
+    expect(sim.colonists[0].job?.type).toBe('hunt');
+    expect(sim.colonists[1].job?.type).not.toBe('hunt');
   });
 });

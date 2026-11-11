@@ -357,3 +357,22 @@ describe('every start has the basics close by', () => {
     }
   });
 });
+
+describe('landing on an island', () => {
+  it('comes with a week of rations and a fishing spot on the shore', () => {
+    for (const seed of [8, 95041, 7919]) {
+      const sim = Simulation.newColony(seed, 'standard', 64, { map: 'island' });
+      const w = sim.world;
+      const meals = sim.resourceTotals().find((r) => r.item === itemId('meal'))?.total ?? 0;
+      expect(meals).toBe(7 * sim.colonists.length);
+      const spots = [...Array(w.size).keys()].filter((i) => w.feature[i] === featureId('fishingSpot'));
+      expect(spots).toHaveLength(1);
+      // On the colony's ground, beside open water, and somewhere to fish from.
+      expect(sim.regionOf(spots[0])).toBe(sim.regionOf(sim.colonists[0].tile));
+      expect(w.neighbors(spots[0]).some((n) => w.isFishable(n))).toBe(true);
+    }
+    // A valley lands with four days' rations and no spot.
+    const valley = Simulation.newColony(8, 'standard', 64);
+    expect(valley.resourceTotals().find((r) => r.item === itemId('meal'))?.total).toBe(4 * valley.colonists.length);
+  });
+});
