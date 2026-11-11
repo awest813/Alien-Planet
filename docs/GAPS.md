@@ -46,6 +46,27 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Seventh audit: accessibility, a newcomer's first days, and what earlier audits left unconfirmed** (an
+  axe-core sweep and keyboard-only play of every screen; a newcomer following the goals through two phases on a
+  desktop and a phone; each finding first seen failing):
+  - **Without a mouse:** there was no way to give an order on the map. The tile in the middle of the view is now
+    the keyboard's cursor (the arrows show it): Enter starts an area there and Enter again marks it, or with
+    Select inspects it. Focus fell to the page after Menu, Settings, back, Resume; the Schedule grid was a Tab
+    stop an hour (a hundred presses); the title screen let Tab wander off; the Hide button sat in a tab list.
+  - **Seeing it:** in high-contrast mode nothing showed which option was chosen (speed, tool, difficulty, tabs)
+    and the bars were empty; the schedule's letters were 2.6:1 on Sleep's blue; a changed production target
+    wasn't announced.
+  - **A newcomer's first days:** a campfire in a hut's corner made it no shelter at all (the goal stuck, a false
+    alarm every evening); one just inside the door shut everyone out while the alerts blamed a gap in the walls;
+    the cloth goal offered a second bench to the end; a goal met while paused read "under way"; on a phone the
+    notices covered the goals drawer; Wood left the top bar at none while an alert asked for it.
+  - **Left unconfirmed before, fixed:** a ship that turned back with everyone away "found no beacon"; a smashed
+    generator lost its fuel; a trade of NaN or a fraction passed the checks; traders were announced as arrived
+    while packing up; the lesson board could be one the teacher couldn't reach; the leader's bar counted years
+    from the landing; All items started off a 360px phone's edge.
+  - **Left as found:** the Work grid is a Tab stop a cell (14 a colonist); the skill numbers on its brightest
+    cells are 4.4:1.
+
 - **Sixth audit: the systems the last two read least, and the interface** (two readers, each finding first seen
   failing in a test or the browser; a busy day-37 Medium colony looked at on a desktop, a tablet and a phone; 100
   scripted players over 120 days):
