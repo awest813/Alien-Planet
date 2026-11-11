@@ -221,6 +221,8 @@ export function updateCaravan(sim: Simulation): void {
   caravan.visitors = caravan.visitors.filter((v) => v.tile >= 0);
   if (
     caravan.arrivedTick === undefined &&
+    // (Not once they've packed up: in on the hour their time ran out, "have arrived, open Trade" while closed.)
+    !caravan.leaving &&
     home !== undefined &&
     caravan.visitors.some((v) => w.distance(v.tile, home) <= ARRIVED)
   ) {
@@ -347,12 +349,13 @@ export function applyTrade(sim: Simulation, buy: [number, number][], sell: [numb
   const silver = SILVER();
   for (const [item, count] of buy) {
     const have = caravan.stock.find((s) => s.item === item)?.count ?? 0;
-    if (count < 0 || count > have) {
+    // (Whole numbers only: NaN or a fraction slipped past a check for less than none or more than there is.)
+    if (!Number.isInteger(count) || count < 0 || count > have) {
       return `The traders don't have that many ${itemDef(item).name.toLowerCase()}.`;
     }
   }
   for (const [item, count] of sell) {
-    if (count < 0 || item === silver || count > colonyStock(sim, item)) {
+    if (!Number.isInteger(count) || count < 0 || item === silver || count > colonyStock(sim, item)) {
       return `The colony doesn't have that many ${itemDef(item).name.toLowerCase()} in its stockpiles.`;
     }
   }

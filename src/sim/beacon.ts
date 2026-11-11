@@ -79,7 +79,13 @@ export function updateBeacon(sim: Simulation): void {
   // Nobody left to meet it, or no beacon to land by: it turns back, and the beacon can call again.
   if (!b.landed && b.landsAt !== undefined && (sim.living().length === 0 || beaconTile(sim) === undefined)) {
     if (sim.tick >= b.landsAt) {
-      chooseToStay(sim, 'The ship found no beacon to land by and turned back.');
+      // (Said as it was: with the beacon standing and everyone away on a trip, it "found no beacon".)
+      chooseToStay(
+        sim,
+        beaconTile(sim) === undefined
+          ? 'The ship found no beacon to land by and turned back.'
+          : 'The ship found nobody at the beacon to meet it and turned back.',
+      );
       sim.beacon.choice = undefined;
     }
     return;

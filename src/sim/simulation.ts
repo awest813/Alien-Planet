@@ -3693,7 +3693,13 @@ export class Simulation {
     const name = featureDef(f).name.toLowerCase();
     // One thing broken, and the rage burns out into a daze for the rest of the break.
     c.breakKind = 'daze';
+    // The fuel in a generator's hopper spills out (lost with it, it wasn't when one was taken down).
+    const def = featureDef(f);
+    const hopper = def.power?.fuel ? Math.floor(w.fuel[i]) : 0;
     w.setFeature(i, NONE);
+    if (hopper > 0) {
+      w.dropItemNear(i, def.power!.fuel!.item, hopper);
+    }
     w.addFilth(i, Filth.RUBBLE, 2);
     const again = this.rebuild(i, f);
     this.stats.smashed = (this.stats.smashed ?? 0) + 1;

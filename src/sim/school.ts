@@ -132,9 +132,16 @@ export function tryLesson(sim: Simulation, c: Colonist): boolean {
   // Everyone to one board, so they meet: the one a pupil is already making for, or else the one nearest the
   // teacher. (Each choosing the board nearest where the teacher stood at the time split them between two.)
   const taken = sim.living().find((o) => o.job?.type === 'lesson' && o.job.line === 0 && boards.includes(o.job.source));
+  // (Of those the teacher can get to: nearest in a straight line, it could be one across a river or behind a wall,
+  // and nobody came.)
+  const w = sim.world;
+  const reach = (b: number) =>
+    w.neighbors(b).some((n) => w.isPassable(n) && sim.regionOf(n) === sim.regionOf(teacher.tile));
   const board =
     taken?.job?.source ??
-    [...boards].sort((a, b) => sim.world.distance(teacher.tile, a) - sim.world.distance(teacher.tile, b))[0];
+    [...boards].sort(
+      (a, b) => Number(reach(b)) - Number(reach(a)) || w.distance(teacher.tile, a) - w.distance(teacher.tile, b),
+    )[0];
   const until = (SCHOOL_END - sim.hour) * TICKS_PER_HOUR;
   return sim.sendTo(c, 'lesson', seats(sim, board, c), {
     source: board,

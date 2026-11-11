@@ -1,7 +1,7 @@
 import { seasonDay } from './seasons';
 import { foodDays } from './storyteller';
 import { ADULT, ELDER } from './lifespans';
-import { DAYS_PER_YEAR } from './seasons';
+import { yearOf } from './seasons';
 import type { Simulation } from './simulation';
 import { traitValue } from './social';
 import { Colonist } from './types';
@@ -193,11 +193,12 @@ export function updateRest(sim: Simulation): void {
 // leading well (or badly) rises this much a year, up to the most.
 const LEADER_BAR_PER_YEAR = 2;
 const LEADER_BAR_MAX = 12;
-// From this year, leading weighs on the leader.
+// After this many years (by the calendar), leading weighs on the leader.
 const OFFICE_WEIGHS_FROM_YEAR = 2;
 
 export function leaderBar(sim: Simulation): number {
-  const years = Math.floor((sim.day - 1) / DAYS_PER_YEAR);
+  // (Years by the calendar the game shows, not from the landing: two days apart.)
+  const years = yearOf(sim.totalHours) - 1;
   return Math.min(LEADER_BAR_MAX, Math.max(0, years - 1) * LEADER_BAR_PER_YEAR);
 }
 
@@ -215,7 +216,7 @@ export function villageThoughts(sim: Simulation, c: Colonist): string[] {
       keys.push('poorlyLed');
     }
   }
-  if (leader === c && (sim.day - 1) / DAYS_PER_YEAR >= OFFICE_WEIGHS_FROM_YEAR) {
+  if (leader === c && yearOf(sim.totalHours) - 1 >= OFFICE_WEIGHS_FROM_YEAR) {
     keys.push('weightOfOffice');
   }
   if (v.rations === 'frugal') {
