@@ -136,6 +136,22 @@ function Clock() {
   );
 }
 
+function Weather({ weather, phone }: { weather: UiState['weather']; phone?: boolean }) {
+  if (!weather.icon) {
+    return null;
+  }
+  return (
+    <span
+      className={phone ? 'weather phone-only' : 'weather not-phone'}
+      role="img"
+      title={`Weather: ${weather.label}`}
+      aria-label={`Weather: ${weather.label}`}
+    >
+      {weather.icon} <span className="weather-label">{weather.label}</span>
+    </span>
+  );
+}
+
 export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
   const state = useUi(pickTopBar);
   const p = state.power;
@@ -168,18 +184,11 @@ export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
           ))}
         </div>
         {/* (After the speeds, so they don't move as the weather comes and goes.) */}
-        {state.weather.icon && (
-          <span
-            className="weather"
-            role="img"
-            title={`Weather: ${state.weather.label}`}
-            aria-label={`Weather: ${state.weather.label}`}
-          >
-            {state.weather.icon} <span className="weather-label">{state.weather.label}</span>
-          </span>
-        )}
+        <Weather weather={state.weather} />
       </div>
       <div className="tb-resources">
+        {/* On a phone the clock's row is full, and the chip took a row of its own: it leads the counts there. */}
+        <Weather weather={state.weather} phone />
         <FoodDays days={state.foodDays} />
         {state.resources
           .filter((r) => r.total > 0 && KEY_RESOURCES.includes(r.name))

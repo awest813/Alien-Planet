@@ -357,6 +357,12 @@ kbd {
   border: 1px solid var(--border);
 }
 
+/* The weather chip: after the speeds, or on a phone leading the counts (see the phone rules below). */
+.weather.phone-only {
+  display: none;
+  align-self: flex-start;
+}
+
 /* A crowded top bar steps down (TopBar measures it: the interface size makes the window's width a poor guide)
    until its buttons keep to one row. First the title goes and the weather shows as its icon (its name stays
    in the tooltip)... */
@@ -1345,6 +1351,14 @@ button.link:focus-visible {
   .tb-resources {
     margin-left: 0;
     gap: 2px 8px;
+  }
+
+  .weather.not-phone {
+    display: none;
+  }
+
+  .weather.phone-only {
+    display: inline;
   }
 
   .tb-resources .res:not(.power):not(.food) {
