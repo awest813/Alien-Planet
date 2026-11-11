@@ -306,8 +306,14 @@ export function manhuntersArrive(sim: Simulation, kind: string, count: number): 
   const muster = musterTicks(walk);
   for (let n = 0; n < count; n++) {
     const a = addAnimal(sim, edge, kind);
+    const prey = nearestPrey(sim, a);
+    // Everyone they could reach is in a pen (animals don't pass gates): they don't come. (It crashed the game.)
+    if (!prey) {
+      sim.animals = sim.animals.filter((o) => o !== a);
+      return n;
+    }
     a.manhunter = true;
-    a.revengeOn = nearestPrey(sim, a)!.id;
+    a.revengeOn = prey.id;
     // Their fury lasts most of a day (from when they set off).
     a.revengeUntil = sim.tick + muster + TICKS_PER_HOUR * 16;
     if (muster > 0) {

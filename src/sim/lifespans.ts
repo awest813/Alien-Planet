@@ -253,8 +253,8 @@ function conceive(sim: Simulation): void {
       a.expectingUntil !== undefined ||
       b.expectingUntil !== undefined ||
       [a, b].some((p) => p.age < PARENT_MIN || p.age > PARENT_MAX || p.health.downed) ||
-      // One baby at a time.
-      sim.infants.some((i) => i.parents.includes(a.id))
+      // One baby at a time (for either of them: one with a baby from an earlier marriage could expect another).
+      sim.infants.some((i) => i.parents.includes(a.id) || i.parents.includes(b.id))
     ) {
       continue;
     }
@@ -327,6 +327,9 @@ function toddle(sim: Simulation, infant: Infant): Colonist {
   c.age = infant.age;
   c.parents = infant.parents;
   c.backstory = COLONY_BORN;
+  // Unarmed (a new colonist lands with a short bow: every toddler had one out of nowhere, and shot at animals with
+  // it). Their clothes, made at home, they keep.
+  c.weapon = 'fists';
   for (const key of SKILL_KEYS) {
     c.skills[key] = sim.rng.int(0, 1);
   }

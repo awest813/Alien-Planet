@@ -1,7 +1,7 @@
 import { TICKS_PER_HOUR, populationFor } from './constants';
 import { FACTIONS, itemDef, itemId, quantity } from './defs';
 import { changeGoodwill } from './diplomacy';
-import { damage } from './health';
+import { bleedingOf, damage } from './health';
 import { DRAFT_AGE, ageBy } from './lifespans';
 import type { Simulation } from './simulation';
 import { colonyStock, goodwillOf, takeFromStockpiles, waresOf } from './trade';
@@ -80,7 +80,8 @@ export function cannotGo(sim: Simulation, c: Colonist): string | null {
   if (c.age < DRAFT_AGE) {
     return 'too young';
   }
-  if (c.health.downed || c.health.injuries.some((i) => i.bleeding > 0) || c.health.disease) {
+  // (Bleeding as the body sees it: a tended wound keeps its figure until it heals, and kept the patient home.)
+  if (c.health.downed || bleedingOf(c) > 0 || c.health.disease) {
     return 'not well enough';
   }
   if (sim.inMentalBreak(c)) {
