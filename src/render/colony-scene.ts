@@ -1897,7 +1897,11 @@ export class ColonyScene extends Phaser.Scene {
           const raider = this.pickRaiderTile(pointer);
           if (colonist !== null) {
             controller.selectColonist(colonist);
-          } else if (tile === null || controller.tool.kind !== 'select' || !controller.orderMove(raider ?? tile)) {
+          } else if (
+            tile === null ||
+            controller.tool.kind !== 'select' ||
+            !controller.orderMove(raider ?? tile, false)
+          ) {
             controller.selectTile(tile);
           }
         }

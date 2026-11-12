@@ -402,6 +402,8 @@ const BUSY_FOR_RITES = new Set<JobType>([
 // A gathering fills recreation in this many hours.
 const GATHERING_HOURS_TO_FULL = 2;
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+// "a fine", "an excellent" (lower-cased): "made a excellent recurve bow".
+const aOrAn = (word: string) => `${/^[aeiou]/i.test(word) ? 'an' : 'a'} ${word.toLowerCase()}`;
 // A memorial's inscription: the fallen by name, or (before anyone has died) a dedication.
 const memorialTitle = (names: string[]) =>
   names.length === 0
@@ -1549,6 +1551,7 @@ export class Simulation {
           const y = w.yOf(p.tile);
           if (
             p.state === 'downed' &&
+            (cmd.captive === undefined || cmd.captive === p.id) &&
             x >= Math.min(x0, x1) &&
             x <= Math.max(x0, x1) &&
             y >= Math.min(y0, y1) &&
@@ -5510,7 +5513,7 @@ export class Simulation {
         this.stats.bestCraft = Math.max(this.stats.bestCraft ?? 0, quality);
       }
       if (rolled) {
-        this.addLog(`${c.name} made a ${qualityLabel(quality).toLowerCase()} ${itemDef(product).name.toLowerCase()}.`);
+        this.addLog(`${c.name} made ${aOrAn(qualityLabel(quality))} ${itemDef(product).name.toLowerCase()}.`);
       }
       this.endJob(c);
     }
@@ -7175,7 +7178,7 @@ export class Simulation {
         }
         c.weapon = def.weapon;
         c.weaponQuality = taken.quality ?? NORMAL_QUALITY;
-        this.addLog(`${c.name} picked up a ${qualityLabel(c.weaponQuality).toLowerCase()} ${def.name.toLowerCase()}.`);
+        this.addLog(`${c.name} picked up ${aOrAn(qualityLabel(c.weaponQuality))} ${def.name.toLowerCase()}.`);
       }
     } else if (def.armor) {
       const taken = w.pickUp(job.source, 1);
@@ -7190,7 +7193,7 @@ export class Simulation {
       const kit = w.pickUp(job.source, 1);
       if (kit.count > 0 && !c.tool) {
         c.tool = { quality: kit.quality ?? NORMAL_QUALITY, wear: kit.fresh ?? 1 };
-        this.addLog(`${c.name} picked up a ${qualityLabel(c.tool.quality).toLowerCase()} tool kit.`);
+        this.addLog(`${c.name} picked up ${aOrAn(qualityLabel(c.tool.quality))} tool kit.`);
       } else if (kit.count > 0) {
         w.dropItemNear(c.tile, TOOL_KIT, 1, kit.fresh, kit.quality);
       }

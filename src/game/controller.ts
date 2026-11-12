@@ -1675,11 +1675,18 @@ export class GameController {
   }
 
   // Drafts every able colonist, or stands everyone down if they're all drafted already.
+  private animalsAttacking(): boolean {
+    return this.sim.animals.some((a) => a.hp > 0 && a.revengeOn >= 0);
+  }
+
   public toggleDraftAll(): void {
     // (Not anyone in a mental break: the colony can't draft them, and counting them would keep this drafting
     // everyone again rather than standing them down.)
     const able = this.sim.living().filter((c) => !c.health.downed && c.age >= DRAFT_AGE && !this.sim.inMentalBreak(c));
-    const draft = able.some((c) => !c.drafted);
+    // With nothing to fight, anyone drafted is stood down (they don't eat while drafted: two left so after a boar
+    // fought back starved for a day with the stores full, and pressing Q drafted everyone else).
+    const threat = !!this.sim.raid || this.animalsAttacking();
+    const draft = threat ? able.some((c) => !c.drafted) : !this.sim.living().some((c) => c.drafted);
     // Done what the "press Q" toast asked: it can go.
     if (draft && this.toast?.includes('Press Q')) {
       this.toast = null;
@@ -1710,7 +1717,8 @@ export class GameController {
   // Right-click with drafted colonists: on a raider, concentrate fire on them (the selected
   // colonist, or everyone drafted if none is selected); elsewhere, send the selected colonist
   // there. Returns false if there was no one to order.
-  public orderMove(tile: number): boolean {
+  // `group`: with nobody selected, everyone drafted goes (a right-click; a tap on a phone inspects instead).
+  public orderMove(tile: number, group = true): boolean {
     const id = this.selectedColonist;
     const raider = this.sim.enemies.find((e) => e.hp > 0 && e.tile === tile);
     if (raider) {
@@ -1722,10 +1730,44 @@ export class GameController {
       this.notify(`${selected ? this.sim.colonists[id].name : 'Everyone drafted'} will concentrate on ${raider.name}.`);
       return true;
     }
-    if (id === null || !this.sim.colonists[id]?.drafted) {
+    if (id !== null && this.sim.colonists[id]?.drafted) {
+      this.command({ type: 'move', colonist: id, tile });
+      return true;
+    }
+    // Nobody (drafted) selected: everyone drafted goes, each to a tile of their own round the spot. (It did
+    // nothing at all, and placing seven defenders took fourteen clicks.)
+    const drafted = this.sim.living().filter((c) => c.drafted && !c.health.downed);
+    if (!group || drafted.length === 0 || (id !== null && !this.sim.colonists[id]?.drafted)) {
       return false;
     }
-    this.command({ type: 'move', colonist: id, tile });
+    const w = this.sim.world;
+    if (!w.isPassable(tile)) {
+      return false;
+    }
+    const spots: number[] = [];
+    const seen = new Set([tile]);
+    for (let q = [tile]; q.length > 0 && spots.length < drafted.length; ) {
+      const next: number[] = [];
+      for (const i of q) {
+        if (spots.length < drafted.length) {
+          spots.push(i);
+        }
+        for (const n of w.neighbors(i, false)) {
+          if (!seen.has(n) && w.isPassable(n)) {
+            seen.add(n);
+            next.push(n);
+          }
+        }
+      }
+      q = next;
+    }
+    // The nearest of them to each spot, so nobody crosses the others.
+    const left = [...drafted];
+    for (const spot of spots) {
+      left.sort((a, b) => w.distance(a.tile, spot) - w.distance(b.tile, spot) || a.id - b.id);
+      this.command({ type: 'move', colonist: left.shift()!.id, tile: spot });
+    }
+    this.notify(drafted.length === 1 ? `${drafted[0].name} is on the way.` : 'Everyone drafted is on the way.');
     return true;
   }
 
@@ -2098,7 +2140,8 @@ export class GameController {
     if (p) {
       const x = this.sim.world.xOf(p.tile);
       const y = this.sim.world.yOf(p.tile);
-      this.command({ type: 'capture', rect: { x0: x, y0: y, x1: x, y1: y }, add: true });
+      // (That one: the rest lying on the same tile were taken too.)
+      this.command({ type: 'capture', rect: { x0: x, y0: y, x1: x, y1: y }, add: true, captive: id });
     }
   }
 
@@ -2291,7 +2334,11 @@ export class GameController {
         (Math.max(1, sim.living().length) * DAILY_NUTRITION),
       objectives: OBJECTIVES.filter((o) => !o.hidden?.(sim)).map((o) => ({
         id: o.id,
-        label: o.label,
+        // (A label that names its research drops it once that's learned: "Dress everyone in a parka (research
+        // Tailoring)" went on asking.)
+        label: o.label.replace(/ \(research ([^)]+)\)$/, (all, name: string) =>
+          RESEARCH.some((r) => r.name.toLowerCase() === name.toLowerCase() && sim.isResearched(r.key)) ? '' : all,
+        ),
         phase: o.phase,
         done: !!sim.objectivesDone[o.id],
         failed: sim.objectiveFailed(o.id),
@@ -2339,7 +2386,8 @@ export class GameController {
       story: [...sim.storyLog].reverse(),
       festivals: sim.story.festivals !== false,
       village: this.villageView(),
-      animalsAttacking: sim.animals.some((a) => a.manhunter && a.hp > 0 && a.revengeOn >= 0),
+      // (Any animal turned on someone: a hunted boar fighting back too, not only a maddened pack.)
+      animalsAttacking: this.animalsAttacking(),
       raid:
         sim.enemies.length > 0
           ? { faction: FACTIONS[sim.enemies[0].faction].name, remaining: sim.enemies.filter((e) => !e.fleeing).length }
@@ -2654,7 +2702,14 @@ export class GameController {
       alerts.push({
         text:
           request.kind === 'hunt'
-            ? `${FACTIONS[request.faction].name} ask: hunt the great boar (${left} left). Drag Hunt over it`
+            ? `${FACTIONS[request.faction].name} ask: hunt the great boar (${left} left). ${
+                // (Marked, it went on saying "drag Hunt over it", fighting back too.)
+                quarry?.revengeOn !== undefined && quarry.revengeOn >= 0
+                  ? "It's fighting back: draft colonists (Q)"
+                  : quarry?.hunted
+                    ? 'Marked: the hunters are after it'
+                    : 'Drag Hunt over it'
+              }`
             : `${FACTIONS[request.faction].name} ask for ${quantity(request.item, request.count)} (${colonyStock(sim, request.item)} stored, ${left} left): send it (Factions)`,
         tone: hours <= 24 ? 'warn' : 'calm',
         tile: quarry?.tile,
@@ -2782,7 +2837,12 @@ export class GameController {
           colonist: c.id,
         });
       } else if (c.needs.food <= 0) {
-        alerts.push({ text: `${c.name} is starving`, tone: 'danger', colonist: c.id });
+        alerts.push({
+          // (Drafted, they don't eat: nothing said so.)
+          text: c.drafted ? `${c.name} is starving, drafted: stand them down (Q) to eat` : `${c.name} is starving`,
+          tone: 'danger',
+          colonist: c.id,
+        });
       } else if (c.mood < 25) {
         alerts.push({ text: `${c.name} is unhappy (mood ${Math.round(c.mood)})`, tone: 'warn', colonist: c.id });
       }
@@ -3103,6 +3163,45 @@ export class GameController {
         tool: 'woodWall',
       };
     }
+    // Bread and iron, step by step once their research is done (they went on asking for the research, or for the
+    // first step, to the end: a colony with milling known and 360 grain stored was told to grow grain).
+    const sim = this.sim;
+    const built = (key: string) => sim.countBuilt((f) => featureDef(f).key === key) > 0;
+    const have = (key: string) => sim.resourceTotals().find((r) => r.item === itemId(key))?.total ?? 0;
+    if (id === 'bread' && sim.isResearched('milling')) {
+      if (!built('millstone')) {
+        return {
+          how: 'Milling is researched: build a millstone (30 stone, 10 wood), where grain is ground into flour.',
+          tool: 'millstone',
+        };
+      }
+      if (have('grain') === 0 && have('flour') === 0) {
+        return { how: 'The millstone is up: grow grain (Zones), and harvest it.', tool: 'growGrain' };
+      }
+      return {
+        how: 'Set targets for flour and bread in Production: cooks grind grain at the millstone and bake at a stove.',
+        screen: 'production',
+      };
+    }
+    if (id === 'iron' && sim.isResearched('smelting')) {
+      if (!built('smelter')) {
+        if (have('bricks') < 20) {
+          return built('kiln')
+            ? {
+                how: 'A smelter takes 20 bricks: fire them in the kiln (Production: Fire bricks), from clay mined along the shore (M).',
+                screen: 'production',
+              }
+            : { how: 'A smelter takes 20 bricks: build a kiln first, to fire them from clay.', tool: 'kiln' };
+        }
+        return { how: 'Smelting is researched and the bricks are in: build a smelter.', tool: 'smelter' };
+      }
+      return have('ironOre') > 0
+        ? {
+            how: 'The smelter is up: set a target for iron in Production, and keep wood in stock to fire it.',
+            screen: 'production',
+          }
+        : { how: 'The smelter is up: mine iron veins (rusty streaks in the rock) for ore.', tool: 'mine' };
+    }
     const after = AFTER_RESEARCH[id];
     if (after && this.sim.isResearched(after.research)) {
       return { how: after.how, tool: after.tool, screen: after.screen };
@@ -3209,6 +3308,13 @@ export class GameController {
       case 'zone':
         // (A stockpile's value carries its settings; any stockpile counts.)
         return any('zones', (i) => (isStockpileZone(tool.zone) ? isStockpileZone(w.zone[i]) : w.zone[i] === tool.zone));
+      // (Marks on animals and captives too: a hunt marked still read as not begun.)
+      case 'hunt':
+        return this.sim.animals.some((a) => a.hunted && a.hp > 0);
+      case 'tame':
+        return this.sim.animals.some((a) => a.taming && !a.tame && a.hp > 0);
+      case 'capture':
+        return this.sim.captives.some((p) => p.capture);
       default:
         return false;
     }

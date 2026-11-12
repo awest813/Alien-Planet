@@ -424,7 +424,28 @@ const EVENTS: EventDef[] = [
     weight: (sim) => (heatWaveOn(sim) ? 0 : 1),
     run: (sim) => {
       sim.story.coldSnapUntil = sim.tick + 2 * DAY;
-      sim.addLog('A cold snap has rolled in. Expect freezing nights for the next two days.', 'warn', true);
+      // Frost kills crops left in the open, in any season: say so while there's time to bring in what's ripe (66
+      // died two days before winter, with nothing said until the morning after).
+      const w = sim.world;
+      let open = 0;
+      let ripe = 0;
+      for (const i of sim.buildingTiles()) {
+        const f = w.feature[i];
+        const crop = f !== NONE ? featureDef(f).crop : undefined;
+        if (crop && !crop.hardy && !sim.isIndoors(i)) {
+          open++;
+          ripe += w.growth[i] >= 1 ? 1 : 0;
+        }
+      }
+      sim.addLog(
+        `A cold snap has rolled in. Expect freezing nights for the next two days${
+          open > 0
+            ? `: frost can kill the ${open} crop${open === 1 ? '' : 's'} in the open${ripe > 0 ? ` (${ripe} ripe: harvest ${ripe === 1 ? 'it' : 'them'} now)` : ''}`
+            : ''
+        }.`,
+        'warn',
+        true,
+      );
       return true;
     },
   },

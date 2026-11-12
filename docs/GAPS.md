@@ -46,6 +46,25 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Ninth pass: the middle game, and a review of the last two passes** (a player through phases 3-5 at real speed,
+  three raids, two packs and the great beast; a reader with the last two passes' diff; each finding first seen
+  failing):
+  - **Fights:** colonists left drafted after one animal fought back starved with the stores full (drafted, nobody
+    eats), Q drafted everyone else, and the Stand down button had gone. With nothing attacking, Q and the button
+    now stand everyone down, the button stays while anyone is drafted, and a drafted colonist's hunger says so. A
+    right-click with nobody selected sends everyone drafted, each to a tile of their own (one at a time, placing
+    seven took fourteen clicks).
+  - **Goals:** bread and iron went on asking for their research, or the first step, to the end; they move on
+    (millstone, grain, Production; kiln, bricks, smelter, ore). A label naming its research drops it once learned.
+    A hunt or taming marked shows as under way; the great boar's request says when it's marked or fighting back.
+  - **Smaller:** a cold snap now says the crops in the open may die (66 did, unannounced, two days before winter);
+    Capture on the Prisoners screen took everyone on the same tile; "made a excellent recurve bow".
+  - **The review:** a dead parent never showed a child born after them; stories by the fire past bedtime were
+    dropped on loading; weapons in older saves kept a stray condition (half a year in the rain, or nine days); the
+    first nudge of the mouse after arrowing to the map's edge snapped the view back.
+  - **Left as found:** fires burn wood all year, so a summer heat wave can bring "firewood running low"; a save
+    loaded on a device that has never played shows the welcome help, first-night advice and all.
+
 - **Eighth pass: a review of this session's own changes, and the long game** (a reader with the diff and no
   context, each finding first seen failing; ten- and thirty-year runs measuring the save, memory, speed and a
   hundred sanity checks a year, which found nothing broken):

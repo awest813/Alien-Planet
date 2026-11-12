@@ -661,8 +661,11 @@ const CONTROLS: [string, string][] = [
   ['Tab', 'Jump to the next colonist'],
   ['F6 / Shift+Tab', 'Move keyboard focus into the interface (then Tab between buttons)'],
   ['H', 'Back to the colony'],
-  ['Q', 'Draft the selected colonist, or everyone'],
-  ['Right-click', 'Move a drafted colonist, or drop the current tool'],
+  ['Q', 'Draft the selected colonist, or everyone (stands everyone down when nothing is attacking)'],
+  [
+    'Right-click',
+    'Move the selected drafted colonist (with nobody selected, everyone drafted), or drop the current tool',
+  ],
   ['Esc', 'Close a screen, drop the tool, clear the selection, then open the menu'],
   ['Letter keys', 'Tools: hover a button in the bottom bar to see its key'],
 ];

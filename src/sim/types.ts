@@ -483,7 +483,8 @@ export type Command =
   | { type: 'hunt'; rect: Rect; add: boolean }
   | { type: 'tame'; rect: Rect; add: boolean }
   // Mark (or unmark) downed raiders in the rectangle to be taken prisoner.
-  | { type: 'capture'; rect: Rect; add: boolean }
+  // `captive`: just that one (the Prisoners screen), not everyone lying in the rectangle.
+  | { type: 'capture'; rect: Rect; add: boolean; captive?: number }
   // Let a prisoner go.
   | { type: 'release'; captive: number }
   | { type: 'execute'; captive: number }

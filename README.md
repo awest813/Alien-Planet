@@ -26,24 +26,24 @@ size, how long notifications stay, camera speed, map sharpness on high-density s
 drops to fast if the game runs slowly), name labels, the minimap, a list of controls, and a way to see the
 welcome help again.
 
-| Action                | Input                                                   |
-| --------------------- | ------------------------------------------------------- |
-| Pan                   | WASD / arrow keys, or right/middle-drag                 |
-| Zoom                  | Mouse wheel                                             |
-| Pause / speeds        | Space, `1` `2` `3` (or the top-bar buttons)             |
-| Tools                 | Toolbar, or hotkeys shown on each button                |
-| Apply a tool          | Left-drag a rectangle (walls are placed as an outline)  |
-| Drop the current tool | Right-click or Esc                                      |
-| Pause menu            | Esc (with no tool or selection), or the Menu button     |
-| Next colonist         | Tab                                                     |
-| Select a colonist     | Click it on the map or in the colonist list             |
-| Save / load / new map | Pause menu: four slots, delete, difficulty, size, seed  |
-| Work priorities       | Work button: click a cell to cycle 1 → 4 → off          |
-| Schedules             | Schedule button: pick a brush and paint hours           |
-| Draft for combat      | Q (selected colonist, or everyone), or the Draft button |
-| Move drafted colonist | Select them, then right-click a tile                    |
-| Hunt                  | V, then drag over animals                               |
-| Production targets    | Production button: "keep N meals / cloth in stock"      |
+| Action                 | Input                                                                 |
+| ---------------------- | --------------------------------------------------------------------- |
+| Pan                    | WASD / arrow keys, or right/middle-drag                               |
+| Zoom                   | Mouse wheel                                                           |
+| Pause / speeds         | Space, `1` `2` `3` (or the top-bar buttons)                           |
+| Tools                  | Toolbar, or hotkeys shown on each button                              |
+| Apply a tool           | Left-drag a rectangle (walls are placed as an outline)                |
+| Drop the current tool  | Right-click or Esc                                                    |
+| Pause menu             | Esc (with no tool or selection), or the Menu button                   |
+| Next colonist          | Tab                                                                   |
+| Select a colonist      | Click it on the map or in the colonist list                           |
+| Save / load / new map  | Pause menu: four slots, delete, difficulty, size, seed                |
+| Work priorities        | Work button: click a cell to cycle 1 → 4 → off                        |
+| Schedules              | Schedule button: pick a brush and paint hours                         |
+| Draft for combat       | Q (selected colonist, or everyone), or the Draft button               |
+| Move drafted colonists | Select one and right-click a tile (nobody selected: everyone drafted) |
+| Hunt                   | V, then drag over animals                                             |
+| Production targets     | Production button: "keep N meals / cloth in stock"                    |
 
 Objectives:
 

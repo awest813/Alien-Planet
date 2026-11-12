@@ -56,7 +56,7 @@ function useTopBarFit(
   state: Pick<
     UiState,
     'raid' | 'animalsAttacking' | 'trade' | 'captives' | 'diplomacy' | 'weather' | 'settings' | 'day'
-  >,
+  > & { anyDrafted: boolean },
 ): { ref: React.RefObject<HTMLElement | null>; className: string } {
   const ref = useRef<HTMLElement>(null);
   const phone = () => window.innerWidth <= 720;
@@ -69,7 +69,7 @@ function useTopBarFit(
   // It tries roomier again when what's in it changes (a raid's or a trader's buttons come and go, the rain stops),
   // and once a day.
   const content = [
-    !!state.raid || state.animalsAttacking,
+    !!state.raid || state.animalsAttacking || state.anyDrafted,
     !!state.trade,
     state.captives.length > 0,
     !!(state.diplomacy.request || state.diplomacy.call || state.diplomacy.dispute || state.diplomacy.envoy),
@@ -219,13 +219,15 @@ export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
         )}
       </div>
       <nav className="screens">
-        {(state.raid || state.animalsAttacking) && (anyFree || state.anyDrafted) && (
+        {/* In a fight, Draft all (or Stand down all); otherwise Stand down all while anyone is drafted (left so after a
+            fight with one animal, they starved: drafted, nobody eats, and the button had gone). */}
+        {(((state.raid || state.animalsAttacking) && (anyFree || state.anyDrafted)) || state.anyDrafted) && (
           <button
             className="danger draft-all"
             onClick={() => controller.toggleDraftAll()}
             title="Draft or stand down everyone (Q, with no colonist selected)"
           >
-            {anyFree ? 'Draft all' : 'Stand down all'}
+            {(state.raid || state.animalsAttacking) && anyFree ? 'Draft all' : 'Stand down all'}
           </button>
         )}
         <button onClick={() => onOpen('work')}>Work</button>
