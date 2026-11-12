@@ -587,7 +587,7 @@ export function ProductionScreen({ onClose }: { onClose: () => void }) {
                     )}
                   </div>
                 </td>
-                <td className="muted">{bill.mend ? `${bill.stock} worn` : `${bill.stock} in stock`}</td>
+                <td className="muted stock">{bill.mend ? `${bill.stock} worn` : `${bill.stock} in stock`}</td>
                 {bill.mend ? (
                   <td>
                     <button
@@ -942,7 +942,7 @@ export function FactionsScreen({ onClose }: { onClose: () => void }) {
       )}
       <WorldNews state={state} />
       <h3>Neighbours</h3>
-      <p className="muted small">
+      <p className="muted">
         Silver in storage: {d.silver}
         {d.looseSilver > 0 && ` (and ${d.looseSilver} lying about: haul it to a stockpile to spend it)`}. Goodwill
         brings better prices, more caravans and more gifts of supplies; below 0 they stop trading altogether. Raiders
@@ -1204,7 +1204,7 @@ function Expeditions({ state }: { state: FactionsState }) {
   return (
     <>
       <h3>Expeditions</h3>
-      <p className="muted small">
+      <p className="muted">
         Send one to three colonists off the map for a few days: to a neighbour's settlement to trade and make friends,
         or to the ruins to salvage. Supplies cost silver, and a trading party carries silver to spend (it goes further
         than with a caravan); there's a chance of trouble on the road.
@@ -1296,7 +1296,7 @@ export function VillageScreen({ onClose }: { onClose: () => void }) {
             : 'No leader yet: the colony holds a vote as soon as it has three adults to cast one.'}
         </p>
       )}
-      <p className="muted small">
+      <p className="muted">
         A vote is held at the start of every season. Each adult backs whoever they think best of; a kind nature helps.
         {v.standings.length > 0 &&
           ` If it were held now: ${v.standings.map((s) => `${s.name} ${s.votes}`).join(', ')}.`}

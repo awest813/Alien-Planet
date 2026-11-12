@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TOOLS, Tool, controller } from '../game/controller';
-import { NONE, featureDef, terrainId } from '../sim/defs';
+import { NONE, featureDef, itemDef, terrainId } from '../sim/defs';
 import { hash2 } from '../sim/rng';
 import { beaconTile, transmitting } from '../sim/beacon';
 import { EXCELLENT, MASTERWORK } from '../sim/art';
@@ -111,6 +111,9 @@ const SEASON_INDEX: Record<string, number> = { Spring: 0, Summer: 1, Autumn: 2, 
 // than that (index.ts), and the camera's own zoom is this many times bigger (see `px`).
 // Below this zoom, map text (names, stack counts) is too small to read.
 const READABLE_ZOOM = 0.9;
+// Below this, a full stack's count is left off (a busy colony's stores were a field of "50 50 50" the colonists
+// were lost in): a partial stack's still shows, and the hover card and All items give every count.
+const FULL_COUNTS_ZOOM = 3;
 // Below this, colonists and raiders get a marker the size of a few screen pixels.
 const MARKER_ZOOM = 0.6;
 const Depth = { WATER: 0.5, OVERLAY: 20, NIGHT: 30, PAWNS: 40, LABELS: 41, PREVIEW: 50 };
@@ -157,6 +160,8 @@ export class ColonyScene extends Phaser.Scene {
   private traders = new Map<number, Phaser.GameObjects.Container>();
   private beasts = new Map<number, Phaser.GameObjects.Container>();
   private itemLabels = new Map<number, Phaser.GameObjects.Text>();
+  // Tiles whose stack is full (their count is left off unless zoomed well in).
+  private readonly fullStacks = new Set<number>();
   private overlay: Phaser.GameObjects.Graphics;
   private preview: Phaser.GameObjects.Graphics;
   private night: Phaser.GameObjects.Rectangle;
@@ -269,8 +274,16 @@ export class ColonyScene extends Phaser.Scene {
     const right = view.right + TILE;
     const top = view.y - TILE;
     const bottom = view.bottom + TILE;
-    this.itemLabels.forEach((label) =>
-      label.setVisible(readable && label.x >= left && label.x <= right && label.y >= top && label.y <= bottom),
+    const fullCounts = this.viewZoom >= FULL_COUNTS_ZOOM;
+    this.itemLabels.forEach((label, i) =>
+      label.setVisible(
+        readable &&
+          (fullCounts || !this.fullStacks.has(i)) &&
+          label.x >= left &&
+          label.x <= right &&
+          label.y >= top &&
+          label.y <= bottom,
+      ),
     );
     const world = controller.sim.world;
     this.syncDirty(world);
@@ -513,6 +526,7 @@ export class ColonyScene extends Phaser.Scene {
     this.map?.destroy();
     this.itemLabels.forEach((label) => label.destroy());
     this.itemLabels.clear();
+    this.fullStacks.clear();
     this.pawns.forEach((pawn) => {
       pawn.root.destroy();
       pawn.label.destroy();
@@ -805,7 +819,13 @@ export class ColonyScene extends Phaser.Scene {
     if (count <= 1) {
       label?.destroy();
       this.itemLabels.delete(i);
+      this.fullStacks.delete(i);
       return;
+    }
+    if (count >= itemDef(world.itemType[i]).stackLimit) {
+      this.fullStacks.add(i);
+    } else {
+      this.fullStacks.delete(i);
     }
     if (!label) {
       // A small badge in the tile's corner, so the item itself still shows.
@@ -942,17 +962,18 @@ export class ColonyScene extends Phaser.Scene {
     const LINE = 7;
     const LEVELS = 3;
     const pawns = [...this.pawns.values()].filter((p) => p.root.visible).sort((a, b) => a.root.x - b.root.x);
-    const placed: { left: number; right: number; y: number; level: number }[] = [];
+    // Each name where it would be drawn, checked against those already placed (a level each colonist's own: a
+    // name a line up from one colonist lay right on the name of the colonist a tile above, and a crowd at a
+    // gathering read "DYaran").
+    const placed: { left: number; right: number; y: number }[] = [];
     for (const pawn of pawns) {
       const half = pawn.label.width / 2;
       const left = pawn.root.x - half;
       const right = pawn.root.x + half;
-      const clash = (level: number) =>
-        placed.some(
-          (o) => o.level === level && Math.abs(o.y - pawn.root.y) < 8 && o.right + 1 > left && o.left < right + 1,
-        );
+      const clash = (y: number) =>
+        placed.some((o) => Math.abs(o.y - y) < LINE && o.right + 1 > left && o.left < right + 1);
       let level = 0;
-      while (level < LEVELS && clash(level)) {
+      while (level < LEVELS && clash(pawn.root.y + NAME_Y - level * LINE)) {
         level++;
       }
       const fits = level < LEVELS;
@@ -960,7 +981,7 @@ export class ColonyScene extends Phaser.Scene {
       pawn.label.setPosition(pawn.root.x, pawn.root.y + offset).setAlpha(fits ? this.nameAlpha(pawn.label) : 0);
       pawn.alert.setY(pawn.label.visible && fits ? offset - LINE : NAME_Y - LINE);
       if (fits) {
-        placed.push({ left, right, y: pawn.root.y, level });
+        placed.push({ left, right, y: pawn.root.y + offset });
       }
     }
   }

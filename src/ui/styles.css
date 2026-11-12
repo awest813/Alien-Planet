@@ -1,6 +1,7 @@
 /* ---------- Tokens ---------- */
 :root {
-  --panel: rgba(16, 20, 28, 0.92);
+  /* Solid: at 0.92 the map's white names showed through the chips, the cards and the title panel. */
+  --panel: #10141c;
   --panel-raised: rgba(255, 255, 255, 0.05);
   --border: rgba(255, 255, 255, 0.1);
   --border-strong: rgba(255, 255, 255, 0.22);
@@ -139,13 +140,22 @@ h4 {
   font-weight: 600;
 }
 
+/* Section headings: small capitals, a little larger than they were (at 11px they were smaller and fainter than the
+   text under them). */
 h3,
-h4,
-.title-panel h2 {
-  font-size: 11px;
+h4 {
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
+}
+
+/* The title screen's view (New colony, Load game) above its sections (Difficulty, Map size): it looked the same as
+   them. */
+.title-panel h2 {
+  font-size: 16px;
+  color: var(--text);
+  margin: 4px 0 10px;
 }
 
 h4 {
@@ -175,10 +185,13 @@ button:focus-visible {
   outline-offset: 1px;
 }
 
+/* Chosen (a speed, a tool, a tab, a choice): a tinted fill, the accent's border and text. The solid accent is for the
+   one thing to do (Start colony, Use Sandbags, Trade): chosen looked the same, and a Trade button on the top bar
+   read as the screen already open. */
 button.active {
-  background: var(--accent);
+  background: rgba(255, 209, 102, 0.2);
   border-color: var(--accent);
-  color: var(--accent-ink);
+  color: var(--accent);
 }
 
 /* High-contrast (forced colours) mode drops background colours, and with them which option is chosen (the speed, the
@@ -617,6 +630,18 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 3px;
+}
+
+/* A soft edge where a panel has more to scroll, and only there (cut off mid-line with no scroll bar, the rest of a
+   goal or of a colonist's card looked like it wasn't there). The panel's own colour covers the edge at either end
+   once scrolled to it. */
+.card-body,
+.side-body {
+  background:
+    linear-gradient(var(--panel) 30%, rgba(16, 20, 28, 0)) top / 100% 24px no-repeat local,
+    linear-gradient(rgba(16, 20, 28, 0), var(--panel) 70%) bottom / 100% 24px no-repeat local,
+    linear-gradient(rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0)) top / 100% 10px no-repeat scroll,
+    linear-gradient(rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.14)) bottom / 100% 10px no-repeat scroll;
 }
 
 .stat {
@@ -1069,6 +1094,26 @@ button.brush.active {
   }
 }
 
+/* Production's columns in line, row to row: the stock on one line, the steps and the targets the same width
+   whatever their numbers ("−5" and "−1" buttons of different widths staggered the "Keep N" down the table). */
+.production td.stock {
+  white-space: nowrap;
+}
+
+.bill-controls .less,
+.bill-controls .more {
+  min-width: 2.6em;
+}
+
+.bill-controls .target {
+  min-width: 5.5em;
+}
+
+/* Explanations in dialogs at a readable length (across a wide dialog, a line ran to 150 characters). */
+.modal p {
+  max-width: 72ch;
+}
+
 /* A production target's controls: fewer, the target, more. */
 .bill-controls {
   display: inline-grid;
@@ -1143,6 +1188,11 @@ button.brush.active {
 .difficulties button span {
   font-size: 11px;
   opacity: 0.8;
+}
+
+/* (The chosen card's description in the usual text colour: in the accent it was a wall of yellow.) */
+.difficulties button.active span {
+  color: var(--text);
 }
 
 .research {
@@ -1277,6 +1327,12 @@ button.brush.active {
     min-height: 0;
     overflow: hidden;
     z-index: 7;
+  }
+
+  /* A tile tapped: its card, not the pause banner over it (the banner covered "Fresh for 29 days"). Back once the
+     card goes. */
+  .ui:has(.hover-card) .notices .pause-banner {
+    display: none;
   }
 
   /* (Never an urgent one: a raid's card was the one hidden behind two calm ones.) */
@@ -1515,10 +1571,13 @@ button.primary {
   font-weight: 600;
 }
 
-button.active:hover:not(:disabled),
 button.primary:hover:not(:disabled) {
   background: #ffdc85;
   border-color: #ffdc85;
+}
+
+button.active:hover:not(:disabled) {
+  background: rgba(255, 209, 102, 0.3);
 }
 
 /* The title sits over the map (a colony paused behind it), dimmed. */
@@ -1586,6 +1645,12 @@ button.primary:hover:not(:disabled) {
 .summary td {
   padding: 3px 4px;
   border-bottom: 1px solid var(--border);
+}
+
+/* The keys in Settings' list of controls: as wide as they need, the descriptions taking the rest. */
+.summary td:first-child:has(kbd) {
+  width: 1%;
+  white-space: nowrap;
 }
 
 .summary td.num {
@@ -1921,6 +1986,8 @@ button.primary:hover:not(:disabled) {
 /* Keyboard keys in help text. */
 .modal kbd {
   display: inline-block;
+  /* (On one line: "W A S D / arrows" broke over two, every key a different size.) */
+  white-space: nowrap;
   margin: 0 1px;
   padding: 0 5px;
   border: 1px solid var(--border-strong);
