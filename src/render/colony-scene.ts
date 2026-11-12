@@ -111,6 +111,9 @@ const SEASON_INDEX: Record<string, number> = { Spring: 0, Summer: 1, Autumn: 2, 
 // than that (index.ts), and the camera's own zoom is this many times bigger (see `px`).
 // Below this zoom, map text (names, stack counts) is too small to read.
 const READABLE_ZOOM = 0.9;
+// Stack counts are smaller still (and on a dark box): below this they were a speckle of boxes with digits too
+// small to make out, all over the stores.
+const COUNTS_ZOOM = 1.4;
 // Below this, a full stack's count is left off (a busy colony's stores were a field of "50 50 50" the colonists
 // were lost in): a partial stack's still shows, and the hover card and All items give every count.
 const FULL_COUNTS_ZOOM = 3;
@@ -277,7 +280,7 @@ export class ColonyScene extends Phaser.Scene {
     const fullCounts = this.viewZoom >= FULL_COUNTS_ZOOM;
     this.itemLabels.forEach((label, i) =>
       label.setVisible(
-        readable &&
+        this.viewZoom >= COUNTS_ZOOM &&
           (fullCounts || !this.fullStacks.has(i)) &&
           label.x >= left &&
           label.x <= right &&
@@ -410,18 +413,31 @@ export class ColonyScene extends Phaser.Scene {
     const s = this.px / cam.zoom;
     const frac = (n: number) => n - Math.floor(n);
     if (kind === 'rain' || kind === 'storm') {
-      if (kind === 'storm') {
-        g.fillStyle(0x10141c, 0.2).fillRect(v.x, v.y, v.width, v.height);
-      }
-      g.fillStyle(0xa8c8ff, kind === 'storm' ? 0.55 : 0.4);
-      const drops = kind === 'storm' ? 260 : 160;
+      const storm = kind === 'storm';
+      // An overcast sky, a storm's darker (at 0.2 a storm looked like a clear day with a few specks falling).
+      g.fillStyle(0x0c1424, storm ? 0.3 : 0.12).fillRect(v.x, v.y, v.width, v.height);
+      // Streaks slanting with the wind, a storm's longer, harder and more of them.
+      const length = (storm ? 14 : 9) * s;
+      const slant = (storm ? 0.35 : 0.18) * length;
+      g.lineStyle(s, 0xb4d0ff, storm ? 0.6 : 0.45);
+      const drops = storm ? 340 : 180;
       // Each drop has its own place and pace (hashed), so they scatter rather than fall in lines.
       for (let k = 0; k < drops; k++) {
-        const x = v.x + frac(hash2(k, 3, 11) + now * 0.00004) * v.width;
-        const y =
-          v.y +
-          frac(hash2(k, 5, 13) + now * (kind === 'storm' ? 0.0014 : 0.001) * (0.8 + 0.4 * hash2(k, 7, 17))) * v.height;
-        g.fillRect(x, y, s, 7 * s);
+        const fall = frac(hash2(k, 5, 13) + now * (storm ? 0.0016 : 0.0011) * (0.8 + 0.4 * hash2(k, 7, 17)));
+        const x = v.x + frac(hash2(k, 3, 11) + now * 0.00004 + fall * (slant / v.width)) * v.width;
+        const y = v.y + fall * v.height;
+        g.lineBetween(x, y, x + slant, y + length);
+      }
+      // And where they land, a brief splash.
+      g.fillStyle(0xd4e4ff, 0.5);
+      for (let k = 0; k < (storm ? 70 : 40); k++) {
+        const phase = frac(hash2(k, 11, 31) + now * 0.003);
+        if (phase < 0.3) {
+          const x = v.x + hash2(k + Math.floor(now * 0.003 + hash2(k, 11, 31)) * 97, 13, 37) * v.width;
+          const y = v.y + hash2(k + Math.floor(now * 0.003 + hash2(k, 11, 31)) * 97, 17, 41) * v.height;
+          const r = (1 + phase * 6) * s;
+          g.fillRect(x - r, y, r * 2, s);
+        }
       }
       // Lightning: a white flash that fades over a second, of real time: a strike often starts a fire, which pauses
       // the game, and a flash timed by the game's ticks stayed on, washing out the map just when the fire was to be
@@ -437,6 +453,8 @@ export class ColonyScene extends Phaser.Scene {
         g.fillStyle(0xffffff, 0.45 * (1 - age / 1000)).fillRect(v.x, v.y, v.width, v.height);
       }
     } else if (kind === 'snow') {
+      // A pale, close sky while it falls.
+      g.fillStyle(0xdfe8f4, 0.1).fillRect(v.x, v.y, v.width, v.height);
       g.fillStyle(0xffffff, 0.85);
       for (let k = 0; k < 140; k++) {
         const drift = Math.sin(now / 900 + k) * 6 * s;
@@ -445,7 +463,20 @@ export class ColonyScene extends Phaser.Scene {
         g.fillRect(x, y, 2 * s, 2 * s);
       }
     } else if (kind === 'fog') {
-      g.fillStyle(0xc8ccd2, 0.3).fillRect(v.x, v.y, v.width, v.height);
+      g.fillStyle(0xc8ccd2, 0.22).fillRect(v.x, v.y, v.width, v.height);
+      // Banks of it drifting slowly across, thicker here and thinner there (one even veil read as a faded
+      // screen, not fog).
+      for (let k = 0; k < 9; k++) {
+        const w = v.width * (0.35 + 0.3 * hash2(k, 2, 43));
+        const h = w * (0.35 + 0.2 * hash2(k, 4, 47));
+        const x = v.x - w / 2 + frac(hash2(k, 6, 53) + now * 0.000006 * (0.6 + hash2(k, 8, 59))) * (v.width + w);
+        const y = v.y + hash2(k, 10, 61) * v.height;
+        // (Ring on ring, each fainter than one solid shape, so a bank's edge is soft.)
+        g.fillStyle(0xd4d8de, 0.025 + 0.02 * hash2(k, 12, 67));
+        for (const r of [1, 0.85, 0.7, 0.55, 0.4]) {
+          g.fillEllipse(x, y, w * r, h * r);
+        }
+      }
     } else if (kind === 'drought') {
       g.fillStyle(0xffa040, 0.08).fillRect(v.x, v.y, v.width, v.height);
     }
@@ -957,6 +988,9 @@ export class ColonyScene extends Phaser.Scene {
   // Colonists side by side would run their names together: one that would overlap a neighbour's goes up
   // a line (up to two lines), and one that still would is faded out rather than drawn over the others.
   // A colonist's "!" or "+" sits just above their own name.
+  // Where colonists' names went this frame, for raiders' names to keep clear of (in a melee they lay on each
+  // other: "Petra" under "Raider").
+  private colonistNames: { left: number; right: number; y: number }[] = [];
   private staggerNames(): void {
     const NAME_Y = -11;
     const LINE = 7;
@@ -966,6 +1000,7 @@ export class ColonyScene extends Phaser.Scene {
     // name a line up from one colonist lay right on the name of the colonist a tile above, and a crowd at a
     // gathering read "DYaran").
     const placed: { left: number; right: number; y: number }[] = [];
+    this.colonistNames = placed;
     for (const pawn of pawns) {
       const half = pawn.label.width / 2;
       const left = pawn.root.x - half;
@@ -1196,8 +1231,9 @@ export class ColonyScene extends Phaser.Scene {
       this.raiderLabels.get(e.id)!.setVisible(controller.settings.showNames && this.labelsReadable && raider.visible);
     }
     // A camp or a melee packs them close: a name that would overlap another goes up a line (or two), or fades
-    // out if there's still no room. Compared where the labels actually sit, rows above and below included.
-    const placed: { left: number; right: number; y: number }[] = [];
+    // out if there's still no room. Compared where the labels actually sit, rows above and below included, and
+    // with the colonists' names.
+    const placed = [...this.colonistNames];
     for (const [id, raider] of [...this.raiders].sort(([, a], [, b]) => a.y - b.y || a.x - b.x)) {
       const label = this.raiderLabels.get(id)!;
       const half = label.width / 2;
@@ -1212,6 +1248,7 @@ export class ColonyScene extends Phaser.Scene {
         placed.push({ left, right, y: raider.y + offset });
       }
     }
+    this.colonistNames = placed;
   }
 
   // Raiders lying where they fell, and prisoners in their beds (in prison orange), both lying down.
@@ -1257,7 +1294,20 @@ export class ColonyScene extends Phaser.Scene {
       captive
         .setPosition((world.xOf(p.tile) + 0.5) * TILE + (carried ? 4 : 0), (world.yOf(p.tile) + 0.5) * TILE)
         .setAlpha(p.state === 'downed' ? 0.85 : 1);
-      (captive.getAt(1) as Phaser.GameObjects.Text).setVisible(controller.settings.showNames && this.labelsReadable);
+      const label = captive.getAt(1) as Phaser.GameObjects.Text;
+      label.setVisible(controller.settings.showNames && this.labelsReadable);
+      // Clear of the names standing over them (a raider fallen in the melee lay under the others' names).
+      const half = label.width / 2;
+      const left = captive.x - half;
+      const right = captive.x + half;
+      const placed = this.colonistNames;
+      const offset = [-7, -14, -21].find(
+        (dy) => !placed.some((o) => Math.abs(o.y - (captive!.y + dy)) < 7 && o.right + 1 > left && o.left < right + 1),
+      );
+      label.setY(offset ?? -7).setAlpha(offset === undefined ? 0 : 1);
+      if (offset !== undefined) {
+        placed.push({ left, right, y: captive.y + offset });
+      }
     }
   }
 
