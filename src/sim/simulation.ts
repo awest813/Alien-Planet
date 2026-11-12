@@ -2399,7 +2399,11 @@ export class Simulation {
     const w = this.world;
     this.coldStores = this.storageTiles().filter((i) => this.isColdStore(i)).length;
     // Copied, because rotting food is removed from the list as it goes.
-    for (const i of [...w.tilesWith('items')]) {
+    // (What can spoil or wear: not the stone and ore, most of what lies about.)
+    for (const i of w.tilesWithItems((item) => {
+      const def = itemDef(item);
+      return def.shelfLife !== undefined || !!(def.weapon || def.armor || def.apparel || def.tool);
+    })) {
       const item = w.itemType[i];
       if (item === NONE) {
         continue;
@@ -3874,9 +3878,21 @@ export class Simulation {
     return best.map((b) => b.i);
   }
 
+  // The same search over the stacks of the item types that pass `types` (the ranking breaks ties by tile index, so
+  // the answer is the one a search of every stack would give, without going past the rest).
+  public nearestItem(
+    types: (item: number) => boolean,
+    from: number,
+    test: (i: number) => boolean,
+    limit = 4,
+    bias?: (i: number) => number,
+  ): number[] {
+    return this.nearestAmong(this.world.tilesWithItems(types), from, test, limit, bias);
+  }
+
   // The same search over a given list of tiles (in any order: the ranking breaks ties by tile index).
   private nearestAmong(
-    tiles: readonly number[],
+    tiles: Iterable<number>,
     from: number,
     test: (i: number) => boolean,
     limit = 4,
@@ -4468,8 +4484,8 @@ export class Simulation {
     }
     const w = this.world;
     const region = this.regionOf(c.tile);
-    const kit = this.nearestIn(
-      'items',
+    const kit = this.nearestItem(
+      (item) => item === TOOL_KIT,
       c.tile,
       (i) => w.itemType[i] === TOOL_KIT && this.regions.region[i] === region && !this.itemTaken(i, c),
       1,
@@ -4728,8 +4744,8 @@ export class Simulation {
         if (!sourceCache.has(need.item)) {
           sourceCache.set(
             need.item,
-            this.nearestIn(
-              'items',
+            this.nearestItem(
+              (item) => item === need.item,
               c.tile,
               (i) => w.itemType[i] === need.item && !this.itemTaken(i, c) && this.regions.region[i] === region,
               1,
@@ -4923,8 +4939,8 @@ export class Simulation {
     if (this.coldStores === 0) {
       return false;
     }
-    const sources = this.nearestIn(
-      'items',
+    const sources = this.nearestItem(
+      (item) => itemDef(item).shelfLife !== undefined,
       c.tile,
       (i) =>
         w.itemType[i] !== NONE &&
@@ -4992,8 +5008,8 @@ export class Simulation {
     const takes = (fuel: { item: number; also?: number[] }, item: number) =>
       item === fuel.item || !!fuel.also?.includes(item);
     const find = (test: (item: number) => boolean) =>
-      this.nearestIn(
-        'items',
+      this.nearestItem(
+        test,
         c.tile,
         (i) => test(w.itemType[i]) && this.regions.region[i] === region && !this.itemTaken(i, c),
         1,
@@ -5088,9 +5104,13 @@ export class Simulation {
   private availableItems(c: Colonist, region: number): Set<number> {
     const w = this.world;
     const items = new Set<number>();
-    for (const i of w.tilesWith('items')) {
-      if (w.itemType[i] !== NONE && this.regions.region[i] === region && !this.itemTaken(i, c)) {
-        items.add(w.itemType[i]);
+    // (One stack of each kind is enough: stop at it.)
+    for (const item of w.itemTypesAbout()) {
+      for (const i of w.tilesWithItem(item)) {
+        if (this.regions.region[i] === region && !this.itemTaken(i, c)) {
+          items.add(item);
+          break;
+        }
       }
     }
     return items;
@@ -5122,8 +5142,10 @@ export class Simulation {
       return v;
     };
     const misplaced = (i: number) => this.storeValue(i, w.itemType[i]) < bestFor(w.itemType[i]);
-    const sources = this.nearestIn(
-      'items',
+    // (Only the kinds some storage here would take: with nowhere better for it, no stack of a kind is misplaced, and
+    // a thousand stacks of stone with the stockpiles full were each looked at, every time.)
+    const sources = this.nearestItem(
+      (item) => bestFor(item) > 0,
       c.tile,
       (i) => this.regions.region[i] === region && !this.itemTaken(i, c) && misplaced(i),
       4,
@@ -5305,7 +5327,8 @@ export class Simulation {
     const usable = (i: number) => this.ingredientUsable(c, ing, region, i);
     // Building comes first: materials that blueprints are waiting for aren't crafted away.
     let available = ing.item !== undefined ? -this.blueprintDemand(ing.item, region) : 0;
-    for (const i of w.tilesWith('items')) {
+    const tiles = w.tilesWithItems((item) => matchesIngredient(item, ing));
+    for (const i of tiles) {
       if (usable(i)) {
         available += w.itemCount[i];
       }
@@ -5313,7 +5336,7 @@ export class Simulation {
     if (available < ing.count) {
       return undefined;
     }
-    return this.nearestIn('items', c.tile, usable, 1, (i) => this.stalenessBias(i))[0];
+    return this.nearestAmong(tiles, c.tile, usable, 1, (i) => this.stalenessBias(i))[0];
   }
 
   // How much of an item the blueprints builders here can get at still need delivered.
@@ -5394,8 +5417,8 @@ export class Simulation {
         // Not enough here: on to the next stack of the same thing.
         // Not enough here: on to the next stack that will do (it may be a different kind of food;
         // the bundle keeps the first kind's name and averages the rest in).
-        next = this.nearestIn(
-          'items',
+        next = this.nearestItem(
+          (item) => matchesIngredient(item, ing),
           c.tile,
           (i) => this.ingredientUsable(c, ing, region, i),
           1,
@@ -5498,8 +5521,8 @@ export class Simulation {
   private tryEat(c: Colonist): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
-    const source = this.nearestIn(
-      'items',
+    const source = this.nearestItem(
+      isFood,
       c.tile,
       (i) =>
         w.itemType[i] !== NONE && isFood(w.itemType[i]) && this.regions.region[i] === region && !this.itemTaken(i, c),
@@ -6339,9 +6362,7 @@ export class Simulation {
     let fed = 0;
     for (const c of guests) {
       const tile = meals
-        .map((m) =>
-          [...w.tilesWith('items')].find((i) => w.itemType[i] === m && this.isStockpile(i) && !w.forbidden[i]),
-        )
+        .map((m) => [...w.tilesWithItem(m)].find((i) => this.isStockpile(i) && !w.forbidden[i]))
         .find((i) => i !== undefined);
       if (tile !== undefined) {
         const def = itemDef(w.itemType[tile]);
@@ -6720,7 +6741,7 @@ export class Simulation {
     this.ensureRegions();
     const w = this.world;
     let n = 0;
-    for (const i of w.tilesWith('items')) {
+    for (const i of w.tilesWithItem(item)) {
       if (this.isMaterial(i, item)) {
         n += w.itemCount[i];
       }
@@ -6735,7 +6756,7 @@ export class Simulation {
       const item = itemId(need.item);
       let left = need.count;
       // (Storage first, then whatever's lying about.)
-      const tiles = [...w.tilesWith('items')].filter((i) => this.isMaterial(i, item));
+      const tiles = [...w.tilesWithItem(item)].filter((i) => this.isMaterial(i, item));
       tiles.sort((a, b) => Number(this.isStockpile(b)) - Number(this.isStockpile(a)));
       for (const i of tiles) {
         if (left > 0) {
@@ -7110,8 +7131,8 @@ export class Simulation {
     const current = score(c.weapon, c.weaponQuality);
     const armorValue = (item: number, wear: number) => itemDef(item).armor!.protection * (0.5 + 0.5 * wear);
     const armorNow = c.armor ? armorValue(c.armor.item, c.armor.wear) : 0;
-    const kit = this.nearestIn(
-      'items',
+    const kit = this.nearestItem(
+      (item) => !!itemDef(item).weapon || !!itemDef(item).armor,
       c.tile,
       (i) => {
         const type = w.itemType[i];
@@ -7196,7 +7217,8 @@ export class Simulation {
       return false;
     }
     this.nextDressCheck.set(c.id, this.tick + TICKS_PER_HOUR);
-    if (![...w.tilesWith('items')].some((i) => !!itemDef(w.itemType[i]).apparel)) {
+    const clothes = w.tilesWithItems((item) => !!itemDef(item).apparel);
+    if (clothes.length === 0) {
       return false;
     }
     const outdoor = this.outdoorTemperature();
@@ -7204,7 +7226,7 @@ export class Simulation {
     const region = this.regionOf(c.tile);
     let best: number | undefined;
     let bestScore = current + 0.5;
-    for (const i of w.tilesWith('items')) {
+    for (const i of clothes) {
       const t = w.itemType[i];
       if (t === NONE || !itemDef(t).apparel || this.regions.region[i] !== region || this.itemTaken(i, c)) {
         continue;
@@ -7683,8 +7705,8 @@ export class Simulation {
       }
       if (hungry) {
         const region = this.regionOf(c.tile);
-        const food = this.nearestIn(
-          'items',
+        const food = this.nearestItem(
+          isFood,
           c.tile,
           (i) =>
             w.itemType[i] !== NONE &&
@@ -8210,8 +8232,8 @@ export class Simulation {
     if (!patient) {
       return null;
     }
-    const source = this.nearestIn(
-      'items',
+    const source = this.nearestItem(
+      isFood,
       c.tile,
       (i) =>
         w.itemType[i] !== NONE && isFood(w.itemType[i]) && this.regions.region[i] === region && !this.itemTaken(i, c),

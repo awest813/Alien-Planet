@@ -58,8 +58,12 @@ with esbuild for speed (see ROADMAP).
     its work than the living); a fallen raider's gear lay where it dropped for ever (about 500 stacks by year 30,
     each slowing every search for an item), and now wears away in a month left out in the weather; the Work grid
     is one Tab stop; scripts/years.ts runs again, and gives the save's real size.
-  - **Left as found:** item scans still walk every stack (a per-type index would end it; the harness's lone
-    stockpile leaves a thousand stacks of stone about by year 10, which a player's colony wouldn't); dead
+  - **Since fixed: item searches walked every stack.** The world now files stacks by item type, and every search for
+    particular things (food, a bow, the wood a blueprint wants, an ingredient, clothes, what can spoil, what some
+    storage would take) looks only at those. The same colonies play out identically; a year-10 Medium colony runs
+    at 37-46 ms per 1,000 ticks against 48-55, about as fast as in its first year. Only the colony's totals, thieves
+    and vermin still look at every stack.
+  - **Left as found:** dead
     colonists' full records and everyone's opinions of them stay in the save (about 2.6KB each); the history
     graphs keep a row a day (16KB by year 30). Saves stay near 1.1MB on Medium and 0.3MB on Tiny over ten years.
 

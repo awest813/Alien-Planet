@@ -11,6 +11,8 @@ const FILTH_MAX = 3;
 // Beauty lost to each level of each kind of mess (dirt, blood, rubble).
 const FILTH_BEAUTY = [0, 0.5, 1.5, 1];
 
+const NO_TILES: ReadonlySet<number> = new Set();
+
 function toggle(set: Set<number>, i: number, present: boolean): void {
   if (present) {
     set.add(i);
@@ -156,6 +158,10 @@ export class World {
     zones: new Set(),
     filth: new Set(),
   };
+  // The item tiles again, by item type, and the type each tile is filed under: a search for one kind of thing (a
+  // bow, the wood a blueprint wants) went past every stack on the map, a thousand of stone by a colony's tenth year.
+  private readonly byItem = new Map<number, Set<number>>();
+  private readonly filedAs: Uint8Array;
   // Bumped whenever passability or room boundaries may have changed.
   public structureVersion = 0;
   // Bumped when a gate, trough or bed comes or goes: what makes ground a pen (see pens.ts).
@@ -189,6 +195,7 @@ export class World {
     this.roof = new Uint8Array(this.size);
     this.fuel = new Float32Array(this.size);
     this.itemType = new Uint8Array(this.size);
+    this.filedAs = new Uint8Array(this.size);
     this.itemCount = new Uint16Array(this.size);
     this.progress = new Float32Array(this.size);
     this.filth = new Uint8Array(this.size);
@@ -287,8 +294,54 @@ export class World {
   // Tiles holding items, buildings or plants, work orders, blueprints and zones, so searches
   // don't have to scan the whole map. They catch up on changed tiles lazily, when next read.
   public tilesWith(kind: TileKind): ReadonlySet<number> {
+    this.catchUp();
+    return this.lists[kind];
+  }
+
+  // The tiles holding `item`.
+  public tilesWithItem(item: number): ReadonlySet<number> {
+    this.catchUp();
+    return this.byItem.get(item) ?? NO_TILES;
+  }
+
+  // The tiles holding any of `items`, or of the item types that pass `test` (only those lying about are looked at).
+  public tilesWithItems(test: (item: number) => boolean): number[] {
+    this.catchUp();
+    const tiles: number[] = [];
+    for (const [item, set] of this.byItem) {
+      if (set.size > 0 && test(item)) {
+        for (const i of set) {
+          tiles.push(i);
+        }
+      }
+    }
+    return tiles;
+  }
+
+  // The item types lying anywhere.
+  public itemTypesAbout(): number[] {
+    this.catchUp();
+    return [...this.byItem].filter(([, set]) => set.size > 0).map(([item]) => item);
+  }
+
+  private catchUp(): void {
     if (this.stale.size > 0) {
       for (const i of this.stale) {
+        const item = this.itemType[i];
+        if (this.filedAs[i] !== item) {
+          if (this.filedAs[i] !== NONE) {
+            this.byItem.get(this.filedAs[i])?.delete(i);
+          }
+          if (item !== NONE) {
+            let set = this.byItem.get(item);
+            if (!set) {
+              set = new Set();
+              this.byItem.set(item, set);
+            }
+            set.add(i);
+          }
+          this.filedAs[i] = item;
+        }
         toggle(this.lists.items, i, this.itemType[i] !== NONE);
         toggle(this.lists.features, i, this.feature[i] !== NONE);
         toggle(this.lists.designations, i, this.designation[i] !== 0);
@@ -298,7 +351,6 @@ export class World {
       }
       this.stale.clear();
     }
-    return this.lists[kind];
   }
 
   // Rebuilds the lists from scratch (after map generation or loading writes the layers directly).
@@ -558,7 +610,8 @@ export class World {
   public pickUp(i: number, count: number): Carried {
     const item = this.itemType[i];
     const def = itemDef(item);
-    const fresh = def.shelfLife !== undefined || def.apparel || def.tool || def.armor ? this.fresh[i] : undefined;
+    const fresh =
+      def.shelfLife !== undefined || def.apparel || def.tool || def.armor || def.weapon ? this.fresh[i] : undefined;
     const quality = this.quality[i];
     return { item, count: this.takeItem(i, count), fresh, quality };
   }
@@ -625,7 +678,7 @@ export class World {
       const incoming =
         fresh ??
         itemDef(item).shelfLife ??
-        (itemDef(item).apparel || itemDef(item).tool || itemDef(item).armor ? 1 : 0);
+        (itemDef(item).apparel || itemDef(item).tool || itemDef(item).armor || itemDef(item).weapon ? 1 : 0);
       this.fresh[fallback] = (this.fresh[fallback] * existing + incoming * remaining) / (existing + remaining);
       this.quality[fallback] =
         (this.quality[fallback] * existing + (quality ?? NORMAL_QUALITY) * remaining) / (existing + remaining);

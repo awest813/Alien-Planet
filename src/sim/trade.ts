@@ -244,8 +244,8 @@ export function updateCaravan(sim: Simulation): void {
 export function colonyStock(sim: Simulation, item: number): number {
   const w = sim.world;
   let n = 0;
-  for (const i of w.tilesWith('items')) {
-    if (w.itemType[i] === item && sim.isStockpile(i)) {
+  for (const i of w.tilesWithItem(item)) {
+    if (sim.isStockpile(i)) {
       n += w.itemCount[i];
     }
   }
@@ -256,7 +256,7 @@ export function colonyStock(sim: Simulation, item: number): number {
 export function takeFromStockpiles(sim: Simulation, item: number, count: number, order?: number[]): void {
   const w = sim.world;
   let left = count;
-  for (const i of [...(order ?? []), ...w.tilesWith('items')]) {
+  for (const i of [...(order ?? []), ...w.tilesWithItem(item)]) {
     if (left <= 0) {
       break;
     }
@@ -288,8 +288,8 @@ export function saleLots(sim: Simulation, item: number): { tile: number; count: 
   const caravan = sim.caravan;
   const base = caravan ? prices(sim, caravan.faction).sell(item) : itemDef(item).value;
   const lots: { tile: number; count: number; price: number }[] = [];
-  for (const i of w.tilesWith('items')) {
-    if (w.itemType[i] === item && sim.isStockpile(i)) {
+  for (const i of w.tilesWithItem(item)) {
+    if (sim.isStockpile(i)) {
       lots.push({ tile: i, count: w.itemCount[i], price: base * condition(w, i) });
     }
   }
