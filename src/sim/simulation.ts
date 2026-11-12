@@ -381,6 +381,8 @@ const FIREWOOD_RESERVE_DAYS = 3;
 const TROUGH_FOOD_DAYS = 3;
 // Wood the colonists land with.
 const SALVAGED_WOOD = 50;
+// Days for gear left out in the weather (unroofed, outside a stockpile) to wear away from new.
+const WEATHERING_DAYS = 30;
 const CRAWL_RANGE = 25;
 // How long "nowhere to carry this patient" stands before a doctor looks again.
 const NO_RESCUE_RETRY = TICKS_PER_HOUR / 2;
@@ -2399,7 +2401,26 @@ export class Simulation {
     // Copied, because rotting food is removed from the list as it goes.
     for (const i of [...w.tilesWith('items')]) {
       const item = w.itemType[i];
-      if (item === NONE || itemDef(item).shelfLife === undefined) {
+      if (item === NONE) {
+        continue;
+      }
+      // Gear left out in the weather (no roof, no stockpile) wears away in a month: a fallen raider's bow or knife
+      // stayed where it dropped for ever, and by the thirtieth year five hundred of them lay about, each a stack
+      // of its own that every search for an item went past.
+      const gear = itemDef(item);
+      if ((gear.weapon || gear.armor || gear.apparel || gear.tool) && !this.isRoofed(i) && !this.isStockpile(i)) {
+        // (A weapon from a save before weapons wore has no condition kept: as good as new. Worn to nothing, gear goes
+        // at once, so none keeps a condition of nothing.)
+        if (!(w.fresh[i] > 0)) {
+          w.fresh[i] = 1;
+        }
+        w.fresh[i] -= hours / 24 / WEATHERING_DAYS;
+        if (w.fresh[i] <= 0) {
+          w.takeItem(i, w.itemCount[i]);
+        }
+        continue;
+      }
+      if (gear.shelfLife === undefined) {
         continue;
       }
       if (this.power.powered && this.isIcebox(i)) {

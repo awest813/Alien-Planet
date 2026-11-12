@@ -540,7 +540,7 @@ export class World {
     if (added > 0) {
       const existing = this.itemType[i] === item ? this.itemCount[i] : 0;
       const merge = (old: number, incoming: number) => (old * existing + incoming * added) / (existing + added);
-      const life = def.shelfLife ?? (def.apparel || def.tool || def.armor ? 1 : undefined);
+      const life = def.shelfLife ?? (def.apparel || def.tool || def.armor || def.weapon ? 1 : undefined);
       if (life !== undefined) {
         this.fresh[i] = merge(this.fresh[i], fresh ?? life);
       }

@@ -95,3 +95,23 @@ describe('a shelter with a fire in its corner', () => {
     expect(counted.has(sim.regionOf(inside))).toBe(true);
   });
 });
+
+describe('gear left out in the weather', () => {
+  it('wears away in a month, but not under a roof or in a stockpile', () => {
+    // (A fallen raider's knife lay where it dropped for ever: five hundred such by the thirtieth year.)
+    const sim = Simulation.newColony(7);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 12);
+    const out = w.idx(x + 5, y + 5);
+    const stored = w.idx(x - 5, y - 5);
+    sim.apply({ type: 'zone', rect: { x0: x - 5, y0: y - 5, x1: x - 5, y1: y - 5 }, zone: 1 });
+    w.addItem(out, itemId('knife'), 1);
+    w.addItem(stored, itemId('knife'), 1);
+    const spoil = (h: number) => (sim as unknown as { updateSpoilage(h: number): void }).updateSpoilage(h);
+    spoil(24 * 20);
+    expect(w.itemType[out]).toBe(itemId('knife'));
+    spoil(24 * 11);
+    expect(w.itemType[out]).not.toBe(itemId('knife'));
+    expect(w.itemType[stored]).toBe(itemId('knife'));
+  });
+});

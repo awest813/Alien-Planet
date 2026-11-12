@@ -3662,7 +3662,8 @@ export class GameController {
       details.push('Roofed');
     }
     const item = w.itemType[i];
-    if (item !== NONE && (itemDef(item).apparel || itemDef(item).tool)) {
+    // (Weapons and armor too: left out in the weather, it wears away.)
+    if (item !== NONE && (itemDef(item).apparel || itemDef(item).tool || itemDef(item).weapon || itemDef(item).armor)) {
       details.push(`${qualityLabel(w.quality[i])}, ${Math.round(w.fresh[i] * 100)}% condition`);
     } else if (item !== NONE && itemDef(item).category === 'meal') {
       details.push(`Cooked with ${qualityLabel(w.quality[i]).toLowerCase()} skill`);
