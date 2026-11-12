@@ -46,6 +46,23 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Eleventh pass: the interface** (a visual review of every screen at seven sizes, from a phone held either way
+  to a wide desktop, and a review of how the game feels to use; each change checked in screenshots):
+  - **Seeing:** a busy colony's stores read as a field of "50 50 50": a full stack's count shows only zoomed well
+    in. Colonists' names no longer overlap in a crowd. Panels are solid (the map's names showed through), with a
+    soft edge where one has more to scroll. A chosen speed, tool or tab is a tinted fill, apart from the solid
+    accent of the one thing to do. Headings, explanation widths and Production's columns are evened out.
+  - **Doing:** notification cards let the map have its clicks (they swallowed right-click moves and build
+    drags), close with a ✕, and take the camera to who or where they're about. Alerts that name a fix open it.
+    A building drag shows how many and what they cost against what's in store, red when short, and a click that
+    places nothing says why. A selected tile's card has buttons for its orders (Cancel, Mine/Chop/Forage,
+    Deconstruct, Forbid/Allow; Delete cancels or deconstructs). Production lists what can be made now and folds
+    what research hasn't unlocked. The Log says when. Speed keys work behind a screen that leaves the game
+    running.
+  - **Phones:** the top bar is a row shorter (on screens 390px wide or more); Factions rows stack instead of
+    squeezing each standing to a word a line; Menu leads the top bar; the new-colony form keeps Start in view
+    held sideways too. The pause menu and Help are titled for what they show.
+
 - **Tenth pass: the late game and its endings, and a review of the mid-game fixes** (a player from ten-year saves
   through the beacon, the ship, sieges, the great beast, thieves and both endings, on a desktop and a phone; a
   reader with the last pass's diff; each finding first seen failing):
