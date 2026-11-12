@@ -10,6 +10,17 @@ export interface Musician {
   skill: number;
   // Whether the player is in view: music off screen is played quietly.
   inView: boolean;
+  // Where on screen, left (-1) to right (1).
+  pan: number;
+}
+
+export type WorkSound = 'chop' | 'mine' | 'build';
+
+// A colonist at work in view: an axe, a pick or a hammer, heard in time with the game's speed.
+export interface Worker {
+  id: number;
+  kind: WorkSound;
+  pan: number;
 }
 
 export interface SoundScene {
@@ -22,12 +33,24 @@ export interface SoundScene {
   // Hard cold: the birds and crickets fall quiet and the wind picks up.
   cold: boolean;
   // Bowshots and blows landing within view since the last frame (a few at most are heard).
-  shots: { ranged: boolean; hit: boolean }[];
+  shots: { ranged: boolean; hit: boolean; pan: number }[];
+  // The nearest few colonists chopping, mining or building in view.
+  workers: Worker[];
+  // How much is burning in view, 0 (nothing) to 1 (a blaze).
+  fire: number;
+  // How fast the clock runs (1 at normal speed): work keeps time with it.
+  speed: number;
 }
 
 export type Alert = 'raid' | 'death' | 'goal' | 'concert' | 'fire' | 'collapse' | 'birth';
 // At most this many fight sounds a second, however big the battle.
 const FIGHT_SOUNDS_PER_SECOND = 8;
+// And of work sounds, however many are at it.
+const WORK_SOUNDS_PER_SECOND = 5;
+// Seconds between strokes at normal speed: an axe swung, a pick, a hammer's quicker taps.
+const WORK_BEAT: Record<WorkSound, number> = { chop: 0.95, mine: 0.8, build: 0.5 };
+// The same cue again this soon (three deaths in one fight, fires breaking out together) isn't played twice.
+const ALERT_GAP = 1.5;
 
 // Whether sound is on: callers can skip gathering what it needs when it isn't.
 export const soundEnabled = (): boolean => sound.isEnabled();
@@ -58,7 +81,9 @@ class Sound {
   private musicBus: GainNode | null = null;
   private effectsBus: GainNode | null = null;
   private wind: GainNode | null = null;
+  private windFilter: BiquadFilterNode | null = null;
   private rainGain: GainNode | null = null;
+  private fireGain: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private playing = new Map<number, Playing>();
   private volumes: Volumes = { enabled: false, master: 0.7, music: 0.8, effects: 0.8 };
@@ -136,6 +161,14 @@ class Sound {
   // Last levels asked of the wind and rain, so they're only changed when the weather does.
   private windLevel = -1;
   private rainLevel = -1;
+  private fireLevel = -1;
+  // The wind comes in gusts: when the next one is due.
+  private nextGust = 0;
+  private nextCrackle = 0;
+  // When each colonist at work next strikes, and when the last strokes were heard.
+  private strokes = new Map<number, number>();
+  private workSounds: number[] = [];
+  private lastAlert = new Map<Alert, number>();
 
   private start(): void {
     if (this.ctx) {
@@ -152,7 +185,14 @@ class Sound {
       this.master = ctx.createGain();
       // Starts silent and fades up to the chosen volume.
       this.master.gain.value = 0;
-      this.master.connect(ctx.destination);
+      // A limiter last: a concert, a battle and an alert at once mustn't clip.
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -10;
+      limiter.knee.value = 6;
+      limiter.ratio.value = 12;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.25;
+      this.master.connect(limiter).connect(ctx.destination);
       this.musicBus = ctx.createGain();
       this.musicBus.connect(this.master);
       this.effectsBus = ctx.createGain();
@@ -164,15 +204,24 @@ class Sound {
         data[i] = Math.random() * 2 - 1;
       }
       this.noise = noise;
-      this.wind = this.loop(ctx, 'lowpass', 380, 0.5);
-      this.rainGain = this.loop(ctx, 'bandpass', 2600, 0.6);
+      [this.wind, this.windFilter] = this.loop(ctx, 'lowpass', 380, 0.5, 0);
+      [this.rainGain] = this.loop(ctx, 'bandpass', 2600, 0.6, 0.7);
+      // A fire's low roar (its crackle is played over it, a pop at a time).
+      [this.fireGain] = this.loop(ctx, 'lowpass', 520, 0.8, 1.3);
     } catch {
       this.ctx = null;
     }
   }
 
-  // A looping noise layer through a filter, starting silent.
-  private loop(ctx: AudioContext, type: BiquadFilterType, freq: number, q: number): GainNode {
+  // A looping noise layer through a filter, starting silent. (Each starts at its own place in the noise, so the
+  // layers don't move together.)
+  private loop(
+    ctx: AudioContext,
+    type: BiquadFilterType,
+    freq: number,
+    q: number,
+    offset: number,
+  ): [GainNode, BiquadFilterNode] {
     const source = ctx.createBufferSource();
     source.buffer = this.noise;
     source.loop = true;
@@ -183,8 +232,20 @@ class Sound {
     const gain = ctx.createGain();
     gain.gain.value = 0;
     source.connect(filter).connect(gain).connect(this.effectsBus!);
-    source.start();
-    return gain;
+    source.start(0, offset);
+    return [gain, filter];
+  }
+
+  // Where a sound goes: through a panner to the left or right of the screen, where there is one.
+  private output(bus: GainNode, pan: number, when: number): AudioNode {
+    const ctx = this.ctx!;
+    if (!ctx.createStereoPanner || pan === 0) {
+      return bus;
+    }
+    const panner = ctx.createStereoPanner();
+    panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), when);
+    panner.connect(bus);
+    return panner;
   }
 
   // Called every frame: keeps each musician's tune going and the weather in the air.
@@ -199,8 +260,24 @@ class Sound {
     if (wind !== this.windLevel || rain !== this.rainLevel) {
       this.windLevel = wind;
       this.rainLevel = rain;
-      this.wind!.gain.setTargetAtTime(wind, now, 1.5);
       this.rainGain!.gain.setTargetAtTime(rain, now, 1.5);
+      this.nextGust = now;
+    }
+    // The wind rises and falls in gusts, brighter as it rises, rather than one steady hiss.
+    if (now >= this.nextGust) {
+      const gust = 0.55 + Math.random() * 0.9;
+      this.nextGust = now + 2 + Math.random() * 4;
+      this.wind!.gain.setTargetAtTime(wind * gust, now, 1.2);
+      this.windFilter!.frequency.setTargetAtTime(300 + gust * 160 + (scene.storm ? 200 : 0), now, 1.2);
+    }
+    const fire = Math.min(1, scene.fire) * 0.14;
+    if (fire !== this.fireLevel) {
+      this.fireLevel = fire;
+      this.fireGain!.gain.setTargetAtTime(fire, now, 0.8);
+    }
+    if (scene.fire > 0 && now >= this.nextCrackle) {
+      this.nextCrackle = now + (0.05 + Math.random() * 0.3) / Math.min(1, 0.3 + scene.fire);
+      this.crackle(now + Math.random() * 0.05, Math.min(1, scene.fire));
     }
     if (!scene.paused && now >= this.nextCall) {
       this.nextCall = now + 2 + Math.random() * 6;
@@ -215,8 +292,11 @@ class Sound {
         }
         this.fightSounds = this.fightSounds.filter((t) => t > now - 1);
         this.fightSounds.push(now);
-        this.fight(shot.ranged, shot.hit, now + Math.random() * 0.04);
+        this.fight(shot.ranged, shot.hit, now + Math.random() * 0.04, shot.pan);
       }
+      this.keepWorking(scene, now);
+    } else {
+      this.strokes.clear();
     }
     const here = new Set<number>();
     for (const m of scene.paused ? [] : scene.musicians) {
@@ -228,6 +308,100 @@ class Sound {
         this.playing.delete(id);
       }
     }
+  }
+
+  // Each colonist at work strikes in their own time, a little loose, and only a few strokes a second are heard.
+  private keepWorking(scene: SoundScene, now: number): void {
+    const here = new Set<number>();
+    this.workSounds = this.workSounds.filter((t) => t > now - 1);
+    for (const w of scene.workers) {
+      here.add(w.id);
+      const beat = WORK_BEAT[w.kind] / Math.sqrt(Math.max(1, scene.speed));
+      let next = this.strokes.get(w.id);
+      if (next === undefined) {
+        next = now + Math.random() * beat;
+      }
+      if (next <= now + 0.05) {
+        if (this.workSounds.length < WORK_SOUNDS_PER_SECOND) {
+          this.workSounds.push(now);
+          this.work(w.kind, Math.max(next, now), w.pan);
+        }
+        next = Math.max(next, now) + beat * (0.9 + Math.random() * 0.2);
+      }
+      this.strokes.set(w.id, next);
+    }
+    for (const id of [...this.strokes.keys()]) {
+      if (!here.has(id)) {
+        this.strokes.delete(id);
+      }
+    }
+  }
+
+  // An axe biting wood, a pick on rock, a hammer on a nail.
+  private work(kind: WorkSound, when: number, pan: number): void {
+    const ctx = this.ctx!;
+    const out = this.output(this.effectsBus!, pan * 0.8, when);
+    const hit = ctx.createBufferSource();
+    hit.buffer = this.noise;
+    const tone = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+    const ring = ctx.createOscillator();
+    const ringGain = ctx.createGain();
+    if (kind === 'chop') {
+      tone.type = 'lowpass';
+      tone.frequency.value = 900;
+      gain.gain.setValueAtTime(0.035, when);
+      gain.gain.exponentialRampToValueAtTime(0.001, when + 0.09);
+      ring.type = 'sine';
+      ring.frequency.setValueAtTime(190, when);
+      ring.frequency.exponentialRampToValueAtTime(120, when + 0.1);
+      ringGain.gain.setValueAtTime(0.035, when);
+      ringGain.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
+    } else if (kind === 'mine') {
+      tone.type = 'bandpass';
+      tone.frequency.value = 3200;
+      gain.gain.setValueAtTime(0.05, when);
+      gain.gain.exponentialRampToValueAtTime(0.001, when + 0.04);
+      ring.type = 'triangle';
+      ring.frequency.value = 1700 + Math.random() * 300;
+      ringGain.gain.setValueAtTime(0.022, when);
+      ringGain.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
+    } else {
+      tone.type = 'bandpass';
+      tone.frequency.value = 1800;
+      gain.gain.setValueAtTime(0.035, when);
+      gain.gain.exponentialRampToValueAtTime(0.001, when + 0.03);
+      ring.type = 'triangle';
+      ring.frequency.setValueAtTime(520, when);
+      ring.frequency.exponentialRampToValueAtTime(380, when + 0.06);
+      ringGain.gain.setValueAtTime(0.03, when);
+      ringGain.gain.exponentialRampToValueAtTime(0.001, when + 0.08);
+    }
+    hit.connect(tone).connect(gain).connect(out);
+    ring.connect(ringGain).connect(out);
+    hit.start(when, Math.random());
+    hit.stop(when + 0.12);
+    ring.start(when);
+    ring.stop(when + 0.2);
+  }
+
+  // A pop from the fire: a short bright click, now loud, now faint.
+  private crackle(when: number, amount: number): void {
+    const ctx = this.ctx!;
+    const pop = ctx.createBufferSource();
+    pop.buffer = this.noise;
+    const tone = ctx.createBiquadFilter();
+    tone.type = 'highpass';
+    tone.frequency.value = 1500 + Math.random() * 2500;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime((0.015 + Math.random() * 0.05) * amount, when);
+    gain.gain.exponentialRampToValueAtTime(0.0005, when + 0.02 + Math.random() * 0.04);
+    pop
+      .connect(tone)
+      .connect(gain)
+      .connect(this.output(this.effectsBus!, (Math.random() - 0.5) * 0.6, when));
+    pop.start(when, Math.random() * 1.9);
+    pop.stop(when + 0.08);
   }
 
   private keepPlaying(m: Musician, now: number): void {
@@ -259,16 +433,17 @@ class Sound {
       }
       p.notes.shift();
       if (when >= now - 0.05) {
-        this.note(m.instrument, next, Math.max(when, now), next.length * secondsPerBeat, level);
+        this.note(m.instrument, next, Math.max(when, now), next.length * secondsPerBeat, level, m.pan);
       }
     }
   }
 
   // One note in the instrument's voice.
-  private note(instrument: InstrumentKey, n: Note, when: number, length: number, level: number): void {
+  private note(instrument: InstrumentKey, n: Note, when: number, length: number, level: number, pan: number): void {
     const ctx = this.ctx!;
+    const bus = this.output(this.musicBus!, pan * 0.7, when);
     const out = ctx.createGain();
-    out.connect(this.musicBus!);
+    out.connect(bus);
     const peak = n.velocity * level * 0.22;
     if (instrument === 'drum') {
       const body = ctx.createOscillator();
@@ -283,7 +458,7 @@ class Sound {
       const hitGain = ctx.createGain();
       hitGain.gain.setValueAtTime(peak * 0.6, when);
       hitGain.gain.exponentialRampToValueAtTime(0.001, when + 0.08);
-      hit.connect(tone).connect(hitGain).connect(this.musicBus!);
+      hit.connect(tone).connect(hitGain).connect(bus);
       out.gain.setValueAtTime(peak * 1.6, when);
       out.gain.exponentialRampToValueAtTime(0.001, when + 0.3);
       body.start(when);
@@ -328,8 +503,9 @@ class Sound {
   }
 
   // A bowshot (a short twang, and a thump if it lands) or a blow (a dull thud).
-  private fight(ranged: boolean, hit: boolean, when: number): void {
+  private fight(ranged: boolean, hit: boolean, when: number, pan: number): void {
     const ctx = this.ctx!;
+    const out = this.output(this.effectsBus!, pan * 0.8, when);
     if (ranged) {
       const string = ctx.createOscillator();
       string.type = 'triangle';
@@ -338,7 +514,7 @@ class Sound {
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0.05, when);
       gain.gain.exponentialRampToValueAtTime(0.001, when + 0.14);
-      string.connect(gain).connect(this.effectsBus!);
+      string.connect(gain).connect(out);
       string.start(when);
       string.stop(when + 0.16);
     }
@@ -352,7 +528,7 @@ class Sound {
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(hit ? 0.09 : 0.04, at);
       gain.gain.exponentialRampToValueAtTime(0.001, at + 0.09);
-      thud.connect(tone).connect(gain).connect(this.effectsBus!);
+      thud.connect(tone).connect(gain).connect(out);
       thud.start(at, Math.random());
       thud.stop(at + 0.1);
     }
@@ -395,6 +571,10 @@ class Sound {
       return;
     }
     const now = ctx.currentTime + 0.02;
+    if (now - (this.lastAlert.get(kind) ?? -Infinity) < ALERT_GAP) {
+      return;
+    }
+    this.lastAlert.set(kind, now);
     const tones: Record<Alert, { pitches: number[]; step: number; type: OscillatorType; length: number }> = {
       // Two low horn calls.
       raid: { pitches: [50, 50], step: 0.45, type: 'sawtooth', length: 0.38 },
@@ -421,7 +601,8 @@ class Sound {
       filter.frequency.value = kind === 'raid' ? 900 : kind === 'fire' ? 2600 : 4000;
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(0.16, start + 0.02);
+      // (Over a concert: at the old level a raid's horn was quieter than one lute.)
+      gain.gain.linearRampToValueAtTime(kind === 'raid' ? 0.34 : kind === 'fire' ? 0.24 : 0.22, start + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.001, start + cue.length);
       osc.connect(filter).connect(gain).connect(this.effectsBus!);
       osc.start(start);

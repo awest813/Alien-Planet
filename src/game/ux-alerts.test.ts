@@ -113,3 +113,40 @@ describe('notifications', () => {
     expect(controller.selectedTile).toBe(77);
   });
 });
+
+describe('what the sound hears', () => {
+  it('colonists at work in view are heard, panned to where they stand', () => {
+    const sim = colony('work-sounds');
+    const w = sim.world;
+    const c = sim.living()[0];
+    const tree = w.idx(w.xOf(c.tile) + 1, w.yOf(c.tile));
+    w.setFeature(tree, featureId('tree'));
+    c.path = [];
+    c.job = {
+      type: 'chop',
+      target: tree,
+      source: -1,
+      item: 0,
+      count: 0,
+      line: 0,
+      stage: 2,
+      progress: 0,
+      wait: 0,
+      patient: -1,
+    };
+    sim.burning.add(tree);
+    const x = w.xOf(c.tile);
+    const y = w.yOf(c.tile);
+    controller.cameraView = { x0: x - 4, y0: y - 10, x1: x + 20, y1: y + 10 };
+    const scene = (controller as unknown as { soundScene(): import('./audio').SoundScene }).soundScene();
+    const heard = scene.workers.find((h) => h.id === c.id)!;
+    expect(heard.kind).toBe('chop');
+    // Left of the middle of the screen.
+    expect(heard.pan).toBeLessThan(-0.5);
+    expect(scene.fire).toBeGreaterThan(0);
+    controller.cameraView = { x0: x + 30, y0: y + 30, x1: x + 40, y1: y + 40 };
+    const away = (controller as unknown as { soundScene(): import('./audio').SoundScene }).soundScene();
+    expect(away.workers).toHaveLength(0);
+    expect(away.fire).toBe(0);
+  });
+});

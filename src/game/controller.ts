@@ -1,6 +1,6 @@
 import { inAbout } from '../sim/arrivals';
 import { TRANSMIT_HOURS, beaconTile } from '../sim/beacon';
-import { Musician, SoundScene, sound } from './audio';
+import { Musician, SoundScene, WorkSound, Worker, sound } from './audio';
 import { isInstrument } from './music';
 import { impressivenessLabel } from '../sim/climate';
 import {
@@ -99,6 +99,7 @@ import {
   Colonist,
   Command,
   DesignationKind,
+  JobType,
   LogEntry,
   Needs,
   Priorities,
@@ -832,6 +833,15 @@ export interface HoverView {
 }
 
 // A story event shown briefly as a card, so major moments aren't missed.
+// The work that's heard: an axe, a pick (or a chisel), a hammer.
+const WORK_SOUNDS: Partial<Record<JobType, WorkSound>> = {
+  chop: 'chop',
+  mine: 'mine',
+  sculpt: 'mine',
+  construct: 'build',
+  deconstruct: 'build',
+};
+
 export interface Notification {
   id: number;
   text: string;
@@ -1343,9 +1353,21 @@ export class GameController {
     const sim = this.sim;
     const w = sim.world;
     const view = this.cameraView;
+    const inView = (i: number) =>
+      w.xOf(i) >= view.x0 && w.xOf(i) <= view.x1 && w.yOf(i) >= view.y0 && w.yOf(i) <= view.y1;
+    // Left (-1) to right (1) of the screen, for the stereo.
+    const cx = (view.x0 + view.x1) / 2;
+    const half = Math.max(1, (view.x1 - view.x0) / 2);
+    const pan = (i: number) => Math.max(-1, Math.min(1, (w.xOf(i) - cx) / half));
     const musicians: Musician[] = [];
+    const workers: (Worker & { off: number })[] = [];
     for (const c of sim.living()) {
       const job = c.job;
+      const work = job && WORK_SOUNDS[job.type];
+      if (work && job.target >= 0 && c.path.length === 0 && inView(c.tile) && w.distance(c.tile, job.target) <= 1.5) {
+        const off = Math.abs(w.xOf(c.tile) - cx) + Math.abs(w.yOf(c.tile) - (view.y0 + view.y1) / 2);
+        workers.push({ id: c.id, kind: work, pan: pan(c.tile), off });
+      }
       if (job?.type !== 'joy' || job.listening || job.target < 0 || c.path.length > 0) {
         continue;
       }
@@ -1361,19 +1383,22 @@ export class GameController {
         instrument: key,
         skill: c.skills.artistic,
         inView: x >= view.x0 && x <= view.x1 && y >= view.y0 && y <= view.y1,
+        pan: pan(c.tile),
       });
     }
     const weather = sim.weather.kind;
     // Fights within view since the last frame (each shot heard once).
-    const inView = (i: number) =>
-      w.xOf(i) >= view.x0 && w.xOf(i) <= view.x1 && w.yOf(i) >= view.y0 && w.yOf(i) <= view.y1;
     // (A save loaded from earlier in time starts the count again.)
     if (this.heardShotsTo > sim.tick) {
       this.heardShotsTo = sim.tick - 1;
     }
     const shots = sim.shots
       .filter((s) => s.tick > this.heardShotsTo && (inView(s.from) || inView(s.to)))
-      .map((s) => ({ ranged: s.ranged, hit: s.hit }));
+      .map((s) => ({ ranged: s.ranged, hit: s.hit, pan: pan(inView(s.from) ? s.from : s.to) }));
+    let burning = 0;
+    for (const i of sim.burning) {
+      burning += inView(i) ? 1 : 0;
+    }
     this.heardShotsTo = sim.tick;
     return {
       musicians,
@@ -1383,6 +1408,13 @@ export class GameController {
       storm: weather === 'storm',
       cold: sim.outdoorTemperature() < 2,
       shots,
+      // (The nearest few to the middle of the screen: a work gang of twenty is no louder than four.)
+      workers: workers
+        .sort((a, b) => a.off - b.off)
+        .slice(0, 4)
+        .map(({ id, kind, pan }) => ({ id, kind, pan })),
+      fire: burning === 0 ? 0 : Math.min(1, 0.3 + burning / 12),
+      speed: SPEEDS[this.speedIndex] || 1,
     };
   }
   // The last tick whose shots have been heard.

@@ -263,7 +263,7 @@ function useMenuView<V extends string>(): [V | 'main', (view: V | 'main') => voi
 }
 
 // The first thing a player sees: carry on, start fresh, or load.
-const pickTitle = fields('latestSave', 'saves');
+const pickTitle = (s: UiState) => ({ ...fields('latestSave', 'saves')(s), sound: s.settings.sound });
 
 export function TitleScreen({ actions }: { actions: MenuActions }) {
   const state = useUi(pickTitle);
@@ -307,6 +307,17 @@ export function TitleScreen({ actions }: { actions: MenuActions }) {
             <button onClick={actions.onSettings}>Settings</button>
             <button onClick={actions.onHelp}>How to play</button>
           </div>
+        )}
+        {/* (Sound starts off, as browsers want, and only Settings said there was any.) */}
+        {view === 'main' && (
+          <button
+            className="link sound-toggle muted"
+            aria-pressed={state.sound}
+            onClick={() => controller.setSettings({ sound: !state.sound })}
+            title="Instruments, weather, work and alerts; volumes in Settings"
+          >
+            {state.sound ? '🔊 Sound on' : '🔈 Sound off: turn it on'}
+          </button>
         )}
         {view === 'new' && (
           <>
@@ -702,7 +713,11 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
         onChange={(v) => set({ pauseOnEmergency: v })}
       />
       <h3>Sound</h3>
-      <Toggle label="Sound (instruments, weather and alerts)" value={s.sound} onChange={(v) => set({ sound: v })} />
+      <Toggle
+        label="Sound (instruments, weather, work and alerts)"
+        value={s.sound}
+        onChange={(v) => set({ sound: v })}
+      />
       <Slider label="Volume" value={s.masterVolume} disabled={!s.sound} onChange={(v) => set({ masterVolume: v })} />
       <Slider label="Music" value={s.musicVolume} disabled={!s.sound} onChange={(v) => set({ musicVolume: v })} />
       <Slider
