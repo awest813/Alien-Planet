@@ -879,7 +879,8 @@ export class Simulation {
     ) {
       const region = this.regionOf(teller.tile);
       const listeners = this.living().filter(
-        (o) => o !== teller && this.freeForStories(o, true) && this.regionOf(o.tile) === region,
+        // (Listeners by the usual rule: past bedtime, anyone free was someone on their way to bed.)
+        (o) => o !== teller && this.freeForStories(o) && this.regionOf(o.tile) === region,
       );
       this.seatStoryCircle(teller, circle.fire, listeners, circle.endsAt);
     }

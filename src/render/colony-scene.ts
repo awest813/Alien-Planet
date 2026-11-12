@@ -210,7 +210,8 @@ export class ColonyScene extends Phaser.Scene {
   // arrows move the view under it, and Enter starts an area there and Enter again marks it (twice on the spot, one
   // tile). With the Select tool, Enter inspects it. (Without a pointer there was no way to give an order at all.)
   private keyMode = false;
-  private wideBounds = false;
+  // Bounds widened for the keyboard's cursor, closing in once it's put down (see fitBounds).
+  private wide: { x: number; y: number; w: number; h: number } | null = null;
   private keyDrag = false;
   private keyHover: number | null = null;
   private pan: { x: number; y: number; scrollX: number; scrollY: number; moved: boolean; button: number } | null = null;
@@ -1959,30 +1960,41 @@ export class ColonyScene extends Phaser.Scene {
   private fitBounds(): void {
     const cam = this.cameras.main;
     const world = controller.sim.world;
-    // Eight tiles past the edge; from the keyboard, half the view, so the cursor in its middle reaches the edge tiles
-    // (with eight, a third of a small map's columns were out of its reach).
-    // (And so on after the mouse moves, until the view is back within the usual margin: narrowed at once, the first
-    // nudge of the mouse snapped the view in from the edge the arrows had taken it to.)
+    // The bounds for a margin round the map (the view never smaller than them, and centred on it when bigger).
+    const around = (marginX: number, marginY: number) => {
+      const w = Math.max(world.width * TILE + marginX * 2, cam.width / cam.zoom);
+      const h = Math.max(world.height * TILE + marginY * 2, cam.height / cam.zoom);
+      return { x: (world.width * TILE) / 2 - w / 2, y: (world.height * TILE) / 2 - h / 2, w, h };
+    };
+    // Eight tiles past the edge. From the keyboard, half the view, so the cursor in its middle reaches the edge
+    // tiles (with eight, a third of a small map's columns were out of its reach).
+    const narrow = around(TILE * 8, TILE * 8);
+    let r = narrow;
     if (this.keyMode) {
-      this.wideBounds = true;
-    } else if (this.wideBounds) {
+      r = around(Math.max(TILE * 8, cam.width / cam.zoom / 2), Math.max(TILE * 8, cam.height / cam.zoom / 2));
+      this.wide = r;
+    } else if (this.wide) {
+      // Back to the mouse: the wide bounds close in behind the view as it comes back, never letting it go further
+      // out, until they're the usual ones. (Narrowed at once, the first nudge of the mouse snapped the view in from
+      // the edge; left wide until the view fitted the usual ones, zoomed right out it never did, and they stayed.)
       const v = cam.worldView;
-      const m = TILE * 8;
-      if (v.x >= -m && v.y >= -m && v.right <= world.width * TILE + m && v.bottom <= world.height * TILE + m) {
-        this.wideBounds = false;
+      const wide = this.wide;
+      const left = Math.max(wide.x, Math.min(narrow.x, v.x));
+      const top = Math.max(wide.y, Math.min(narrow.y, v.y));
+      const right = Math.min(wide.x + wide.w, Math.max(narrow.x + narrow.w, v.right));
+      const bottom = Math.min(wide.y + wide.h, Math.max(narrow.y + narrow.h, v.bottom));
+      r = { x: left, y: top, w: right - left, h: bottom - top };
+      const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
+      if (near(r.x, narrow.x) && near(r.y, narrow.y) && near(r.w, narrow.w) && near(r.h, narrow.h)) {
+        this.wide = null;
+        r = narrow;
+      } else {
+        this.wide = r;
       }
     }
-    const marginX = Math.max(TILE * 8, this.wideBounds ? cam.width / cam.zoom / 2 : 0);
-    const marginY = Math.max(TILE * 8, this.wideBounds ? cam.height / cam.zoom / 2 : 0);
-    const mapW = world.width * TILE + marginX * 2;
-    const mapH = world.height * TILE + marginY * 2;
-    const w = Math.max(mapW, cam.width / cam.zoom);
-    const h = Math.max(mapH, cam.height / cam.zoom);
     const b = cam.getBounds();
-    const x = mapW / 2 - marginX - w / 2;
-    const y = mapH / 2 - marginY - h / 2;
-    if (b.x !== x || b.y !== y || b.width !== w || b.height !== h) {
-      cam.setBounds(x, y, w, h);
+    if (b.x !== r.x || b.y !== r.y || b.width !== r.w || b.height !== r.h) {
+      cam.setBounds(r.x, r.y, r.w, r.h);
     }
   }
 

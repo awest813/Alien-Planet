@@ -1676,7 +1676,8 @@ export class GameController {
 
   // Drafts every able colonist, or stands everyone down if they're all drafted already.
   private animalsAttacking(): boolean {
-    return this.sim.animals.some((a) => a.hp > 0 && a.revengeOn >= 0);
+    // (Not one that snapped at its tamer: that's left to the tamer, and drafting everyone for it starved them.)
+    return this.sim.animals.some((a) => a.hp > 0 && a.revengeOn >= 0 && !a.lashOut);
   }
 
   public toggleDraftAll(): void {
@@ -1741,15 +1742,25 @@ export class GameController {
       return false;
     }
     const w = this.sim.world;
-    if (!w.isPassable(tile)) {
+    // A wall or an embrasure clicked: the ground beside it, as a single colonist's move does.
+    const starts = w.isPassable(tile) ? [tile] : w.neighbors(tile).filter((n) => w.isPassable(n));
+    if (starts.length === 0) {
       return false;
     }
+    // Only those who can get there (across water, or into a walled pocket, they'd have been sent and gone nowhere,
+    // with "everyone is on the way").
+    const region = this.sim.regionOf(starts[0]);
+    const going = drafted.filter((c) => this.sim.regionOf(c.tile) === region);
+    if (going.length === 0) {
+      this.notify('None of the drafted colonists can get there from where they are.');
+      return true;
+    }
     const spots: number[] = [];
-    const seen = new Set([tile]);
-    for (let q = [tile]; q.length > 0 && spots.length < drafted.length; ) {
+    const seen = new Set(starts);
+    for (let q = [...starts]; q.length > 0 && spots.length < going.length; ) {
       const next: number[] = [];
       for (const i of q) {
-        if (spots.length < drafted.length) {
+        if (spots.length < going.length) {
           spots.push(i);
         }
         for (const n of w.neighbors(i, false)) {
@@ -1762,12 +1773,19 @@ export class GameController {
       q = next;
     }
     // The nearest of them to each spot, so nobody crosses the others.
-    const left = [...drafted];
+    const left = [...going];
     for (const spot of spots) {
       left.sort((a, b) => w.distance(a.tile, spot) - w.distance(b.tile, spot) || a.id - b.id);
       this.command({ type: 'move', colonist: left.shift()!.id, tile: spot });
     }
-    this.notify(drafted.length === 1 ? `${drafted[0].name} is on the way.` : 'Everyone drafted is on the way.');
+    const stuck = drafted.length - going.length;
+    this.notify(
+      going.length === 1 && stuck === 0
+        ? `${going[0].name} is on the way.`
+        : stuck === 0
+          ? 'Everyone drafted is on the way.'
+          : `${going.length} drafted on the way (${stuck} can't get there from where they are).`,
+    );
     return true;
   }
 
@@ -2839,7 +2857,10 @@ export class GameController {
       } else if (c.needs.food <= 0) {
         alerts.push({
           // (Drafted, they don't eat: nothing said so.)
-          text: c.drafted ? `${c.name} is starving, drafted: stand them down (Q) to eat` : `${c.name} is starving`,
+          // (Select them first: in a fight, Q with nobody selected drafts the rest.)
+          text: c.drafted
+            ? `${c.name} is starving, drafted: select them and stand them down (Q) to eat`
+            : `${c.name} is starving`,
           tone: 'danger',
           colonist: c.id,
         });
@@ -3178,6 +3199,12 @@ export class GameController {
       if (have('grain') === 0 && have('flour') === 0) {
         return { how: 'The millstone is up: grow grain (Zones), and harvest it.', tool: 'growGrain' };
       }
+      if (!built('stove')) {
+        return {
+          how: "Bread is baked at a stove, and there isn't one: build a stove (granite, from mining rock).",
+          tool: 'stove',
+        };
+      }
       return {
         how: 'Set targets for flour and bread in Production: cooks grind grain at the millstone and bake at a stove.',
         screen: 'production',
@@ -3310,7 +3337,8 @@ export class GameController {
         return any('zones', (i) => (isStockpileZone(tool.zone) ? isStockpileZone(w.zone[i]) : w.zone[i] === tool.zone));
       // (Marks on animals and captives too: a hunt marked still read as not begun.)
       case 'hunt':
-        return this.sim.animals.some((a) => a.hunted && a.hp > 0);
+        // (Not livestock marked for slaughter: it doesn't count as a hunt.)
+        return this.sim.animals.some((a) => a.hunted && !a.tame && a.hp > 0);
       case 'tame':
         return this.sim.animals.some((a) => a.taming && !a.tame && a.hp > 0);
       case 'capture':

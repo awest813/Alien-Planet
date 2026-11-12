@@ -26,7 +26,9 @@ describe('the middle game', () => {
     const [a] = sim.living();
     controller.command({ type: 'draft', colonist: a.id, drafted: true });
     a.needs.food = 0;
-    expect(alerts().some((x) => x.text === `${a.name} is starving, drafted: stand them down (Q) to eat`)).toBe(true);
+    expect(
+      alerts().some((x) => x.text === `${a.name} is starving, drafted: select them and stand them down (Q) to eat`),
+    ).toBe(true);
     controller.selectColonist(null);
     controller.draftKey();
     expect(sim.living().some((c) => c.drafted)).toBe(false);
@@ -57,6 +59,9 @@ describe('the middle game', () => {
     controller.publish();
     expect(goal('bread').tool).toBe('growGrain');
     w.addItem(w.idx(x + 5, y + 5), itemId('grain'), 20);
+    controller.publish();
+    expect(goal('bread').tool).toBe('stove');
+    w.setFeature(w.idx(x + 3, y - 3), featureId('stove'));
     controller.publish();
     expect(goal('bread').screen).toBe('production');
     expect(goal('iron').tool).toBe('kiln');
