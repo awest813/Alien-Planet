@@ -485,7 +485,11 @@ export interface StoryEntry {
   hour: number;
   text: string;
   tone: LogEntry['tone'];
+  // Who or where it's about, for its notification to take the camera there.
+  about?: StoryAbout;
 }
+
+export type StoryAbout = { colonist: number } | { tile: number };
 
 const JOB_FOR_DESIGNATION: Record<number, JobType> = {
   [Designation.MINE]: 'mine',
@@ -2097,14 +2101,14 @@ export class Simulation {
   }
 
   // `story` marks moments worth keeping in the colony's history.
-  public addLog(text: string, tone: LogEntry['tone'] = 'info', story = false): void {
+  public addLog(text: string, tone: LogEntry['tone'] = 'info', story = false, about?: StoryAbout): void {
     this.log.push({ tick: this.tick, text, tone });
     if (this.log.length > LOG_LIMIT) {
       this.log.shift();
     }
     if (story) {
       this.storyCount++;
-      this.storyLog.push({ day: this.day, hour: Math.floor(this.hour), text, tone });
+      this.storyLog.push({ day: this.day, hour: Math.floor(this.hour), text, tone, ...(about && { about }) });
       if (this.storyLog.length > STORY_LIMIT) {
         this.storyLog.shift();
       }
@@ -4185,10 +4189,14 @@ export class Simulation {
           this.addThought(o, 'colonyLegend');
         }
       }
-      this.addLog(`${c.name} has finished their vision: a legendary sculpture, “${title}”.`, 'good', true);
+      this.addLog(`${c.name} has finished their vision: a legendary sculpture, “${title}”.`, 'good', true, {
+        colonist: c.id,
+      });
     } else if (quality >= MASTERWORK) {
       this.addThought(c, 'madeMasterwork');
-      this.addLog(`${c.name} has carved a masterwork: ${name.toLowerCase()}, “${title}”.`, 'good', true);
+      this.addLog(`${c.name} has carved a masterwork: ${name.toLowerCase()}, “${title}”.`, 'good', true, {
+        colonist: c.id,
+      });
     } else {
       this.addThought(c, 'madeArt');
       this.addLog(
@@ -7923,7 +7931,7 @@ export class Simulation {
         captive.since = this.tick;
         captive.capture = false;
         this.stats.captured = (this.stats.captured ?? 0) + 1;
-        this.addLog(`${c.name} took ${captive.name} prisoner.`, 'good', true);
+        this.addLog(`${c.name} took ${captive.name} prisoner.`, 'good', true, { tile: job.target });
       } else {
         captive.tile = c.tile;
       }

@@ -104,7 +104,9 @@ export function infectionStep(sim: Simulation, c: Colonist, injury: Injury, hour
       injury.infection = 0.01;
       injury.treated = false;
       sim.stats.infections = (sim.stats.infections ?? 0) + 1;
-      sim.addLog(`${c.name}'s ${PART_LABELS[injury.part ?? 'torso']} wound has become infected.`, 'warn', true);
+      sim.addLog(`${c.name}'s ${PART_LABELS[injury.part ?? 'torso']} wound has become infected.`, 'warn', true, {
+        colonist: c.id,
+      });
     }
   }
   if (isInfected(injury)) {

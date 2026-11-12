@@ -221,7 +221,9 @@ function birthday(sim: Simulation, c: Colonist): void {
       c.priorities[work] ||= 3;
     }
     sim.addThought(c, 'grewUp');
-    sim.addLog(`${c.name} has come of age, and takes on a full share of the work.${comeOfAge(sim, c)}`, 'good', true);
+    sim.addLog(`${c.name} has come of age, and takes on a full share of the work.${comeOfAge(sim, c)}`, 'good', true, {
+      colonist: c.id,
+    });
   } else if (age === ELDER) {
     sim.addLog(`${c.name} turns ${ELDER}, and is slowing down a little.`, 'info');
   }
@@ -285,7 +287,7 @@ function birth(sim: Simulation, carrier: Colonist): void {
   sim.infants.push(infant);
   sim.stats.births = (sim.stats.births ?? 0) + 1;
   const names = parents.map((p) => sim.colonists[p].name).join(' and ');
-  sim.addLog(`${infant.name} is born to ${names}.`, 'good', true);
+  sim.addLog(`${infant.name} is born to ${names}.`, 'good', true, { colonist: carrier.id });
   sim.events.push('birth');
   for (const c of sim.living()) {
     sim.addThought(c, parents.includes(c.id) ? 'newParent' : 'newbornInColony');

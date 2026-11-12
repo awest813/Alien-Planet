@@ -871,6 +871,26 @@ kbd {
   flex: 1;
 }
 
+/* A notification about someone or somewhere takes the camera there. */
+.notification-go {
+  pointer-events: auto;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.notification-go:hover:not(:disabled),
+.notification-go:focus-visible {
+  background: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .notification-x {
   flex: none;
   padding: 0 6px;

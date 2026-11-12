@@ -94,5 +94,7 @@ export function beastSlain(sim: Simulation, a: Animal, by: Colonist): void {
   for (const c of sim.living()) {
     sim.addThought(c, 'slewGreatBeast');
   }
-  sim.addLog(`The colony has slain ${a.name ?? 'the great beast'}! ${by.name} struck the last blow.`, 'good', true);
+  sim.addLog(`The colony has slain ${a.name ?? 'the great beast'}! ${by.name} struck the last blow.`, 'good', true, {
+    colonist: by.id,
+  });
 }

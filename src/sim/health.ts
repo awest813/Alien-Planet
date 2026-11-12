@@ -366,7 +366,7 @@ export function die(sim: Simulation, c: Colonist, cause: string): void {
   c.drafted = false;
   // Waiting to be buried (a grave and a funeral), and remembered by name.
   sim.unburied.push({ id: c.id, name: c.name, day: sim.day, cause });
-  sim.addLog(`${c.name} has died of ${cause}.`, 'danger', true);
+  sim.addLog(`${c.name} has died of ${cause}.`, 'danger', true, { tile: c.tile });
   if (sim.village.leader === c.id) {
     sim.village.leader = -1;
     sim.addLog('The colony has lost its leader. A new one will be chosen.', 'warn');

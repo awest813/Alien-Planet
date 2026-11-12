@@ -289,7 +289,9 @@ function complete(sim: Simulation, what: string): void {
   if (r.recruit && roomToGrow(sim)) {
     const c = sim.addWanderer();
     if (c) {
-      sim.addLog(`${what} ${name} are grateful: ${c.name} has come to join the colony.`, 'good', true);
+      sim.addLog(`${what} ${name} are grateful: ${c.name} has come to join the colony.`, 'good', true, {
+        colonist: c.id,
+      });
       return;
     }
   }

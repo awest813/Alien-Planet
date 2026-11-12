@@ -877,7 +877,9 @@ function ravage(sim: Simulation, e: Enemy): boolean {
   sim.stats.ravaged = (sim.stats.ravaged ?? 0) + 1;
   if (sim.raid && !sim.raid.ravaging) {
     sim.raid.ravaging = true;
-    sim.addLog(`Raiders are laying waste to the fields: ${e.name} is trampling the ${crop}!`, 'danger', true);
+    sim.addLog(`Raiders are laying waste to the fields: ${e.name} is trampling the ${crop}!`, 'danger', true, {
+      tile: at,
+    });
   }
   e.ravageAt = undefined;
   return true;
@@ -1166,10 +1168,11 @@ export function updateEnemies(sim: Simulation): void {
       !besieging(sim) &&
       fighting.some((e) => sim.living().some((c) => w.distance(e.tile, c.tile) <= ARRIVAL_RANGE))
     ) {
+      const near = fighting.find((e) => sim.living().some((c) => w.distance(e.tile, c.tile) <= ARRIVAL_RANGE))!;
       raid.arrivedTick = sim.tick;
       // On a big map raiders can take hours to walk in; say when they actually get close.
       if (sim.tick - raid.startedTick > TICKS_PER_HOUR / 2) {
-        sim.addLog('The raiders are closing in on the colony!', 'danger', true);
+        sim.addLog('The raiders are closing in on the colony!', 'danger', true, { tile: near.tile });
         sim.events.push('raidNear');
       }
     }
@@ -1853,9 +1856,12 @@ function updateSiege(sim: Simulation, raid: RaidState): void {
     return;
   }
   siege.attacking = true;
-  if (sim.enemies.some((e) => e.hp > 0 && !e.fleeing)) {
+  const attacker = sim.enemies.find((e) => e.hp > 0 && !e.fleeing);
+  if (attacker) {
     raid.arrivedTick = sim.tick;
-    sim.addLog('The siege party is breaking camp and attacking! Draft your colonists.', 'danger', true);
+    sim.addLog('The siege party is breaking camp and attacking! Draft your colonists.', 'danger', true, {
+      tile: attacker.tile,
+    });
     sim.events.push('raidNear');
   }
 }

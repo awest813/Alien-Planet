@@ -381,7 +381,9 @@ const EVENTS: EventDef[] = [
       if (!c) {
         return false;
       }
-      sim.addLog(`${c.name}, a traveller from ${friendlyFaction().name}, has asked to join the colony.`, 'good', true);
+      sim.addLog(`${c.name}, a traveller from ${friendlyFaction().name}, has asked to join the colony.`, 'good', true, {
+        colonist: c.id,
+      });
       for (const other of sim.living()) {
         if (other !== c) {
           sim.addThought(other, 'welcomedNewcomer');
@@ -484,7 +486,7 @@ const EVENTS: EventDef[] = [
       let roll = sim.rng.next() * options.reduce((sum, [, , weight]) => sum + weight, 0);
       const [key, count] = options.find(([, , weight]) => (roll -= weight) <= 0) ?? options[0];
       sim.world.dropItemNear(home, itemId(key), count);
-      sim.addLog(`${friendlyFaction().name} left a gift of supplies near the colony.`, 'good', true);
+      sim.addLog(`${friendlyFaction().name} left a gift of supplies near the colony.`, 'good', true, { tile: home });
       return true;
     },
   },
@@ -523,7 +525,7 @@ const EVENTS: EventDef[] = [
       if (lost === 0) {
         return false;
       }
-      sim.addLog(`Blight has struck a field. ${lost} plants withered.`, 'warn', true);
+      sim.addLog(`Blight has struck a field. ${lost} plants withered.`, 'warn', true, { tile: start });
       return true;
     },
   },

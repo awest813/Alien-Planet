@@ -138,7 +138,7 @@ export function talk(sim: Simulation, warden: Colonist, p: Captive): Colonist | 
   const c = sim.adopt(p.name, p.tile);
   c.skills.combat = Math.max(c.skills.combat, Math.min(20, Math.round(p.skill)));
   sim.stats.recruited = (sim.stats.recruited ?? 0) + 1;
-  sim.addLog(`${warden.name} has won over ${p.name}, who joins the colony!`, 'good', true);
+  sim.addLog(`${warden.name} has won over ${p.name}, who joins the colony!`, 'good', true, { colonist: c.id });
   return c;
 }
 

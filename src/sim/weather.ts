@@ -281,7 +281,7 @@ function lightning(sim: Simulation): void {
   }
   sim.lastLightning = sim.tick;
   if (ignite(sim, tile)) {
-    sim.addLog('Lightning struck near the colony and started a fire!', 'danger', true);
+    sim.addLog('Lightning struck near the colony and started a fire!', 'danger', true, { tile });
     sim.events.push('fire');
   }
 }

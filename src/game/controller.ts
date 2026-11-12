@@ -37,7 +37,15 @@ import { MAX_SKILL, SKILL_LABELS, xpToNext } from '../sim/skills';
 import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
-import { MAP_SIZE, NIGHT_START, OBJECTIVES, Simulation, StoryEntry, TICKS_PER_HOUR } from '../sim/simulation';
+import {
+  MAP_SIZE,
+  NIGHT_START,
+  OBJECTIVES,
+  Simulation,
+  StoryAbout,
+  StoryEntry,
+  TICKS_PER_HOUR,
+} from '../sim/simulation';
 import { DOWNED_TICKS, persuasion, ransomBlocked, ransomPrice, roomToJoin } from '../sim/prisoners';
 import { DRAFT_AGE, ELDER, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans';
 import { LEGEND } from '../sim/minds';
@@ -828,6 +836,8 @@ export interface Notification {
   id: number;
   text: string;
   tone: LogEntry['tone'];
+  // Who or where it's about: clicked, the camera goes there.
+  about?: StoryAbout;
 }
 
 export interface RaidView {
@@ -1887,6 +1897,23 @@ export class GameController {
     }
   }
 
+  // Takes the camera to whoever or wherever a notification is about.
+  public focusNotification(n: Notification): void {
+    if (!n.about) {
+      return;
+    }
+    if ('tile' in n.about) {
+      this.focusRequest = n.about.tile;
+      this.selectTile(n.about.tile);
+      return;
+    }
+    // (Someone who has since died or left has nowhere to be shown.)
+    const c = this.sim.colonists[n.about.colonist];
+    if (c && !c.health.dead && !c.away) {
+      this.selectColonist(c.id, true);
+    }
+  }
+
   // Picks a tool by its id (goals use this); returns false if it's locked or unknown.
   public selectToolById(id: string): boolean {
     const tool = TOOLS.find((t) => t.id === id);
@@ -1982,6 +2009,7 @@ export class GameController {
         id: this.nextNotification++,
         text: entry.text,
         tone: entry.tone,
+        ...(entry.about && { about: entry.about }),
         expires: now + this.settings.noticeSeconds * 1000,
       });
     }
@@ -2510,7 +2538,12 @@ export class GameController {
         wintersSurvived: sim.stats.wintersSurvived,
         built: sim.stats.built,
       },
-      notifications: this.notifications.map(({ id, text, tone }) => ({ id, text, tone })),
+      notifications: this.notifications.map(({ id, text, tone, about }) => ({
+        id,
+        text,
+        tone,
+        ...(about && { about }),
+      })),
       seed: sim.seed,
       difficulty: sim.story.difficulty,
       mapSize: sim.world.width,

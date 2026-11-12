@@ -92,7 +92,13 @@ export function updateBeacon(sim: Simulation): void {
   }
   if (!b.landed && b.landsAt !== undefined && sim.tick >= b.landsAt) {
     b.landed = true;
-    sim.addLog('The ship has landed beside the beacon. It will wait a day: board it, or stay.', 'good', true);
+    const at = beaconTile(sim);
+    sim.addLog(
+      'The ship has landed beside the beacon. It will wait a day: board it, or stay.',
+      'good',
+      true,
+      at === undefined ? undefined : { tile: at },
+    );
     sim.events.push('shipLanded');
     return;
   }

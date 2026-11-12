@@ -119,7 +119,7 @@ export function inspire(sim: Simulation): boolean {
     tamingInspiration: 'feels a way with animals today: their next taming will surely work.',
     teachingInspiration: 'is in a teaching mood: the children around them will learn fast.',
   };
-  sim.addLog(`${c.name} ${what[kind]}`, 'good', true);
+  sim.addLog(`${c.name} ${what[kind]}`, 'good', true, { colonist: c.id });
   return true;
 }
 
@@ -215,6 +215,6 @@ export function updateObsession(sim: Simulation): void {
     sim.addThought(c, 'obsessionFailed');
     // A long break, in their own way (a kind soul doesn't rage).
     sim.startBreak(c, chooseBreak(sim, c), 8);
-    sim.addLog(`${c.name}'s vision came to nothing, and they've snapped.`, 'danger', true);
+    sim.addLog(`${c.name}'s vision came to nothing, and they've snapped.`, 'danger', true, { colonist: c.id });
   }
 }

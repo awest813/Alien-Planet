@@ -96,3 +96,20 @@ describe('tile card', () => {
     expect(w.designation[tree]).toBe(Designation.CHOP);
   });
 });
+
+describe('notifications', () => {
+  it('a notification about someone takes the camera to them', () => {
+    // (Cards said "Mara is inspired" or "Lightning started a fire" with no way to find where.)
+    const sim = colony('notice-go');
+    const c = sim.living()[1];
+    sim.addLog(`${c.name} is inspired.`, 'good', true, { colonist: c.id });
+    sim.addLog('A fire!', 'danger', true, { tile: 77 });
+    (controller as unknown as { collectNotifications(now: number): void }).collectNotifications(Date.now());
+    const [person, place] = controller.getState().notifications.slice(-2);
+    expect(person.about).toEqual({ colonist: c.id });
+    controller.focusNotification(person);
+    expect(controller.selectedColonist).toBe(c.id);
+    controller.focusNotification(place);
+    expect(controller.selectedTile).toBe(77);
+  });
+});

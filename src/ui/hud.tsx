@@ -1401,7 +1401,17 @@ export function Notices({ paused = false }: { paused?: boolean }) {
       {state.notifications.map((n) => (
         <div key={n.id} className={`notification ${n.tone}`}>
           <ToneMark tone={n.tone} />
-          <span className="notification-text">{forTouch(n.text)}</span>
+          {n.about ? (
+            <button
+              className="notification-text notification-go"
+              onClick={() => controller.focusNotification(n)}
+              title="Show me"
+            >
+              {forTouch(n.text)}
+            </button>
+          ) : (
+            <span className="notification-text">{forTouch(n.text)}</span>
+          )}
           <button
             className="notification-x"
             onClick={() => controller.dismissNotification(n.id)}
