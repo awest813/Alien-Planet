@@ -136,6 +136,24 @@ export function Modal({
 }
 
 // The skill each kind of work draws on (hauling needs none).
+// What each kind of work covers (the column headers had no explanation: Handle? Warden? Cut plants?).
+const WORK_HELP: Record<WorkTypeKey, string> = {
+  doctor: 'Tending wounds and illness, rescuing the downed, feeding the bedridden (Medicine)',
+  cooking: 'Cooking meals and baking at a stove, milling flour (Cooking)',
+  construction: 'Building and taking down, repairs, putting out fires (Construction)',
+  growing: 'Sowing and harvesting fields (Plants)',
+  mining: 'Mining rock, ore and clay, and digging shafts (Mining)',
+  plantCutting: 'Chopping trees and foraging berries (Plants)',
+  hunting: 'Hunting marked animals, and fishing (Animals)',
+  handling: 'Taming, and tending animals in pens (Animals)',
+  warden: 'Capturing the downed, feeding and talking with prisoners (Social)',
+  crafting: 'Making goods at the crafting bench, kiln, smelter and the rest (Crafting)',
+  art: 'Sculptures and the like (Artistic)',
+  research: 'Studying at the research bench (Intellectual)',
+  hauling: 'Carrying things to storage, refuelling fires and generators, filling troughs',
+  cleaning: 'Clearing mess and rubble indoors',
+};
+
 const WORK_SKILL: Partial<Record<WorkTypeKey, SkillKey>> = {
   doctor: 'medicine',
   cooking: 'cooking',
@@ -307,7 +325,9 @@ export function WorkScreen({ onClose }: { onClose: () => void }) {
                 <span className="sr-only">Colonist</span>
               </th>
               {WORK_TYPES.map((work) => (
-                <th key={work}>{WORK_LABELS[work]}</th>
+                <th key={work} title={WORK_HELP[work]}>
+                  {WORK_LABELS[work]}
+                </th>
               ))}
             </tr>
           </thead>
@@ -1267,8 +1287,16 @@ export function VillageScreen({ onClose }: { onClose: () => void }) {
   const v = state.village;
   const set = (policy: { rations?: Rations; hours?: Hours; restDays?: boolean; hunting?: Hunting }) =>
     controller.command({ type: 'policy', ...policy });
-  const choice = <T extends string>(value: T, current: T, label: string, apply: () => void) => (
-    <button key={value} className={value === current ? 'active' : ''} aria-pressed={value === current} onClick={apply}>
+  // Each option says what it does before it's picked (only the chosen one's line showed, so learning one meant
+  // applying it).
+  const choice = <T extends string>(value: T, current: T, label: string, apply: () => void, what: string) => (
+    <button
+      key={value}
+      className={value === current ? 'active' : ''}
+      aria-pressed={value === current}
+      onClick={apply}
+      title={what}
+    >
       {label}
     </button>
   );
@@ -1304,16 +1332,16 @@ export function VillageScreen({ onClose }: { onClose: () => void }) {
       <h3>Policies</h3>
       <div className="muted small">Rations</div>
       <div className="row">
-        {choice('frugal', v.rations, 'Frugal', () => set({ rations: 'frugal' }))}
-        {choice('normal', v.rations, 'Normal', () => set({ rations: 'normal' }))}
-        {choice('generous', v.rations, 'Generous', () => set({ rations: 'generous' }))}
+        {choice('frugal', v.rations, 'Frugal', () => set({ rations: 'frugal' }), POLICY_TEXT.rations.frugal)}
+        {choice('normal', v.rations, 'Normal', () => set({ rations: 'normal' }), POLICY_TEXT.rations.normal)}
+        {choice('generous', v.rations, 'Generous', () => set({ rations: 'generous' }), POLICY_TEXT.rations.generous)}
       </div>
       <p className="muted small">{POLICY_TEXT.rations[v.rations]}</p>
       <div className="muted small">Working hours</div>
       <div className="row">
-        {choice('short', v.hours, 'Short', () => set({ hours: 'short' }))}
-        {choice('normal', v.hours, 'Normal', () => set({ hours: 'normal' }))}
-        {choice('long', v.hours, 'Long', () => set({ hours: 'long' }))}
+        {choice('short', v.hours, 'Short', () => set({ hours: 'short' }), POLICY_TEXT.hours.short)}
+        {choice('normal', v.hours, 'Normal', () => set({ hours: 'normal' }), POLICY_TEXT.hours.normal)}
+        {choice('long', v.hours, 'Long', () => set({ hours: 'long' }), POLICY_TEXT.hours.long)}
       </div>
       <p className="muted small">{POLICY_TEXT.hours[v.hours]}</p>
       <label className="setting check-first">
@@ -1325,8 +1353,8 @@ export function VillageScreen({ onClose }: { onClose: () => void }) {
       </label>
       <div className="muted small">Hunting</div>
       <div className="row">
-        {choice('all', v.hunting, 'Hunt all', () => set({ hunting: 'all' }))}
-        {choice('surplus', v.hunting, 'Surplus only', () => set({ hunting: 'surplus' }))}
+        {choice('all', v.hunting, 'Hunt all', () => set({ hunting: 'all' }), POLICY_TEXT.hunting.all)}
+        {choice('surplus', v.hunting, 'Surplus only', () => set({ hunting: 'surplus' }), POLICY_TEXT.hunting.surplus)}
       </div>
       <p className="muted small">{POLICY_TEXT.hunting[v.hunting]}</p>
     </Modal>

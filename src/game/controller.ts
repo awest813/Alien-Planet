@@ -1059,6 +1059,10 @@ export interface Alert {
   // A threat to the colony (a raid, a siege, thieves, a pack, the great beast): listed before everything else (the
   // great beast's came eighth, under three colonists' collapses, out of sight).
   threat?: boolean;
+  // What fixes it, one click away (as a goal's button): the tool to pick, or the screen to open. ("Forage berries
+  // (G)" and "(Factions)" were plain text: clicked, nothing happened.)
+  tool?: string;
+  screen?: 'work' | 'production' | 'research' | 'factions' | 'trade';
 }
 
 // A late project's building and materials, and (while it can be picked) what it's waiting on.
@@ -1227,6 +1231,11 @@ export class GameController {
   private notStarted = false;
   // Speed to restore when a menu that paused the game closes.
   private heldSpeed: number | null = null;
+
+  // A menu holding the clock still (the pause menu, Settings): the speed keys leave it alone.
+  public get speedHeld(): boolean {
+    return this.heldSpeed !== null;
+  }
   private resumeSpeed = 1;
   private accumulator = 0;
   private lastFrame = performance.now();
@@ -1722,6 +1731,14 @@ export class GameController {
       (c.drafted || (!c.health.downed && c.age >= DRAFT_AGE && !this.sim.inMentalBreak(c)));
     if (c && can) {
       this.toggleDraft(c.id);
+      // In a fight, with others still free: it was only the one, and the "Press Q" card stayed up as though
+      // everyone had been.
+      const free = this.sim
+        .living()
+        .some((o) => o !== c && !o.drafted && !o.health.downed && o.age >= DRAFT_AGE && !this.sim.inMentalBreak(o));
+      if (c.drafted && free && (this.sim.raid || this.animalsAttacking())) {
+        this.notify(`${c.name} is drafted. For everyone: Draft all, or Esc then Q.`);
+      }
     } else {
       this.toggleDraftAll();
     }
@@ -1750,6 +1767,12 @@ export class GameController {
     // Nobody (drafted) selected: everyone drafted goes, each to a tile of their own round the spot. (It did
     // nothing at all, and placing seven defenders took fourteen clicks.)
     const drafted = this.sim.living().filter((c) => c.drafted && !c.health.downed);
+    // A colonist selected who isn't drafted: say how (a right-click did nothing, without a word).
+    const chosen = id !== null ? this.sim.colonists[id] : undefined;
+    if (group && chosen && !chosen.drafted && !chosen.health.dead && !chosen.away) {
+      this.hint(`Draft ${chosen.name} (Q) to send them somewhere.`);
+      return true;
+    }
     if (!group || drafted.length === 0 || (id !== null && !this.sim.colonists[id]?.drafted)) {
       return false;
     }
@@ -2544,6 +2567,7 @@ export class GameController {
       const hours = Math.max(0, Math.ceil((sim.caravan.leaveAt - sim.tick) / TICKS_PER_HOUR));
       alerts.push({
         text: `Traders are visiting for ${hours} more ${hours === 1 ? 'hour' : 'hours'}: open Trade in the top bar.`,
+        screen: 'trade',
         tone: 'warn',
       });
     }
@@ -2679,7 +2703,7 @@ export class GameController {
     // (Wounds and sickness: medicine does nothing for the cold.)
     const hurt = sim.living().some((c) => c.health.injuries.length > 0 || c.health.disease);
     if (hurt && sim.stockOf(itemId('herbalMedicine')) === 0) {
-      alerts.push({ text: 'No medicine: grow healroot for better treatment', tone: 'warn' });
+      alerts.push({ text: 'No medicine: grow healroot for better treatment', tone: 'warn', tool: 'growHealroot' });
     }
     // Fires gone out for want of wood.
     const cold = sim
@@ -2721,6 +2745,7 @@ export class GameController {
       const { hours, left } = dueIn(call.until);
       alerts.push({
         text: `${FACTIONS[call.faction].name}, your allies, ask for help (${left} left): lend a colonist or send ${quantity(call.item, call.count)} (Factions)`,
+        screen: 'factions',
         tone: hours <= 24 ? 'danger' : 'warn',
       });
     }
@@ -2728,6 +2753,7 @@ export class GameController {
       const { hours, left } = dueIn(dispute.until);
       alerts.push({
         text: `${FACTIONS[dispute.a].name} and ${FACTIONS[dispute.b].name} are quarrelling and want your backing (${left} left): pick a side (Factions)`,
+        screen: 'factions',
         tone: hours <= 24 ? 'warn' : 'calm',
       });
     }
@@ -2735,6 +2761,7 @@ export class GameController {
       const { hours, left } = dueIn(envoy.until);
       alerts.push({
         text: `An envoy from ${FACTIONS[envoy.faction].name} offers an alliance (${left} left): accept or send them home (Factions)`,
+        screen: 'factions',
         tone: hours <= 24 ? 'warn' : 'calm',
         tile: envoy.visitor?.tile,
       });
@@ -2758,6 +2785,7 @@ export class GameController {
             : `${FACTIONS[request.faction].name} ask for ${quantity(request.item, request.count)} (${colonyStock(sim, request.item)} stored, ${left} left): send it (Factions)`,
         tone: hours <= 24 ? 'warn' : 'calm',
         tile: quarry?.tile,
+        screen: request.kind === 'hunt' ? undefined : 'factions',
       });
     }
     // Firewood: say so before the fires go out, not after.
@@ -2773,6 +2801,7 @@ export class GameController {
       }
       alerts.push({
         text: `Firewood running low: ${wood} wood, ${days < 1 ? 'under a day' : `about ${days} day${days > 1 ? 's' : ''}`} of fires. ${trees < 20 ? 'Few trees are left: grow poplars (Zones)' : 'Chop trees (C)'}`,
+        tool: trees < 20 ? 'growPoplars' : 'chop',
         tone: days < 2 ? 'danger' : 'warn',
       });
     }
@@ -2808,7 +2837,7 @@ export class GameController {
       sim.countBuilt((f) => featureDef(f).researchStation) > 0 &&
       availableProjects(sim.research).some((p) => !p.repeatable)
     ) {
-      alerts.push({ text: 'No research project selected', tone: 'warn' });
+      alerts.push({ text: 'No research project selected', tone: 'warn', screen: 'research' });
     }
     // The current project waiting on a building, or on materials to finish.
     const studying = sim.research.current ? researchDef(sim.research.current) : undefined;
@@ -2873,6 +2902,10 @@ export class GameController {
         colonist: coldInside[0].id,
       });
     }
+    // The hungry, and the unhappy, each said once for all of them (one line each, "Pell is starving", "Wren is
+    // starving"..., filled the three alerts that show and pushed out the one that said why: out of food).
+    const starving: Colonist[] = [];
+    const unhappy: Colonist[] = [];
     for (const c of sim.living()) {
       if (sim.inMentalBreak(c)) {
         alerts.push({ text: `${c.name} is having a mental break`, tone: 'danger', colonist: c.id });
@@ -2883,19 +2916,39 @@ export class GameController {
           tone: 'danger',
           colonist: c.id,
         });
-      } else if (c.needs.food <= 0) {
+      } else if (c.needs.food <= 0 && c.drafted) {
+        // (Drafted, they don't eat: nothing said so. Select them first: in a fight, Q with nobody selected drafts
+        // the rest.)
         alerts.push({
-          // (Drafted, they don't eat: nothing said so.)
-          // (Select them first: in a fight, Q with nobody selected drafts the rest.)
-          text: c.drafted
-            ? `${c.name} is starving, drafted: select them and stand them down (Q) to eat`
-            : `${c.name} is starving`,
+          text: `${c.name} is starving, drafted: select them and stand them down (Q) to eat`,
           tone: 'danger',
           colonist: c.id,
         });
+      } else if (c.needs.food <= 0) {
+        starving.push(c);
       } else if (c.mood < 25) {
-        alerts.push({ text: `${c.name} is unhappy (mood ${Math.round(c.mood)})`, tone: 'warn', colonist: c.id });
+        unhappy.push(c);
       }
+    }
+    if (starving.length > 0) {
+      alerts.push({
+        text:
+          starving.length === 1
+            ? `${starving[0].name} is starving`
+            : `${starving.length} colonists are starving: ${listNames(starving.map((c) => c.name))}`,
+        tone: 'danger',
+        colonist: starving[0].id,
+      });
+    }
+    if (unhappy.length > 0) {
+      alerts.push({
+        text:
+          unhappy.length === 1
+            ? `${unhappy[0].name} is unhappy (mood ${Math.round(unhappy[0].mood)})`
+            : `${unhappy.length} colonists are unhappy: ${listNames(unhappy.map((c) => c.name))}`,
+        tone: 'warn',
+        colonist: unhappy[0].id,
+      });
     }
     const shut = this.roomShut();
     if (!sim.hasShelter() && sim.hour >= 16 && sim.hour < NIGHT_START) {
@@ -2938,7 +2991,11 @@ export class GameController {
     const days = nutrition / (Math.max(1, sim.living().length) * DAILY_NUTRITION);
     if (days < 2) {
       alerts.push({
-        text: `Food is running low (about ${days.toFixed(1)} days left): forage berries (G), hunt or fish`,
+        text:
+          days < 0.05
+            ? 'Out of food: forage berries (G), hunt or fish'
+            : `Food is running low (about ${days.toFixed(1)} days left): forage berries (G), hunt or fish`,
+        tool: 'forage',
         tone: days < 1 ? 'danger' : 'warn',
       });
     }
@@ -2946,7 +3003,7 @@ export class GameController {
     const alive = sim.living().length;
     if (sim.day > 1 && alive > 0 && beds < alive) {
       const missing = alive - beds;
-      alerts.push({ text: `${missing} colonist${missing > 1 ? 's' : ''} without a bed`, tone: 'warn' });
+      alerts.push({ text: `${missing} colonist${missing > 1 ? 's' : ''} without a bed`, tone: 'warn', tool: 'bed' });
     }
     // Beds nobody can get to: a door opening onto rock, say, or a room walled in on every side. And beds only
     // some can get to: one colonist walled in with them, the rest locked out (four of five froze outside so in a
@@ -3062,7 +3119,21 @@ export class GameController {
       if (short > 0) {
         const def = itemDef(item);
         const how = source[def.key] ? `: ${source[def.key]}` : '';
-        alerts.push({ text: `Blueprints need ${short} more ${def.name.toLowerCase()}${how}`, tone: 'warn' });
+        // (What gets it, picked: a gathering tool, or Production for what's made.)
+        const gather: Record<string, string> = {
+          wood: 'chop',
+          stone: 'mine',
+          clay: 'mine',
+          ironOre: 'mine',
+          leather: 'hunt',
+        };
+        const made = ['cloth', 'stoneBlocks', 'bricks', 'iron'].includes(def.key);
+        alerts.push({
+          text: `Blueprints need ${short} more ${def.name.toLowerCase()}${how}`,
+          tone: 'warn',
+          tool: gather[def.key],
+          screen: made ? 'production' : undefined,
+        });
       }
     }
     // Full means no stockpile tile has room for any of the kinds of item lying outside.
@@ -3089,7 +3160,7 @@ export class GameController {
     }
     const ateRaw = sim.colonists.some((c) => c.thoughts.some((t) => t.key === 'ateRaw'));
     if (ateRaw && sim.countBuilt((f) => featureDef(f).workbench === 'cooking') === 0) {
-      alerts.push({ text: 'No stove: colonists are eating raw food', tone: 'warn' });
+      alerts.push({ text: 'No stove: colonists are eating raw food', tone: 'warn', tool: 'stove' });
     }
     const idle = sim.living().filter((c) => {
       // Only working hours count: wandering during recreation time is expected.
@@ -3122,6 +3193,7 @@ export class GameController {
             ? `Nothing to do: ${names}. Nobody has ${unstaffed.join(' or ')} work turned on (Work)`
             : `Nothing to do: ${names}. Give more orders (Orders tab)`,
         tone: 'warn',
+        screen: unstaffed.length > 0 ? 'work' : undefined,
       });
     }
     return alerts;

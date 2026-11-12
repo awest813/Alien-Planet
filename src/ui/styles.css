@@ -115,10 +115,12 @@ body {
   pointer-events: none;
 }
 
-/* Everything interactive takes the mouse; empty space passes it to the map. */
+/* Everything interactive takes the mouse; empty space passes it to the map. (The notices' cards and the toast let
+   it through, but for a card's ✕.) */
 .panel,
 .chip,
-.notices > *,
+.notices > .pause-banner,
+.notification-x,
 .side-toggle {
   pointer-events: auto;
 }
@@ -215,6 +217,12 @@ button.active {
 button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* Draft all, Stand down all: wide enough for either (changing width with its label, it re-flowed the top bar and
+   moved the buttons from under a second click, in the middle of a fight). */
+.draft-all {
+  min-width: 8.5em;
 }
 
 /* Something waiting on the player (a neighbour's request). */
@@ -845,8 +853,33 @@ kbd {
 
 .notification {
   width: 100%;
+  box-sizing: border-box;
   text-align: left;
   border-left: 3px solid var(--accent);
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.notification-text {
+  flex: 1;
+}
+
+.notification-x {
+  flex: none;
+  padding: 0 6px;
+  margin: -2px -6px -2px 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+@media (pointer: coarse) {
+  .notification-x {
+    min-width: 32px;
+    min-height: 28px;
+  }
 }
 
 .notification.good {
@@ -1534,6 +1567,12 @@ button.link:focus-visible {
 
   /* Draft all stays at the row's start however it's scrolled: a raid's notice says to tap it, and it had been
      scrolled out of sight. */
+  /* Menu first in the row (saving and settings are only there on a phone, and at the end it began off the screen,
+     under the fade). */
+  .screens .menu-button {
+    order: -1;
+  }
+
   .screens .draft-all {
     position: sticky;
     left: 0;

@@ -1388,10 +1388,26 @@ export class ColonyScene extends Phaser.Scene {
     const tool = controller.tool;
     // Allowing is the friendly half of forbidding: green, not red.
     const color = tool.kind === 'forbid' && !tool.on ? 0x8fe36b : (TOOL_COLORS[tool.kind] ?? 0xffffff);
+    let label: string | null = null;
+    let short = false;
     if (this.drag) {
+      let placed = 0;
       for (const i of this.dragTiles(tool, this.drag.start, this.drag.end)) {
         const blocked = tool.kind === 'build' && !controller.sim.canPlaceBlueprint(i, tool.feature);
+        placed += blocked ? 0 : 1;
         p.fillStyle(blocked ? 0xff5252 : color, 0.25).fillRect(world.xOf(i) * TILE, world.yOf(i) * TILE, TILE, TILE);
+      }
+      // What it comes to, by the cursor: how many, and what they cost against what's in store (a 5×5 of walls showed
+      // only an outline, and the hint the cost of one).
+      if (tool.kind === 'build') {
+        const def = featureDef(tool.feature);
+        const costs = (def.build?.cost ?? []).map((c) => {
+          const need = c.count * placed;
+          const have = controller.sim.stockOf(c.item);
+          short ||= need > have;
+          return `${need} ${itemDef(c.item).name.toLowerCase()} (${have} in store)`;
+        });
+        label = `${placed} ${def.name.toLowerCase()}${placed === 1 ? '' : 's'}${costs.length > 0 ? ` · ${costs.join(', ')}` : ''}`;
       }
       const r = this.dragRect(this.drag.start, this.drag.end);
       p.lineStyle(1, color, 0.9).strokeRect(
@@ -1402,9 +1418,32 @@ export class ColonyScene extends Phaser.Scene {
       );
     } else if (controller.hoverTile !== null) {
       const i = controller.hoverTile;
-      p.lineStyle(1, color, 0.8).strokeRect(world.xOf(i) * TILE, world.yOf(i) * TILE, TILE, TILE);
+      // Red where a building won't go (it looked the same as anywhere, then a click placed nothing).
+      const blocked = tool.kind === 'build' && !controller.sim.canPlaceBlueprint(i, tool.feature);
+      p.lineStyle(1, blocked ? 0xff5252 : color, 0.8).strokeRect(world.xOf(i) * TILE, world.yOf(i) * TILE, TILE, TILE);
+    }
+    this.dragLabel ??= this.mapText(0, 0, '', {
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '6px',
+      color: '#ffffff',
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      padding: { x: 2, y: 1 },
+    })
+      .setOrigin(0, 1)
+      .setResolution(6)
+      .setDepth(Depth.PREVIEW + 1);
+    if (label && this.drag) {
+      const end = this.drag.end;
+      this.dragLabel
+        .setText(label)
+        .setColor(short ? '#ff8a8a' : '#ffffff')
+        .setPosition((world.xOf(end) + 1) * TILE + 2, world.yOf(end) * TILE - 2)
+        .setVisible(true);
+    } else {
+      this.dragLabel.setVisible(false);
     }
   }
+  private dragLabel?: Phaser.GameObjects.Text;
 
   // The sky through the day: clear at midday, a warm golden hour and dusk, deep blue at night and a
   // rosy dawn. An eclipse brings dusk in the middle of the day.
@@ -1695,6 +1734,33 @@ export class ColonyScene extends Phaser.Scene {
     return tiles;
   }
 
+  // Orders in a rectangle (marked work, blueprints, and the animals and captives marked in it), to tell whether a
+  // Cancel did anything.
+  private ordersIn(rect: { x0: number; y0: number; x1: number; y1: number }): string {
+    const sim = controller.sim;
+    const world = sim.world;
+    const inRect = (i: number) => {
+      const x = world.xOf(i);
+      const y = world.yOf(i);
+      return (
+        x >= Math.min(rect.x0, rect.x1) &&
+        x <= Math.max(rect.x0, rect.x1) &&
+        y >= Math.min(rect.y0, rect.y1) &&
+        y <= Math.max(rect.y0, rect.y1)
+      );
+    };
+    let marks = 0;
+    for (let y = Math.min(rect.y0, rect.y1); y <= Math.max(rect.y0, rect.y1); y++) {
+      for (let x = Math.min(rect.x0, rect.x1); x <= Math.max(rect.x0, rect.x1); x++) {
+        const i = world.idx(x, y);
+        marks += (world.designation[i] !== 0 ? 1 : 0) + (world.blueprint[i] !== NONE ? 1 : 0);
+      }
+    }
+    const animals = sim.animals.filter((a) => inRect(a.tile) && (a.hunted || a.taming)).length;
+    const captives = sim.captives.filter((p) => inRect(p.tile) && p.capture).length;
+    return `${marks}|${animals}|${captives}`;
+  }
+
   private applyDrag(start: number, end: number): void {
     const tool = controller.tool;
     const rect = this.dragRect(start, end);
@@ -1725,12 +1791,18 @@ export class ColonyScene extends Phaser.Scene {
         }
         break;
       }
-      case 'cancel':
+      case 'cancel': {
+        // (Over nothing to cancel it said nothing, as the other orders now do.)
+        const before = this.ordersIn(rect);
         controller.command({ type: 'cancel', rect });
         controller.command({ type: 'hunt', rect, add: false });
         controller.command({ type: 'tame', rect, add: false });
         controller.command({ type: 'capture', rect, add: false });
+        if (before === this.ordersIn(rect)) {
+          controller.hint('Nothing to cancel there: drag over marked work or blueprints.');
+        }
         break;
+      }
       case 'hunt':
         controller.command({ type: 'hunt', rect, add: true });
         controller.sayIfNoAnimals(rect, 'hunt');
@@ -1742,9 +1814,20 @@ export class ColonyScene extends Phaser.Scene {
       case 'capture':
         controller.command({ type: 'capture', rect, add: true });
         break;
-      case 'forbid':
+      case 'forbid': {
         controller.command({ type: 'forbid', rect, on: tool.on });
+        const world = controller.sim.world;
+        let items = 0;
+        for (let y = Math.min(rect.y0, rect.y1); y <= Math.max(rect.y0, rect.y1); y++) {
+          for (let x = Math.min(rect.x0, rect.x1); x <= Math.max(rect.x0, rect.x1); x++) {
+            items += world.itemType[world.idx(x, y)] !== NONE ? 1 : 0;
+          }
+        }
+        if (items === 0) {
+          controller.hint(`No items there to ${tool.on ? 'forbid' : 'allow'}: drag over the stacks you want.`);
+        }
         break;
+      }
       case 'zone':
         controller.command({ type: 'zone', rect, zone: tool.zone });
         break;
@@ -1762,8 +1845,14 @@ export class ColonyScene extends Phaser.Scene {
                 !(world.feature[i] !== NONE && featureDef(world.feature[i]).blocksRoom),
             ).length
           : 0;
+        const placeable = tiles.filter((i) => controller.sim.canPlaceBlueprint(i, tool.feature)).length;
         controller.command({ type: 'build', feature: tool.feature, tiles });
-        if (skipped > 0) {
+        if (placeable === 0 && tiles.length > 0 && !tiles.some((i) => world.blueprint[i] === tool.feature)) {
+          // (Nothing went down, and nothing said so: a bed clicked over shallow water.)
+          controller.hint(
+            `Can't build ${featureDef(tool.feature).name.toLowerCase()} there: it needs clear, solid ground (red where it won't go).`,
+          );
+        } else if (skipped > 0) {
           controller.hint(
             `${skipped} tile${skipped > 1 ? 's' : ''} of that outline can't take a wall (water, or something in the way): the room won't close until the gap is walled some other way.`,
           );
@@ -2046,7 +2135,23 @@ export class ColonyScene extends Phaser.Scene {
     };
     const onDown = (event: KeyboardEvent) => {
       // Menus and screens own the keyboard while they're open.
-      if (isTyping(event) || event.ctrlKey || event.metaKey || event.altKey || controller.modalOpen) {
+      if (isTyping(event) || event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+      // Behind a screen that leaves the game running (Work, Production...), Space and the speed keys still work,
+      // unless a control in it has focus (they pressed nothing, and the dialog covered the pause button).
+      if (controller.modalOpen) {
+        const control = (event.target as HTMLElement | null)?.closest?.('button,input,select,textarea,[role=button]');
+        const speedKey = event.key === ' ' || /^Digit[123]$/.test(event.code);
+        if (!speedKey || control || controller.speedHeld || event.repeat) {
+          return;
+        }
+        event.preventDefault();
+        if (event.key === ' ') {
+          controller.togglePause();
+        } else {
+          controller.setSpeed(Number(event.code.slice(5)));
+        }
         return;
       }
       const key = keyOf(event);

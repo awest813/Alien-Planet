@@ -276,7 +276,9 @@ export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
         <button onClick={() => onOpen('help')} title="How to play" aria-label="How to play">
           ?
         </button>
-        <button onClick={() => onOpen('menu')}>Menu</button>
+        <button className="menu-button" onClick={() => onOpen('menu')}>
+          Menu
+        </button>
       </nav>
     </header>
   );
@@ -960,7 +962,7 @@ export function SidePanel({ onOpen }: { onOpen: (screen: Screen) => void }) {
       {alerts.length > 0 && (
         <ul className="alerts" aria-label="Alerts">
           {shown.map((alert, index) => (
-            <AlertLine key={`${index}-${alert.text}`} alert={alert} onJump={foldOnPhone} />
+            <AlertLine key={`${index}-${alert.text}`} alert={alert} onJump={foldOnPhone} onOpen={onOpen} />
           ))}
           {alerts.length > ALERTS_SHOWN && (
             <li className="more">
@@ -1103,11 +1105,37 @@ function ToneMark({ tone }: { tone: string }) {
 }
 
 // An alert; the ones about someone or somewhere take the camera there when clicked.
-function AlertLine({ alert, onJump }: { alert: Alert; onJump?: () => void }) {
+function AlertLine({
+  alert,
+  onJump,
+  onOpen,
+}: {
+  alert: Alert;
+  onJump?: () => void;
+  onOpen?: (screen: Screen) => void;
+}) {
   const target = alert.colonist !== undefined || alert.tile !== undefined;
+  // What fixes it, one click away: its tool picked, or its screen opened.
+  const fix = !target && (alert.tool !== undefined || (alert.screen !== undefined && onOpen));
   return (
     <li className={alert.tone}>
-      {target ? (
+      {fix ? (
+        <button
+          className="alert-jump"
+          onClick={() => {
+            if (alert.tool !== undefined) {
+              controller.selectToolById(alert.tool);
+            } else if (alert.screen !== undefined) {
+              onOpen?.(alert.screen);
+            }
+            onJump?.();
+          }}
+          title={alert.tool !== undefined ? 'Pick the tool for it' : 'Open the screen for it'}
+        >
+          <ToneMark tone={alert.tone} />
+          {forTouch(alert.text)} <span className="go">›</span>
+        </button>
+      ) : target ? (
         <button
           className="alert-jump"
           onClick={() => {
@@ -1301,16 +1329,21 @@ export function Notices({ paused = false }: { paused?: boolean }) {
         </button>
       )}
       {state.toast && <div className="toast">{forTouch(state.toast)}</div>}
+      {/* The cards let the map have its clicks (over the colony, they swallowed right-clicks to move the drafted,
+          and drags to build); the ✕ dismisses one. */}
       {state.notifications.map((n) => (
-        <button
-          key={n.id}
-          className={`notification ${n.tone}`}
-          onClick={() => controller.dismissNotification(n.id)}
-          title="Dismiss"
-        >
+        <div key={n.id} className={`notification ${n.tone}`}>
           <ToneMark tone={n.tone} />
-          {forTouch(n.text)}
-        </button>
+          <span className="notification-text">{forTouch(n.text)}</span>
+          <button
+            className="notification-x"
+            onClick={() => controller.dismissNotification(n.id)}
+            title="Dismiss"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
       ))}
     </div>
   );
