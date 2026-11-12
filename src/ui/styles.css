@@ -1139,6 +1139,12 @@ button.brush.active {
   white-space: nowrap;
 }
 
+/* The recipes research hasn't unlocked, folded under the rest. */
+.production .production-later td:last-child {
+  padding-top: 8px;
+  text-align: left;
+}
+
 .bill-controls .less,
 .bill-controls .more {
   min-width: 2.6em;

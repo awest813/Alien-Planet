@@ -585,6 +585,63 @@ const pickProduction = fields('bills');
 export function ProductionScreen({ onClose }: { onClose: () => void }) {
   const state = useUi(pickProduction);
   const set = (recipe: number, target: number) => controller.command({ type: 'bill', recipe, target });
+  // What research hasn't unlocked yet folds away below (its targets kept for when it is).
+  const open = state.bills.filter((b) => !b.locked);
+  const later = state.bills.filter((b) => b.locked);
+  const [showLater, setShowLater] = useState(false);
+  const row = (bill: (typeof state.bills)[number]) => (
+    <tr key={bill.recipe}>
+      <td>
+        {bill.name}
+        <div className="muted small">
+          {bill.recipeText} at a {bill.bench}
+          {!bill.hasBench && <span className="tag warn">no {bill.bench} yet</span>}
+          {bill.locked && <span className="tag warn">🔒 needs {bill.locked}</span>}
+          {bill.minSkill && <span className="tag">needs {bill.minSkill}</span>}
+          {bill.short && !bill.mend && bill.stock < bill.target && (
+            <span className="tag warn">short of {bill.short}</span>
+          )}
+        </div>
+      </td>
+      <td className="muted stock">{bill.mend ? `${bill.stock} worn` : `${bill.stock} in stock`}</td>
+      {bill.mend ? (
+        <td>
+          <button
+            className={bill.target > 0 ? 'active' : ''}
+            aria-pressed={bill.target > 0}
+            title={forTouch(bill.target > 0 ? 'Click to stop mending' : 'Click to start mending')}
+            onClick={() => set(bill.recipe, bill.target > 0 ? 0 : 1)}
+          >
+            {bill.target > 0 ? 'Mending: on' : 'Mending: off'}
+          </button>
+        </td>
+      ) : (
+        <td>
+          <span className="bill-controls">
+            <button
+              className="less"
+              disabled={bill.target <= 0}
+              onClick={() => set(bill.recipe, bill.target - bill.step)}
+              aria-label={`Keep ${bill.step} fewer ${bill.name}`}
+            >
+              −{bill.step}
+            </button>
+            {/* (Said aloud as it changes: the button's own name stays "Keep 5 more ...".) */}
+            <span className="target" aria-live="polite">
+              Keep {bill.target}
+            </span>
+            <button
+              className="more"
+              onClick={() => set(bill.recipe, bill.target + bill.step)}
+              aria-label={`Keep ${bill.step} more ${bill.name}`}
+            >
+              +{bill.step}
+            </button>
+          </span>
+        </td>
+      )}
+    </tr>
+  );
   return (
     <Modal title="Production" onClose={onClose} medium>
       <p className="muted">
@@ -594,59 +651,18 @@ export function ProductionScreen({ onClose }: { onClose: () => void }) {
       <div className="production-list">
         <table className="saves production">
           <tbody>
-            {state.bills.map((bill) => (
-              <tr key={bill.recipe}>
-                <td>
-                  {bill.name}
-                  <div className="muted small">
-                    {bill.recipeText} at a {bill.bench}
-                    {!bill.hasBench && <span className="tag warn">no {bill.bench} yet</span>}
-                    {bill.locked && <span className="tag warn">🔒 needs {bill.locked}</span>}
-                    {bill.minSkill && <span className="tag">needs {bill.minSkill}</span>}
-                    {bill.short && !bill.mend && bill.stock < bill.target && (
-                      <span className="tag warn">short of {bill.short}</span>
-                    )}
-                  </div>
+            {open.map(row)}
+            {later.length > 0 && (
+              <tr className="production-later">
+                <td colSpan={3}>
+                  <button className="link" aria-expanded={showLater} onClick={() => setShowLater(!showLater)}>
+                    {showLater ? '▾' : '▸'} {later.length} more once research unlocks{' '}
+                    {later.length === 1 ? 'it' : 'them'}
+                  </button>
                 </td>
-                <td className="muted stock">{bill.mend ? `${bill.stock} worn` : `${bill.stock} in stock`}</td>
-                {bill.mend ? (
-                  <td>
-                    <button
-                      className={bill.target > 0 ? 'active' : ''}
-                      aria-pressed={bill.target > 0}
-                      title={forTouch(bill.target > 0 ? 'Click to stop mending' : 'Click to start mending')}
-                      onClick={() => set(bill.recipe, bill.target > 0 ? 0 : 1)}
-                    >
-                      {bill.target > 0 ? 'Mending: on' : 'Mending: off'}
-                    </button>
-                  </td>
-                ) : (
-                  <td>
-                    <span className="bill-controls">
-                      <button
-                        className="less"
-                        disabled={bill.target <= 0}
-                        onClick={() => set(bill.recipe, bill.target - bill.step)}
-                        aria-label={`Keep ${bill.step} fewer ${bill.name}`}
-                      >
-                        −{bill.step}
-                      </button>
-                      {/* (Said aloud as it changes: the button's own name stays "Keep 5 more ...".) */}
-                      <span className="target" aria-live="polite">
-                        Keep {bill.target}
-                      </span>
-                      <button
-                        className="more"
-                        onClick={() => set(bill.recipe, bill.target + bill.step)}
-                        aria-label={`Keep ${bill.step} more ${bill.name}`}
-                      >
-                        +{bill.step}
-                      </button>
-                    </span>
-                  </td>
-                )}
               </tr>
-            ))}
+            )}
+            {showLater && later.map(row)}
           </tbody>
         </table>
       </div>
