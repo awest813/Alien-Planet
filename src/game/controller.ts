@@ -1483,10 +1483,13 @@ export class GameController {
     // owed in one go, the next frame slower still. What's left over is dropped (beyond a few ticks), so the game
     // runs a little slower than asked on a machine that can't keep up, rather than stalling.
     const budget = now + STEP_BUDGET_MS;
-    while (this.accumulator >= 1) {
+    while (this.accumulator >= 1 && SPEEDS[this.speedIndex] > 0) {
       this.sim.step();
       this.accumulator--;
       if (this.sim.events.some((event) => this.pausesFor(event)) || this.sim.headcount() === 0) {
+        // The rest of what was owed goes (the fraction stays, for drawing between ticks): kept, it ran on the next
+        // frames with the clock stopped, or all at once on resuming.
+        this.accumulator %= 1;
         break;
       }
       if (performance.now() > budget) {
