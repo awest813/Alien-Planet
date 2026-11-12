@@ -1428,34 +1428,17 @@ button.brush.active {
     z-index: 8;
   }
 
-  /* New colony on a phone: the choices two to a row, and only the chosen one says more, so the whole form fits
-     in a screen or two instead of fourteen full-width cards; the seed and Start stay in reach at the bottom. */
+  /* New colony on a phone: the choices two to a row (and only the chosen one says more, below), so the whole
+     form fits in a screen or two instead of fourteen full-width cards. */
   .difficulties,
   .difficulties.four {
     grid-template-columns: 1fr 1fr;
   }
-
-  .difficulties button span {
-    display: none;
-  }
-
-  .choice-note {
-    display: block;
-  }
-
-  .title-panel .start-row {
-    position: sticky;
-    bottom: -24px;
-    margin: 0 -24px -24px;
-    padding: 12px 24px 24px;
-    background: var(--panel-solid, #10141c);
-    box-shadow: 0 -8px 12px rgba(16, 20, 28, 0.9);
-  }
 }
 
-/* New colony on a phone held sideways: wide enough for the rows, too short for the descriptions on every card (Start
-   was far below the fold). Only the chosen one says more, and Start stays in reach. */
-@media (max-height: 480px) {
+/* New colony on a phone, upright or held sideways (wide enough for the rows, too short for a description on every
+   card): only the chosen one says more, and the seed and Start stay in reach at the bottom. */
+@media (max-width: 720px), (max-height: 480px) {
   .difficulties button span {
     display: none;
   }
@@ -1469,7 +1452,7 @@ button.brush.active {
     bottom: -24px;
     margin: 0 -24px -24px;
     padding: 12px 24px 24px;
-    background: #10141c;
+    background: var(--panel);
     box-shadow: 0 -8px 12px rgba(16, 20, 28, 0.9);
   }
 }
@@ -2142,12 +2125,7 @@ details summary {
   color: var(--accent);
 }
 
-/* New colony form. */
-.start-row input {
-  max-width: 180px;
-}
-
-/* Back, the seed and Start in one row: the seed gives way (on a phone they took two or three rows). */
+/* New colony form: Back, the seed and Start in one row: the seed gives way (on a phone they took two or three rows). */
 .start-row {
   flex-wrap: nowrap;
 }
