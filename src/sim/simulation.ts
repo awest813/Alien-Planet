@@ -873,11 +873,11 @@ export class Simulation {
       !teller.health.dead &&
       !teller.away &&
       this.tick < circle.endsAt &&
-      this.freeForStories(teller)
+      this.freeForStories(teller, true)
     ) {
       const region = this.regionOf(teller.tile);
       const listeners = this.living().filter(
-        (o) => o !== teller && this.freeForStories(o) && this.regionOf(o.tile) === region,
+        (o) => o !== teller && this.freeForStories(o, true) && this.regionOf(o.tile) === region,
       );
       this.seatStoryCircle(teller, circle.fire, listeners, circle.endsAt);
     }
@@ -6018,15 +6018,15 @@ export class Simulation {
     this.addLog(`${teller.name} is telling the old stories by the ${fireName}. Anyone free is welcome.`, 'good');
   }
 
-  // Free to tell stories, or to listen: off duty and not busy with anything that matters more.
-  private freeForStories(c: Colonist): boolean {
+  // Free to tell stories, or to listen: off duty and not busy with anything that matters more. `under way`: to carry
+  // on with one after a load, past bedtime too (a circle runs on to its end, and one past bedtime was dropped).
+  private freeForStories(c: Colonist, underWay = false): boolean {
     return (
       !c.drafted &&
       !c.sleeping &&
       !c.health.downed &&
       !this.inMentalBreak(c) &&
-      this.slotOf(c) !== 'W' &&
-      this.slotOf(c) !== 'S' &&
+      (underWay || (this.slotOf(c) !== 'W' && this.slotOf(c) !== 'S')) &&
       (!c.job || c.job.type === 'joy' || c.job.type === 'wander') &&
       !c.job?.listening &&
       !c.job?.gathering

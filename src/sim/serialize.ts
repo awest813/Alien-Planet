@@ -5,7 +5,7 @@ import { Diplomacy, freshDiplomacy } from './diplomacy';
 import { Shaft } from './depths';
 import { ChronicleEntry, chronicleFromStory } from './chronicle';
 import type { BeaconState } from './beacon';
-import { NONE, RECIPES, featureDef } from './defs';
+import { NONE, RECIPES, featureDef, itemDef } from './defs';
 import type { JoyKind } from './defs';
 import { RaidState } from './combat';
 import { PowerState } from './power';
@@ -111,6 +111,8 @@ interface SavedColonist {
 // are not saved: colonists simply pick new work after loading.
 export interface SaveData {
   version: number;
+  // Weapons lying about keep a condition (they wear away out in the weather). Missing from older saves.
+  weaponsWear?: boolean;
   seed: number;
   tick: number;
   rngState: number;
@@ -193,6 +195,7 @@ export function serialize(sim: Simulation): SaveData {
   const w = sim.world;
   return {
     version: SAVE_VERSION,
+    weaponsWear: true,
     seed: sim.seed,
     tick: sim.tick,
     rngState: sim.rng.state,
@@ -374,6 +377,16 @@ export function deserialize(data: SaveData): Simulation {
       const burns = world.feature[i] !== NONE ? featureDef(world.feature[i]).burns : undefined;
       if (burns) {
         world.fuel[i] = burns.capacity;
+      }
+    }
+  }
+  // A save from before weapons wore kept no condition for them: each tile held whatever the last stack there left
+  // (a meat's days, a tunic's wear), so one knife would last half a year out in the rain and another nine days.
+  // As good as new.
+  if (!data.weaponsWear) {
+    for (let i = 0; i < world.size; i++) {
+      if (world.itemType[i] !== NONE && itemDef(world.itemType[i]).weapon) {
+        world.fresh[i] = 1;
       }
     }
   }

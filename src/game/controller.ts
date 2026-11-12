@@ -2027,7 +2027,9 @@ export class GameController {
   private deadViewsFor = '';
 
   private deadView(c: Colonist): ColonistView | undefined {
-    const key = `${this.simVersion}|${this.sim.colonists.length}|${this.sim.headcount()}`;
+    // (The babies too: a dead father's family is meant to show the child born after him, and they're kept apart from
+    // the colonists until they walk.)
+    const key = `${this.simVersion}|${this.sim.colonists.length}|${this.sim.headcount()}|${this.sim.infants.map((i) => i.id).join(',')}`;
     if (key !== this.deadViewsFor) {
       this.deadViewsFor = key;
       this.deadViews.clear();

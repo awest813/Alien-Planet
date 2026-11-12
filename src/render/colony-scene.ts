@@ -210,6 +210,7 @@ export class ColonyScene extends Phaser.Scene {
   // arrows move the view under it, and Enter starts an area there and Enter again marks it (twice on the spot, one
   // tile). With the Select tool, Enter inspects it. (Without a pointer there was no way to give an order at all.)
   private keyMode = false;
+  private wideBounds = false;
   private keyDrag = false;
   private keyHover: number | null = null;
   private pan: { x: number; y: number; scrollX: number; scrollY: number; moved: boolean; button: number } | null = null;
@@ -1956,8 +1957,19 @@ export class ColonyScene extends Phaser.Scene {
     const world = controller.sim.world;
     // Eight tiles past the edge; from the keyboard, half the view, so the cursor in its middle reaches the edge tiles
     // (with eight, a third of a small map's columns were out of its reach).
-    const marginX = Math.max(TILE * 8, this.keyMode ? cam.width / cam.zoom / 2 : 0);
-    const marginY = Math.max(TILE * 8, this.keyMode ? cam.height / cam.zoom / 2 : 0);
+    // (And so on after the mouse moves, until the view is back within the usual margin: narrowed at once, the first
+    // nudge of the mouse snapped the view in from the edge the arrows had taken it to.)
+    if (this.keyMode) {
+      this.wideBounds = true;
+    } else if (this.wideBounds) {
+      const v = cam.worldView;
+      const m = TILE * 8;
+      if (v.x >= -m && v.y >= -m && v.right <= world.width * TILE + m && v.bottom <= world.height * TILE + m) {
+        this.wideBounds = false;
+      }
+    }
+    const marginX = Math.max(TILE * 8, this.wideBounds ? cam.width / cam.zoom / 2 : 0);
+    const marginY = Math.max(TILE * 8, this.wideBounds ? cam.height / cam.zoom / 2 : 0);
     const mapW = world.width * TILE + marginX * 2;
     const mapH = world.height * TILE + marginY * 2;
     const w = Math.max(mapW, cam.width / cam.zoom);
