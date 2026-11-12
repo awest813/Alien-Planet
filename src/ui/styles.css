@@ -1879,10 +1879,11 @@ button.primary:hover:not(:disabled) {
   font-size: 13px;
 }
 
+/* (A little lighter than the muted grey: on the brightest cells, the most skilled, that was 4.4:1.) */
 .work-grid .skill {
   font-size: 11px;
   font-weight: 400;
-  color: var(--muted);
+  color: #b8bec6;
 }
 
 .work-grid .skill .passion {

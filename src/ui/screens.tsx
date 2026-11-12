@@ -229,6 +229,66 @@ export function WorkScreen({ onClose }: { onClose: () => void }) {
   const forward = (value: number) => (value === 0 ? 1 : value === 4 ? 0 : value + 1);
   const back = (value: number) => (value === 0 ? 4 : value === 1 ? 0 : value - 1);
   const press = useLongPress();
+  // One Tab stop for the grid, the arrows (and Home, End) going from cell to cell, skipping work someone can't do:
+  // a stop a cell was fourteen presses of Tab a colonist.
+  const [cursor, setCursor] = useState<{ row: number; col: number } | null>(null);
+  const moveCursor = (e: React.KeyboardEvent<HTMLElement>) => {
+    const step: Record<string, [number, number]> = {
+      ArrowLeft: [0, -1],
+      ArrowRight: [0, 1],
+      ArrowUp: [-1, 0],
+      ArrowDown: [1, 0],
+    };
+    if (!(e.key in step) && e.key !== 'Home' && e.key !== 'End') {
+      return;
+    }
+    const cells = [...e.currentTarget.querySelectorAll<HTMLElement>('button.priority[data-row]')];
+    const pos = (el: HTMLElement) => ({ row: Number(el.dataset.row), col: Number(el.dataset.col) });
+    const here = cells.find((el) => el === document.activeElement);
+    if (!here) {
+      return;
+    }
+    const { row, col } = pos(here);
+    const inRow = cells.filter((el) => pos(el).row === row);
+    let next: HTMLElement | undefined;
+    if (e.key === 'Home' || e.key === 'End') {
+      next = e.key === 'Home' ? inRow[0] : inRow[inRow.length - 1];
+    } else {
+      const [dr, dc] = step[e.key];
+      // The nearest cell that way, in the same row (or column).
+      next = cells
+        .filter((el) => {
+          const p = pos(el);
+          return dr === 0
+            ? p.row === row && Math.sign(p.col - col) === dc
+            : p.col === col && Math.sign(p.row - row) === dr;
+        })
+        .sort(
+          (a, b) => Math.abs(pos(a).col - col + pos(a).row - row) - Math.abs(pos(b).col - col + pos(b).row - row),
+        )[0];
+    }
+    e.preventDefault();
+    if (next) {
+      setCursor(pos(next));
+      next.focus();
+    }
+  };
+  const living = state.colonists.filter((c) => !c.dead);
+  // Whether a colonist can be given this work (children don't work, teens only light work, the retired what they
+  // please).
+  const canDo = (c: (typeof living)[number], work: WorkTypeKey) =>
+    !(c.age < ADULT && (c.age < TEEN || !TEEN_WORK.includes(work))) && !(c.retired && !RETIRED_WORK.includes(work));
+  const open = (row: number, col: number) =>
+    row < living.length && col < WORK_TYPES.length && canDo(living[row], WORK_TYPES[col]);
+  // The cell that takes Tab: the one last moved to (while it's still there), or the first there is.
+  let stop = cursor && open(cursor.row, cursor.col) ? cursor : null;
+  for (let row = 0; !stop && row < living.length; row++) {
+    const col = WORK_TYPES.findIndex((work) => canDo(living[row], work));
+    if (col >= 0) {
+      stop = { row, col };
+    }
+  }
+  stop ??= { row: 0, col: 0 };
   return (
     <Modal title="Work priorities" onClose={onClose} wide>
       <p className="muted">
@@ -238,7 +298,7 @@ export function WorkScreen({ onClose }: { onClose: () => void }) {
         better at it.
       </p>
       <div className="table-scroll">
-        <table className="grid work-grid">
+        <table className="grid work-grid" onKeyDown={moveCursor}>
           <thead>
             <tr>
               <th>
@@ -250,82 +310,84 @@ export function WorkScreen({ onClose }: { onClose: () => void }) {
             </tr>
           </thead>
           <tbody>
-            {state.colonists
-              .filter((c) => !c.dead)
-              .map((c) => (
-                <tr key={c.id}>
-                  <td className="row-label">
-                    <span className="swatch" style={{ background: c.color }} /> {c.name}
-                    {c.age < ADULT && (
-                      <span className="muted small">
-                        {' '}
-                        ({c.stage}, {c.age})
-                      </span>
-                    )}
-                    {c.retired && <span className="muted small"> (retired, {c.age})</span>}
-                  </td>
-                  {WORK_TYPES.map((work) => {
-                    const value = c.priorities[work];
-                    const key = WORK_SKILL[work];
-                    const skill = key ? c.skillList.find((sk) => sk.key === key) : undefined;
-                    const set = (next: number) =>
-                      controller.command({ type: 'priority', colonist: c.id, work, value: next });
-                    const stars = skill?.passion ? '★'.repeat(skill.passion) : '';
-                    // Children don't work, teens only do light work, and the retired only what they please.
-                    const young = c.age < ADULT && (c.age < TEEN || !TEEN_WORK.includes(work));
-                    if (young || (c.retired && !RETIRED_WORK.includes(work))) {
-                      return (
-                        <td key={work}>
-                          <span
-                            className="priority too-young"
-                            role="img"
-                            aria-label={`${c.name}, ${WORK_LABELS[work]}: ${young ? 'too young' : 'retired'}`}
-                            title={
-                              young ? `${c.name} is too young for this work` : `${c.name} has retired from this work`
-                            }
-                          >
-                            ·
-                          </span>
-                        </td>
-                      );
-                    }
+            {living.map((c, row) => (
+              <tr key={c.id}>
+                <td className="row-label">
+                  <span className="swatch" style={{ background: c.color }} /> {c.name}
+                  {c.age < ADULT && (
+                    <span className="muted small">
+                      {' '}
+                      ({c.stage}, {c.age})
+                    </span>
+                  )}
+                  {c.retired && <span className="muted small"> (retired, {c.age})</span>}
+                </td>
+                {WORK_TYPES.map((work, col) => {
+                  const value = c.priorities[work];
+                  const key = WORK_SKILL[work];
+                  const skill = key ? c.skillList.find((sk) => sk.key === key) : undefined;
+                  const set = (next: number) =>
+                    controller.command({ type: 'priority', colonist: c.id, work, value: next });
+                  const stars = skill?.passion ? '★'.repeat(skill.passion) : '';
+                  // Children don't work, teens only do light work, and the retired only what they please.
+                  const young = c.age < ADULT && (c.age < TEEN || !TEEN_WORK.includes(work));
+                  if (young || (c.retired && !RETIRED_WORK.includes(work))) {
                     return (
                       <td key={work}>
-                        <button
-                          className={`priority p${value}`}
-                          style={
-                            skill
-                              ? { background: `rgba(143, 195, 255, ${(0.03 + (skill.level / 20) * 0.32).toFixed(2)})` }
-                              : undefined
-                          }
+                        <span
+                          className="priority too-young"
+                          role="img"
+                          aria-label={`${c.name}, ${WORK_LABELS[work]}: ${young ? 'too young' : 'retired'}`}
                           title={
-                            skill
-                              ? `${c.name}: ${skill.label} ${skill.level}${skill.passion === 2 ? ', burning passion' : skill.passion === 1 ? ', interested' : ''}`
-                              : `${c.name}: ${WORK_LABELS[work]}`
+                            young ? `${c.name} is too young for this work` : `${c.name} has retired from this work`
                           }
-                          aria-label={`${c.name}, ${WORK_LABELS[work]}: ${value === 0 ? 'off' : `priority ${value}`}${
-                            skill
-                              ? `; ${skill.label} ${skill.level}${skill.passion === 2 ? ', burning passion' : skill.passion === 1 ? ', interested' : ''}`
-                              : ''
-                          }`}
-                          {...press(
-                            () => set(forward(value)),
-                            () => set(back(value)),
-                          )}
                         >
-                          <span className="prio">{value === 0 ? '–' : value}</span>
-                          {skill && (
-                            <span className="skill">
-                              {skill.level}
-                              {stars && <span className="passion">{stars}</span>}
-                            </span>
-                          )}
-                        </button>
+                          ·
+                        </span>
                       </td>
                     );
-                  })}
-                </tr>
-              ))}
+                  }
+                  return (
+                    <td key={work}>
+                      <button
+                        className={`priority p${value}`}
+                        data-row={row}
+                        data-col={col}
+                        tabIndex={row === stop.row && col === stop.col ? 0 : -1}
+                        onFocus={() => setCursor({ row, col })}
+                        style={
+                          skill
+                            ? { background: `rgba(143, 195, 255, ${(0.03 + (skill.level / 20) * 0.32).toFixed(2)})` }
+                            : undefined
+                        }
+                        title={
+                          skill
+                            ? `${c.name}: ${skill.label} ${skill.level}${skill.passion === 2 ? ', burning passion' : skill.passion === 1 ? ', interested' : ''}`
+                            : `${c.name}: ${WORK_LABELS[work]}`
+                        }
+                        aria-label={`${c.name}, ${WORK_LABELS[work]}: ${value === 0 ? 'off' : `priority ${value}`}${
+                          skill
+                            ? `; ${skill.label} ${skill.level}${skill.passion === 2 ? ', burning passion' : skill.passion === 1 ? ', interested' : ''}`
+                            : ''
+                        }`}
+                        {...press(
+                          () => set(forward(value)),
+                          () => set(back(value)),
+                        )}
+                      >
+                        <span className="prio">{value === 0 ? '–' : value}</span>
+                        {skill && (
+                          <span className="skill">
+                            {skill.level}
+                            {stars && <span className="passion">{stars}</span>}
+                          </span>
+                        )}
+                      </button>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
