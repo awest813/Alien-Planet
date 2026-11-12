@@ -46,6 +46,23 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Eighth pass: a review of this session's own changes, and the long game** (a reader with the diff and no
+  context, each finding first seen failing; ten- and thirty-year runs measuring the save, memory, speed and a
+  hundred sanity checks a year, which found nothing broken):
+  - **The session's own bugs:** after an emergency stopped the clock, the frame's owed ticks ran on with it stopped
+    (or all at once on resuming); focus after a chain of dialogs went to a top-bar button from long before; a
+    locked door was taken for something built across it; the keyboard's cursor couldn't reach a third of a small
+    map's columns; a storyteller drafted just before a save went back to telling on loading; holding Enter
+    repeated it; a French keyboard's top row didn't pick speeds.
+  - **The long game:** the interface built every dead colonist over again five times a second (by year 30, more of
+    its work than the living); a fallen raider's gear lay where it dropped for ever (about 500 stacks by year 30,
+    each slowing every search for an item), and now wears away in a month left out in the weather; the Work grid
+    is one Tab stop; scripts/years.ts runs again, and gives the save's real size.
+  - **Left as found:** item scans still walk every stack (a per-type index would end it; the harness's lone
+    stockpile leaves a thousand stacks of stone about by year 10, which a player's colony wouldn't); dead
+    colonists' full records and everyone's opinions of them stay in the save (about 2.6KB each); the history
+    graphs keep a row a day (16KB by year 30). Saves stay near 1.1MB on Medium and 0.3MB on Tiny over ten years.
+
 - **Seventh audit: accessibility, a newcomer's first days, and what earlier audits left unconfirmed** (an
   axe-core sweep and keyboard-only play of every screen; a newcomer following the goals through two phases on a
   desktop and a phone; each finding first seen failing):
