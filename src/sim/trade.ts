@@ -172,7 +172,7 @@ export function caravanArrives(sim: Simulation): boolean {
   if (edge === undefined) {
     return false;
   }
-  const names = [...faction.names];
+  const names = sim.unusedNames(faction.names);
   const visitors: Visitor[] = [];
   for (let n = 0; n < 3; n++) {
     const name = names.splice(sim.rng.int(0, names.length - 1), 1)[0] ?? 'Trader';

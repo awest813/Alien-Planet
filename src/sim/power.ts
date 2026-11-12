@@ -47,6 +47,11 @@ export function updatePower(sim: Simulation, tiles: number[], hours: number): vo
     if (!power) {
       continue;
     }
+    // A beacon fallen quiet (the colony chose to stay) draws nothing: its 400 W kept the generators burning wood for
+    // a signal nobody was sending.
+    if (sim.beacon.silent && featureDef(f).key === 'signalBeacon') {
+      continue;
+    }
     if (power.fuel) {
       generators.push(i);
     } else if (power.solar) {

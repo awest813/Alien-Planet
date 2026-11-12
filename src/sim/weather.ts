@@ -224,7 +224,11 @@ function burnOut(sim: Simulation, tile: number): void {
       w.addFilth(tile, Filth.RUBBLE, 2);
       // (Said only if it is: a sculpture is gone for good, and so is anything that was to come down anyway.)
       const again = sim.rebuild(tile, feature);
-      sim.addLog(`Fire destroyed a ${def.name.toLowerCase()}.${again ? " It's marked for rebuilding." : ''}`, 'warn');
+      const name = def.name.toLowerCase();
+      sim.addLog(
+        `Fire destroyed ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name}.${again ? " It's marked for rebuilding." : ''}`,
+        'warn',
+      );
     }
   }
   w.markDirty(tile);

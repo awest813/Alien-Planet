@@ -274,7 +274,7 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
     }
     const centre = sim.rng.pick(edge);
     const spots = edge.sort((a, b) => w.distance(a, centre) - w.distance(b, centre)).slice(0, count);
-    const names = [...def.names];
+    const names = sim.unusedNames(def.names);
     const skill = def.skill + (sim.story.difficulty === 'harsh' ? 1 : 0) + Math.floor(sim.day / 20);
     for (let n = 0; n < count; n++) {
       const name = names.length > 0 ? names.splice(sim.rng.int(0, names.length - 1), 1)[0] : 'Raider';
@@ -1530,7 +1530,7 @@ function alliesArrive(sim: Simulation, count: number): void {
   if (spots.length === 0) {
     return;
   }
-  const names = [...FACTIONS[friend].names];
+  const names = sim.unusedNames(FACTIONS[friend].names);
   for (let n = 0; n < count; n++) {
     const name = names.length > 0 ? names.splice(sim.rng.int(0, names.length - 1), 1)[0] : 'Kin fighter';
     sim.allies.push({

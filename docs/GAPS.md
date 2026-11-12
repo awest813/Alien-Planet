@@ -46,6 +46,23 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Tenth pass: the late game and its endings, and a review of the mid-game fixes** (a player from ten-year saves
+  through the beacon, the ship, sieges, the great beast, thieves and both endings, on a desktop and a phone; a
+  reader with the last pass's diff; each finding first seen failing):
+  - **The late game:** raiders took the names of colonists won over from their side ("Rook-eye died of their
+    wounds", then "Rook-eye is telling the old stories"); the beacon goal offered a second beacon when the first had
+    no power, and the card skipped ahead to the ship for all five days of the signal; thieves running off with the
+    silver dropped out of the alerts, and the great beast's alert came eighth, out of sight (threats now come
+    first); the winter harvest pointed only at Glassmaking when sun lamps do it; the wealth goal said buildings
+    count (only goods do); the Ship button was off a phone's top bar; boarding was followed by "Next: Generations
+    goals"; a quiet beacon still drew 400 W; the fallen colony's screen had no way to read its story; the Research
+    screen listed requirements already learned; "Fire destroyed a armchair".
+  - **The review:** an animal that snapped at its tamer counted as a fight (Draft all, and Q drafted everyone);
+    the starving-drafted alert's Q advice was wrong in a fight; a group move to where nobody could go said
+    everyone was on the way, and one to a wall did nothing; the bread goal skipped the stove; livestock marked
+    for slaughter showed the hunt goal under way; stories carried on past bedtime seated whoever was on the way to
+    bed; the keyboard's wide camera bounds never narrowed zoomed right out.
+
 - **Ninth pass: the middle game, and a review of the last two passes** (a player through phases 3-5 at real speed,
   three raids, two packs and the great beast; a reader with the last two passes' diff; each finding first seen
   failing):

@@ -336,7 +336,7 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
     tool: 'signalBeacon',
   },
   beaconSignal: {
-    how: 'Five days of power without a break in the signal… and raiders will come for it. Keep the generators fed.',
+    how: 'Five days of power (the signal pauses while the power is off)… and raiders will come for it. Keep the generators fed.',
   },
   shipChoice: { how: 'When the ship lands, decide: board it and end the story here, or stay.', screen: 'ship' },
   grownUp: { how: 'Couples who love each other have children; keep them fed, warm and safe until they are 18.' },
@@ -363,7 +363,10 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
   },
   thiefCaught: { how: 'When thieves come, draft colonists and bring one down before they reach the edge of the map.' },
   cleanDefence: { how: 'Fight from cover (sandbags, embrasures, traps) so a raid breaks before anyone falls.' },
-  wealthy: { how: 'Build, craft and store goods: everything the colony owns counts.' },
+  // (Goods only: buildings aren't counted, and building with goods lowers it.)
+  wealthy: {
+    how: "Craft and store goods: everything the colony has in stock counts (buildings and art standing don't).",
+  },
   allResearch: {
     how: 'Keep researchers busy. Later projects need buildings and materials too (see Research).',
     screen: 'research',
@@ -1053,6 +1056,9 @@ export interface Alert {
   // Who or where it's about: clicking the alert takes the camera there.
   colonist?: number;
   tile?: number;
+  // A threat to the colony (a raid, a siege, thieves, a pack, the great beast): listed before everything else (the
+  // great beast's came eighth, under three colonists' collapses, out of sight).
+  threat?: boolean;
 }
 
 // A late project's building and materials, and (while it can be picked) what it's waiting on.
@@ -1531,7 +1537,13 @@ export class GameController {
         this.notify('Game paused: the raiders are closing in.');
       } else if (event === 'manhunters' && this.settings.pauseOnRaid) {
         this.setSpeed(0);
-        this.notify('Game paused: maddened animals are coming. Press Q to draft your colonists.');
+        // (The great beast by name: "maddened animals" undersold it.)
+        const beast = this.sim.animals.find((a) => a.kind === 'greatBeast' && a.manhunter && a.hp > 0);
+        this.notify(
+          beast
+            ? `Game paused: ${animalName(beast)} is coming. Press Q to draft your colonists.`
+            : 'Game paused: maddened animals are coming. Press Q to draft your colonists.',
+        );
       } else if (event === 'raid' && this.settings.pauseOnRaid) {
         // Give the player a moment to react.
         this.setSpeed(0);
@@ -2239,7 +2251,8 @@ export class GameController {
         available: isAvailable(sim.research, p),
         current: sim.research.current === p.key,
         repeatable: !!p.repeatable,
-        requires: p.requires.map((r) => researchDef(r)?.name ?? r),
+        // (What's still to learn: "Requires Engineering" stayed once it was learned.)
+        requires: p.requires.filter((r) => !sim.isResearched(r)).map((r) => researchDef(r)?.name ?? r),
         ...researchNeeds(sim, p),
       })),
       researchBench: sim.countBuilt((f) => featureDef(f).researchStation) > 0,
@@ -2549,6 +2562,7 @@ export class GameController {
         text: `Siege: ${raiders} raider${raiders > 1 ? 's' : ''} camped nearby, attacking in about ${hours}h. Break the camp, or fortify and wait.`,
         tone: 'danger',
         tile: siege.camp,
+        threat: true,
       });
     } else if (raiders > 0) {
       // Still on the way (or gathering at the edge of a small map): when to expect them.
@@ -2559,13 +2573,26 @@ export class GameController {
           : '';
       alerts.push({
         // (Once everyone who can fight is drafted, it stops telling the player to draft them.)
-        text: `Raid: ${raiders} raider${raiders > 1 ? 's' : ''} from ${FACTIONS[sim.enemies[0].faction].name}${coming}. ${
+        text: `${sim.raid?.thieves ? `Thieves: ${raiders}` : `Raid: ${raiders} raider${raiders > 1 ? 's' : ''}`} from ${FACTIONS[sim.enemies[0].faction].name}${coming}. ${
           sim.living().some((c) => !c.drafted && !c.health.downed && c.age >= DRAFT_AGE && !sim.inMentalBreak(c))
             ? 'Draft with Q.'
             : 'Everyone who can fight is drafted.'
         }`,
         tone: 'danger',
         tile: sim.enemies.find((e) => !e.fleeing)?.tile,
+        threat: true,
+      });
+    }
+    // Thieves running off with the goods: there's still time to bring one down (they dropped out of the alerts as
+    // they ran, the moment they were worth chasing).
+    const runners = sim.enemies.filter((e) => e.thief && e.loot && e.hp > 0);
+    if (runners.length > 0) {
+      const loot = runners.reduce((n, e) => n + e.loot!.count * itemDef(e.loot!.item).value, 0);
+      alerts.push({
+        text: `Thieves are running off with about ${Math.round(loot)} silver's worth: bring them down before they reach the edge (Q)`,
+        tone: 'danger',
+        tile: runners[0].tile,
+        threat: true,
       });
     }
     // An obsessed artist's vision: what it still needs, and how long is left.
@@ -2814,6 +2841,7 @@ export class GameController {
             : `${manhunters.length} maddened animal${manhunters.length > 1 ? 's are' : ' is'} hunting colonists: draft and fight (Q)`,
         tone: 'danger',
         tile: manhunters[0].tile,
+        threat: true,
       });
     } else {
       // On the way (or gathering at the edge): something to tap to find them while there's time to get ready.
@@ -2826,6 +2854,7 @@ export class GameController {
           }: draft colonists somewhere they can fight (Q)`,
           tone: 'warn',
           tile: coming[0].tile,
+          threat: true,
         });
       }
     }
@@ -3228,6 +3257,34 @@ export class GameController {
             screen: 'production',
           }
         : { how: 'The smelter is up: mine iron veins (rusty streaks in the rock) for ore.', tool: 'mine' };
+    }
+    // The late game, as it goes (the playthrough found each card a step behind, or ahead).
+    if (id === 'beaconResearch') {
+      const left = ['electricity', 'engineering', 'signalBeacon'].filter((k) => !sim.isResearched(k));
+      return {
+        how: `Research ${left.map((k) => RESEARCH.find((r) => r.key === k)?.name ?? k).join(', then ')} (Research).`,
+        screen: 'research',
+      };
+    }
+    if (id === 'beaconBuilt' && built('signalBeacon') && !sim.power.powered) {
+      // (It went on offering "Use Signal beacon", and a second one could be placed, for 60 silver.)
+      return {
+        how: 'The beacon is up but has no power: build a wood generator (or another), and keep it fed with wood.',
+        tool: 'woodGenerator',
+      };
+    }
+    if (id === 'shipChoice' && !sim.beacon.landed) {
+      // (No Ship screen to open before it lands: the card skipped ahead to it for all five days of the signal.)
+      return { how: 'When the ship lands, decide: board it and end the story here, or stay.' };
+    }
+    if (id === 'winterHarvest' && sim.isResearched('sunLamps')) {
+      return {
+        how: 'Sun lamps grow crops all year: wall a field in as a room, heat it, light it with sun lamps, and harvest it in winter.',
+        tool: 'sunLamp',
+      };
+    }
+    if (id === 'cavern' && sim.isResearched('deepMining')) {
+      return { how: 'Dig a mine shaft deep enough, and be ready for what comes up.', tool: 'mineShaft' };
     }
     const after = AFTER_RESEARCH[id];
     if (after && this.sim.isResearched(after.research)) {
@@ -3716,7 +3773,14 @@ export class GameController {
         details.push(`Grid storage ${Math.round(sim.power.stored)}/${sim.power.capacity} Wh`);
       }
       if (def.power.draw) {
-        details.push(running ? `Running (${def.power.draw} W)` : 'No power: not running');
+        // (A quiet beacon draws nothing.)
+        details.push(
+          def.key === 'signalBeacon' && sim.beacon.silent
+            ? 'Quiet: drawing no power'
+            : running
+              ? `Running (${def.power.draw} W)`
+              : 'No power: not running',
+        );
       }
     }
     if (def?.icebox) {
@@ -3738,7 +3802,7 @@ export class GameController {
             ? 'Answered: a ship is on its way'
             : b.silent
               ? 'Quiet since the colony chose to stay'
-              : `Transmitting: ${b.hours} of ${TRANSMIT_HOURS} hours (it needs power)`,
+              : `Transmitting: ${b.hours} of ${TRANSMIT_HOURS} hours${sim.power.powered ? '' : ' (paused: no power)'}`,
       );
     }
     if (def?.fishing) {

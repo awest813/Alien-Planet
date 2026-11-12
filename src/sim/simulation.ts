@@ -998,6 +998,20 @@ export class Simulation {
     return this.colonists.filter((c) => !c.health.dead && !c.away);
   }
 
+  // Of `names`, those nobody in the valley goes by: a colonist (living or dead, recruited from the raiders say), a
+  // captive, a raider, an ally or a trader. (Raiders took the names of colonists won over from their side: "Rook-eye
+  // died of their wounds", then "Rook-eye is telling the old stories".)
+  public unusedNames(names: readonly string[]): string[] {
+    const taken = new Set<string>([
+      ...this.colonists.map((c) => c.name),
+      ...this.captives.map((p) => p.name),
+      ...this.enemies.map((e) => e.name),
+      ...this.allies.map((a) => a.name),
+      ...(this.caravan?.visitors ?? []).map((v) => v.name),
+    ]);
+    return names.filter((n) => !taken.has(n));
+  }
+
   // Everyone alive, here or away: the colony's count against its population cap.
   public headcount(): number {
     return this.colonists.filter((c) => !c.health.dead).length;
@@ -2704,6 +2718,10 @@ export class Simulation {
       ) {
         this.objectivesDone[key] = true;
         const last = index === PHASE_NAMES.length - 1;
+        // (Not once the colony has left on the ship: "Next: Generations goals" closed its story.)
+        if (this.departed) {
+          return;
+        }
         this.addLog(
           last
             ? 'Every goal is complete. The colony is thriving: play on for as long as you like.'

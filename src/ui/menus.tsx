@@ -436,6 +436,8 @@ export function FallenScreen({ actions }: { actions: MenuActions }) {
             New colony
           </button>
           <button onClick={() => setView('load')}>Load game</button>
+          {/* (As at the ship's ending: the story of a colony lost is worth reading too.) */}
+          {actions.onStory && <button onClick={actions.onStory}>Read the colony's story</button>}
           <button onClick={actions.onTitle}>Title screen</button>
         </div>
       )}

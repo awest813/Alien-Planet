@@ -230,6 +230,13 @@ export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
             {(state.raid || state.animalsAttacking) && anyFree ? 'Draft all' : 'Stand down all'}
           </button>
         )}
+        {/* The ship waits a day: its choice stays one click away after the dialog is closed. (At the front: on a
+            phone the bar scrolls, and at the end it was off the screen.) */}
+        {state.ship === 'landed' && (
+          <button className="primary" onClick={() => onOpen('ship')} title="The ship is waiting: board it, or stay">
+            Ship
+          </button>
+        )}
         <button onClick={() => onOpen('work')}>Work</button>
         <button onClick={() => onOpen('schedule')}>Schedule</button>
         <button onClick={() => onOpen('production')}>Production</button>
@@ -264,12 +271,6 @@ export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
             onClick={() => onOpen('trade')}
           >
             Trade
-          </button>
-        )}
-        {/* The ship waits a day: its choice stays one click away after the dialog is closed. */}
-        {state.ship === 'landed' && (
-          <button className="primary" onClick={() => onOpen('ship')} title="The ship is waiting: board it, or stay">
-            Ship
           </button>
         )}
         <button onClick={() => onOpen('help')} title="How to play" aria-label="How to play">
@@ -948,9 +949,11 @@ export function SidePanel({ onOpen }: { onOpen: (screen: Screen) => void }) {
       </button>
     );
   }
-  // Dangers first, then warnings, then good news.
+  // Threats to the colony first, then dangers, then warnings, then good news.
   const rank = { danger: 0, warn: 1, calm: 2 };
-  const alerts = [...state.alerts].sort((a, b) => rank[a.tone] - rank[b.tone]);
+  const alerts = [...state.alerts].sort(
+    (a, b) => Number(!!b.threat) - Number(!!a.threat) || rank[a.tone] - rank[b.tone],
+  );
   const shown = allAlerts ? alerts : alerts.slice(0, ALERTS_SHOWN);
   return (
     <aside className="panel side">
