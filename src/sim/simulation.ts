@@ -4021,7 +4021,7 @@ export class Simulation {
 
   // What deconstructing this tile takes down: the building, else the roof, else the floor. A crop or
   // tree under a roof stays put while the roof comes off.
-  private deconstructTarget(i: number): number {
+  public deconstructTarget(i: number): number {
     const w = this.world;
     const f = w.feature[i];
     if (f !== NONE && featureDef(f).build) {

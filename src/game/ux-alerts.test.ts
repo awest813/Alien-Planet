@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { spawnRaid } from '../sim/combat';
+import { featureId, itemId } from '../sim/defs';
+import { Designation } from '../sim/world';
 import { HOUR, clearAround } from '../sim/test-helpers';
 import { Alert, controller } from './controller';
 
@@ -60,5 +62,37 @@ describe('alerts and orders', () => {
     controller.selectColonist(a.id);
     expect(controller.orderMove(sim.world.idx(5, 5))).toBe(true);
     expect(controller.getState().toast).toBe(`Draft ${a.name} (Q) to send them somewhere.`);
+  });
+});
+
+describe('tile card', () => {
+  it('offers the map orders for the selected tile as buttons', () => {
+    // (Cancelling one order or forbidding one pile meant picking a tool and dragging over a single tile.)
+    const sim = colony('tile-actions');
+    const w = sim.world;
+    const { x, y } = { x: w.xOf(sim.colonists[0].tile) + 5, y: w.yOf(sim.colonists[0].tile) };
+    const tree = w.idx(x, y);
+    w.setFeature(tree, featureId('tree'));
+    controller.selectTile(tree);
+    expect(controller.getState().selectedTile!.actions).toMatchObject({
+      harvest: 'chop',
+      deconstruct: false,
+      cancel: false,
+    });
+    controller.command({ type: 'designate', kind: 'chop', rect: { x0: x, y0: y, x1: x, y1: y } });
+    controller.publish();
+    expect(controller.getState().selectedTile!.actions).toMatchObject({ harvest: null, cancel: true });
+
+    const wall = w.idx(x + 1, y);
+    w.setFeature(wall, featureId('woodWall'));
+    controller.selectTile(wall);
+    expect(controller.getState().selectedTile!.actions).toMatchObject({ harvest: null, deconstruct: true });
+
+    const pile = w.idx(x + 2, y);
+    w.addItem(pile, itemId('wood'), 5);
+    controller.selectTile(pile);
+    controller.publish();
+    expect(controller.getState().selectedTile!.actions.forbidden).toBe(false);
+    expect(w.designation[tree]).toBe(Designation.CHOP);
   });
 });

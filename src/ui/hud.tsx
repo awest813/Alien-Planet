@@ -794,6 +794,7 @@ function TileCard({ t, onClose }: { t: TileView; onClose?: () => void }) {
           {o}
         </div>
       ))}
+      {onClose && <TileActions t={t} />}
       {onClose && t.stockpile && <StockpileSettings s={t.stockpile} />}
       {onClose && t.beaconSilent && (
         <div className="row">
@@ -819,6 +820,71 @@ function TileCard({ t, onClose }: { t: TileView; onClose?: () => void }) {
         </div>
       )}
     </section>
+  );
+}
+
+const HARVEST_LABEL = { mine: 'Mine', chop: 'Chop', forage: 'Forage' } as const;
+
+// The orders the map tools give, for just this tile, without picking up the tool. Delete does the
+// first of Cancel or Deconstruct.
+function TileActions({ t }: { t: TileView }) {
+  const a = t.actions;
+  const rect = { x0: t.x, y0: t.y, x1: t.x, y1: t.y };
+  const del = a.cancel ? 'cancel' : a.deconstruct ? 'deconstruct' : null;
+  useEffect(() => {
+    if (!del) {
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (e.key !== 'Delete' || e.repeat || target?.closest('input, textarea, select, [role=dialog]')) {
+        return;
+      }
+      e.preventDefault();
+      controller.command(
+        del === 'cancel' ? { type: 'cancel', rect } : { type: 'designate', kind: 'deconstruct', rect },
+      );
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [del, t.x, t.y]);
+  if (!a.cancel && !a.harvest && !a.deconstruct && a.forbidden === null) {
+    return null;
+  }
+  return (
+    <div className="row tile-actions">
+      {a.cancel && (
+        <button
+          title="Drop the order or blueprint here (Delete)"
+          onClick={() => controller.command({ type: 'cancel', rect })}
+        >
+          Cancel order
+        </button>
+      )}
+      {a.harvest && (
+        <button onClick={() => controller.command({ type: 'designate', kind: a.harvest!, rect })}>
+          {HARVEST_LABEL[a.harvest]}
+        </button>
+      )}
+      {a.deconstruct && (
+        <button
+          title="Take it down for some of its materials back (Delete)"
+          onClick={() => controller.command({ type: 'designate', kind: 'deconstruct', rect })}
+        >
+          Deconstruct
+        </button>
+      )}
+      {a.forbidden !== null && (
+        <button
+          className={a.forbidden ? 'active' : ''}
+          aria-pressed={a.forbidden}
+          title={a.forbidden ? 'Let colonists use or haul it again' : 'Colonists leave it alone'}
+          onClick={() => controller.command({ type: 'forbid', rect, on: !a.forbidden })}
+        >
+          {a.forbidden ? 'Forbidden: allow' : 'Forbid'}
+        </button>
+      )}
+    </div>
   );
 }
 

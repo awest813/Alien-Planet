@@ -854,6 +854,15 @@ export interface TileView {
   door: { tile: number; locked: boolean } | null;
   // On the signal beacon: quiet (after the colony chose to stay), for the "Signal again" button.
   beaconSilent: boolean | null;
+  // The orders the tile card offers as buttons: cancel what's marked here, mark a tree, rock or bush
+  // for its work, take a building down, or forbid/allow the items (null with nothing to forbid).
+  actions: {
+    tile: number;
+    cancel: boolean;
+    harvest: 'mine' | 'chop' | 'forage' | null;
+    deconstruct: boolean;
+    forbidden: boolean | null;
+  };
 }
 
 export interface CaptiveView {
@@ -3756,7 +3765,7 @@ export class GameController {
       details.push(`Shelf: ${w.itemCount[i]}/${w.capacity(i, w.itemType[i])}`);
     }
     if (w.forbidden[i] && w.itemType[i] !== NONE) {
-      details.push('Forbidden: colonists leave it alone (Allow to use it)');
+      details.push('Forbidden: colonists leave it alone');
     }
     if (w.filth[i] !== 0) {
       const mess = ['', 'Dirt', 'Blood', 'Rubble'][w.filthKind(i)];
@@ -3966,6 +3975,18 @@ export class GameController {
       details,
       door: def?.door ? { tile: i, locked: w.locked[i] === 1 } : null,
       beaconSilent: def?.key === 'signalBeacon' ? !!sim.beacon.silent : null,
+      actions: {
+        tile: i,
+        cancel: w.designation[i] !== Designation.NONE || w.blueprint[i] !== NONE,
+        harvest:
+          w.designation[i] === Designation.NONE &&
+          !def?.shaft &&
+          (def?.harvest?.work === 'mine' || def?.harvest?.work === 'chop' || def?.harvest?.work === 'forage')
+            ? def.harvest.work
+            : null,
+        deconstruct: w.designation[i] === Designation.NONE && sim.deconstructTarget(i) !== NONE,
+        forbidden: w.itemType[i] !== NONE ? w.forbidden[i] === 1 : null,
+      },
       stockpile: isStockpileZone(w.zone[i])
         ? { tile: i, refused: refusedGroups(w.zone[i]), priority: stockpilePriority(w.zone[i]) }
         : null,
