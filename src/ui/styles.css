@@ -1750,6 +1750,36 @@ button.active:hover:not(:disabled) {
   font-variant-numeric: tabular-nums;
 }
 
+/* Factions: in a dialog of the usual width or less, each neighbour's name and standing share a line and its buttons take
+   the line beneath. In three columns the standing was squeezed to a word a line ("goodwill" / "-36"). */
+.factions-list {
+  container-type: inline-size;
+}
+
+.factions td.num > div {
+  white-space: nowrap;
+}
+
+@container (max-width: 640px) {
+  .factions tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .factions td {
+    display: block;
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  .factions td:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Settings: a label on the left, its control on the right. */
 .setting {
   display: flex;

@@ -988,142 +988,144 @@ export function FactionsScreen({ onClose }: { onClose: () => void }) {
         soften when their people are let go or ransomed, and harden when they are starved; the warier they are, the more
         often and harder they raid.
       </p>
-      <table className="summary">
-        <tbody>
-          {state.factions.map((f) => (
-            <tr key={f.id}>
-              <td>
-                <b>{f.name}</b>
-                <div className="muted small">{f.description}</div>
-              </td>
-              <td className="num">
-                {f.relation}
-                <div className="muted small">goodwill {f.goodwill}</div>
-                {f.peaceDays > 0 && (
-                  <div className="muted small">
-                    {f.peaceDays} day{f.peaceDays === 1 ? '' : 's'} of peace left
-                  </div>
-                )}
-                {f.truceDays > 0 && (
-                  <div className="muted small">
-                    {f.truceDays} day{f.truceDays === 1 ? '' : 's'} of truce left
-                  </div>
-                )}
-              </td>
-              <td>
-                {f.hostile ? (
-                  <div className="row">
-                    <button
-                      disabled={d.silver < d.tributeCost}
-                      onClick={() => controller.command({ type: 'tribute', faction: f.id })}
-                      title={
-                        d.silver < d.tributeCost
-                          ? `The colony has ${d.silver} silver in storage of the ${d.tributeCost} it would take`
-                          : 'Pay them to leave the colony alone for 12 days: their share of the raids stops (the others still come)'
-                      }
-                    >
-                      Pay {d.tributeCost} silver for peace
-                    </button>
-                    <button
-                      disabled={f.goodwill < d.truceGoodwill || f.truceDays > 0}
-                      onClick={() => controller.command({ type: 'world', action: { kind: 'truce', faction: f.id } })}
-                      title={
-                        f.goodwill < d.truceGoodwill
-                          ? `They won't agree below goodwill ${d.truceGoodwill}: let their people go, or ransom them`
-                          : 'No raids from them for a while; it spends some of their goodwill'
-                      }
-                    >
-                      Offer a truce
-                    </button>
-                  </div>
-                ) : (
-                  <>
+      <div className="factions-list">
+        <table className="summary factions">
+          <tbody>
+            {state.factions.map((f) => (
+              <tr key={f.id}>
+                <td>
+                  <b>{f.name}</b>
+                  <div className="muted small">{f.description}</div>
+                </td>
+                <td className="num">
+                  {f.relation}
+                  <div className="muted small">goodwill {f.goodwill}</div>
+                  {f.peaceDays > 0 && (
+                    <div className="muted small">
+                      {f.peaceDays} day{f.peaceDays === 1 ? '' : 's'} of peace left
+                    </div>
+                  )}
+                  {f.truceDays > 0 && (
+                    <div className="muted small">
+                      {f.truceDays} day{f.truceDays === 1 ? '' : 's'} of truce left
+                    </div>
+                  )}
+                </td>
+                <td>
+                  {f.hostile ? (
                     <div className="row">
-                      {d.giftSizes.map((s, k) => (
-                        <button
-                          key={s}
-                          disabled={d.silver < s || f.giftGains[k] <= 0}
-                          onClick={() => controller.command({ type: 'gift', faction: f.id, silver: s })}
-                          title={
-                            f.giftGains[k] > 0
-                              ? `Give ${s} silver: goodwill +${f.giftGains[k]}`
-                              : 'They already think the world of the colony'
-                          }
-                        >
-                          Gift {s} silver
-                        </button>
-                      ))}
                       <button
-                        disabled={(f.goodwill ?? 0) < d.aid.goodwill || d.aid.waitDays > 0}
-                        onClick={() => controller.command({ type: 'world', action: { kind: 'food', faction: f.id } })}
+                        disabled={d.silver < d.tributeCost}
+                        onClick={() => controller.command({ type: 'tribute', faction: f.id })}
                         title={
-                          (f.goodwill ?? 0) < d.aid.goodwill
-                            ? `They'd help a closer friend (goodwill ${d.aid.goodwill} needed)`
-                            : d.aid.waitDays > 0
-                              ? `Friends sent food not long ago (again in ${d.aid.waitDays} day${d.aid.waitDays === 1 ? '' : 's'})`
-                              : `Three days' food for everyone, for ${d.aid.cost} goodwill`
+                          d.silver < d.tributeCost
+                            ? `The colony has ${d.silver} silver in storage of the ${d.tributeCost} it would take`
+                            : 'Pay them to leave the colony alone for 12 days: their share of the raids stops (the others still come)'
                         }
                       >
-                        Ask for food (−{d.aid.cost} goodwill)
+                        Pay {d.tributeCost} silver for peace
+                      </button>
+                      <button
+                        disabled={f.goodwill < d.truceGoodwill || f.truceDays > 0}
+                        onClick={() => controller.command({ type: 'world', action: { kind: 'truce', faction: f.id } })}
+                        title={
+                          f.goodwill < d.truceGoodwill
+                            ? `They won't agree below goodwill ${d.truceGoodwill}: let their people go, or ransom them`
+                            : 'No raids from them for a while; it spends some of their goodwill'
+                        }
+                      >
+                        Offer a truce
                       </button>
                     </div>
-                    {f.id === d.settler.faction && (
+                  ) : (
+                    <>
                       <div className="row">
+                        {d.giftSizes.map((s, k) => (
+                          <button
+                            key={s}
+                            disabled={d.silver < s || f.giftGains[k] <= 0}
+                            onClick={() => controller.command({ type: 'gift', faction: f.id, silver: s })}
+                            title={
+                              f.giftGains[k] > 0
+                                ? `Give ${s} silver: goodwill +${f.giftGains[k]}`
+                                : 'They already think the world of the colony'
+                            }
+                          >
+                            Gift {s} silver
+                          </button>
+                        ))}
                         <button
-                          disabled={d.silver < d.hireCost || (f.goodwill ?? 0) < d.hireGoodwill}
-                          onClick={() => controller.command({ type: 'hireFighters', faction: f.id })}
+                          disabled={(f.goodwill ?? 0) < d.aid.goodwill || d.aid.waitDays > 0}
+                          onClick={() => controller.command({ type: 'world', action: { kind: 'food', faction: f.id } })}
                           title={
-                            (f.goodwill ?? 0) < d.hireGoodwill
-                              ? `They won't fight for the colony below goodwill ${d.hireGoodwill}`
-                              : d.silver < d.hireCost
-                                ? `The colony has ${d.silver} silver in storage of the ${d.hireCost} it would take`
-                                : `Their fighters come to every raid and siege for ${d.hireDays} days, timed to arrive with the raiders`
+                            (f.goodwill ?? 0) < d.aid.goodwill
+                              ? `They'd help a closer friend (goodwill ${d.aid.goodwill} needed)`
+                              : d.aid.waitDays > 0
+                                ? `Friends sent food not long ago (again in ${d.aid.waitDays} day${d.aid.waitDays === 1 ? '' : 's'})`
+                                : `Three days' food for everyone, for ${d.aid.cost} goodwill`
                           }
                         >
-                          Hire fighters: {d.hireCost} silver
-                        </button>
-                        {d.hiredDaysLeft > 0 && (
-                          <span className="muted small">
-                            Fighters hired for {d.hiredDaysLeft} more day{d.hiredDaysLeft === 1 ? '' : 's'}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {f.id === d.settler.faction && (
-                      <div className="row">
-                        <button
-                          disabled={
-                            d.silver < d.settler.cost ||
-                            f.goodwill < d.settler.goodwill ||
-                            d.settler.waitDays > 0 ||
-                            !d.settler.room
-                          }
-                          onClick={() =>
-                            controller.command({ type: 'world', action: { kind: 'settler', faction: f.id } })
-                          }
-                          title={
-                            !d.settler.room
-                              ? 'The colony has no room for more'
-                              : f.goodwill < d.settler.goodwill
-                                ? `They won't send one of their own below goodwill ${d.settler.goodwill}`
-                                : d.settler.waitDays > 0
-                                  ? `Nobody else is ready to leave for ${d.settler.waitDays} day${d.settler.waitDays === 1 ? '' : 's'}`
-                                  : d.silver < d.settler.cost
-                                    ? `The colony has ${d.silver} silver in storage of the ${d.settler.cost} it would take`
-                                    : 'A willing settler comes to join the colony'
-                          }
-                        >
-                          Ask for a settler: {d.settler.cost} silver
+                          Ask for food (−{d.aid.cost} goodwill)
                         </button>
                       </div>
-                    )}
-                  </>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                      {f.id === d.settler.faction && (
+                        <div className="row">
+                          <button
+                            disabled={d.silver < d.hireCost || (f.goodwill ?? 0) < d.hireGoodwill}
+                            onClick={() => controller.command({ type: 'hireFighters', faction: f.id })}
+                            title={
+                              (f.goodwill ?? 0) < d.hireGoodwill
+                                ? `They won't fight for the colony below goodwill ${d.hireGoodwill}`
+                                : d.silver < d.hireCost
+                                  ? `The colony has ${d.silver} silver in storage of the ${d.hireCost} it would take`
+                                  : `Their fighters come to every raid and siege for ${d.hireDays} days, timed to arrive with the raiders`
+                            }
+                          >
+                            Hire fighters: {d.hireCost} silver
+                          </button>
+                          {d.hiredDaysLeft > 0 && (
+                            <span className="muted small">
+                              Fighters hired for {d.hiredDaysLeft} more day{d.hiredDaysLeft === 1 ? '' : 's'}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {f.id === d.settler.faction && (
+                        <div className="row">
+                          <button
+                            disabled={
+                              d.silver < d.settler.cost ||
+                              f.goodwill < d.settler.goodwill ||
+                              d.settler.waitDays > 0 ||
+                              !d.settler.room
+                            }
+                            onClick={() =>
+                              controller.command({ type: 'world', action: { kind: 'settler', faction: f.id } })
+                            }
+                            title={
+                              !d.settler.room
+                                ? 'The colony has no room for more'
+                                : f.goodwill < d.settler.goodwill
+                                  ? `They won't send one of their own below goodwill ${d.settler.goodwill}`
+                                  : d.settler.waitDays > 0
+                                    ? `Nobody else is ready to leave for ${d.settler.waitDays} day${d.settler.waitDays === 1 ? '' : 's'}`
+                                    : d.silver < d.settler.cost
+                                      ? `The colony has ${d.silver} silver in storage of the ${d.settler.cost} it would take`
+                                      : 'A willing settler comes to join the colony'
+                            }
+                          >
+                            Ask for a settler: {d.settler.cost} silver
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <Expeditions state={state} />
     </Modal>
   );
