@@ -2436,7 +2436,7 @@ export class GameController {
         };
       }),
       alerts: this.alertsFor(totals),
-      log: sim.log.slice(-12).reverse(),
+      log: sim.log.slice(-20).reverse(),
       story: [...sim.storyLog].reverse(),
       festivals: sim.story.festivals !== false,
       village: this.villageView(),

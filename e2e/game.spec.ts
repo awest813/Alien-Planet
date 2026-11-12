@@ -38,7 +38,7 @@ const SCREENS: { open: (page: Page) => ReturnType<Page['locator']>; dialog: stri
   { open: (p) => p.locator('.screens button', { hasText: 'Story' }), dialog: 'The story so far' },
   { open: (p) => p.locator('.screens button', { hasText: 'Village' }), dialog: 'Village' },
   { open: (p) => p.locator('.screens button', { hasText: /^Factions/ }), dialog: 'Factions' },
-  { open: (p) => p.locator('.screens button', { hasText: /^\?$/ }), dialog: 'Welcome to Colony Alpha' },
+  { open: (p) => p.locator('.screens button', { hasText: /^\?$/ }), dialog: 'How to play' },
   { open: (p) => p.getByRole('button', { name: 'All colonists' }), dialog: 'Colonists' },
 ];
 
@@ -104,7 +104,7 @@ test('save to a slot and load it back', async ({ page }) => {
   await page.locator('.screens button', { hasText: 'Menu' }).click();
   const menu = page.getByRole('dialog', { name: 'Paused' });
   await menu.getByRole('button', { name: 'Save or load' }).click();
-  const slot1 = menu.getByRole('row', { name: /Slot 1/ });
+  const slot1 = page.getByRole('dialog', { name: 'Save or load' }).getByRole('row', { name: /Slot 1/ });
   await expect(slot1).toContainText('Empty');
   await slot1.getByRole('button', { name: 'Save' }).click();
   await expect(slot1).toContainText('Day 1');

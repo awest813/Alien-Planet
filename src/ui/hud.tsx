@@ -12,7 +12,7 @@ import {
   controller,
 } from '../game/controller';
 import { itemIconStyle } from '../render/icons';
-import { PHASE_NAMES } from '../sim/simulation';
+import { PHASE_NAMES, START_HOUR, TICKS_PER_HOUR } from '../sim/simulation';
 import type { Stance } from '../sim/types';
 import { STORAGE_GROUPS, StockpilePriority } from '../sim/world';
 import { DRAFT_AGE } from '../sim/lifespans';
@@ -898,7 +898,7 @@ type SideTab = 'goals' | 'log';
 const ALERTS_SHOWN = 3;
 
 const pickSidePanel = (s: UiState) => ({
-  ...fields('alerts', 'log', 'objectives', 'toolId')(s),
+  ...fields('alerts', 'day', 'log', 'objectives', 'toolId')(s),
   afternoon: parseInt(s.time, 10) >= 12,
 });
 
@@ -1079,6 +1079,7 @@ export function SidePanel({ onOpen }: { onOpen: (screen: Screen) => void }) {
           <ul className="log">
             {state.log.map((entry, index) => (
               <li key={`${entry.tick}-${index}`} className={entry.tone}>
+                <span className="when">{logTime(entry.tick, state.day)}</span>
                 {entry.text}
               </li>
             ))}
@@ -1347,4 +1348,12 @@ export function Notices({ paused = false }: { paused?: boolean }) {
       ))}
     </div>
   );
+}
+
+// "14:00" for today's entries, "Day 3, 14:00" for older ones — the same clock the Story screen uses.
+function logTime(tick: number, today: number): string {
+  const hours = tick / TICKS_PER_HOUR + START_HOUR;
+  const day = Math.floor(hours / 24) + 1;
+  const time = `${String(Math.floor(hours % 24)).padStart(2, '0')}:00`;
+  return day === today ? time : `Day ${day}, ${time}`;
 }

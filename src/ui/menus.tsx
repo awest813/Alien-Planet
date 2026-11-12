@@ -146,7 +146,8 @@ function NewColonyForm({
       <div className="row start-row">
         {onBack && <button onClick={onBack}>Back</button>}
         <input
-          placeholder="Seed (optional)"
+          // ("Seed (optional)" was cut to "Seed (optio" on a narrow phone; the title says it's optional.)
+          placeholder="Seed"
           aria-label="Seed"
           title="The same seed gives the same map; leave blank for a random one"
           value={seed}
@@ -346,7 +347,8 @@ export function PauseMenu({ onClose, actions }: { onClose: () => void; actions: 
   const living = state.colonists.filter((c) => !c.dead).length;
   return (
     <Modal
-      title="Paused"
+      // (Each view by its name, as on the title screen: Load game and New colony were "Paused" here.)
+      title={view === 'saves' ? 'Save or load' : view === 'new' ? 'New colony' : 'Paused'}
       onClose={onClose}
       closeButton={view !== 'main'}
       footer={view !== 'main' && <button onClick={() => setView('main')}>Back</button>}

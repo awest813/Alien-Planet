@@ -1,6 +1,7 @@
 import { TOUCH, forTouch } from './touch';
 import { useEffect, useRef, useState } from 'react';
 import { ChronicleYear, UiState, controller, timeLeft } from '../game/controller';
+import { helpSeen } from '../game/settings';
 import { ChronicleKind } from '../sim/chronicle';
 import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey, WorldAction } from '../sim/types';
 import { Bar, SLOT_LABELS, WORK_LABELS, fields, moodColor, useUi } from './common';
@@ -654,8 +655,10 @@ export function ProductionScreen({ onClose }: { onClose: () => void }) {
 }
 
 export function HelpScreen({ onClose }: { onClose: () => void }) {
+  // (A welcome the first time; after that, the How to play it's opened as. Read once, as it opens.)
+  const [welcomed] = useState(() => helpSeen());
   return (
-    <Modal title="Welcome to Colony Alpha" onClose={onClose}>
+    <Modal title={welcomed ? 'How to play' : 'Welcome to Colony Alpha'} onClose={onClose}>
       <p>
         A handful of colonists have crash-landed. You don't steer them directly: you give orders, and they decide who
         does what between eating, sleeping and taking breaks.

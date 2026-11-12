@@ -788,6 +788,12 @@ kbd {
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
+.log .when {
+  color: var(--muted);
+  margin-right: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
 .log li.good,
 .story li.good {
   color: var(--good);
@@ -1417,6 +1423,27 @@ button.brush.active {
     margin: 0 -24px -24px;
     padding: 12px 24px 24px;
     background: var(--panel-solid, #10141c);
+    box-shadow: 0 -8px 12px rgba(16, 20, 28, 0.9);
+  }
+}
+
+/* New colony on a phone held sideways: wide enough for the rows, too short for the descriptions on every card (Start
+   was far below the fold). Only the chosen one says more, and Start stays in reach. */
+@media (max-height: 480px) {
+  .difficulties button span {
+    display: none;
+  }
+
+  .choice-note {
+    display: block;
+  }
+
+  .title-panel .start-row {
+    position: sticky;
+    bottom: -24px;
+    margin: 0 -24px -24px;
+    padding: 12px 24px 24px;
+    background: #10141c;
     box-shadow: 0 -8px 12px rgba(16, 20, 28, 0.9);
   }
 }
