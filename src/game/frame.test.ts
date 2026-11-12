@@ -69,3 +69,25 @@ describe('a frame', () => {
     expect(odd).toEqual([]);
   });
 });
+
+describe('the dead in the interface', () => {
+  it('are built once, and again only when the colony changes', () => {
+    // (Every dead colonist was built over again five times a second, thoughts and all.)
+    controller.newColony('the-dead');
+    const sim = controller.sim;
+    while (sim.colonists.length < 4) {
+      sim.addWanderer();
+    }
+    const [a, b] = sim.colonists;
+    a.health.dead = true;
+    controller.publish();
+    const thoughts = vi.spyOn(sim, 'thoughtsOf');
+    controller.publish();
+    expect(thoughts.mock.calls.some(([c]) => c === a)).toBe(false);
+    // Another death: the first one's view is built again (who they knew among the living has changed).
+    b.health.dead = true;
+    controller.publish();
+    const shown = controller.getState().colonists.find((c) => c.id === a.id)!;
+    expect(shown.relations.some((r) => r.name === b.name)).toBe(false);
+  });
+});

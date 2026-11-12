@@ -2020,6 +2020,28 @@ export class GameController {
     }
   }
 
+  // The dead don't change, but every one was built over again five times a second, thoughts, skills and all: by a
+  // colony's thirtieth year, more of the interface's work than the living. Kept until the colony's makeup changes
+  // (a death, a birth, a load: their family and who they knew among the living are part of it).
+  private deadViews = new Map<number, ColonistView>();
+  private deadViewsFor = '';
+
+  private deadView(c: Colonist): ColonistView | undefined {
+    const key = `${this.simVersion}|${this.sim.colonists.length}|${this.sim.headcount()}`;
+    if (key !== this.deadViewsFor) {
+      this.deadViewsFor = key;
+      this.deadViews.clear();
+    }
+    return c.health.dead ? this.deadViews.get(c.id) : undefined;
+  }
+
+  private keepDead(c: Colonist, view: ColonistView): ColonistView {
+    if (c.health.dead) {
+      this.deadViews.set(c.id, view);
+    }
+    return view;
+  }
+
   private replaceSim(sim: Simulation): void {
     this.sim = sim;
     this.simVersion++;
@@ -2171,91 +2193,95 @@ export class GameController {
       speed: this.speedIndex,
       notStarted: this.notStarted,
       toolId: toolId(this.tool),
-      colonists: sim.colonists.map((c) => ({
-        id: c.id,
-        name: c.name,
-        color: c.color,
-        activity: this.activityOf(c),
-        carrying: c.carrying && `${c.carrying.count} ${itemDef(c.carrying.item).name.toLowerCase()}`,
-        skills: { ...c.skills },
-        needs: { ...c.needs },
-        recentRecreation: (Object.entries(c.recentJoy) as [JoyKind, number][])
-          .filter(([, amount]) => amount >= 0.05)
-          .sort((a, b) => b[1] - a[1])
-          .map(([kind]) => JOY_KIND_LABELS[kind])
-          .join(', '),
-        mood: Math.round(c.mood),
-        inBreak: sim.inMentalBreak(c),
-        thoughts: sim.thoughtsOf(c),
-        priorities: { ...c.priorities },
-        schedule: [...c.schedule],
-        traits: c.traits.map((key) => ({ label: TRAITS[key].label, description: TRAITS[key].description })),
-        leader: sim.village.leader === c.id,
-        canRetire: !c.health.dead && (c.age >= ELDER || !!c.retired),
-        retired: !!c.retired,
-        age: Math.floor(c.age),
-        stage: c.retired ? 'elder, retired' : stageOf(c.age),
-        backstory: (({ title, description }) => ({ title, description }))(backstoryOf(c.backstory)),
-        family: this.familyOf(c),
-        bleeding: !c.health.dead && bleedingOf(c) > 0,
-        sleeping: c.sleeping,
-        status: c.health.dead
-          ? 'Dead'
-          : c.away
-            ? 'Away'
-            : c.health.downed
-              ? 'Downed'
-              : c.health.disease
-                ? 'Sick'
-                : c.health.injuries.length > 0
-                  ? 'Injured'
-                  : 'Healthy',
-        injuries: c.health.injuries.map((injury) => ({
-          label: injury.part ? `${injury.label} (${PART_LABELS[injury.part]})` : injury.label,
-          severity: injury.severity,
-          tended: injury.tended > 0,
-          infected: isInfected(injury),
-        })),
-        scars: [...scarsOf(c).map((s) => SCAR_LABELS[s.kind]), ...ailmentsOf(c).map((a) => AILMENTS[a].label)],
-        bloodLoss: c.health.bloodLoss,
-        disease: c.health.disease && {
-          label: c.health.disease.label,
-          severity: c.health.disease.severity,
-          immunity: c.health.disease.immunity,
-        },
-        relations: sim.colonists
-          .filter((o) => o !== c && !o.health.dead)
-          .map((o) => ({ name: o.name, opinion: Math.round(c.opinions[o.id] ?? 0), label: kinLabel(c, o) }))
-          .sort((a, b) => b.opinion - a.opinion),
-        drafted: c.drafted,
-        dead: c.health.dead,
-        skillList: SKILL_KEYS.map((key) => ({
-          key,
-          label: SKILL_LABELS[key],
-          level: c.skills[key],
-          passion: c.passions[key],
-          progress: c.skills[key] >= MAX_SKILL ? 1 : c.skillXp[key] / xpToNext(c.skills[key]),
-        })),
-        weapon:
-          weaponDef(c.weapon).item !== undefined
-            ? `${qualityLabel(c.weaponQuality)} ${weaponDef(c.weapon).name.toLowerCase()}`
-            : weaponDef(c.weapon).name,
-        armor: c.armor
-          ? `${itemDef(c.armor.item).name} (${Math.round(armorOf(c).protection * 100)}%, ${Math.round(c.armor.wear * 100)}% condition)`
-          : 'None',
-        stance: c.stance,
-        focus: sim.enemies.find((e) => e.id === c.focus && e.hp > 0)?.name ?? null,
-        tool: c.tool ? `${qualityLabel(c.tool.quality)} tool kit (${Math.round(c.tool.wear * 100)}%)` : 'None',
-        apparel: c.apparel
-          ? `${qualityLabel(c.apparel.quality)} ${itemDef(c.apparel.item).name.toLowerCase()} (${Math.round(c.apparel.wear * 100)}%)`
-          : 'Nothing',
-        comfort: ((r) => `${Math.round(r.min)}°C to ${Math.round(r.max)}°C`)(comfortRange(c)),
-        conditions: [
-          { label: 'Hypothermia', value: c.health.hypothermia },
-          { label: 'Heatstroke', value: c.health.heatstroke },
-          { label: 'Food poisoning', value: c.health.poisoned / POISONING_HOURS },
-        ].filter((condition) => condition.value > 0.02),
-      })),
+      colonists: sim.colonists.map(
+        (c) =>
+          this.deadView(c) ??
+          this.keepDead(c, {
+            id: c.id,
+            name: c.name,
+            color: c.color,
+            activity: this.activityOf(c),
+            carrying: c.carrying && `${c.carrying.count} ${itemDef(c.carrying.item).name.toLowerCase()}`,
+            skills: { ...c.skills },
+            needs: { ...c.needs },
+            recentRecreation: (Object.entries(c.recentJoy) as [JoyKind, number][])
+              .filter(([, amount]) => amount >= 0.05)
+              .sort((a, b) => b[1] - a[1])
+              .map(([kind]) => JOY_KIND_LABELS[kind])
+              .join(', '),
+            mood: Math.round(c.mood),
+            inBreak: sim.inMentalBreak(c),
+            thoughts: sim.thoughtsOf(c),
+            priorities: { ...c.priorities },
+            schedule: [...c.schedule],
+            traits: c.traits.map((key) => ({ label: TRAITS[key].label, description: TRAITS[key].description })),
+            leader: sim.village.leader === c.id,
+            canRetire: !c.health.dead && (c.age >= ELDER || !!c.retired),
+            retired: !!c.retired,
+            age: Math.floor(c.age),
+            stage: c.retired ? 'elder, retired' : stageOf(c.age),
+            backstory: (({ title, description }) => ({ title, description }))(backstoryOf(c.backstory)),
+            family: this.familyOf(c),
+            bleeding: !c.health.dead && bleedingOf(c) > 0,
+            sleeping: c.sleeping,
+            status: c.health.dead
+              ? 'Dead'
+              : c.away
+                ? 'Away'
+                : c.health.downed
+                  ? 'Downed'
+                  : c.health.disease
+                    ? 'Sick'
+                    : c.health.injuries.length > 0
+                      ? 'Injured'
+                      : 'Healthy',
+            injuries: c.health.injuries.map((injury) => ({
+              label: injury.part ? `${injury.label} (${PART_LABELS[injury.part]})` : injury.label,
+              severity: injury.severity,
+              tended: injury.tended > 0,
+              infected: isInfected(injury),
+            })),
+            scars: [...scarsOf(c).map((s) => SCAR_LABELS[s.kind]), ...ailmentsOf(c).map((a) => AILMENTS[a].label)],
+            bloodLoss: c.health.bloodLoss,
+            disease: c.health.disease && {
+              label: c.health.disease.label,
+              severity: c.health.disease.severity,
+              immunity: c.health.disease.immunity,
+            },
+            relations: sim.colonists
+              .filter((o) => o !== c && !o.health.dead)
+              .map((o) => ({ name: o.name, opinion: Math.round(c.opinions[o.id] ?? 0), label: kinLabel(c, o) }))
+              .sort((a, b) => b.opinion - a.opinion),
+            drafted: c.drafted,
+            dead: c.health.dead,
+            skillList: SKILL_KEYS.map((key) => ({
+              key,
+              label: SKILL_LABELS[key],
+              level: c.skills[key],
+              passion: c.passions[key],
+              progress: c.skills[key] >= MAX_SKILL ? 1 : c.skillXp[key] / xpToNext(c.skills[key]),
+            })),
+            weapon:
+              weaponDef(c.weapon).item !== undefined
+                ? `${qualityLabel(c.weaponQuality)} ${weaponDef(c.weapon).name.toLowerCase()}`
+                : weaponDef(c.weapon).name,
+            armor: c.armor
+              ? `${itemDef(c.armor.item).name} (${Math.round(armorOf(c).protection * 100)}%, ${Math.round(c.armor.wear * 100)}% condition)`
+              : 'None',
+            stance: c.stance,
+            focus: sim.enemies.find((e) => e.id === c.focus && e.hp > 0)?.name ?? null,
+            tool: c.tool ? `${qualityLabel(c.tool.quality)} tool kit (${Math.round(c.tool.wear * 100)}%)` : 'None',
+            apparel: c.apparel
+              ? `${qualityLabel(c.apparel.quality)} ${itemDef(c.apparel.item).name.toLowerCase()} (${Math.round(c.apparel.wear * 100)}%)`
+              : 'Nothing',
+            comfort: ((r) => `${Math.round(r.min)}°C to ${Math.round(r.max)}°C`)(comfortRange(c)),
+            conditions: [
+              { label: 'Hypothermia', value: c.health.hypothermia },
+              { label: 'Heatstroke', value: c.health.heatstroke },
+              { label: 'Food poisoning', value: c.health.poisoned / POISONING_HOURS },
+            ].filter((condition) => condition.value > 0.02),
+          }),
+      ),
       selectedColonist: this.selectedColonist,
       resources: totals.map((r) => ({ item: r.item, name: itemDef(r.item).name, stored: r.stored, total: r.total })),
       foodDays:
