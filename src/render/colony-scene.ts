@@ -1954,14 +1954,17 @@ export class ColonyScene extends Phaser.Scene {
   private fitBounds(): void {
     const cam = this.cameras.main;
     const world = controller.sim.world;
-    const margin = TILE * 8;
-    const mapW = world.width * TILE + margin * 2;
-    const mapH = world.height * TILE + margin * 2;
+    // Eight tiles past the edge; from the keyboard, half the view, so the cursor in its middle reaches the edge tiles
+    // (with eight, a third of a small map's columns were out of its reach).
+    const marginX = Math.max(TILE * 8, this.keyMode ? cam.width / cam.zoom / 2 : 0);
+    const marginY = Math.max(TILE * 8, this.keyMode ? cam.height / cam.zoom / 2 : 0);
+    const mapW = world.width * TILE + marginX * 2;
+    const mapH = world.height * TILE + marginY * 2;
     const w = Math.max(mapW, cam.width / cam.zoom);
     const h = Math.max(mapH, cam.height / cam.zoom);
     const b = cam.getBounds();
-    const x = mapW / 2 - margin - w / 2;
-    const y = mapH / 2 - margin - h / 2;
+    const x = mapW / 2 - marginX - w / 2;
+    const y = mapH / 2 - marginY - h / 2;
     if (b.x !== x || b.y !== y || b.width !== w || b.height !== h) {
       cam.setBounds(x, y, w, h);
     }
@@ -1975,6 +1978,12 @@ export class ColonyScene extends Phaser.Scene {
       const key = event.key;
       if (key.length !== 1) {
         return key;
+      }
+      // The number keys by where they are: on a French keyboard the top row types & é " without Shift, and only
+      // é (not a Latin letter) reached a speed.
+      const digit = /^Digit([0-9])$/.exec(event.code);
+      if (digit) {
+        return digit[1];
       }
       if (/^[\x20-\x7e]$/.test(key)) {
         return key.toLowerCase();
@@ -2020,7 +2029,7 @@ export class ColonyScene extends Phaser.Scene {
         this.keyMode = true;
       }
       // Holding a toggle key mustn't flicker it.
-      if (event.repeat && (key === ' ' || key === 'q' || key === 'Tab')) {
+      if (event.repeat && (key === ' ' || key === 'q' || key === 'Tab' || key === 'Enter')) {
         event.preventDefault();
         return;
       }

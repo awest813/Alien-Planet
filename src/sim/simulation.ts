@@ -812,7 +812,9 @@ export class Simulation {
       nextShelterSearch: [...this.nextShelterSearch],
       shelterLogged: [...this.shelterLogged],
       concert: this.concert ? { ...this.concert } : null,
-      storyCircle: this.storyCircle ? { ...this.storyCircle } : null,
+      // (Only while the teller is still telling.)
+      storyCircle:
+        this.storyCircle && this.colonists[this.storyCircle.teller]?.job?.telling ? { ...this.storyCircle } : null,
     };
   }
 
@@ -861,7 +863,16 @@ export class Simulation {
     }
     const circle = timers.storyCircle;
     const teller = circle ? this.colonists[circle.teller] : undefined;
-    if (circle && teller && !teller.health.dead && !teller.away && this.tick < circle.endsAt) {
+    // (Not a teller who'd been called away when it was saved, drafted say: the circle outlives their job by up to a
+    // slow tick, and a load put them back to telling.)
+    if (
+      circle &&
+      teller &&
+      !teller.health.dead &&
+      !teller.away &&
+      this.tick < circle.endsAt &&
+      this.freeForStories(teller)
+    ) {
       const region = this.regionOf(teller.tile);
       const listeners = this.living().filter(
         (o) => o !== teller && this.freeForStories(o) && this.regionOf(o.tile) === region,

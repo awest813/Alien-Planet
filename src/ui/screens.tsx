@@ -64,7 +64,9 @@ export function Modal({
   const [before] = useState(() => {
     const active = document.activeElement;
     const keyboard = active instanceof HTMLElement && active.matches(':focus-visible') ? active : null;
-    if (keyboard && !keyboard.closest('.modal-backdrop')) {
+    // (Each chain of dialogs started from outside them starts afresh, from the page too: one left over from long
+    // before sent focus back to an old Work button, and Space opened Work rather than starting the clock.)
+    if (!(active instanceof HTMLElement && active.closest('.modal-backdrop'))) {
       outsideOpener = keyboard;
     }
     return keyboard;

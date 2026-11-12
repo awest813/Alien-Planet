@@ -2759,6 +2759,7 @@ export class GameController {
         alerts.push({ text: `${c.name} is unhappy (mood ${Math.round(c.mood)})`, tone: 'warn', colonist: c.id });
       }
     }
+    const shut = this.roomShut();
     if (!sim.hasShelter() && sim.hour >= 16 && sim.hour < NIGHT_START) {
       const left = Math.ceil(NIGHT_START - sim.hour);
       const walls = [...w.tilesWith('blueprints')].filter((i) => featureDef(w.blueprint[i]).blocksRoom).length;
@@ -2768,9 +2769,11 @@ export class GameController {
             ? ` (${walls} ${walls === 1 ? 'wall or door' : 'walls and doors'} still to build)`
             : this.wallsLeak()
               ? ': the walls are up but leave a gap (over water, or a missing piece): wall it up'
-              : this.roomShut()
-                ? ': the room is closed in but nobody can get into it: is something built across the door?'
-                : ': plan walls and a door'
+              : shut === 'locked'
+                ? ': its door is locked: select the door and unlock it'
+                : shut === 'blocked'
+                  ? ': the room is closed in but nobody can get into it: is something built across the door?'
+                  : ': plan walls and a door'
         }`,
         tone: left <= 2 ? 'danger' : 'warn',
       });
@@ -2783,9 +2786,11 @@ export class GameController {
           text: `${outside} colonist${outside > 1 ? 's are' : ' is'} sleeping outside: cold and miserable. ${
             this.wallsLeak()
               ? 'The walls leave a gap (over water, or a missing piece): wall it up to close the room'
-              : this.roomShut()
-                ? 'Nobody can get into the room: is something built across the door?'
-                : 'Build a shelter with beds'
+              : shut === 'locked'
+                ? 'The door is locked: select it and unlock it'
+                : shut === 'blocked'
+                  ? 'Nobody can get into the room: is something built across the door?'
+                  : 'Build a shelter with beds'
           }`,
           tone: 'warn',
         });
@@ -3044,7 +3049,11 @@ export class GameController {
     if (this.sim.objectivesDone[id]) {
       return help;
     }
-    if (id === 'shelter' && this.roomShut()) {
+    const shut = id === 'shelter' ? this.roomShut() : null;
+    if (shut === 'locked') {
+      return { how: "The room's door is locked, so nobody can get in: select the door and unlock it." };
+    }
+    if (shut === 'blocked') {
       return {
         how: 'The room is closed in, but nobody can get into it: something built just inside or outside the door blocks the way. Deconstruct it (R), or put the door somewhere else.',
         tool: 'deconstruct',
@@ -3102,10 +3111,10 @@ export class GameController {
   // Walls and a door built, nothing left to build, and still no closed room: there's a gap somewhere (a wall
   // outline dragged over water leaves one, without a word). The help used to say "plan walls and a door".
   // A built door opening into a closed-in room (not a pocket among the rocks, which every map can have).
-  private doorRoom(): boolean {
+  private doorRooms(): number[] {
     const sim = this.sim;
     const w = sim.world;
-    return sim.buildingTiles().some(
+    return sim.buildingTiles().filter(
       (d) =>
         !!featureDef(w.feature[d]).door &&
         w.neighbors(d, false).some((n) => {
@@ -3115,9 +3124,18 @@ export class GameController {
     );
   }
 
-  // No shelter anyone can get to, but a room closed in with a door: the way in is blocked (a campfire just inside).
-  private roomShut(): boolean {
-    return !this.sim.hasShelter() && this.doorRoom();
+  private doorRoom(): boolean {
+    return this.doorRooms().length > 0;
+  }
+
+  // No shelter anyone can get to, but a room closed in with a door: the way in is locked, or blocked (a campfire
+  // just inside). (A locked door was taken for something built across it, and the help said to deconstruct it.)
+  private roomShut(): 'locked' | 'blocked' | null {
+    if (this.sim.hasShelter()) {
+      return null;
+    }
+    const doors = this.doorRooms();
+    return doors.length === 0 ? null : doors.every((d) => this.sim.world.locked[d]) ? 'locked' : 'blocked';
   }
 
   private wallsLeak(): boolean {
