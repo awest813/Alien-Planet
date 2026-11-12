@@ -1548,9 +1548,15 @@ button.link:focus-visible {
     padding: 4px 6px;
   }
 
-  .tb-time {
-    gap: 6px;
+  /* (Spaced a little closer, the speeds fit beside the clock on most phones, saving a row.) */
+  .tb-time,
+  .topbar.tight .tb-time {
+    gap: 4px;
     font-size: 12px;
+  }
+
+  .temp {
+    min-width: 2.8em;
   }
 
   .speeds button {
