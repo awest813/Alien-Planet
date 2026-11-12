@@ -63,7 +63,12 @@ export function App() {
   const actions: MenuActions = {
     // A new player gets the welcome help as their first colony starts.
     // (A game loaded with the ship waiting opens on its choice: this runs after the effect below, and closed it.)
-    onPlay: () => setScreen(controller.getState().ship === 'landed' ? 'ship' : helpSeen() ? null : 'help'),
+    // (The welcome only for a colony on its first day: a save from day 32 loaded on a new device opened on it, the
+    // first night's advice and all.)
+    onPlay: () =>
+      setScreen(
+        controller.getState().ship === 'landed' ? 'ship' : helpSeen() || controller.sim.day > 1 ? null : 'help',
+      ),
     onSettings: openFromMenu('settings'),
     onHelp: openFromMenu('help'),
     onStory: () => setScreen('story'),

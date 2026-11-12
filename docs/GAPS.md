@@ -62,8 +62,10 @@ with esbuild for speed (see ROADMAP).
   - **The review:** a dead parent never showed a child born after them; stories by the fire past bedtime were
     dropped on loading; weapons in older saves kept a stray condition (half a year in the rain, or nine days); the
     first nudge of the mouse after arrowing to the map's edge snapped the view back.
-  - **Left as found:** fires burn wood all year, so a summer heat wave can bring "firewood running low"; a save
-    loaded on a device that has never played shows the welcome help, first-night advice and all.
+  - **Left as found, since looked at:** a save loaded on a device that has never played opened on the welcome
+    help, first-night advice and all (it's only for a colony on its first day now). Fires do burn wood all year
+    (a campfire is lit), but the firewood alert waits for winter to be near; a summer "firewood running low" wasn't
+    seen again.
 
 - **Eighth pass: a review of this session's own changes, and the long game** (a reader with the diff and no
   context, each finding first seen failing; ten- and thirty-year runs measuring the save, memory, speed and a
