@@ -871,6 +871,16 @@ kbd {
   flex: 1;
 }
 
+/* The colonist card's body takes focus so the keyboard can scroll it: a ring for the keyboard, none for a click. */
+.card-body:focus {
+  outline: none;
+}
+
+.card-body:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 /* A notification about someone or somewhere takes the camera there. */
 .notification-go {
   pointer-events: auto;
@@ -1083,7 +1093,8 @@ button.brush.slot-A {
 
 .slot-W,
 button.brush.slot-W {
-  background: rgba(255, 209, 102, 0.55);
+  /* (At 0.55 the Work brush's dark label was 4.3:1.) */
+  background: rgba(255, 209, 102, 0.65);
 }
 
 .slot-J,
@@ -1285,7 +1296,8 @@ button.brush.active {
 }
 
 .research li.done {
-  opacity: 0.55;
+  /* (Finished, so set back, but still readable: at 0.55 its notes were 3:1.) */
+  opacity: 0.8;
 }
 
 /* What a locked project needs is worth reading: dimmed less than a finished one. */
@@ -2059,11 +2071,11 @@ button.active:hover:not(:disabled) {
   font-size: 13px;
 }
 
-/* (A little lighter than the muted grey: on the brightest cells, the most skilled, that was 4.4:1.) */
+/* (Lighter than the muted grey: on the brightest cells, the most skilled, that was 4.4:1, and #b8bec6 4.3.) */
 .work-grid .skill {
   font-size: 11px;
   font-weight: 400;
-  color: #b8bec6;
+  color: #c8ced6;
 }
 
 .work-grid .skill .passion {

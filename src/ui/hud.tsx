@@ -441,7 +441,7 @@ const Chip = memo(function Chip({ c, selected }: { c: ChipView; selected: boolea
 export function ColonistBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
   const state = useUi(pickColonistBar);
   return (
-    <div className="colonist-bar" role="toolbar" aria-label="Colonists">
+    <section className="colonist-bar" aria-label="Colonists">
       {/* (Not the dead: they kept full chips among the living, and a big colony's bar ran to two rows. The
           Colonists screen remembers them.) */}
       {state.colonists
@@ -458,7 +458,7 @@ export function ColonistBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
         ☰{/* (On a phone, where the row scrolls and only a few names show: how many there are.) */}
         <span className="chip-count">{state.colonists.filter((c) => !c.dead).length}</span>
       </button>
-    </div>
+    </section>
   );
 }
 
@@ -576,7 +576,8 @@ function ColonistCard({ c }: { c: ColonistView }) {
           </button>
         ))}
       </div>
-      <div className="card-body">
+      {/* (Focusable, so the keyboard can scroll it: a long Social tab had nothing in it to tab to.) */}
+      <div className="card-body" tabIndex={0} role="tabpanel" aria-label={`${c.name}: ${tab}`}>
         {tab === 'overview' && <OverviewTab c={c} />}
         {tab === 'health' && <HealthTab c={c} />}
         {tab === 'social' && <SocialTab c={c} />}
@@ -937,7 +938,8 @@ export function HoverCard() {
   }
   const { tile, colonist } = hover;
   return (
-    <div className="panel hover-card">
+    // (The mouse's own: the same as the tile card a click gives, so a screen reader is spared it.)
+    <div className="panel hover-card" aria-hidden="true">
       {colonist && (
         <div className="hover-colonist">
           <span className="swatch" style={{ background: colonist.color }} /> <b>{colonist.name}</b>{' '}

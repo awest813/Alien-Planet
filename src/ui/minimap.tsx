@@ -137,7 +137,7 @@ export function Minimap() {
     );
   }
   return (
-    <div className="panel minimap">
+    <section className="panel minimap" aria-label="Minimap">
       <div className="minimap-head">
         <span className="muted">Map</span>
         <button onClick={() => setOpen(false)} title="Hide the minimap" aria-label="Hide the minimap">
@@ -156,6 +156,6 @@ export function Minimap() {
         }}
         onPointerMove={(e) => e.buttons === 1 && panTo(e)}
       />
-    </div>
+    </section>
   );
 }
