@@ -692,6 +692,7 @@ const CONTROLS: [string, string][] = [
     'Move the selected drafted colonist (with nobody selected, everyone drafted), or drop the current tool',
   ],
   ['Esc', 'Close a screen, drop the tool, clear the selection, then open the menu'],
+  ['Delete', 'On a selected tile: cancel the order there, or else mark the building for taking down'],
   ['Letter keys', 'Tools: hover a button in the bottom bar to see its key'],
 ];
 

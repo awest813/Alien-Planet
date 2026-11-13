@@ -62,6 +62,10 @@ with esbuild for speed (see ROADMAP).
   - **From the review:** the speed keys no longer restart the clock behind the fallen colony's screen; a
     notification about someone since dead goes to where they fell; a building drag no longer counts the stores
     every frame.
+  - **Accessibility and a soak:** an automated scan (axe-core) of every screen is clean: three texts under 4.5:1
+    contrast fixed, the colonist card's body reachable by keyboard, the map, colonist bar and minimap labelled
+    landmarks. A five-year colony run at top speed in a browser holds its memory flat (about 86 MB, no growth in
+    page or scene objects), and 120-day playtests of twelve players saw no crashes or broken invariants.
 
 - **Eleventh pass: the interface** (a visual review of every screen at seven sizes, from a phone held either way
   to a wide desktop, and a review of how the game feels to use; each change checked in screenshots):
