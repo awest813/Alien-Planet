@@ -94,6 +94,16 @@ function skyAt(hour: number): { color: number; alpha: number; dark: number } {
   return { color: 0xffffff, alpha: 0, dark: 0 };
 }
 
+// What flies off each kind of work: its colours, how far and high, and how quickly (a cycle in ms).
+const WORK_FX: Partial<Record<string, { colors: number[]; reach: number; lift: number; ms: number }>> = {
+  // (Pale fresh-cut wood: darker chips were lost on a tree's canopy.)
+  chop: { colors: [0xf2d29a, 0xd9a86a], reach: 9, lift: 5, ms: 520 },
+  mine: { colors: [0xfff1a8, 0xd8d8d8], reach: 5, lift: 3, ms: 380 },
+  sculpt: { colors: [0xe8e8e8, 0xbdbdbd], reach: 4, lift: 2, ms: 420 },
+  construct: { colors: [0xd8c39a, 0xa89878], reach: 5, lift: 2, ms: 600 },
+  deconstruct: { colors: [0xd8c39a, 0x8c7c62], reach: 6, lift: 3, ms: 600 },
+};
+
 // The legs frame for a figure: a two-step stride while walking, standing otherwise.
 const stride = (moving: boolean, time: number) =>
   moving ? `pawn-legs-${1 + (Math.floor(time / 140) % 2)}` : 'pawn-legs-0';
@@ -395,6 +405,43 @@ export class ColonyScene extends Phaser.Scene {
     }
   }
 
+  // On a clear day in autumn a few leaves blow across; on a clear summer night, fireflies. (Not for anyone who
+  // asks for less motion: still, they'd read as specks on the map.)
+  private drawSeason(g: Phaser.GameObjects.Graphics, v: Phaser.Geom.Rectangle, now: number): void {
+    const sim = controller.sim;
+    if (REDUCED_MOTION?.matches || !controller.settings.dayNightLighting) {
+      return;
+    }
+    const s = this.px / this.cameras.main.zoom;
+    const frac = (n: number) => n - Math.floor(n);
+    if (sim.season === 'Autumn' && !sim.isNight()) {
+      // (Bright, with a shadow: browns and golds were lost on the autumn grass.)
+      const colors = [0xff8c1a, 0xd8342a, 0xffd23f, 0xe0602a];
+      for (let k = 0; k < 36; k++) {
+        const t = frac(hash2(k, 21, 83) + now * 0.00005 * (0.7 + 0.6 * hash2(k, 23, 89)));
+        const x = v.x + frac(hash2(k, 25, 97) + t * 0.6) * v.width;
+        const y = v.y + t * v.height + Math.sin(now / 500 + k) * 4 * s;
+        // A leaf tumbling: now edge on, now flat.
+        const flat = Math.abs(Math.sin(now / 260 + k * 1.7));
+        const w = (2 + flat * 3) * s;
+        g.fillStyle(0x000000, 0.3).fillRect(x + 2 * s, y + 3 * s, w, 2 * s);
+        g.fillStyle(colors[k % colors.length], 1).fillRect(x, y, w, 3 * s);
+      }
+    } else if (sim.season === 'Summer' && sim.isNight()) {
+      for (let k = 0; k < 30; k++) {
+        const glow = Math.sin(now / (500 + 300 * hash2(k, 31, 101)) + k * 2.3);
+        if (glow < 0.3) {
+          continue;
+        }
+        const x = v.x + frac(hash2(k, 33, 103) + Math.sin(now / 4000 + k) * 0.01) * v.width;
+        const y = v.y + frac(hash2(k, 35, 107) + Math.cos(now / 3500 + k) * 0.01) * v.height;
+        g.fillStyle(0xd8ff7a, 0.18 * glow).fillCircle(x, y, 7 * s);
+        g.fillStyle(0xd8ff7a, 0.3 * glow).fillCircle(x, y, 3.5 * s);
+        g.fillStyle(0xf2ffb0, glow).fillRect(x - s, y - s, 2 * s, 2 * s);
+      }
+    }
+  }
+
   // Rain, snow, fog and storm flashes over whatever part of the map is in view.
   private drawWeather(): void {
     const g = this.weatherFx;
@@ -404,6 +451,7 @@ export class ColonyScene extends Phaser.Scene {
     // For anyone whose system asks for less motion, the rain, snow and aurora hold still.
     const now = REDUCED_MOTION?.matches ? 0 : this.time.now;
     if (kind === 'clear') {
+      this.drawSeason(g, this.cameras.main.worldView, now);
       this.drawAurora(g, this.cameras.main.worldView, now);
       return;
     }
@@ -871,7 +919,9 @@ export class ColonyScene extends Phaser.Scene {
         .setOrigin(1, 1)
         .setResolution(6)
         .setDepth(4.5)
-        .setVisible(this.labelsReadable);
+        // (Hidden until the next frame's pass, which knows the zoom and whether the stack is full: shown here, a
+        // new count flashed up for a frame where counts are left off.)
+        .setVisible(false);
       this.itemLabels.set(i, label);
     }
     label.setText(count >= 1000 ? `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}k` : String(count));
@@ -1313,11 +1363,48 @@ export class ColonyScene extends Phaser.Scene {
 
   // ---- Overlay: progress bars, hover, selection, drag preview ----
 
+  // Chips flying from an axe, sparks from a pick or chisel, dust from building: who's at work shows at a glance,
+  // with the strokes the sound plays. Only while the clock runs (work stops when it's paused), and still for anyone
+  // who asks for less motion.
+  private drawWorkFx(g: Phaser.GameObjects.Graphics): void {
+    if (REDUCED_MOTION?.matches || controller.getState().speed === 0) {
+      return;
+    }
+    const sim = controller.sim;
+    const world = sim.world;
+    const view = this.cameras.main.worldView;
+    const now = this.time.now;
+    for (const c of sim.living()) {
+      const job = c.job;
+      const look = job && WORK_FX[job.type];
+      if (!look || job.target < 0 || c.path.length > 0 || world.distance(c.tile, job.target) > 1.5) {
+        continue;
+      }
+      const cx = (world.xOf(job.target) + 0.5) * TILE;
+      const cy = (world.yOf(job.target) + 0.5) * TILE;
+      if (cx < view.x - TILE || cx > view.right + TILE || cy < view.y - TILE || cy > view.bottom + TILE) {
+        continue;
+      }
+      for (let k = 0; k < 3; k++) {
+        // Each particle on its own cycle: out from the work, up and falling back, fading.
+        const cycle = now / look.ms + hash2(c.id, k, 71);
+        const f = cycle - Math.floor(cycle);
+        const round = Math.floor(cycle);
+        const angle = hash2(c.id * 31 + k, round, 73) * Math.PI * 2;
+        const reach = look.reach * (0.5 + 0.5 * hash2(c.id + k, round, 79));
+        const x = cx + Math.cos(angle) * reach * f;
+        const y = cy + Math.sin(angle) * reach * f * 0.6 - Math.sin(f * Math.PI) * look.lift;
+        g.fillStyle(look.colors[k % look.colors.length], 1 - f).fillRect(x, y, 1, 1);
+      }
+    }
+  }
+
   private drawOverlay(): void {
     const g = this.overlay;
     const sim = controller.sim;
     const world = sim.world;
     g.clear();
+    this.drawWorkFx(g);
 
     for (const c of sim.colonists) {
       const progress = sim.jobProgress(c);
@@ -1451,11 +1538,16 @@ export class ColonyScene extends Phaser.Scene {
       // only an outline, and the hint the cost of one).
       if (tool.kind === 'build') {
         const def = featureDef(tool.feature);
+        // (Counted twice a second, not every frame: each count goes over every pile on the map.)
+        if (this.time.now - this.dragStockAt > 500) {
+          this.dragStockAt = this.time.now;
+          this.dragStock = controller.sim.resourceTotals().map((t) => t.total);
+        }
         const costs = (def.build?.cost ?? []).map((c) => {
           const need = c.count * placed;
-          const have = controller.sim.stockOf(c.item);
+          const have = this.dragStock[c.item - 1] ?? 0;
           short ||= need > have;
-          return `${need} ${itemDef(c.item).name.toLowerCase()} (${have} in store)`;
+          return `${need} ${itemDef(c.item).name.toLowerCase()} (have ${have})`;
         });
         label = `${placed} ${def.name.toLowerCase()}${placed === 1 ? '' : 's'}${costs.length > 0 ? ` · ${costs.join(', ')}` : ''}`;
       }
@@ -1484,16 +1576,24 @@ export class ColonyScene extends Phaser.Scene {
       .setDepth(Depth.PREVIEW + 1);
     if (label && this.drag) {
       const end = this.drag.end;
+      // (A colour set redraws the text: only when it changes.)
+      if (short !== this.dragShort) {
+        this.dragShort = short;
+        this.dragLabel.setColor(short ? '#ff8a8a' : '#ffffff');
+      }
       this.dragLabel
         .setText(label)
-        .setColor(short ? '#ff8a8a' : '#ffffff')
         .setPosition((world.xOf(end) + 1) * TILE + 2, world.yOf(end) * TILE - 2)
         .setVisible(true);
     } else {
       this.dragLabel.setVisible(false);
+      this.dragStockAt = -Infinity;
     }
   }
   private dragLabel?: Phaser.GameObjects.Text;
+  private dragShort = false;
+  private dragStock: number[] = [];
+  private dragStockAt = -Infinity;
 
   // The sky through the day: clear at midday, a warm golden hour and dusk, deep blue at night and a
   // rosy dawn. An eclipse brings dusk in the middle of the day.
@@ -2193,7 +2293,9 @@ export class ColonyScene extends Phaser.Scene {
       if (controller.modalOpen) {
         const control = (event.target as HTMLElement | null)?.closest?.('button,input,select,textarea,[role=button]');
         const speedKey = event.key === ' ' || /^Digit[123]$/.test(event.code);
-        if (!speedKey || control || controller.speedHeld || event.repeat) {
+        // (Not behind the fallen colony's screen, or the ship's farewell: there's no clock left to run.)
+        const over = controller.getState().fallen || controller.getState().ship === 'departed';
+        if (!speedKey || control || controller.speedHeld || over || event.repeat) {
           return;
         }
         event.preventDefault();
