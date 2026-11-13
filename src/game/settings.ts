@@ -26,6 +26,8 @@ export interface Settings {
   mapSharpness: number;
   // Sound, off until the player turns it on, and its volumes (0..1).
   sound: boolean;
+  // The soundtrack, under the colonists' own playing.
+  score: boolean;
   masterVolume: number;
   musicVolume: number;
   effectsVolume: number;
@@ -68,6 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
   panSpeed: 1,
   mapSharpness: 0,
   sound: false,
+  score: true,
   masterVolume: 0.7,
   musicVolume: 0.8,
   effectsVolume: 0.8,

@@ -623,11 +623,21 @@ function Choice<T extends number>({
   );
 }
 
-function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
+function Toggle({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  disabled?: boolean;
+  onChange: (value: boolean) => void;
+}) {
   return (
     <label className="setting">
       <span>{label}</span>
-      <input type="checkbox" checked={value} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" checked={value} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
     </label>
   );
 }
@@ -719,6 +729,12 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
         onChange={(v) => set({ sound: v })}
       />
       <Slider label="Volume" value={s.masterVolume} disabled={!s.sound} onChange={(v) => set({ masterVolume: v })} />
+      <Toggle
+        label="Soundtrack (under the colonists' own playing)"
+        value={s.score}
+        disabled={!s.sound}
+        onChange={(v) => set({ score: v })}
+      />
       <Slider label="Music" value={s.musicVolume} disabled={!s.sound} onChange={(v) => set({ musicVolume: v })} />
       <Slider
         label="Ambience and alerts"

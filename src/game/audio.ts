@@ -3,6 +3,7 @@
 // player turns sound on, and every call is safe without audio support: the game just stays quiet.
 
 import { InstrumentKey, Note, frequency, phrase, tempoFor } from './music';
+import { Bar, Mood, scoreBar } from './score';
 
 export interface Musician {
   id: number;
@@ -40,6 +41,8 @@ export interface SoundScene {
   fire: number;
   // How fast the clock runs (1 at normal speed): work keeps time with it.
   speed: number;
+  // The soundtrack's mood.
+  mood: Mood;
 }
 
 export type Alert = 'raid' | 'death' | 'goal' | 'concert' | 'fire' | 'collapse' | 'birth';
@@ -57,6 +60,8 @@ export const soundEnabled = (): boolean => sound.isEnabled();
 
 export interface Volumes {
   enabled: boolean;
+  // The soundtrack under the colonists' own playing.
+  score: boolean;
   master: number;
   music: number;
   effects: number;
@@ -86,7 +91,16 @@ class Sound {
   private fireGain: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private playing = new Map<number, Playing>();
-  private volumes: Volumes = { enabled: false, master: 0.7, music: 0.8, effects: 0.8 };
+  private volumes: Volumes = { enabled: false, score: true, master: 0.7, music: 0.8, effects: 0.8 };
+  private scoreBus: GainNode | null = null;
+  private limiter: DynamicsCompressorNode | null = null;
+  // When the soundtrack's next bar starts (audio-context seconds), its number in the piece, and the piece's mood
+  // and tune.
+  private scoreNext = 0;
+  private scoreIndex = 0;
+  private scoreMood: Mood | null = null;
+  private scoreSeed = Math.floor(Math.random() * 1000);
+  private scoreDuck = 1;
   private nextCall = 0;
 
   // Applies the player's settings. Turning sound on creates the audio graph (it's called from a
@@ -116,6 +130,7 @@ class Sound {
       this.master.gain.setTargetAtTime(volumes.enabled ? volumes.master : 0, t, 0.05);
       this.musicBus.gain.setTargetAtTime(volumes.music, t, 0.05);
       this.effectsBus.gain.setTargetAtTime(volumes.effects, t, 0.05);
+      this.scoreBus!.gain.setTargetAtTime(volumes.score ? this.scoreDuck : 0, t, 0.3);
     }
     if (!volumes.enabled) {
       // Let the fade-out be heard, then stop the audio altogether.
@@ -187,16 +202,23 @@ class Sound {
       this.master.gain.value = 0;
       // A limiter last: a concert, a battle and an alert at once mustn't clip.
       const limiter = ctx.createDynamicsCompressor();
-      limiter.threshold.value = -10;
-      limiter.knee.value = 6;
-      limiter.ratio.value = 12;
+      this.limiter = limiter;
+      limiter.threshold.value = -2;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
       limiter.attack.value = 0.003;
       limiter.release.value = 0.25;
-      this.master.connect(limiter).connect(ctx.destination);
+      // (A browser's compressor raises everything by a "make-up gain" of its own: about 4 dB at the first settings
+      // tried, measured, a limiter that made the whole game louder. Set high, it adds about 1 dB, trimmed off here.)
+      const trim = ctx.createGain();
+      trim.gain.value = 0.88;
+      this.master.connect(limiter).connect(trim).connect(ctx.destination);
       this.musicBus = ctx.createGain();
       this.musicBus.connect(this.master);
       this.effectsBus = ctx.createGain();
       this.effectsBus.connect(this.master);
+      this.scoreBus = ctx.createGain();
+      this.scoreBus.connect(this.musicBus);
       // Two seconds of noise, looped for wind and rain and cut short for drum hits.
       const noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
       const data = noise.getChannelData(0);
@@ -255,6 +277,7 @@ class Sound {
       return;
     }
     const now = ctx.currentTime;
+    this.keepScoring(scene, now);
     const wind = scene.storm ? 0.22 : scene.rain ? 0.1 : scene.cold ? 0.09 : 0.05;
     const rain = scene.storm ? 0.12 : scene.rain ? 0.07 : 0;
     if (wind !== this.windLevel || rain !== this.rainLevel) {
@@ -307,6 +330,91 @@ class Sound {
       if (!here.has(id)) {
         this.playing.delete(id);
       }
+    }
+  }
+
+  // The soundtrack: bars scheduled a little ahead, a new piece when the mood changes (at the end of the bar
+  // playing), quieter under a colonist playing in view.
+  private keepScoring(scene: SoundScene, now: number): void {
+    if (!this.volumes.score) {
+      this.scoreMood = null;
+      return;
+    }
+    const duck = !scene.paused && scene.musicians.some((m) => m.inView) ? 0.25 : 1;
+    if (duck !== this.scoreDuck) {
+      this.scoreDuck = duck;
+      this.scoreBus!.gain.setTargetAtTime(duck, now, 1);
+    }
+    // Starting, or fell far behind (a hidden tab): from now, rather than a burst of bars to catch up.
+    if (this.scoreMood === null || this.scoreNext < now - 1) {
+      this.scoreNext = now + 0.1;
+    }
+    while (this.scoreNext < now + LOOKAHEAD + 0.1) {
+      if (scene.mood !== this.scoreMood) {
+        this.scoreMood = scene.mood;
+        this.scoreIndex = 0;
+        this.scoreSeed++;
+      }
+      const bar = scoreBar(scene.mood, this.scoreIndex++, this.scoreSeed);
+      this.playBar(bar, this.scoreNext, scene.mood);
+      this.scoreNext += bar.seconds;
+    }
+  }
+
+  // One bar: a soft pad swelling in and fading into the next, a few harp notes, a drum's low pulse in danger.
+  private playBar(bar: Bar, when: number, mood: Mood): void {
+    const ctx = this.ctx!;
+    const end = when + bar.seconds;
+    const pad = ctx.createGain();
+    const tone = ctx.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = mood === 'night' || mood === 'winter' ? 650 : 900;
+    pad.connect(tone).connect(this.scoreBus!);
+    // (A bed under everything: as loud as this, it matched a colonist's lute.)
+    const peak = 0.014 * bar.level;
+    pad.gain.setValueAtTime(0, when);
+    pad.gain.linearRampToValueAtTime(peak, when + Math.min(1.4, bar.seconds / 3));
+    pad.gain.setTargetAtTime(0, end - 0.2, 0.5);
+    for (const pitch of bar.chord) {
+      for (const [type, detune] of [
+        ['triangle', 0],
+        ['sine', 6],
+      ] as const) {
+        const osc = ctx.createOscillator();
+        osc.type = type;
+        osc.frequency.value = frequency(pitch);
+        osc.detune.value = detune;
+        osc.connect(pad);
+        osc.start(when);
+        osc.stop(end + 2.5);
+      }
+    }
+    for (const n of bar.melody) {
+      const at = when + n.at;
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.value = frequency(n.pitch);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.028 * bar.level, at);
+      gain.gain.exponentialRampToValueAtTime(0.001, at + 2.2);
+      const soft = ctx.createBiquadFilter();
+      soft.type = 'lowpass';
+      soft.frequency.value = 2200;
+      osc.connect(soft).connect(gain).connect(this.scoreBus!);
+      osc.start(at);
+      osc.stop(at + 2.3);
+    }
+    for (const t of bar.pulse) {
+      const at = when + t;
+      const osc = ctx.createOscillator();
+      osc.frequency.setValueAtTime(75, at);
+      osc.frequency.exponentialRampToValueAtTime(42, at + 0.3);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(t === 0 ? 0.08 : 0.045, at);
+      gain.gain.exponentialRampToValueAtTime(0.001, at + 0.4);
+      osc.connect(gain).connect(this.scoreBus!);
+      osc.start(at);
+      osc.stop(at + 0.45);
     }
   }
 

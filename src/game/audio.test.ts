@@ -29,6 +29,7 @@ class FakeNode {
   frequency = new FakeParam();
   Q = new FakeParam();
   pan = new FakeParam();
+  detune = new FakeParam();
   threshold = new FakeParam();
   knee = new FakeParam();
   ratio = new FakeParam();
@@ -75,6 +76,7 @@ const scene = (patch: Partial<import('./audio').SoundScene> = {}): import('./aud
   workers: [],
   fire: 0,
   speed: 1,
+  mood: 'day',
   ...patch,
 });
 
@@ -85,7 +87,8 @@ const hadWindow = 'window' in g;
 beforeAll(async () => {
   g.window ??= { AudioContext: FakeContext, addEventListener() {}, removeEventListener() {} };
   ({ sound } = await import('./audio'));
-  sound.configure({ enabled: true, master: 0.7, music: 0.8, effects: 0.8 });
+  // (The soundtrack off, so the counts below are the sounds' own.)
+  sound.configure({ enabled: true, score: false, master: 0.7, music: 0.8, effects: 0.8 });
 });
 
 afterAll(() => {
@@ -141,5 +144,25 @@ describe('sound', () => {
       sound.update(scene({ fire: 1 }));
     }
     expect(sinceNow(from).filter((s) => s.kind === 'noise').length).toBeGreaterThan(2);
+  });
+
+  it('the soundtrack plays bar on bar, without a burst after a long gap', () => {
+    sound.configure({ enabled: true, score: true, master: 0.7, music: 0.8, effects: 0.8 });
+    clock = 100;
+    const from = started.length;
+    for (let frame = 0; frame < 60 * 12; frame++) {
+      clock = 100 + frame / 60;
+      sound.update(scene({ paused: true }));
+    }
+    // Twelve seconds of day: two or three bars, each a pad of six voices and a few notes.
+    const bars = sinceNow(from).filter((s) => s.kind === 'osc').length;
+    expect(bars).toBeGreaterThanOrEqual(12);
+    expect(bars).toBeLessThanOrEqual(60);
+    // An hour away (a hidden tab): it picks up from now, not with a hundred bars at once.
+    clock = 4000;
+    const later = started.length;
+    sound.update(scene({ paused: true }));
+    expect(sinceNow(later).filter((s) => s.kind === 'osc').length).toBeLessThanOrEqual(12);
+    sound.configure({ enabled: true, score: false, master: 0.7, music: 0.8, effects: 0.8 });
   });
 });

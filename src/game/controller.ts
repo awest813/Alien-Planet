@@ -1345,7 +1345,13 @@ export class GameController {
       return;
     }
     const s = this.settings;
-    sound.configure({ enabled: s.sound, master: s.masterVolume, music: s.musicVolume, effects: s.effectsVolume });
+    sound.configure({
+      enabled: s.sound,
+      score: s.score,
+      master: s.masterVolume,
+      music: s.musicVolume,
+      effects: s.effectsVolume,
+    });
   }
 
   // What the sound needs from the colony each frame: who's playing what, and the weather.
@@ -1414,6 +1420,17 @@ export class GameController {
         .slice(0, 4)
         .map(({ id, kind, pan }) => ({ id, kind, pan })),
       fire: burning === 0 ? 0 : Math.min(1, 0.3 + burning / 12),
+      // (A raid still walking in from the map's edge isn't yet a fight.)
+      mood:
+        this.inPlay &&
+        ((sim.raid?.arrivedTick !== undefined && sim.enemies.some((e) => e.hp > 0 && !e.fleeing)) ||
+          this.animalsAttacking())
+          ? 'danger'
+          : sim.isNight()
+            ? 'night'
+            : sim.season === 'Winter'
+              ? 'winter'
+              : 'day',
       speed: SPEEDS[this.speedIndex] || 1,
     };
   }
@@ -1929,6 +1946,19 @@ export class GameController {
     }
   }
 
+  // Where a notification's link can still take the camera: someone who has since died, to where they fell; someone
+  // who has left (or is away), nowhere, so the card is plain text again (its "Show me" did nothing).
+  private showable(about: StoryAbout | undefined): StoryAbout | undefined {
+    if (!about || 'tile' in about) {
+      return about;
+    }
+    const c = this.sim.colonists[about.colonist];
+    if (!c || c.away) {
+      return undefined;
+    }
+    return c.health.dead ? { tile: c.tile } : about;
+  }
+
   // Takes the camera to whoever or wherever a notification is about.
   public focusNotification(n: Notification): void {
     if (!n.about) {
@@ -1939,7 +1969,6 @@ export class GameController {
       this.selectTile(n.about.tile);
       return;
     }
-    // (Someone who has since died or left has nowhere to be shown.)
     const c = this.sim.colonists[n.about.colonist];
     if (c && !c.health.dead && !c.away) {
       this.selectColonist(c.id, true);
@@ -2570,12 +2599,10 @@ export class GameController {
         wintersSurvived: sim.stats.wintersSurvived,
         built: sim.stats.built,
       },
-      notifications: this.notifications.map(({ id, text, tone, about }) => ({
-        id,
-        text,
-        tone,
-        ...(about && { about }),
-      })),
+      notifications: this.notifications.map(({ id, text, tone, about }) => {
+        const where = this.showable(about);
+        return { id, text, tone, ...(where && { about: where }) };
+      }),
       seed: sim.seed,
       difficulty: sim.story.difficulty,
       mapSize: sim.world.width,

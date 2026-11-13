@@ -111,6 +111,15 @@ describe('notifications', () => {
     expect(controller.selectedColonist).toBe(c.id);
     controller.focusNotification(place);
     expect(controller.selectedTile).toBe(77);
+    // Since died: the card takes the camera to where they fell. Since left: no link at all (it did nothing).
+    c.health.dead = true;
+    controller.publish();
+    expect(controller.getState().notifications.slice(-2)[0].about).toEqual({ tile: c.tile });
+    c.health.dead = false;
+    c.away = 'gone';
+    controller.publish();
+    expect(controller.getState().notifications.slice(-2)[0].about).toBeUndefined();
+    c.away = undefined;
   });
 });
 
