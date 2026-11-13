@@ -46,6 +46,23 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Twelfth pass: sound and the look of the map** (the sound engine driven in a browser and its levels measured
+  from an analyser, one source at a time; screenshots of a five-year colony in every weather and season, in a
+  raid and at each zoom; a reviewer's read of the session's diff):
+  - **Sound:** a quiet soundtrack in the colonists' key, following the hour, winter and danger, ducking under a
+    colonist's playing (its own switch in Settings). Work is heard (an axe, a pick, a hammer, keeping time with
+    the game's speed) and a fire crackles; musicians, fights and work sit left or right; the wind gusts. A
+    limiter catches peaks (the first settings raised everything by 4 dB, measured). Alerts are louder (a raid's
+    horn was quieter than one lute) and the same cue twice at once plays once. The title screen says whether
+    sound is on.
+  - **The map:** rain slants and splashes, a storm under a darker sky; fog drifts in soft banks; leaves blow in
+    autumn and fireflies blink on summer nights; chips, sparks and dust fly where colonists work. Raiders' and
+    downed raiders' names keep clear of colonists'; stack counts are left off below zoom 1.4, where they were
+    unreadable boxes.
+  - **From the review:** the speed keys no longer restart the clock behind the fallen colony's screen; a
+    notification about someone since dead goes to where they fell; a building drag no longer counts the stores
+    every frame.
+
 - **Eleventh pass: the interface** (a visual review of every screen at seven sizes, from a phone held either way
   to a wide desktop, and a review of how the game feels to use; each change checked in screenshots):
   - **Seeing:** a busy colony's stores read as a field of "50 50 50": a full stack's count shows only zoomed well
