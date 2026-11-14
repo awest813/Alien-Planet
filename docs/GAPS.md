@@ -46,6 +46,16 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Browser compatibility** (the build's targets, Chrome/Edge 111, Firefox 114, Safari/iOS 16.4, checked by
+  scanning the code against them (eslint-plugin-compat and es-x with type information, doiuse for the CSS), and the
+  browser tests run in Firefox 155 and WebKit 26.6 as well as Chromium): every JavaScript built-in is in the
+  targets. Found and fixed: without WebGL the game died on its first frame with a blank page (the ground layer
+  needs it), and now says what's wrong; in Firefox, a dialog opened from the keyboard on a button focused from
+  script (F6) didn't give the focus back; :has(), which Firefox only has from 121, is gone from every desktop
+  rule (classes instead; the phone-only ones stay, Firefox on Android updates itself); the scroll fades carry
+  Chrome 111-119's -webkit- mask. The browser tests run in all three (the long press, driven through Chromium's
+  DevTools, only there).
+
 - **Twelfth pass: sound and the look of the map** (the sound engine driven in a browser and its levels measured
   from an analyser, one source at a time; screenshots of a five-year colony in every weather and season, in a
   raid and at each zoom; a reviewer's read of the session's diff):

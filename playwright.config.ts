@@ -5,8 +5,10 @@ import { defineConfig } from '@playwright/test';
 //
 //   npm run test:e2e
 //
-// E2E_PORT picks another port if 4317 is taken (two copies running side by side, say).
+// E2E_PORT picks another port if 4317 is taken (two copies running side by side, say). E2E_BROWSER runs them in
+// firefox or webkit instead (installed with `npx playwright install firefox webkit`), to check the other engines.
 const port = Number(process.env.E2E_PORT ?? 4317);
+const browserName = (process.env.E2E_BROWSER ?? 'chromium') as 'chromium' | 'firefox' | 'webkit';
 
 export default defineConfig({
   testDir: 'e2e',
@@ -19,10 +21,13 @@ export default defineConfig({
   reporter: process.env.CI ? [['list'], ['github']] : 'list',
   use: {
     baseURL: `http://127.0.0.1:${port}`,
-    browserName: 'chromium',
+    browserName,
     viewport: { width: 1280, height: 800 },
-    // WebGL in a headless browser without a GPU.
-    launchOptions: { args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] },
+    // WebGL in a headless browser without a GPU. (Chromium's flags; the others find their own way.)
+    launchOptions:
+      browserName === 'chromium'
+        ? { args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] }
+        : {},
   },
   webServer: {
     command: `npx vite --port ${port} --strictPort --host 127.0.0.1`,

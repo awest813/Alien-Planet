@@ -635,7 +635,7 @@ function Toggle({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <label className="setting">
+    <label className={`setting${disabled ? ' disabled' : ''}`}>
       <span>{label}</span>
       <input type="checkbox" checked={value} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
     </label>
@@ -655,7 +655,7 @@ function Slider({
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="setting">
+    <label className={`setting${disabled ? ' disabled' : ''}`}>
       <span>{label}</span>
       <span className="slider">
         <input
@@ -794,7 +794,7 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
         <tbody>
           {(TOUCH ? TOUCH_CONTROLS : CONTROLS).map(([key, what]) => (
             <tr key={key}>
-              <td>
+              <td className="key">
                 <kbd>{key}</kbd>
               </td>
               <td>{what}</td>

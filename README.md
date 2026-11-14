@@ -484,7 +484,13 @@ npx tsx scripts/years.ts 240 1 seed=150461       # a ten-year game, one line a y
 The harness also takes `craft` (kiln, smelter, bricks, iron and gear), `diplomat` (tribute, policies,
 requests), `surplus` and `pen` (hunting and husbandry), and `biome=` / `map=`. `npm run playtest:long` plays
 players 40–49 for 120 days (a weekly GitHub workflow runs it too), and `npm run test:e2e` runs the browser
-tests (Playwright: every screen, save and load, the phone layout and the Work grid's long press).
+tests (Playwright: every screen, save and load, the phone layout and the Work grid's long press). They run in
+Chromium; `E2E_BROWSER=firefox` or `E2E_BROWSER=webkit` runs them in the other engines (after
+`npx playwright install firefox webkit`; Firefox needs a display for WebGL, so `xvfb-run` and `--headed` on a
+server).
+
+Browsers: the build targets Chrome and Edge 111, Firefox 114 and Safari 16.4 (iOS 16.4) or later, and the game
+needs WebGL; without it, the page says so rather than starting.
 
 [docs/GAPS.md](docs/GAPS.md) lists where the game is thin, unbalanced or untested, with the evidence.
 

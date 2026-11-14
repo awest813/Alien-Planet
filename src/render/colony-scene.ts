@@ -2323,7 +2323,8 @@ export class ColonyScene extends Phaser.Scene {
       // there Tab reaches every button. (Tab alone, with nothing focused, is "next colonist".)
       if (key === 'F6') {
         event.preventDefault();
-        document.querySelector<HTMLElement>('.topbar button')?.focus();
+        // (Shown as keyboard focus: Firefox drew no ring for a button focused from script.)
+        document.querySelector<HTMLElement>('.topbar button')?.focus({ focusVisible: true } as FocusOptions);
         return;
       }
       if (key === 'Tab' && event.shiftKey) {

@@ -151,7 +151,9 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
-  test('on the Work grid, a tap raises a priority and a long press lowers it', async ({ page }) => {
+  test('on the Work grid, a tap raises a priority and a long press lowers it', async ({ page, browserName }) => {
+    // (The long press is held with Chromium's own touch events, over its DevTools protocol.)
+    test.skip(browserName !== 'chromium', 'touch is driven through Chromium DevTools');
     const errors = watchErrors(page);
     await startColony(page);
     await page.locator('.screens button', { hasText: 'Work' }).click();

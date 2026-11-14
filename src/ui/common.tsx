@@ -1,4 +1,4 @@
-import { useRef, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { HoverView, UiState, controller } from '../game/controller';
 import { share } from '../game/share';
 import { ScheduleSlot, WorkTypeKey } from '../sim/types';
@@ -81,4 +81,34 @@ export function arrowKeys(e: React.KeyboardEvent<HTMLElement>, selector = '[role
   e.preventDefault();
   items[next].focus();
   items[next].click();
+}
+
+// Whether the player's last input was a key rather than a pointer (mouse, finger or pen). Firefox doesn't count a
+// button focused by script (F6, a test's focus()) as :focus-visible once a key is pressed on it, as Chromium and
+// WebKit do, so a dialog opened from it with Enter didn't give the focus back when it closed.
+let keyboardLast = false;
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', () => (keyboardLast = true), true);
+  window.addEventListener('pointerdown', () => (keyboardLast = false), true);
+}
+export const lastInputWasKeyboard = (): boolean => keyboardLast;
+
+// A class on <body> while a component is shown (counted, for dialogs over dialogs), for the styles that change with
+// it. (In place of :has(): Firefox only had it from version 121, and a rule using it was dropped whole before that.)
+const bodyFlags = new Map<string, number>();
+export function useBodyFlag(name: string, on = true): void {
+  useEffect(() => {
+    if (!on) {
+      return;
+    }
+    bodyFlags.set(name, (bodyFlags.get(name) ?? 0) + 1);
+    document.body.classList.add(name);
+    return () => {
+      const left = (bodyFlags.get(name) ?? 1) - 1;
+      bodyFlags.set(name, left);
+      if (left === 0) {
+        document.body.classList.remove(name);
+      }
+    };
+  }, [name, on]);
 }

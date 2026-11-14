@@ -4,7 +4,7 @@ import { ChronicleYear, UiState, controller, timeLeft } from '../game/controller
 import { helpSeen } from '../game/settings';
 import { ChronicleKind } from '../sim/chronicle';
 import { ScheduleSlot, SkillKey, WORK_TYPES, WorkTypeKey, WorldAction } from '../sim/types';
-import { Bar, SLOT_LABELS, WORK_LABELS, fields, moodColor, useUi } from './common';
+import { Bar, SLOT_LABELS, WORK_LABELS, fields, lastInputWasKeyboard, moodColor, useBodyFlag, useUi } from './common';
 import { ADULT, DRAFT_AGE, RETIRED_WORK, TEEN, TEEN_WORK } from '../sim/lifespans';
 import { Hours, Hunting, POLICY_TEXT, Rations } from '../sim/village';
 
@@ -59,12 +59,14 @@ export function Modal({
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const downOnBackdrop = useRef(false);
+  useBodyFlag('modal-open');
   // Where keyboard focus was as the dialog opened, read on its first render: by the time an effect runs, a button
   // in the dialog with autoFocus (the pause menu's Resume) has taken it. (Only keyboard focus: a button clicked
   // with the mouse shouldn't take the focus back and with it Tab and Space from the game.)
   const [before] = useState(() => {
     const active = document.activeElement;
-    const keyboard = active instanceof HTMLElement && active.matches(':focus-visible') ? active : null;
+    const keyboard =
+      active instanceof HTMLElement && (active.matches(':focus-visible') || lastInputWasKeyboard()) ? active : null;
     // (Each chain of dialogs started from outside them starts afresh, from the page too: one left over from long
     // before sent focus back to an old Work button, and Space opened Work rather than starting the clock.)
     if (!(active instanceof HTMLElement && active.closest('.modal-backdrop'))) {

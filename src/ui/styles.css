@@ -684,7 +684,7 @@ kbd {
 
 /* ---------- Hover card ---------- */
 /* (Beside a colonist's or a tile's card, not over the bottom of it.) */
-.ui:has(.left-column .inspector) .hover-card {
+.inspector-open .hover-card {
   left: calc(min(300px, 25vw) + var(--gap));
 }
 
@@ -1419,11 +1419,11 @@ button.brush.active {
 
   /* With a dialog open, the message it gives (a gift's thanks, why a button is off) shows over it: the notices'
      own layer had kept them under every dialog. The other notices wait. */
-  .ui:has(.modal-backdrop) .notices {
+  .modal-open .notices {
     z-index: 11;
   }
 
-  .ui:has(.modal-backdrop) .notices > :not(.toast) {
+  .modal-open .notices > :not(.toast) {
     display: none;
   }
 
@@ -1614,6 +1614,7 @@ button.link:focus-visible {
     scrollbar-width: none;
     /* The row scrolls sideways (Village, Factions and the Menu are past the edge): a fade says there's more, and
        room past Menu lets it scroll clear of the fade. */
+    -webkit-mask-image: linear-gradient(to right, #000 85%, transparent);
     mask-image: linear-gradient(to right, #000 85%, transparent);
     padding-right: 40px;
     box-sizing: border-box;
@@ -1745,7 +1746,7 @@ button.active:hover:not(:disabled) {
 }
 
 /* The keys in Settings' list of controls: as wide as they need, the descriptions taking the rest. */
-.summary td:first-child:has(kbd) {
+.summary td.key {
   width: 1%;
   white-space: nowrap;
 }
@@ -2016,7 +2017,7 @@ button.active:hover:not(:disabled) {
 }
 
 /* The circle in its own column, so a goal that wraps lines up under its text. */
-.objectives .goal:has(> .goal-text) {
+.objectives .goal.with-text {
   display: grid;
   grid-template-columns: 18px 1fr;
 }
@@ -2203,7 +2204,7 @@ button.big {
 }
 
 /* A setting that can't be changed right now (the volume sliders with sound off). */
-.setting:has(input:disabled) {
+.setting.disabled {
   opacity: 0.5;
 }
 
@@ -2493,6 +2494,7 @@ input[type='checkbox'] {
 /* A wide table that scrolls sideways fades at its edge, so it's plain there's more. */
 @media (max-width: 800px) {
   .table-scroll {
+    -webkit-mask-image: linear-gradient(to right, #000 92%, transparent);
     mask-image: linear-gradient(to right, #000 92%, transparent);
     /* Room past the last column, so scrolled to the end it isn't under the fade. */
     padding-right: 24px;

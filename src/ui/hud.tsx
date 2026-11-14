@@ -16,7 +16,7 @@ import { PHASE_NAMES, START_HOUR, TICKS_PER_HOUR } from '../sim/simulation';
 import type { Stance } from '../sim/types';
 import { STORAGE_GROUPS, StockpilePriority } from '../sim/world';
 import { DRAFT_AGE } from '../sim/lifespans';
-import { Bar, arrowKeys, fields, moodColor, useHover, useUi } from './common';
+import { Bar, arrowKeys, fields, moodColor, useBodyFlag, useHover, useUi } from './common';
 
 // The always-on game HUD: top bar, colonist bar, inspector, side panel, and architect menu.
 
@@ -472,6 +472,7 @@ const pickInspector = (s: UiState) => ({
 export function Inspector() {
   const state = useUi(pickInspector);
   const colonist = state.colonist;
+  useBodyFlag('inspector-open', !!colonist || !!state.selectedTile);
   if (colonist) {
     return <ColonistCard c={colonist} />;
   }
@@ -1115,7 +1116,7 @@ export function SidePanel({ onOpen }: { onOpen: (screen: Screen) => void }) {
                           .map((o) => (
                             <li key={o.id} className={`${o.failed ? 'failed' : ''} ${o === next ? 'next' : ''}`}>
                               <button
-                                className="goal"
+                                className="goal with-text"
                                 title={o.how || undefined}
                                 aria-expanded={!o.tool && !o.screen ? explained === o.id : undefined}
                                 onClick={() =>
