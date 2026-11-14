@@ -46,6 +46,23 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **The build bar, and five new buildings** (balanced against what was there, and weighed in the harness with a
+  new `newbuild` mode over 16 seeds and 30 days, with and without `defend`):
+  - **The bar:** Furniture (14 tools, beds beside the harp) and Production (14, wrapping to a second row) are
+    split, into Furniture and Recreation, and Production and Farm & food: twelve tabs of at most eleven tools. A
+    building's cost in the hint shows what the colony has against it, in red where it's short (only a drag had
+    said so). Under 1180px the map buttons beside the tabs show only their icons, so the tabs keep one row.
+  - **New:** a wind turbine (Power, Electricity: 700 W rated, about half that on average with the weather, night
+    and day; a solar panel gives about 450 W, all by day; nothing under a roof), a park bench (Recreation: wood,
+    relaxing, no quicker than a walk), a bookshelf (Furniture: research at a bench within two tiles 15% faster,
+    one counts), a barricade (Security: wood cover from the start, worse than sandbags) and a stone fountain (Art:
+    fixed beauty short of a large sculpture, for fewer blocks and no artist).
+  - **The harness:** mood the same within noise (about 52 either way, standard error 3.4); research up 0.8
+    projects in 30 days, with the bookshelf placed by the bench in most runs; nobody lost to raids with
+    barricades, but a colony holding behind them from day 4 has its fields ravaged four times as often (53 times
+    against 13) and goes hungrier (114 colonist-hours against 34): the ravagers doing their job, said in the barricade's hint.
+    Barracks ended less impressive in the new mode (22 against 32, and 17 against 23), from mess, not anything built there.
+
 - **Chromebook mode** (on by itself on ChromeOS; checked in a browser posing as a Chromebook at 1366×768 and 125%,
   in Chromium, Firefox and WebKit): the map at 30 frames a second and the page's resolution, fewer effects, and
   a touchpad's two fingers moving the map with a pinch to zoom. For every laptop: a touchpad's run of small

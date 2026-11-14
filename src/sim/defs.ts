@@ -71,6 +71,9 @@ export interface PowerSpec {
   draw: number;
   storage: number;
   solar: boolean;
+  // A wind turbine: its output rises and falls with the wind (the weather, and gusts hour to hour), and it only
+  // turns under the open sky.
+  wind: boolean;
   fuel?: { item: number; capacity: number; perDay: number };
 }
 
@@ -111,6 +114,8 @@ export interface FeatureDef {
   // Research project that must be finished before it can be built.
   research?: string;
   researchStation: boolean;
+  // Books: research at a bench within reach of one goes faster (BOOKS_BONUS, in the simulation).
+  books: boolean;
   // Rest gain multiplier for beds.
   restGain: number;
   power?: PowerSpec;
@@ -216,8 +221,9 @@ interface RawFeature {
   cover?: number;
   research?: string;
   researchStation?: boolean;
+  books?: boolean;
   restGain?: number;
-  power?: { output?: number; draw?: number; storage?: number; solar?: boolean; fuel?: RawFuel };
+  power?: { output?: number; draw?: number; storage?: number; solar?: boolean; wind?: boolean; fuel?: RawFuel };
   cooler?: { amount: number; target: number };
   icebox?: boolean;
   shelf?: number;
@@ -362,12 +368,14 @@ export const FEATURES: FeatureDef[] = (featuresJson as RawFeature[]).map((f, i) 
   cover: f.cover ?? 1,
   research: f.research,
   researchStation: !!f.researchStation,
+  books: !!f.books,
   restGain: f.restGain ?? 1,
   power: f.power && {
     output: f.power.output ?? 0,
     draw: f.power.draw ?? 0,
     storage: f.power.storage ?? 0,
     solar: !!f.power.solar,
+    wind: !!f.power.wind,
     fuel: f.power.fuel && { ...f.power.fuel, item: resolveItem(f.power.fuel.item) },
   },
   cooler: f.cooler,

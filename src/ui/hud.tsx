@@ -17,6 +17,7 @@ import { PHASE_NAMES, START_HOUR, TICKS_PER_HOUR } from '../sim/simulation';
 import type { Stance } from '../sim/types';
 import { STORAGE_GROUPS, StockpilePriority } from '../sim/world';
 import { DRAFT_AGE } from '../sim/lifespans';
+import { featureDef, itemDef } from '../sim/defs';
 import { Bar, arrowKeys, fields, moodColor, useBodyFlag, useHover, useUi } from './common';
 
 // The always-on game HUD: top bar, colonist bar, inspector, side panel, and architect menu.
@@ -1275,10 +1276,31 @@ function NextGoal({
 // A phone or tablet: the map is moved with a finger rather than a mouse.
 
 const pickArchitect = (s: UiState) => ({
-  ...fields('lockedTools', 'overlay', 'toolId')(s),
+  ...fields('lockedTools', 'overlay', 'resources', 'toolId')(s),
   // (For the hint: in Chromebook mode, two fingers move the map rather than the wheel zooming it.)
   scrollMoves: scrollMoves(s.settings.scroll, chromebookMode(s.settings.chromebook, controller.onChromeOS)),
 });
+
+// A building's description and its cost against what the colony has: what's short in red, so a tool can be
+// seen to be out of reach before its blueprint is dragged out (the drag said so, the hint didn't).
+function BuildCost({ about, feature, resources }: { about: string; feature: number; resources: UiState['resources'] }) {
+  const cost = featureDef(feature).build?.cost ?? [];
+  return (
+    <>
+      {forTouch(about)}
+      {cost.length > 0 && ' · costs '}
+      {cost.map((c, k) => {
+        const have = resources[c.item - 1]?.total ?? 0;
+        return (
+          <span key={c.item} className={have < c.count ? 'short' : undefined}>
+            {k > 0 && ', '}
+            {c.count} {itemDef(c.item).name.toLowerCase()} <span className="have">(have {have})</span>
+          </span>
+        );
+      })}
+    </>
+  );
+}
 
 export function Architect() {
   const state = useUi(pickArchitect);
@@ -1331,16 +1353,18 @@ export function Architect() {
           ))}
         </div>
         <span className="spacer" />
-        <button onClick={() => controller.focusHome()} title="Back to the colony (H)">
-          ⌂ Colony
+        {/* (Their words go on a narrower screen, so the tabs keep one row; the names stay for screen readers.) */}
+        <button onClick={() => controller.focusHome()} title="Back to the colony (H)" aria-label="Back to the colony">
+          ⌂<span className="arch-word"> Colony</span>
         </button>
         <button
           className={state.overlay === 'temperature' ? 'active' : ''}
           aria-pressed={state.overlay === 'temperature'}
           onClick={() => controller.setOverlay(state.overlay === 'temperature' ? 'none' : 'temperature')}
           title="Show temperatures on the map"
+          aria-label="Temperatures on the map"
         >
-          🌡 Temperature
+          🌡<span className="arch-word"> Temperature</span>
         </button>
       </div>
       <div className="arch-tools" ref={tools0}>
@@ -1375,7 +1399,12 @@ export function Architect() {
       <div className="hint">
         {shown && (
           <>
-            <b>{shown.label}:</b> {forTouch(shown.hint)}
+            <b>{shown.label}:</b>{' '}
+            {shown.tool.kind === 'build' && shown.about !== undefined ? (
+              <BuildCost about={shown.about} feature={shown.tool.feature} resources={state.resources} />
+            ) : (
+              forTouch(shown.hint)
+            )}
             {lockedShown && <span className="locked-note"> · needs research: {lockedShown}</span>}
           </>
         )}

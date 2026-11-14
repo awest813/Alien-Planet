@@ -144,6 +144,8 @@ export interface ToolDef {
   tool: Tool;
   group: ToolGroup;
   hint: string;
+  // A building's description without its cost, which the build bar shows against what's in store.
+  about?: string;
 }
 
 export type ToolGroup =
@@ -152,8 +154,10 @@ export type ToolGroup =
   | 'structure'
   | 'floors'
   | 'furniture'
+  | 'recreation'
   | 'decor'
   | 'production'
+  | 'farm'
   | 'power'
   | 'climate'
   | 'security';
@@ -165,8 +169,10 @@ export const TOOL_GROUPS: { key: ToolGroup; label: string }[] = [
   { key: 'structure', label: 'Structure' },
   { key: 'floors', label: 'Floors' },
   { key: 'furniture', label: 'Furniture' },
+  { key: 'recreation', label: 'Recreation' },
   { key: 'decor', label: 'Art & decor' },
   { key: 'production', label: 'Production' },
+  { key: 'farm', label: 'Farm & food' },
   { key: 'power', label: 'Power' },
   { key: 'climate', label: 'Climate' },
   { key: 'security', label: 'Security' },
@@ -184,6 +190,7 @@ const build = (key: string, label: string, hotkey: string, group: ToolDef['group
     tool: { kind: 'build', feature: featureId(key) },
     group,
     hint: cost ? `${hint} · costs ${cost}` : hint,
+    about: hint,
   };
 };
 
@@ -601,31 +608,38 @@ export const TOOLS: ToolDef[] = [
   ),
   build('table', 'Table', 'l', 'furniture', 'Colonists dislike eating without a table'),
   build('armchair', 'Armchair', '', 'furniture', 'Comfortable recreation (relaxing) and decor'),
-  build('horseshoePin', 'Horseshoe pin', 'i', 'furniture', 'Recreation spot (games)'),
+  build('horseshoePin', 'Horseshoe pin', 'i', 'recreation', 'Recreation spot (games)'),
+  build(
+    'parkBench',
+    'Park bench',
+    '',
+    'recreation',
+    'Somewhere to sit and rest (relaxing): no quicker than a walk, but a change from one',
+  ),
   build(
     'chessTable',
     'Chess table',
     '',
-    'furniture',
+    'recreation',
     'Games for two: players chat as they play. Alone, it is much less fun',
   ),
-  build('cardTable', 'Card table', '', 'furniture', 'Social recreation for up to four. Alone, it is much less fun'),
+  build('cardTable', 'Card table', '', 'recreation', 'Social recreation for up to four. Alone, it is much less fun'),
   build(
     'lessonBoard',
     'Lesson board',
     '',
-    'furniture',
+    'recreation',
     'Morning lessons: the most skilled grown-up (a retired elder first) teaches the children here',
   ),
-  build('telescope', 'Telescope', '', 'furniture', 'Stargazing on clear nights; it must stand under the open sky'),
-  build('drum', 'Drum', '', 'furniture', 'Music: players train Artistic and anyone within earshot enjoys it'),
-  build('flute', 'Flute stand', '', 'furniture', 'Music: players train Artistic and anyone within earshot enjoys it'),
-  build('lute', 'Lute stand', '', 'furniture', 'Music: a skilled player may give an evening concert'),
+  build('telescope', 'Telescope', '', 'recreation', 'Stargazing on clear nights; it must stand under the open sky'),
+  build('drum', 'Drum', '', 'recreation', 'Music: players train Artistic and anyone within earshot enjoys it'),
+  build('flute', 'Flute stand', '', 'recreation', 'Music: players train Artistic and anyone within earshot enjoys it'),
+  build('lute', 'Lute stand', '', 'recreation', 'Music: a skilled player may give an evening concert'),
   build(
     'harp',
     'Harp',
     '',
-    'furniture',
+    'recreation',
     'The finest instrument: listeners enjoy it a quarter more, and a skilled harpist can hold the whole colony',
   ),
   build(
@@ -638,6 +652,7 @@ export const TOOLS: ToolDef[] = [
   build('sculptureLarge', 'Large sculpture', '', 'decor', 'A granite piece, twice the beauty of a small one'),
   build('sculptureGrand', 'Grand sculpture', '', 'decor', 'Granite and silver: the finest piece a colony can make'),
   build('flowerPot', 'Flower pot', '', 'decor', 'Pretty while in bloom; little to look at in winter'),
+  build('fountain', 'Stone fountain', '', 'decor', 'Handsome stonework, near a good sculpture, that needs no artist'),
   build('grave', 'Grave', '', 'decor', 'A resting place: the colony holds a funeral here for someone who has died'),
   build(
     'memorial',
@@ -658,7 +673,7 @@ export const TOOLS: ToolDef[] = [
     'dryingRack',
     'Drying rack',
     '',
-    'production',
+    'farm',
     'Haulers hang meat, fish and berries here; in half a day they dry into food that keeps for months',
   ),
   build(
@@ -686,21 +701,35 @@ export const TOOLS: ToolDef[] = [
     'fishingSpot',
     'Fishing spot',
     '',
-    'production',
+    'farm',
     'Build on the shore; hunters fish here when food runs short, and more in winter',
   ),
   build(
     'trough',
     'Feeding trough',
     '',
-    'production',
+    'farm',
     'Build on the edge of a pen; haulers fill it with hay (from grain fields), or potatoes, berries or grain, and fed animals in the pen breed in any season',
   ),
-  build('icebox', 'Icebox', '', 'production', 'Food storage that keeps food fresh while powered (50 W)'),
-  build('shelf', 'Shelf', '', 'production', 'Storage for three stacks of one kind of item on a single tile'),
-  build('sunLamp', 'Sun lamp', '', 'production', 'Crops nearby grow day and night, all year (300 W)'),
+  build('icebox', 'Icebox', '', 'farm', 'Food storage that keeps food fresh while powered (50 W)'),
+  build('shelf', 'Shelf', '', 'furniture', 'Storage for three stacks of one kind of item on a single tile'),
+  build(
+    'bookshelf',
+    'Bookshelf',
+    '',
+    'furniture',
+    'Research at a bench with a bookshelf within two tiles goes 15% faster (one is enough)',
+  ),
+  build('sunLamp', 'Sun lamp', '', 'farm', 'Crops nearby grow day and night, all year (300 W)'),
   build('woodGenerator', 'Wood generator', '', 'power', '1000 W while fuelled; haulers refuel it with wood'),
   build('solarPanel', 'Solar panel', '', 'power', 'Up to 1200 W in daylight, less in winter'),
+  build(
+    'windTurbine',
+    'Wind turbine',
+    '',
+    'power',
+    'Power day and night from the wind: about half its 700 W on average, more in a storm, little in fog. It must stand under the open sky',
+  ),
   build('battery', 'Battery', '', 'power', 'Stores 8 kWh of spare power for the night'),
   build(
     'signalBeacon',
@@ -714,6 +743,13 @@ export const TOOLS: ToolDef[] = [
   build('electricHeater', 'Electric heater', '', 'climate', 'Strong heater, keeps rooms at 21°C (175 W)'),
   build('airConditioner', 'Air conditioner', '', 'climate', 'Cools a room to 20°C in hot weather (200 W)'),
   build('freezer', 'Freezer unit', '', 'climate', 'Chills a room to −6°C: a walk-in freezer for food (300 W)'),
+  build(
+    'barricade',
+    'Barricade',
+    '',
+    'security',
+    'Wooden cover, before sandbags: halves the chance of being hit from that side. Hold behind it and raiders may go for the fields instead',
+  ),
   build('sandbags', 'Sandbags', '', 'security', 'Cover: cuts the chance of being hit from that side to about a third'),
   build(
     'embrasure',

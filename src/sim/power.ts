@@ -1,4 +1,6 @@
 import { NONE, featureDef } from './defs';
+import { hash2 } from './rng';
+import { TICKS_PER_HOUR } from './constants';
 import type { Simulation } from './simulation';
 import { eclipseOn } from './storyteller';
 
@@ -32,6 +34,24 @@ export function daylight(hour: number): number {
 // Weaker winter sun.
 const WINTER_SOLAR = 0.6;
 
+// How hard the wind blows, as a share of a turbine's full output: by the weather, and gusting hour to hour (the
+// same in a replay of the same colony). Over a year it comes to about half, night and day alike: a 700 W turbine
+// gives about 350 W where a 1200 W solar panel gives about 450 W, all of it by day.
+const WIND_BY_WEATHER: Record<string, number> = {
+  storm: 1,
+  rain: 0.75,
+  snow: 0.65,
+  clear: 0.45,
+  drought: 0.4,
+  fog: 0.12,
+};
+export function windStrength(sim: Simulation): number {
+  const base = WIND_BY_WEATHER[sim.weather.kind] ?? 0.45;
+  const hour = Math.floor(sim.tick / TICKS_PER_HOUR);
+  const gust = (hash2(hour, 7, 911) - 0.5) * 0.5;
+  return Math.max(0, Math.min(1, base + gust * base));
+}
+
 // Advances the grid by `hours`, burning generator fuel and charging or draining batteries.
 export function updatePower(sim: Simulation, tiles: number[], hours: number): void {
   const w = sim.world;
@@ -41,6 +61,7 @@ export function updatePower(sim: Simulation, tiles: number[], hours: number): vo
   let capacity = 0;
   const sun = eclipseOn(sim) ? 0 : daylight(sim.hour) * (sim.season === 'Winter' ? WINTER_SOLAR : 1);
   const generators: number[] = [];
+  let wind: number | undefined;
   for (const i of tiles) {
     const f = w.feature[i];
     const power = f !== NONE ? featureDef(f).power : undefined;
@@ -56,6 +77,9 @@ export function updatePower(sim: Simulation, tiles: number[], hours: number): vo
       generators.push(i);
     } else if (power.solar) {
       supply += power.output * sun;
+    } else if (power.wind) {
+      // (Under a roof its blades can't turn.)
+      supply += sim.isRoofed(i) ? 0 : power.output * (wind ??= windStrength(sim));
     } else {
       supply += power.output;
     }

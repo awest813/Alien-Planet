@@ -1046,6 +1046,103 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillRect(7, 4, 2, 2);
       c.fillRect(6, 6, 4, 1);
       break;
+    case 'windTurbine':
+      // A mast, a hub and three pale blades.
+      c.fillStyle = 'rgba(0,0,0,0.25)';
+      c.fillRect(5, 14, 6, 2);
+      c.fillStyle = '#8a8f98';
+      c.fillRect(7, 7, 2, 8);
+      c.fillStyle = '#e4e8ee';
+      c.fillRect(7, 0, 2, 6);
+      c.fillRect(2, 8, 2, 2);
+      c.fillRect(4, 7, 2, 2);
+      c.fillRect(10, 7, 2, 2);
+      c.fillRect(12, 8, 2, 2);
+      c.fillStyle = '#b8bec8';
+      c.fillRect(8, 0, 1, 6);
+      c.fillRect(2, 9, 2, 1);
+      c.fillRect(12, 9, 2, 1);
+      c.fillStyle = '#5a5f68';
+      c.fillRect(6, 5, 4, 3);
+      break;
+    case 'parkBench':
+      // Slatted seat and back on iron legs.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(2, 13, 12, 2);
+      c.fillStyle = '#3a3a40';
+      c.fillRect(2, 9, 1, 5);
+      c.fillRect(13, 9, 1, 5);
+      c.fillStyle = '#9a6b3e';
+      c.fillRect(1, 4, 14, 2);
+      c.fillRect(1, 8, 14, 2);
+      c.fillStyle = '#b8844f';
+      c.fillRect(1, 4, 14, 1);
+      c.fillRect(1, 8, 14, 1);
+      c.fillStyle = '#3a3a40';
+      c.fillRect(2, 6, 1, 2);
+      c.fillRect(13, 6, 1, 2);
+      break;
+    case 'bookshelf': {
+      // A dark wooden case, its shelves full of coloured spines.
+      c.fillStyle = '#4a3020';
+      c.fillRect(1, 1, 14, 14);
+      c.fillStyle = '#2e1d12';
+      c.fillRect(2, 2, 12, 12);
+      const spines = ['#a33b3b', '#3b6aa3', '#c9a43a', '#4f8a4a', '#8a4f8a', '#d8d0c0'];
+      for (const y of [2, 7, 12]) {
+        for (let x = 2; x < 14; x++) {
+          const tall = (x * 7 + y) % 3 !== 0;
+          c.fillStyle = spines[(x * 5 + y) % spines.length];
+          c.fillRect(x, y + (tall ? 0 : 1), 1, tall ? 3 : 2);
+        }
+      }
+      c.fillStyle = '#4a3020';
+      c.fillRect(1, 5, 14, 2);
+      c.fillRect(1, 10, 14, 2);
+      break;
+    }
+    case 'barricade':
+      // Rough planks lashed across a pair of stakes.
+      c.fillStyle = 'rgba(0,0,0,0.2)';
+      c.fillRect(1, 13, 14, 2);
+      c.fillStyle = '#6e4a2a';
+      c.fillRect(3, 3, 2, 11);
+      c.fillRect(11, 3, 2, 11);
+      c.fillStyle = '#a07040';
+      c.fillRect(1, 5, 14, 3);
+      c.fillRect(1, 9, 14, 3);
+      c.fillStyle = '#7a5230';
+      c.fillRect(1, 7, 14, 1);
+      c.fillRect(1, 11, 14, 1);
+      c.fillStyle = '#c8a070';
+      c.fillRect(3, 2, 2, 1);
+      c.fillRect(11, 2, 2, 1);
+      break;
+    case 'fountain':
+      // A round stone basin of clear water, a spout rising from the middle.
+      c.fillStyle = '#8f949c';
+      c.fillRect(2, 3, 12, 11);
+      c.fillRect(3, 2, 10, 13);
+      c.fillStyle = '#b4b9c0';
+      c.fillRect(3, 3, 10, 1);
+      c.fillStyle = '#3f7fc4';
+      c.fillRect(4, 5, 8, 7);
+      c.fillRect(5, 4, 6, 9);
+      // Ripples spreading from the jet (uneven: a symmetrical pair read as a face), and its spray.
+      c.fillStyle = '#6aa6e0';
+      c.fillRect(4, 9, 3, 1);
+      c.fillRect(10, 6, 1, 3);
+      c.fillRect(9, 11, 2, 1);
+      c.fillStyle = '#c8ccd2';
+      c.fillRect(7, 8, 2, 2);
+      c.fillStyle = '#bfe0ff';
+      c.fillRect(7, 4, 2, 4);
+      c.fillStyle = '#e8f4ff';
+      c.fillRect(8, 4, 1, 1);
+      c.fillRect(6, 5, 1, 1);
+      c.fillRect(10, 4, 1, 1);
+      c.fillRect(5, 7, 1, 1);
+      break;
     case 'armchair':
       c.fillStyle = '#7a2e3a';
       c.fillRect(2, 2, 12, 12);

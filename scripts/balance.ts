@@ -75,6 +75,10 @@ const surplus = process.argv.includes('surplus');
 const flow = process.argv.includes('flow');
 // "pen" fences a pen with a gate and a trough once the colony is settled, and tames a pair to keep in it.
 const keepPen = process.argv.includes('pen');
+// "newbuild" also builds the later additions, to weigh them: a bookshelf by the research bench and a park bench
+// (day 2), a stone fountain once there are blocks for it (day 12), a wind turbine once electricity is known, and
+// with "defend" a ring of barricades round the hut until sandbags can go up (day 4).
+const newBuild = process.argv.includes('newbuild');
 // Nutrition a colonist eats in a day (as the top bar's "days of food" counts it).
 const DAILY_NUTRITION = 1.4;
 // "policy=frugal,long,rest" sets the colony's policies from the start.
@@ -221,6 +225,8 @@ interface Result {
   joyLowHours: number;
   // Impressiveness of each enclosed room at the end, by role.
   rooms: { role: string; impressiveness: number }[];
+  // With "newbuild": which of the later additions stand at the end, and whether the bookshelf reaches the bench.
+  built: string;
   mess: number;
   births: number;
   smashed: number;
@@ -278,6 +284,22 @@ const TRIBUTE_RESERVE = 50;
 const MAX_PRISON_BEDS = 8;
 
 // Every enclosed room on the map, once each.
+// Which of the later additions stand at the end (with "newbuild"), and whether a bench has books beside it.
+function builtAtEnd(sim: Simulation): string {
+  const keys = ['bookshelf', 'parkBench', 'fountain', 'windTurbine', 'barricade'];
+  const counts = new Map<string, number>();
+  let booksBench = false;
+  for (let i = 0; i < sim.world.size; i++) {
+    const f = sim.world.feature[i];
+    const key = f !== NONE ? featureDef(f).key : '';
+    if (keys.includes(key)) {
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    booksBench ||= key === 'researchBench' && sim.booksBeside(i);
+  }
+  return `${keys.map((k) => `${k} ${counts.get(k) ?? 0}`).join(', ')}${booksBench ? ', books by the bench' : ''}`;
+}
+
 function roomsAtEnd(sim: Simulation): { role: string; impressiveness: number }[] {
   const seen = new Map<number, { role: string; impressiveness: number }>();
   for (let i = 0; i < sim.world.size; i++) {
@@ -453,6 +475,11 @@ function play(seed: number): Result {
   const fell = new Set<number>();
   let beaconPlaced = false;
   let shaftPlaced = false;
+  let booksPlaced = false;
+  let parkBenchPlaced = false;
+  let fountainPlaced = false;
+  let turbinePlaced = false;
+  let barricadesPlaced = false;
   let poplarsPlanted = 0;
   let shipsLanded = 0;
   let bannerPlaced = false;
@@ -697,6 +724,63 @@ function play(seed: number): Result {
     if (defend && !sandbagsPlaced && hut && sim.isResearched('fortifications')) {
       sandbagsPlaced = true;
       sim.apply({ type: 'build', feature: featureId('sandbags'), tiles: sandbagRing });
+    }
+    // The later additions, with "newbuild".
+    if (newBuild) {
+      const free = (i: number, key: string) => sim.canPlaceBlueprint(i, featureId(key)) && !avoid.has(i);
+      // A bookshelf within two tiles of the research bench, once there is one.
+      if (!booksPlaced && labTile >= 0 && sim.world.feature[labTile] === featureId('researchBench')) {
+        const world = sim.world;
+        for (const [dx, dy] of [
+          [2, 0],
+          [-2, 0],
+          [0, 2],
+          [0, -2],
+          [2, 2],
+          [-2, -2],
+          [2, -2],
+          [-2, 2],
+        ]) {
+          const x = world.xOf(labTile) + dx;
+          const y = world.yOf(labTile) + dy;
+          if (world.inBounds(x, y) && free(world.idx(x, y), 'bookshelf')) {
+            avoid.add(world.idx(x, y));
+            sim.apply({ type: 'build', feature: featureId('bookshelf'), tiles: [world.idx(x, y)] });
+            booksPlaced = true;
+            break;
+          }
+        }
+      }
+      // Outdoors, as a player would (the first free spot was as likely inside the barracks).
+      const placeOne = (key: string) => {
+        const indoors = new Set(avoid);
+        for (let i = 0; i < sim.world.size; i++) {
+          if (sim.roomAt(i)?.enclosed) {
+            indoors.add(i);
+          }
+        }
+        const site = findSite(sim, 1, 1, indoors);
+        if (site) {
+          claim(avoid, sim, site.x, site.y, 1, 1);
+          sim.apply({ type: 'build', feature: featureId(key), tiles: [at(site.x, site.y)] });
+        }
+        return !!site;
+      };
+      if (!parkBenchPlaced && sim.day >= 2) {
+        parkBenchPlaced = placeOne('parkBench');
+      }
+      if (!fountainPlaced && sim.day >= 12) {
+        fountainPlaced = placeOne('fountain');
+      }
+      if (!turbinePlaced && sim.isResearched('electricity')) {
+        turbinePlaced = placeOne('windTurbine');
+      }
+      // Barricades on the ring kept for sandbags, until fortifications are known (then sandbags as usual, where
+      // the barricades leave room).
+      if (defend && !barricadesPlaced && hut && sim.day >= 4 && !sim.isResearched('fortifications')) {
+        barricadesPlaced = true;
+        sim.apply({ type: 'build', feature: featureId('barricade'), tiles: sandbagRing });
+      }
     }
     // Deep mining researched: sink a shaft (it's marked for digging once built).
     if (!shaftPlaced && sim.isResearched('deepMining')) {
@@ -1331,6 +1415,7 @@ function play(seed: number): Result {
     colonistHours,
     joyLowHours,
     rooms: roomsAtEnd(sim),
+    built: newBuild ? builtAtEnd(sim) : '',
     births: sim.stats.births ?? 0,
     smashed: sim.stats.smashed ?? 0,
     infections: sim.stats.infections ?? 0,
@@ -1508,7 +1593,7 @@ for (const seed of seedList) {
   console.log(
     `seed ${String(r.seed).padStart(6)}  alive ${r.living}/${r.total}  raids ${r.raids} (kills ${r.raidKills})  ` +
       `fever ${r.diseaseCases} (deaths ${r.diseaseDeaths})  breaks ${r.breaks}  mood avg ${r.avgMood.toFixed(0)} min ${r.minMood.toFixed(0)}  ` +
-      `friends day ${r.friendDay}  rivals ${r.rivals} lovers ${r.lovers}  starving h ${r.starvingHours}  objectives ${r.objectives}/${OBJECTIVES.length}  research ${r.research} (tailoring day ${r.tailoringDay})  frost ${r.frost}`,
+      `friends day ${r.friendDay}  rivals ${r.rivals} lovers ${r.lovers}  starving h ${r.starvingHours}  objectives ${r.objectives}/${OBJECTIVES.length}  research ${r.research} (tailoring day ${r.tailoringDay})  frost ${r.frost}${r.built ? `\n      built: ${r.built}` : ''}`,
   );
   for (const d of r.deaths) {
     console.log(`    ${d}`);

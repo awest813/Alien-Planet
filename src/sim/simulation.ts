@@ -437,6 +437,9 @@ const VARIETY_SHARE = 0.12;
 const SAME_OLD_TOTAL = 0.6;
 const SAME_OLD_SHARE = 0.85;
 const EAT_TICKS = 60;
+// Research at a bench with a bookshelf within this many tiles goes this much faster.
+const BOOKS_REACH = 2;
+export const BOOKS_BONUS = 0.15;
 
 // Mood below this for a couple of hours risks a mental break.
 export const BREAK_THRESHOLD = 12;
@@ -6837,6 +6840,24 @@ export class Simulation {
     return true;
   }
 
+  // Whether a bookshelf stands within reach of this research bench (one is enough; more don't add).
+  public booksBeside(bench: number): boolean {
+    const w = this.world;
+    const x = w.xOf(bench);
+    const y = w.yOf(bench);
+    for (let dy = -BOOKS_REACH; dy <= BOOKS_REACH; dy++) {
+      for (let dx = -BOOKS_REACH; dx <= BOOKS_REACH; dx++) {
+        if (w.inBounds(x + dx, y + dy)) {
+          const f = w.feature[w.idx(x + dx, y + dy)];
+          if (f !== NONE && featureDef(f).books) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   private stepResearch(c: Colonist, job: Job): void {
     const w = this.world;
     const key = this.research.current;
@@ -6846,7 +6867,9 @@ export class Simulation {
       this.endJob(c);
       return;
     }
-    this.research.progress[project.key] = (this.research.progress[project.key] ?? 0) + this.workSpeed(c, 'research');
+    this.research.progress[project.key] =
+      (this.research.progress[project.key] ?? 0) +
+      this.workSpeed(c, 'research') * (this.booksBeside(job.target) ? 1 + BOOKS_BONUS : 1);
     learn(this, c, 'research');
     const cost = researchCost(this.research, project);
     // Materials short: the work goes as far as it can, and waits there.

@@ -1411,5 +1411,101 @@
       "item": "wood",
       "count": 5
     }
+  },
+  {
+    "key": "windTurbine",
+    "name": "Wind turbine",
+    "power": {
+      "output": 700,
+      "wind": true
+    },
+    "research": "electricity",
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 35
+        },
+        {
+          "item": "stone",
+          "count": 15
+        },
+        {
+          "item": "cloth",
+          "count": 10
+        }
+      ],
+      "work": 300
+    }
+  },
+  {
+    "key": "parkBench",
+    "name": "Park bench",
+    "passable": true,
+    "moveCost": 1.5,
+    "beauty": 1,
+    "joy": {
+      "activity": "Resting on a bench",
+      "kind": "relaxing",
+      "hoursToFull": 4
+    },
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 12
+        }
+      ],
+      "work": 60
+    }
+  },
+  {
+    "key": "bookshelf",
+    "name": "Bookshelf",
+    "beauty": 2,
+    "books": true,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 25
+        },
+        {
+          "item": "cloth",
+          "count": 6
+        }
+      ],
+      "work": 140
+    }
+  },
+  {
+    "key": "barricade",
+    "name": "Barricade",
+    "passable": true,
+    "moveCost": 2.5,
+    "cover": 0.5,
+    "build": {
+      "cost": [
+        {
+          "item": "wood",
+          "count": 6
+        }
+      ],
+      "work": 50
+    }
+  },
+  {
+    "key": "fountain",
+    "name": "Stone fountain",
+    "beauty": 5,
+    "build": {
+      "cost": [
+        {
+          "item": "stoneBlocks",
+          "count": 25
+        }
+      ],
+      "work": 400
+    }
   }
 ]

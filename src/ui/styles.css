@@ -810,6 +810,16 @@ kbd {
 }
 
 /* ---------- Architect (bottom) ---------- */
+/* A building's cost against the stores, in the build bar's hint: what's short in red. */
+.hint .have {
+  color: var(--muted);
+}
+
+.hint .short,
+.hint .short .have {
+  color: #ff8a8a;
+}
+
 .architect {
   width: 100%;
 }
@@ -825,6 +835,14 @@ kbd {
 .arch-tabs button {
   font-size: 12px;
   padding: 3px 10px;
+}
+
+/* Twelve tabs and the two map buttons in one row: under 1180px the map buttons show only their icons (at
+   1366×768 and 125%, a Chromebook's, Temperature had wrapped to a second row). */
+@media (max-width: 1180px) {
+  .arch-tabs .arch-word {
+    display: none;
+  }
 }
 
 .arch-tools {

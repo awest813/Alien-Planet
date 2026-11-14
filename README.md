@@ -117,7 +117,7 @@ How the living simulation works:
 - **Needs:** food, rest and recreation drain over time. Colonists eat when hungry (cooked meals first) and sleep
   during scheduled hours or when exhausted. A starving colonist (food at zero) works at 80% and walks at 90% until
   they eat.
-- **Recreation:** colonists relax in an armchair, pitch horseshoes, play chess (two players) or cards (up to four),
+- **Recreation:** colonists relax in an armchair or on a park bench (as slow as a walk, but a change), pitch horseshoes, play chess (two players) or cards (up to four),
   stargaze through a telescope on clear nights (Optics research), or go for a walk, which does more good among
   trees and water. Each has a kind (relaxing, games, social, outdoors; music and art come later). Doing the same
   kind over and over is worth less each time, so colonists move between them, and a good mix gives "Varied
@@ -288,8 +288,9 @@ How the storytelling layer works:
   drop-off and armor piercing: fists, knife, club, spear, short bow, recurve bow, longbow (Longbows research) and
   crossbow (Crossbows research). Leather and scale armor (Armor and Scale armor research) turn aside a share of
   every blow, wear down as they do it, and scale armor slows its wearer. Colonists pick up clearly better weapons
-  and armor from storage, and fallen raiders drop some of their kit. Sandbags and embrasures (stone wall slots you
-  can shoot through but not walk through) cut the chance of being hit from the side they face, and blows struck
+  and armor from storage, and fallen raiders drop some of their kit. Barricades (wood, from the start), sandbags and
+  embrasures (stone wall slots you can shoot through but not walk through) cut the chance of being hit from the
+  side they face, and blows struck
   across them (or by someone clambering over sandbags) land less often; spike traps
   (Traps research) wound the first raider to step on them and go back on the build list.
 - **Seasons:** a year is four six-day seasons, starting in early spring. Temperatures follow the year (warm
@@ -299,8 +300,9 @@ How the storytelling layer works:
   work type study it (training the Intellectual skill). Forty-five projects unlock, among much else, the recurve bow,
   sandbags, the stone hearth, the fine bed, tailoring and all the electrical tech below, or improve insulation, crop growth and
   doctoring.
-- **Power:** the colony shares one grid. Wood-fired generators (kept fuelled by haulers) and solar panels (daytime
-  only, weaker in winter) supply it; batteries store the surplus. If demand outstrips supply and storage,
+- **Power:** the colony shares one grid. Wood-fired generators (kept fuelled by haulers), solar panels (daytime
+  only, weaker in winter) and wind turbines (night and day, with the weather: strong in a storm, weak in fog, and
+  only under the open sky) supply it; batteries store the surplus. If demand outstrips supply and storage,
   everything electric switches off. Generators idle to save fuel while the batteries are full and nothing
   else needs them, and haulers refuel a generator that's running low before anything else.
 - **Climate control and cold storage:** electric heaters, air conditioners (cool to 20°C) and freezer units
