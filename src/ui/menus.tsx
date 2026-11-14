@@ -3,10 +3,12 @@ import { TOUCH } from './touch';
 import { SAVE_SLOTS, UiState, controller, slotLabel, TradeLine } from '../game/controller';
 import { SaveMeta } from '../game/save-store';
 import {
+  CHROMEBOOK_CHOICES,
   DEFAULT_SETTINGS,
   MAP_SHARPNESS,
   NOTICE_TIMES,
   PAN_SPEEDS,
+  SCROLL_CHOICES,
   Settings,
   UI_SCALES,
   forgetHelp,
@@ -678,7 +680,8 @@ const CONTROLS: [string, string][] = [
   ['Space', 'Pause or resume'],
   ['1 · 2 · 3', 'Game speed'],
   ['W A S D / arrows', 'Move the view (or drag with the right mouse button)'],
-  ['Mouse wheel', 'Zoom'],
+  ['Mouse wheel', 'Zoom (or move the map: Scrolling, above); Ctrl and the wheel, or a pinch, always zoom'],
+  ['+ / −', 'Zoom in or out'],
   [
     'Enter',
     'Without a mouse: the tile in the middle of the view is the cursor (move the view with the arrows). Enter inspects it, or with a tool, starts an area there; Enter again marks it',
@@ -692,7 +695,7 @@ const CONTROLS: [string, string][] = [
     'Move the selected drafted colonist (with nobody selected, everyone drafted), or drop the current tool',
   ],
   ['Esc', 'Close a screen, drop the tool, clear the selection, then open the menu'],
-  ['Delete', 'On a selected tile: cancel the order there, or else mark the building for taking down'],
+  ['Delete / Backspace', 'On a selected tile: cancel the order there, or else mark the building for taking down'],
   ['Letter keys', 'Tools: hover a button in the bottom bar to see its key'],
 ];
 
@@ -752,6 +755,28 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
         onChange={(v) => set({ noticeSeconds: v })}
       />
       <Choice label="Camera speed" value={s.panSpeed} options={PAN_SPEEDS} onChange={(v) => set({ panSpeed: v })} />
+      <Choice
+        label="Chromebook mode"
+        value={s.chromebook}
+        options={CHROMEBOOK_CHOICES}
+        onChange={(v) => set({ chromebook: v })}
+      />
+      <p className="muted small setting-note">
+        {controller.chromebook ? 'On' : 'Off'}
+        {s.chromebook === 0 && (controller.onChromeOS ? ' (this is a Chromebook)' : " (this isn't a Chromebook)")}. For
+        a Chromebook or any low-powered laptop: the map at 30 frames a second and the screen's own resolution, fewer
+        effects, and two fingers on the touchpad move the map (a pinch zooms). Easier on the battery.
+      </p>
+      <Choice
+        label="Scrolling (the wheel, or two fingers)"
+        value={s.scroll}
+        options={SCROLL_CHOICES}
+        onChange={(v) => set({ scroll: v })}
+      />
+      <p className="muted small setting-note">
+        {s.scroll === 0 && (controller.scrollMoves ? 'Auto moves the map, as Chromebook mode is on. ' : 'Auto zooms. ')}
+        A pinch, or Ctrl and the wheel, always zooms; so do + and −.
+      </p>
       {/* (Only a sharp screen has the choice: elsewhere the map is drawn one pixel to one already.) */}
       {window.devicePixelRatio > 1 && (
         <>
@@ -775,6 +800,8 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
                   Try sharp again
                 </button>
               </>
+            ) : s.mapSharpness === SHARPNESS_AUTO && controller.chromebook ? (
+              'Chromebook mode draws Auto as Fast, for the battery; Sharp is sharper.'
             ) : (
               'Sharp uses more battery. Auto starts sharp and switches to Fast if the game runs slowly.'
             )}

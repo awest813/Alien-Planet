@@ -4,6 +4,7 @@ import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { sound } from './game/audio';
 import { controller } from './game/controller';
+import { CHROMEBOOK_FPS } from './game/device';
 import { ColonyScene } from './render/colony-scene';
 import { SHARPNESS_AUTO, autoSharpness, canvasRatio, retrySharp } from './render/sharpness';
 import { triggerEvent } from './sim/storyteller';
@@ -15,7 +16,10 @@ import './ui/styles.css';
 // On a sharp (high-density) screen the canvas has more pixels than the page gives it, and is shown at the page's
 // size: drawn at the page's resolution, the browser blew it up and the map looked soft. How many more is the
 // "Map sharpness" setting's (render/sharpness.ts); Auto drops to the page's resolution if the frames run slow.
-const pixelRatio = () => canvasRatio(controller.settings.mapSharpness, window.devicePixelRatio, autoSharpness.slow);
+// (In Chromebook mode, Auto draws at the page's resolution from the start: a Chromebook's small GPU was the slow
+// case Auto waited to find.)
+const pixelRatio = () =>
+  canvasRatio(controller.settings.mapSharpness, window.devicePixelRatio, autoSharpness.slow || controller.chromebook);
 let ratio = pixelRatio();
 const pageSize = () => {
   const box = document.getElementById('game')!.getBoundingClientRect();
@@ -69,10 +73,24 @@ const watchDensity = () => {
 };
 watchDensity();
 
+// Chromebook mode holds the map to 30 frames a second (Phaser's frame limit, set as it runs; the game's clock
+// keeps its own time, so nothing slows but the drawing).
+const capFrames = () => {
+  const limit = controller.chromebook ? CHROMEBOOK_FPS : 0;
+  const loop = game.loop as unknown as { fpsLimit: number; hasFpsLimit: boolean; _limitRate: number };
+  if (loop.fpsLimit !== limit) {
+    loop.fpsLimit = limit;
+    loop.hasFpsLimit = limit > 0;
+    loop._limitRate = limit > 0 ? 1000 / limit : 0;
+  }
+};
+capFrames();
+
 // The setting changed (and switching back to Auto from Sharp or Fast gives sharp another try; so does the button
 // for it in Settings).
 let setting = controller.settings.mapSharpness;
 controller.subscribe(() => {
+  capFrames();
   if (controller.settings.mapSharpness !== setting) {
     setting = controller.settings.mapSharpness;
     if (setting === SHARPNESS_AUTO) {

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { TOOLS, Tool, controller } from '../game/controller';
 import { NONE, featureDef, itemDef, terrainId } from '../sim/defs';
+import { wheelPixels, wheelZoom } from '../game/device';
 import { hash2 } from '../sim/rng';
 import { beaconTile, transmitting } from '../sim/beacon';
 import { EXCELLENT, MASTERWORK } from '../sim/art';
@@ -409,7 +410,7 @@ export class ColonyScene extends Phaser.Scene {
   // asks for less motion: still, they'd read as specks on the map.)
   private drawSeason(g: Phaser.GameObjects.Graphics, v: Phaser.Geom.Rectangle, now: number): void {
     const sim = controller.sim;
-    if (REDUCED_MOTION?.matches || !controller.settings.dayNightLighting) {
+    if (REDUCED_MOTION?.matches || !controller.settings.dayNightLighting || controller.chromebook) {
       return;
     }
     const s = this.px / this.cameras.main.zoom;
@@ -468,7 +469,9 @@ export class ColonyScene extends Phaser.Scene {
       const length = (storm ? 14 : 9) * s;
       const slant = (storm ? 0.35 : 0.18) * length;
       g.lineStyle(s, 0xb4d0ff, storm ? 0.6 : 0.45);
-      const drops = storm ? 340 : 180;
+      // (Half as many in Chromebook mode, and no splashes: still plainly rain.)
+      const light = controller.chromebook;
+      const drops = (storm ? 340 : 180) / (light ? 2 : 1);
       // Each drop has its own place and pace (hashed), so they scatter rather than fall in lines.
       for (let k = 0; k < drops; k++) {
         const fall = frac(hash2(k, 5, 13) + now * (storm ? 0.0016 : 0.0011) * (0.8 + 0.4 * hash2(k, 7, 17)));
@@ -478,7 +481,7 @@ export class ColonyScene extends Phaser.Scene {
       }
       // And where they land, a brief splash.
       g.fillStyle(0xd4e4ff, 0.5);
-      for (let k = 0; k < (storm ? 70 : 40); k++) {
+      for (let k = 0; k < (light ? 0 : storm ? 70 : 40); k++) {
         const phase = frac(hash2(k, 11, 31) + now * 0.003);
         if (phase < 0.3) {
           const x = v.x + hash2(k + Math.floor(now * 0.003 + hash2(k, 11, 31)) * 97, 13, 37) * v.width;
@@ -514,14 +517,15 @@ export class ColonyScene extends Phaser.Scene {
       g.fillStyle(0xc8ccd2, 0.22).fillRect(v.x, v.y, v.width, v.height);
       // Banks of it drifting slowly across, thicker here and thinner there (one even veil read as a faded
       // screen, not fog).
-      for (let k = 0; k < 9; k++) {
+      const light = controller.chromebook;
+      for (let k = 0; k < (light ? 5 : 9); k++) {
         const w = v.width * (0.35 + 0.3 * hash2(k, 2, 43));
         const h = w * (0.35 + 0.2 * hash2(k, 4, 47));
         const x = v.x - w / 2 + frac(hash2(k, 6, 53) + now * 0.000006 * (0.6 + hash2(k, 8, 59))) * (v.width + w);
         const y = v.y + hash2(k, 10, 61) * v.height;
         // (Ring on ring, each fainter than one solid shape, so a bank's edge is soft.)
         g.fillStyle(0xd4d8de, 0.025 + 0.02 * hash2(k, 12, 67));
-        for (const r of [1, 0.85, 0.7, 0.55, 0.4]) {
+        for (const r of light ? [1, 0.7, 0.4] : [1, 0.85, 0.7, 0.55, 0.4]) {
           g.fillEllipse(x, y, w * r, h * r);
         }
       }
@@ -534,7 +538,8 @@ export class ColonyScene extends Phaser.Scene {
   // Drifting glints on open water, and foam where it meets the shore.
   private drawWater(): void {
     const now = this.time.now;
-    if (now - this.waterAt < 120) {
+    // (Chromebook mode: the glints move a little less often, a redraw of every shore in view saved.)
+    if (now - this.waterAt < (controller.chromebook ? 300 : 120)) {
       return;
     }
     this.waterAt = now;
@@ -1367,7 +1372,8 @@ export class ColonyScene extends Phaser.Scene {
   // with the strokes the sound plays. Only while the clock runs (work stops when it's paused), and still for anyone
   // who asks for less motion.
   private drawWorkFx(g: Phaser.GameObjects.Graphics): void {
-    if (REDUCED_MOTION?.matches || controller.getState().speed === 0) {
+    // (Nor in Chromebook mode: the progress bar says the same, for less drawing.)
+    if (REDUCED_MOTION?.matches || controller.getState().speed === 0 || controller.chromebook) {
       return;
     }
     const sim = controller.sim;
@@ -2192,10 +2198,24 @@ export class ColonyScene extends Phaser.Scene {
 
     this.input.on('gameout', () => controller.setHover(null));
 
-    this.input.on('wheel', (pointer: Phaser.Input.Pointer, _objects: unknown, _dx: number, dy: number) => {
+    this.input.on('wheel', (pointer: Phaser.Input.Pointer, _objects: unknown, dx: number, dy: number) => {
+      const event = pointer.event as WheelEvent | undefined;
+      const mode = event?.deltaMode ?? 0;
+      // A pinch on a touchpad comes as a wheel event with Ctrl held (the page keeps from zooming itself: Phaser
+      // stops it over the map), and Ctrl with a mouse wheel zooms however scrolling is set.
+      const pinch = !!event?.ctrlKey;
+      if (!pinch && controller.scrollMoves) {
+        // Two fingers on a touchpad move the map, as they scroll a page (Settings: Scrolling).
+        cam.setScroll(
+          cam.scrollX + (wheelPixels(dx, mode) * this.px) / cam.zoom,
+          cam.scrollY + (wheelPixels(dy, mode) * this.px) / cam.zoom,
+        );
+        this.fitBounds();
+        return;
+      }
       // (A sideways scroll on a trackpad is no zoom at all.)
       if (dy !== 0) {
-        this.zoomAround(cam.zoom * (dy > 0 ? 1 / 1.15 : 1.15), pointer);
+        this.zoomAround(cam.zoom * wheelZoom(dy, mode, pinch), pointer);
       }
     });
   }
@@ -2321,6 +2341,16 @@ export class ColonyScene extends Phaser.Scene {
       }
       // F6 takes keyboard focus to the top bar, and Shift+Tab into the interface, as the browser does: from
       // there Tab reaches every button. (Tab alone, with nothing focused, is "next colonist".)
+      // + and − zoom about the middle of the view: a touchpad has no wheel, and a pinch isn't for everyone.
+      if (key === '=' || key === '+' || key === '-' || key === '_') {
+        event.preventDefault();
+        const step = key === '=' || key === '+' ? 1.15 : 1 / 1.15;
+        this.zoomAround(this.cameras.main.zoom * step, {
+          x: this.cameras.main.width / 2,
+          y: this.cameras.main.height / 2,
+        });
+        return;
+      }
       if (key === 'F6') {
         event.preventDefault();
         // (Shown as keyboard focus: Firefox drew no ring for a button focused from script.)

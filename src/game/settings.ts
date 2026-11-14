@@ -24,6 +24,11 @@ export interface Settings {
   panSpeed: number;
   // How sharp the map is drawn on a high-density screen: 0 auto, 1 fast, 2 sharp (render/sharpness.ts).
   mapSharpness: number;
+  // Lighter drawing and touchpad scrolling for a Chromebook: 0 auto (on one), 1 on, 2 off (game/device.ts).
+  chromebook: number;
+  // Whether a scroll (the wheel, two fingers) zooms or moves the map: 0 auto (moves in Chromebook mode), 1 zooms,
+  // 2 moves.
+  scroll: number;
   // Sound, off until the player turns it on, and its volumes (0..1).
   sound: boolean;
   // The soundtrack, under the colonists' own playing.
@@ -69,6 +74,8 @@ export const DEFAULT_SETTINGS: Settings = {
   noticeSeconds: 8,
   panSpeed: 1,
   mapSharpness: 0,
+  chromebook: 0,
+  scroll: 0,
   sound: false,
   score: true,
   masterVolume: 0.7,
@@ -105,6 +112,18 @@ export const MAP_SHARPNESS = [
   { value: 1, label: 'Fast' },
 ];
 
+export const CHROMEBOOK_CHOICES = [
+  { value: 0, label: 'Auto' },
+  { value: 1, label: 'On' },
+  { value: 2, label: 'Off' },
+];
+
+export const SCROLL_CHOICES = [
+  { value: 0, label: 'Auto' },
+  { value: 1, label: 'Zooms' },
+  { value: 2, label: 'Moves the map' },
+];
+
 const KEY = 'colony-alpha:settings';
 
 export function loadSettings(): Settings {
@@ -131,6 +150,8 @@ export function loadSettings(): Settings {
   settings.noticeSeconds = snap(settings.noticeSeconds, NOTICE_TIMES, DEFAULT_SETTINGS.noticeSeconds);
   settings.panSpeed = snap(settings.panSpeed, PAN_SPEEDS, DEFAULT_SETTINGS.panSpeed);
   settings.mapSharpness = snap(settings.mapSharpness, MAP_SHARPNESS, DEFAULT_SETTINGS.mapSharpness);
+  settings.chromebook = snap(settings.chromebook, CHROMEBOOK_CHOICES, DEFAULT_SETTINGS.chromebook);
+  settings.scroll = snap(settings.scroll, SCROLL_CHOICES, DEFAULT_SETTINGS.scroll);
   for (const key of ['masterVolume', 'musicVolume', 'effectsVolume'] as const) {
     const v = settings[key];
     settings[key] = Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : DEFAULT_SETTINGS[key];

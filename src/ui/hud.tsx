@@ -11,6 +11,7 @@ import {
   UiState,
   controller,
 } from '../game/controller';
+import { chromebookMode, scrollMoves } from '../game/device';
 import { itemIconStyle } from '../render/icons';
 import { PHASE_NAMES, START_HOUR, TICKS_PER_HOUR } from '../sim/simulation';
 import type { Stance } from '../sim/types';
@@ -839,7 +840,12 @@ function TileActions({ t }: { t: TileView }) {
     }
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      if (e.key !== 'Delete' || e.repeat || target?.closest('input, textarea, select, [role=dialog]')) {
+      // (Backspace too: a Chromebook's keyboard has no Delete key.)
+      if (
+        (e.key !== 'Delete' && e.key !== 'Backspace') ||
+        e.repeat ||
+        target?.closest('input, textarea, select, [role=dialog]')
+      ) {
         return;
       }
       e.preventDefault();
@@ -1268,7 +1274,11 @@ function NextGoal({
 // Build and order tools, grouped into tabs.
 // A phone or tablet: the map is moved with a finger rather than a mouse.
 
-const pickArchitect = fields('lockedTools', 'overlay', 'toolId');
+const pickArchitect = (s: UiState) => ({
+  ...fields('lockedTools', 'overlay', 'toolId')(s),
+  // (For the hint: in Chromebook mode, two fingers move the map rather than the wheel zooming it.)
+  scrollMoves: scrollMoves(s.settings.scroll, chromebookMode(s.settings.chromebook, controller.onChromeOS)),
+});
 
 export function Architect() {
   const state = useUi(pickArchitect);
@@ -1373,7 +1383,9 @@ export function Architect() {
           <span className="muted">
             {TOUCH
               ? ' · Drag to move the map, pinch to zoom, tap to inspect.'
-              : ' · Right-drag or WASD pans, the wheel zooms, right-click drops the tool; from the keyboard, arrows and Enter.'}
+              : state.scrollMoves
+                ? ' · Two fingers or WASD move the map, a pinch or + − zooms, right-click drops the tool; from the keyboard, arrows and Enter.'
+                : ' · Right-drag or WASD pans, the wheel zooms, right-click drops the tool; from the keyboard, arrows and Enter.'}
           </span>
         )}
       </div>

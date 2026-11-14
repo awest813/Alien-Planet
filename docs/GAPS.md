@@ -46,6 +46,15 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Chromebook mode** (on by itself on ChromeOS; checked in a browser posing as a Chromebook at 1366×768 and 125%,
+  in Chromium, Firefox and WebKit): the map at 30 frames a second and the page's resolution, fewer effects, and
+  a touchpad's two fingers moving the map with a pinch to zoom. For every laptop: a touchpad's run of small
+  scrolls zoomed a full step each (wildly fast), now in proportion (a mouse's notch is still the old step,
+  whatever the browser counts it as); + and − zoom; Backspace does what Delete does on a tile (a Chromebook has
+  none); on a short screen the minimap is smaller, so the goals above it show more than a heading. Not shown here:
+  the power saved. This machine draws in software, which keeps every core busy whatever is drawn; the cap and the
+  page's resolution are what a real GPU draws less of.
+
 - **Browser compatibility** (the build's targets, Chrome/Edge 111, Firefox 114, Safari/iOS 16.4, checked by
   scanning the code against them (eslint-plugin-compat and es-x with type information, doiuse for the CSS), and the
   browser tests run in Firefox 155 and WebKit 26.6 as well as Chromium): every JavaScript built-in is in the

@@ -17,7 +17,8 @@ const FEATURE_COLORS: Record<string, string> = { tree: '#2f5d27', rock: '#4a4a4f
 const BUILDING_COLOR = '#d9c9a3';
 // The terrain picture is rebuilt this often; colonists and the view box are drawn every frame.
 const TERRAIN_REFRESH_MS = 2000;
-// On-screen size of the minimap, in CSS pixels.
+// The minimap's size at its largest, in CSS pixels (drawn at twice that, for sharp screens). Its size on the page is
+// the stylesheet's: smaller on a short screen.
 const SIZE = 150;
 
 function terrainImage(): HTMLCanvasElement {
@@ -148,7 +149,6 @@ export function Minimap() {
         ref={canvasRef}
         width={SIZE * 2}
         height={SIZE * 2}
-        style={{ width: SIZE, height: SIZE }}
         aria-label={TOUCH ? 'Minimap: tap to move the view' : 'Minimap: click to move the view'}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);

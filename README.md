@@ -492,6 +492,12 @@ server).
 Browsers: the build targets Chrome and Edge 111, Firefox 114 and Safari 16.4 (iOS 16.4) or later, and the game
 needs WebGL; without it, the page says so rather than starting.
 
+Chromebooks: **Chromebook mode** (Settings, Display) is on by itself on ChromeOS and can be turned on anywhere, for
+a Chromebook or any low-powered laptop. The map is drawn at 30 frames a second and the screen's own resolution,
+with fewer effects (no work or seasonal particles, lighter rain and fog), and two fingers on the touchpad move the
+map while a pinch zooms (Settings: Scrolling, to choose). Anywhere, + and − zoom, Backspace does what Delete does,
+and a touchpad's scroll zooms in proportion rather than a full step for each of its many small events.
+
 [docs/GAPS.md](docs/GAPS.md) lists where the game is thin, unbalanced or untested, with the evidence.
 
 ## Roadmap

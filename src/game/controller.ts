@@ -122,6 +122,7 @@ import {
 import { Difficulty, coldSnapOn, eclipseOn, heatWaveOn } from '../sim/storyteller';
 import { SaveMeta, deleteSave, listSaves, readSave, writeSave } from './save-store';
 import { Settings, loadSettings, storeSettings } from './settings';
+import { chromebookMode, isChromeOS, scrollMoves } from './device';
 import { share } from './share';
 import { autoSharpness } from '../render/sharpness';
 
@@ -1304,6 +1305,15 @@ export class GameController {
 
   // Player preferences, remembered between visits.
   public settings: Settings = loadSettings();
+  // Whether this is a Chromebook (as the browser says), and whether Chromebook mode is on: lighter drawing, and a
+  // scroll that moves the map (game/device.ts).
+  public readonly onChromeOS = isChromeOS();
+  public get chromebook(): boolean {
+    return chromebookMode(this.settings.chromebook, this.onChromeOS);
+  }
+  public get scrollMoves(): boolean {
+    return scrollMoves(this.settings.scroll, this.chromebook);
+  }
   // False until the player starts, continues or loads a colony, and again after quitting to the title.
   private inPlay = false;
 

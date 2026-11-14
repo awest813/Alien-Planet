@@ -313,3 +313,103 @@ test('orders can be given on the map from the keyboard alone', async ({ page }) 
   await expect.poll(zoned).toBeGreaterThan(1);
   expect(errors).toEqual([]);
 });
+
+// A Chromebook: its user agent, and the page a 1366×768 screen at 125% leaves (1093×615).
+test.describe('on a Chromebook', () => {
+  test.use({
+    userAgent:
+      'Mozilla/5.0 (X11; CrOS x86_64 15917.71.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    viewport: { width: 1093, height: 615 },
+  });
+
+  type Cam = { scrollX: number; scrollY: number; zoom: number };
+  const camera = (page: Page) =>
+    page.evaluate(() => {
+      const scene = (window as unknown as { colonyGame: { scene: { scenes: { cameras: { main: Cam } }[] } } })
+        .colonyGame.scene.scenes[0];
+      const { scrollX, scrollY, zoom } = scene.cameras.main;
+      return { scrollX, scrollY, zoom };
+    });
+
+  test('Chromebook mode is on: lighter drawing, and two fingers move the map while a pinch zooms', async ({ page }) => {
+    const errors = watchErrors(page);
+    await startColony(page);
+    const state = await page.evaluate(() => {
+      const w = window as unknown as {
+        colony: { chromebook: boolean; scrollMoves: boolean };
+        colonyGame: { loop: { fpsLimit: number }; canvas: HTMLCanvasElement };
+      };
+      return {
+        chromebook: w.colony.chromebook,
+        scrollMoves: w.colony.scrollMoves,
+        fpsLimit: w.colonyGame.loop.fpsLimit,
+        canvas: w.colonyGame.canvas.width,
+        page: window.innerWidth,
+      };
+    });
+    expect(state).toMatchObject({ chromebook: true, scrollMoves: true, fpsLimit: 30 });
+    // Drawn at the page's resolution, not the screen's.
+    expect(state.canvas).toBe(state.page);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.mouse.move(400, 330);
+    // Two fingers on the touchpad: the map moves, at the same zoom.
+    const before = await camera(page);
+    await page.mouse.wheel(60, 80);
+    await expect.poll(async () => (await camera(page)).scrollY).toBeGreaterThan(before.scrollY);
+    const moved = await camera(page);
+    expect(moved.scrollX).toBeGreaterThan(before.scrollX);
+    expect(moved.zoom).toBe(before.zoom);
+    // A pinch (a wheel event with Ctrl held): it zooms.
+    await page.keyboard.down('Control');
+    await page.mouse.wheel(0, -20);
+    await page.keyboard.up('Control');
+    await expect.poll(async () => (await camera(page)).zoom).toBeGreaterThan(moved.zoom);
+    // And + zooms in, for a touchpad with no wheel.
+    const pinched = (await camera(page)).zoom;
+    await page.keyboard.press('Equal');
+    await expect.poll(async () => (await camera(page)).zoom).toBeGreaterThan(pinched);
+    expect(errors).toEqual([]);
+  });
+
+  test('Backspace cancels an order on the selected tile (a Chromebook has no Delete key)', async ({ page }) => {
+    const errors = watchErrors(page);
+    await startColony(page);
+    // A tree beside the first colonist, marked for chopping, and its tile selected.
+    await page.evaluate(async () => {
+      // (Served by the dev server: a path the type checker can't follow.)
+      const defs = '/src/sim/defs.ts';
+      const { featureId } = (await import(defs)) as { featureId(key: string): number };
+      type W = {
+        colony: {
+          sim: {
+            colonists: { tile: number }[];
+            world: {
+              xOf(i: number): number;
+              yOf(i: number): number;
+              idx(x: number, y: number): number;
+              setFeature(i: number, f: number): void;
+            };
+            apply(cmd: unknown): void;
+          };
+          selectTile(i: number): void;
+          publish(): void;
+        };
+      };
+      const c = (window as unknown as W).colony;
+      const w = c.sim.world;
+      const x = w.xOf(c.sim.colonists[0].tile) + 2;
+      const y = w.yOf(c.sim.colonists[0].tile);
+      w.setFeature(w.idx(x, y), featureId('tree'));
+      c.sim.apply({ type: 'designate', kind: 'chop', rect: { x0: x, y0: y, x1: x, y1: y } });
+      c.selectTile(w.idx(x, y));
+      c.publish();
+      (document.activeElement as HTMLElement | null)?.blur();
+    });
+    const card = page.getByRole('region', { name: 'Tile details' });
+    await expect(card.getByRole('button', { name: 'Cancel order' })).toBeVisible();
+    await page.keyboard.press('Backspace');
+    await expect(card.getByRole('button', { name: 'Cancel order' })).toBeHidden();
+    await expect(card.getByRole('button', { name: 'Chop' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+});

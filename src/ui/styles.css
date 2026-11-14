@@ -1501,9 +1501,20 @@ button.link:focus-visible {
 
 .minimap canvas {
   display: block;
+  width: 150px;
+  height: 150px;
   cursor: crosshair;
   image-rendering: pixelated;
   touch-action: none;
+}
+
+/* A short screen (a Chromebook's 1366×768 at 125% leaves a page 615 high): a smaller minimap, so the goals above it
+   keep room to show more than their heading. */
+@media (max-height: 700px) {
+  .minimap canvas {
+    width: 104px;
+    height: 104px;
+  }
 }
 
 .minimap-head {
