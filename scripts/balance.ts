@@ -82,6 +82,9 @@ const keepPen = process.argv.includes('pen');
 const newBuild = process.argv.includes('newbuild');
 // On an island or a river the harness bridges a ford on day 3 (see below); "nobridge" doesn't.
 const noBridge = process.argv.includes('nobridge');
+// There, the hut goes on ground reached without wading, smaller if a 9x7 won't fit; "anyhut" puts it wherever a
+// 9x7 fits nearest, as before.
+
 // Nutrition a colonist eats in a day (as the top bar's "days of food" counts it).
 const DAILY_NUTRITION = 1.4;
 // "policy=frugal,long,rest" sets the colony's policies from the start.
@@ -425,7 +428,7 @@ function play(seed: number): Result {
   // 9x7 on ground they can reach dry; on an island too small for one, 7x5 (a player builds what fits rather
   // than across the water, where the hut took the boat's timbers over the ford a log at a time); failing both, 9x7
   // anywhere. (Valleys, as before: the nearest 9x7.)
-  const dry = mapKind === 'valley' ? undefined : dryGround(sim);
+  const dry = mapKind === 'valley' || process.argv.includes('anyhut') ? undefined : dryGround(sim);
   let hutW = 9;
   let hutH = 7;
   let hut = findSite(sim, 9, 7, avoid, dry);

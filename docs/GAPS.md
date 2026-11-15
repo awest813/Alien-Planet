@@ -12,27 +12,12 @@ with esbuild for speed (see ROADMAP).
 
 ## Still open
 
-- **Separations are rare** (one in six ten-year runs). Mood is lower late (yearly average about 47–52, from
-  52–56); breaks no longer come in bursts after a death (no new break within a day of the last: seed 7919 went
-  from 9 breaks in ten years to 2, mean mood 48.8).
-- **Elders:** about one in ten new adults (founders and newcomers) is already 55–70, so most colonies know an elder
-  within ten years (one of two ten-year runs had one or two elders from year 1 and three deaths of old age; the
-  other's oldest reached 63).
-- **Some dealings are thin:** the harness seldom buys settlers (its population is at the cap), and Meadow Kin
-  goodwill still ends at 100 in some runs (though high goodwill can now be spent: friends send three days' food
-  for 20 goodwill when asked). (Envoys walk in, wait about the colony, and walk off home with the
-  answer; a returning expedition is seen on the road two hours out.)
-- **Islands still run hungrier than valleys:** since this pass an island landing brings a week's rations and a
-  fishing spot, and the colony fishes before its hut is up, so islands starve about half the hours they did
-  (48 days, five seeds, Tiny: desert 4,329 to 1,983 colonist-hours, temperate 1,959 to 973, forest 1,214 to
-  782, tundra 2,154 to 1,865), but that's still 5-8 times a valley's (109-367). What's left is the island
-  itself: little room to farm, and the timber across the water, so building eats the hours sowing needs. The
-  tundra's valleys no longer starve more than others (268 hours, from about 2,400). Now (30 days, 48 colonies
-  each, with the boat's timbers and a bridged ford): island mood about 50 against a valley's 52.5, hunger about
-  1.5-2 times a valley's, and a few island colonies with no walls by winter (see the harness note below).
-- **Testing on a real iPhone:** the long press on the Work grid passes in WebKit (Safari's engine) with an
-  iPhone's screen and touch, and in Firefox and Chromium, but hasn't been tried on an iPhone itself. Saves from
-  before version 16 can't be loaded (the game says so).
+- **A real iPhone:** the long press on the Work grid passes in WebKit (Safari's engine) with an iPhone's screen and
+  touch, and in Firefox and Chromium, but hasn't been tried on an iPhone itself; nor has the game as a whole on a
+  phone's own browser. That needs the device.
+
+By design, and not gaps: saves from before version 16 can't be loaded (the game says so); island colonies have
+the hardest start (see below); marriages rarely end.
 
 ## Closed in this pass
 
@@ -57,6 +42,21 @@ with esbuild for speed (see ROADMAP).
     and mourned. Over 96 colonies × 48 days, the harness paying or exchanging as a player would: on Harsh 83
     taken, 52 bought back, 14 exchanged, 6 escaped, 9 lost (one colony in eleven), mood level (53.8 and 53.0
     against 54.0 and 53.1); on Standard 14 taken and 1 lost, mood level. Harsh's description says so.
+  - **Islands are the harder start, by design:** about twice a valley's starving hours and mood a few points lower
+    (51 against 54-55), from the island itself: little room to farm, the timber across the water. The new-colony
+    screen now says so ("a harder start").
+  - **Separations, elders, late mood and dealings,** measured again in four ten-year colonies and today's seven
+    others: 10 weddings and no separations (a marriage parts only after six days soured, under 10 opinion each
+    way; a test covers it), so they are rare by design; mood in year 10 is 58-67 (the list had 47-52); every
+    colony had elders in some years, the oldest 67-71, and four of seven saw deaths of old age. The Meadow Kin
+    ended at goodwill 100 in one of four, but goodwill that high now buys food, a settler or fighters, and drifts
+    down above 75; settlers bought: one in four, the harness's population at its cap the rest of the time.
+  - **Island colonies freezing:** the harness built its 9×7 hut on the nearest open ground, which on a small
+    island was across the ford, the boat's timbers carried over a log at a time; some had no walled bedroom by day
+    10 and the first deep cold killed whoever slept out. It now builds on ground reached dry, 7×5 if a 9×7 won't
+    fit (as a player would; "anyhut" for the old way). 48 colonies each, 30 days: temperate islands 6 frozen and a
+    colony lost to none, no walled bedroom by day 10 in 8 to 1, mood 50.4 to 51.0, breaks 46 to 36; desert islands
+    5 frozen to none, 11 late to 8, mood and hunger within the noise.
   - **Goals:** the 10-15 goals ten-year test colonies miss are the harness's doing, not the game's: it builds no
     smelter or kiln (so no iron, steel or last research), sandbags, icebox, memorial or tame animals, and doesn't
     shelter everyone the first night; a third generation came by year 20 on a Medium map. Every goal says how in

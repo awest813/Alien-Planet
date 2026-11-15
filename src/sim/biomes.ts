@@ -155,7 +155,7 @@ export const MAP_KINDS: { key: MapKind; label: string; description: string }[] =
     key: 'island',
     label: 'Island',
     description:
-      'Land on an island in a lake, joined to the shore by shallow fords. Little room to farm, but a week of rations and a fishing spot by the landing.',
+      'Land on an island in a lake, joined to the shore by shallow fords: a harder start, with little room to farm. The boat brings a week of rations and its timbers, and there is a fishing spot by the landing.',
   },
 ];
 

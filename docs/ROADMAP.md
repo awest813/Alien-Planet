@@ -819,7 +819,8 @@ dries, fuel within its tank, an obsession always has its blueprint). Fixed:
   under tsx, every imported value goes through a getter, which inflates the numbers by about half. After
   Phase L, a busy 128×128 colony over 40 days ran at about 48 ms per 1,000 ticks (from 58), once `nearest`
   searched outward from its starting point instead of scanning the whole map, hunters re-planned less often
-  on long chases, and skittish animals looked about every fourth tick instead of every tick.
+  on long chases, and skittish animals looked about every fourth tick instead of every tick. `npm run perf` now
+  times a quiet colony and a raid of twelve on the largest map against the budget, and the weekly playtest runs it.
 
 ### Decided
 

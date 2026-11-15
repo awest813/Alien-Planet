@@ -101,7 +101,9 @@ How the living simulation works:
   with herbal medicine to spare (more than three doses) eases an aching elder: the old aches hurt less than
   half as much for three days. Grief for a spouse, child, parent or friend lasts weeks and returns on the anniversary; the colony
   expects more of its leader as the years pass, and the leader and elders want rooms of their own.
-- **The wider world:** the raiders have goodwill too: releasing or ransoming their people softens them,
+- **The wider world:** raiders who overrun the colony (everyone down) may carry one of the fallen off: the colony
+  has six days to buy them back or exchange a prisoner of theirs (Factions), some slip away, and the rest are never
+  seen again. The raiders have goodwill too: releasing or ransoming their people softens them,
   starving or executing them hardens them (an execution also weighs on every colonist for days), and once they're soft enough they'll take a truce. A second friendly faction,
   the Hollowstone Clans, trades iron, tools and stone and quarrels with the Meadow Kin: back one and the other
   takes it badly. Envoys walk in to offer alliances; an ally's fighters come to raids more often, and when they're raided
@@ -355,7 +357,7 @@ How the storytelling layer works:
   on Standard, a day and a half on Peaceful, half a day on Harsh), and no new threat comes while half the
   colony is down or a maddened pack is still loose. Gifts lean towards what the colony is short of: food when
   the stores are low, medicine when someone is hurt or sick, wood when the pile is nearly gone. Pick the difficulty when founding a colony: Peaceful (no
-  raids or manhunters), Standard, or Harsh (bigger, harder-hitting raids).
+  raids or manhunters), Standard, or Harsh (bigger, harder-hitting raids, and the fallen more often carried off).
 
 ## Architecture
 
@@ -469,9 +471,9 @@ npx tsx scripts/balance.ts 30 1 trace seed=7919 # replay one colony (DEBUG=1 add
 npx tsx scripts/balance.ts 48 6 flow           # day-by-day food, materials, crops and wildlife, averaged
 ```
 
-With the current tuning (8 seeds × 26 days, through the first winter), a Standard colony that farms enough
-keeps everyone alive but goes hungry for a while late in winter; Harsh costs around one colonist in six, with
-no colony wiped out. First friendships appear around day 6–7, with a few rivalries and couples.
+With the current tuning (96 seeds × 48 days, two winters), a Standard colony keeps nearly everyone (eight
+deaths in about 590 colonists, mostly illness and old age); Harsh loses about one colonist in 25, over a third of
+them carried off by raiders and never bought back, with no colony wiped out. First friendships appear around day 6–7, with a few rivalries and couples.
 
 `scripts/playtest.ts` plays 100 simulated players with ten play styles (by the book, farmer, militarist,
 neglectful, micromanager, random clicking, artist, warden, save-scummer, demolisher) across every difficulty
