@@ -1230,7 +1230,16 @@ function play(seed: number): Result {
     }
     // Hunt whatever wildlife is around once the colony is settled (leather becomes recurve bows).
     if (sim.day >= 3 && !noHunt) {
-      sim.apply({ type: 'hunt', rect: { x0: 0, y0: 0, x1: w.width - 1, y1: w.height - 1 }, add: true });
+      if (keepPen) {
+        // (Not those being tamed for the pen: a hunting mark replaces a taming one, and the whole map marked each
+        // day undid the taming orders, so a "pen" colony never kept an animal.)
+        for (const a of sim.animals.filter((b) => !b.tame && !b.taming && !b.hunted)) {
+          const r = { x0: w.xOf(a.tile), y0: w.yOf(a.tile), x1: w.xOf(a.tile), y1: w.yOf(a.tile) };
+          sim.apply({ type: 'hunt', rect: r, add: true });
+        }
+      } else {
+        sim.apply({ type: 'hunt', rect: { x0: 0, y0: 0, x1: w.width - 1, y1: w.height - 1 }, add: true });
+      }
     }
     // A 7×7 pen with a gate and a trough, then a pair of grazers tamed to keep in it (and spared the hunt).
     if (keepPen && !penBuilt && sim.day >= 6) {

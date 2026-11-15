@@ -97,6 +97,36 @@ describe('the vote', () => {
     expect(sim.colonists[sim.village.leader].health.dead).toBe(false);
   });
 
+  it("waits for a leader who is away: the season's vote is held the first dawn they're back", () => {
+    // (Off on a trip they weren't a candidate, and were voted out for being gone: a quarter of all changes.)
+    const sim = colony(4);
+    at(sim, 2, 7);
+    updateVillage(sim);
+    const leader = sim.colonists[sim.village.leader];
+    // Everyone now thinks better of someone else.
+    const rival = sim.colonists.find((c) => c !== leader)!;
+    for (const c of sim.colonists) {
+      c.opinions[rival.id] = c === rival ? 0 : 90;
+    }
+    leader.away = 'gone';
+    let day = 2;
+    do {
+      at(sim, ++day, 7);
+    } while (seasonDay(sim.totalHours) !== 1);
+    const votes = sim.stats.elections;
+    updateVillage(sim);
+    expect(sim.stats.elections).toBe(votes);
+    expect(sim.village.leader).toBe(leader.id);
+    expect(sim.village.voteDue).toBe(true);
+    // Back two days later: the vote is held that dawn.
+    leader.away = undefined;
+    at(sim, day + 2, 7);
+    updateVillage(sim);
+    expect(sim.stats.elections).toBe(votes! + 1);
+    expect(sim.village.leader).toBe(rival.id);
+    expect(sim.village.voteDue).toBe(false);
+  });
+
   it('makes a cheerful leader lift the colony and a miserable one drag it down', () => {
     const sim = colony(4);
     elect(sim);

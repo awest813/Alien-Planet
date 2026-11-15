@@ -80,10 +80,11 @@ export function populateWildlife(sim: Simulation, count: number, avoid: number):
   }
 }
 
-// A small herd wanders in from the map edge (only grazers, if asked). Returns how many arrived.
-export function herdArrives(sim: Simulation, grazersOnly = false): number {
+// A small herd wanders in from the map edge (only grazers, if asked; only hunters, if asked, and then even into a
+// full valley: they'll thin it). Returns how many arrived.
+export function herdArrives(sim: Simulation, grazersOnly = false, huntersOnly = false): number {
   const region = sim.outsideRegion();
-  if (region === undefined || wildCount(sim) >= wildCap(sim)) {
+  if (region === undefined || (!huntersOnly && wildCount(sim) >= wildCap(sim))) {
     return 0;
   }
   const w = sim.world;
@@ -97,9 +98,16 @@ export function herdArrives(sim: Simulation, grazersOnly = false): number {
   }
   // One pack of predators at a time is plenty.
   const predatorsAbout = sim.animals.some((a) => !a.tame && a.hp > 0 && ANIMALS[a.kind].preys);
-  const kind = pickKind(sim, (key) => !ANIMALS[key].preys || (!grazersOnly && !predatorsAbout));
+  const kind = huntersOnly
+    ? pickKind(sim, (key) => !!ANIMALS[key].preys)
+    : pickKind(sim, (key) => !ANIMALS[key].preys || (!grazersOnly && !predatorsAbout));
+  if (huntersOnly && !ANIMALS[kind].preys) {
+    return 0;
+  }
   const [least, most] = ANIMALS[kind].group;
-  const count = Math.min(wildCap(sim) - wildCount(sim), sim.rng.int(least, most));
+  const count = huntersOnly
+    ? sim.rng.int(least, most)
+    : Math.min(wildCap(sim) - wildCount(sim), sim.rng.int(least, most));
   for (let n = 0; n < count; n++) {
     addAnimal(sim, edge, kind);
   }
@@ -419,6 +427,7 @@ export function animalsAtDawn(sim: Simulation): void {
   wildYoung(sim);
   moveOn(sim);
   migrate(sim);
+  huntersReturn(sim);
   // Wounds mend, a quarter of an animal's health a day.
   for (const a of sim.animals) {
     if (a.hp > 0) {
@@ -573,6 +582,31 @@ function migrate(sim: Simulation): void {
     sim.addLog(
       `${count === 1 ? `A ${ANIMALS[kind].name.toLowerCase()} has` : `${count} ${ANIMALS[kind].plural} have`} wandered into the valley.`,
       'info',
+    );
+  }
+}
+
+// A valley full of game with no hunters in it draws them back, now and then: a pack (wolves or foxes, by the land)
+// comes in from the edge. (Predators that ate the valley bare moved on, and none came again: in a ten-year game
+// without hunting, the wolves were gone after the first year, and only grazers were left.)
+const HUNTERS_RETURN = 0.03;
+const HUNTERS_DRAWN_BY = 6;
+function huntersReturn(sim: Simulation): void {
+  const wild = sim.animals.filter((a) => !a.tame && a.hp > 0 && !a.leaving);
+  if (
+    wild.some((a) => ANIMALS[a.kind].preys) ||
+    wild.filter((a) => Object.values(ANIMALS).some((p) => p.preys?.includes(a.kind))).length < HUNTERS_DRAWN_BY ||
+    !sim.rng.chance(HUNTERS_RETURN)
+  ) {
+    return;
+  }
+  const count = herdArrives(sim, false, true);
+  if (count > 0) {
+    const kind = sim.animals[sim.animals.length - 1].kind;
+    sim.addLog(
+      `A pack of ${count} ${ANIMALS[kind].plural ?? ANIMALS[kind].name.toLowerCase()} has come into the valley to hunt. They leave people alone unless provoked.`,
+      'warn',
+      true,
     );
   }
 }

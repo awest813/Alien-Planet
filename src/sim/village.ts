@@ -30,6 +30,8 @@ export interface Village {
   // day that was decided.
   resting: boolean;
   restDecidedOn: number;
+  // A season's vote put off while the leader was away, held at the first dawn they're back.
+  voteDue?: boolean;
 }
 
 export const freshVillage = (): Village => ({
@@ -154,8 +156,18 @@ export function updateVillage(sim: Simulation): void {
   }
   const dawn = Math.floor(sim.hour) === 7;
   const newSeason = seasonDay(sim.totalHours) === 1 && v.electedOn !== sim.day;
-  if (v.leader < 0 || (dawn && newSeason)) {
+  if (v.leader < 0) {
     elect(sim);
+    v.voteDue = false;
+  } else if (dawn && (newSeason || v.voteDue)) {
+    // Not while the leader is away on a trip, or held by raiders: off the map, they weren't a candidate, and
+    // were voted out for being gone (a quarter of all changes of leader). The vote waits for them.
+    if (leader.away) {
+      v.voteDue = true;
+    } else {
+      v.voteDue = false;
+      elect(sim);
+    }
   }
 }
 

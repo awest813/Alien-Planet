@@ -231,3 +231,28 @@ describe('a living valley', () => {
     expect(herdsWary(sim)).toBe(false);
   });
 });
+
+describe('hunters return', () => {
+  it('a valley full of game and no predators draws a pack back now and then; a bare one does not', () => {
+    // (Predators that ate the valley bare moved on and never came again: ten years of grazers alone.)
+    const predators = (sim: Simulation) => sim.animals.filter((a) => !a.tame && a.hp > 0 && ANIMALS[a.kind].preys);
+    const sim = Simulation.newColony(21, 'standard', 96);
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    sim.animals = sim.animals.filter((a) => !ANIMALS[a.kind].preys);
+    let dawns = 0;
+    while (predators(sim).length === 0 && dawns < 400) {
+      animalsAtDawn(sim);
+      dawns++;
+    }
+    expect(predators(sim).length).toBeGreaterThan(0);
+    expect(sim.storyLog.some((s) => /has come into the valley to hunt/.test(s.text))).toBe(true);
+    // No game, no pack.
+    const bare = Simulation.newColony(22, 'standard', 96);
+    bare.animals = [];
+    for (let k = 0; k < 400; k++) {
+      animalsAtDawn(bare);
+      bare.animals = bare.animals.filter((a) => ANIMALS[a.kind].preys);
+    }
+    expect(predators(bare)).toHaveLength(0);
+  });
+});
