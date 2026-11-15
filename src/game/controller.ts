@@ -1393,6 +1393,8 @@ export class GameController {
   private storySeen = 0;
   // Tick at which each colonist last started idling, for the idle alert.
   private idleSince = new Map<number, number>();
+  // When each colonist's food ran out, to say so once it's been an hour (most are on their way to eat by then).
+  private starvingSince = new Map<number, number>();
   // Set once everyone has died (the game pauses and offers a new colony).
   private fallen = false;
   private state: UiState;
@@ -1869,7 +1871,7 @@ export class GameController {
       this.toast = null;
       changed = true;
     }
-    this.collectNotifications(now);
+    this.collectNotifications(now, deltaMs);
     if (this.settings.sound) {
       sound.update(this.soundScene());
     }
@@ -2318,9 +2320,16 @@ export class GameController {
   }
 
   // Turns new story entries into short-lived notification cards.
-  private collectNotifications(now: number): void {
+  private collectNotifications(now: number, deltaMs = 0): void {
     const story = this.sim.storyLog;
     const before = this.notifications.length;
+    // Paused, the cards wait too: the clock stopping itself for a death or a raid, the card saying so went on
+    // counting down while the player looked to the map, and was gone, with the game waiting on them.
+    if (SPEEDS[this.speedIndex] === 0) {
+      for (const n of this.notifications) {
+        n.expires += deltaMs;
+      }
+    }
     // The story log is capped, so count entries ever written rather than its length.
     const fresh = Math.min(this.sim.storyCount - this.storySeen, story.length);
     for (const entry of story.slice(story.length - fresh)) {
@@ -2329,7 +2338,8 @@ export class GameController {
         text: entry.text,
         tone: entry.tone,
         ...(entry.about && { about: entry.about }),
-        expires: now + this.settings.noticeSeconds * 1000,
+        // Bad news a little longer: rarer, and it's what most wants reading.
+        expires: now + this.settings.noticeSeconds * 1000 * (entry.tone === 'danger' ? 1.5 : 1),
       });
     }
     this.storySeen = this.sim.storyCount;
@@ -2667,6 +2677,7 @@ export class GameController {
     this.claimTab();
     this.simVersion++;
     this.idleSince.clear();
+    this.starvingSince.clear();
     // (A new colony sets it again; a loaded one is under way, whatever was showing before.)
     this.notStarted = false;
     // A colony started after the last one fell shouldn't sit paused: resume at the player's speed,
@@ -3057,7 +3068,10 @@ export class GameController {
 
   private alertsFor(totals: ReturnType<Simulation['resourceTotals']>): Alert[] {
     // Orders given while paused change alerts too, so they count as well as ticks.
-    const key = `${this.simVersion}:${Math.floor(this.sim.tick / 20)}:${this.commandCount}`;
+    // Paused, the exact tick: the clock stopping itself for a raid or a fire mid-way through twenty ticks kept the
+    // list from before it, with no word of the raid it had stopped for, until the player did something.
+    const tick = SPEEDS[this.speedIndex] === 0 ? this.sim.tick : Math.floor(this.sim.tick / 20);
+    const key = `${this.simVersion}:${SPEEDS[this.speedIndex] === 0 ? 'p' : ''}${tick}:${this.commandCount}`;
     if (key !== this.alertsKey) {
       this.alertsKey = key;
       this.alerts = this.buildAlerts(totals);
@@ -3237,11 +3251,14 @@ export class GameController {
       }
       const disease = c.health.disease;
       if (disease) {
-        const sev = Math.round(disease.severity * 100);
-        const imm = Math.round(disease.immunity * 100);
+        // How it's going, in words, and red only when it could kill within the day. ("Severity 5%, immunity 0%",
+        // in red, for every illness from its first hour: two in eight hundred were fatal, and the numbers said
+        // nothing of which.)
+        const outlook = diseaseOutlook(sim, c);
+        const text = this.diseaseOutlookText(c);
         alerts.push({
-          text: `${c.name} has ${disease.label.toLowerCase()} (severity ${sev}%, immunity ${imm}%)`,
-          tone: disease.severity > disease.immunity ? 'danger' : 'warn',
+          text: `${c.name} has ${disease.label.toLowerCase()}${text ? `: ${text.charAt(0).toLowerCase()}${text.slice(1).replace(':', ',')}` : ''}`,
+          tone: outlook && !outlook.recovers ? (outlook.hours < 24 ? 'danger' : 'warn') : 'calm',
           colonist: c.id,
         });
       }
@@ -3279,6 +3296,7 @@ export class GameController {
       woodLow = alerts.length;
       alerts.push({
         text: `Wood is running low: the fires burn about ${Math.round(perDay)} a day. Chop trees (C)`,
+        tool: 'chop',
         tone: sim.season === 'Winter' || daysUntilWinter(sim.totalHours) < 4 ? 'danger' : 'warn',
       });
     }
@@ -3383,6 +3401,7 @@ export class GameController {
             ? 'Nowhere warm to shelter: build an enclosed room with a campfire before the colonists freeze'
             : `Winter in ${Math.ceil(untilWinter)} day${untilWinter > 1 ? 's' : ''} and nowhere warm to shelter: build an enclosed room with a campfire`,
         tone: 'danger',
+        tool: 'campfire',
       });
     } else if (untilWinter > 0 && untilWinter <= 5) {
       // What's stored against the winter, when nothing grows outdoors: "stock food" said nothing of how much, and
@@ -3390,12 +3409,15 @@ export class GameController {
       const stored = this.foodDays(totals);
       const when = `Winter in ${Math.ceil(untilWinter)} day${untilWinter > 1 ? 's' : ''}`;
       const short = stored < DAYS_PER_SEASON;
-      alerts.push({
-        text: short
-          ? `${when}, and ${stored < 0.1 ? 'no' : `${stored.toFixed(1)} days'`} food stored for its ${DAYS_PER_SEASON} days (nothing grows outdoors): harvest, hunt, fish and forage`
-          : `${when}: ${Math.floor(stored)} days of food stored for its ${DAYS_PER_SEASON}. Bring in the harvest`,
-        tone: short ? 'warn' : 'calm',
-      });
+      // Enough put by: only in its last two days (five days before every winter, it was up a fifth of the year to
+      // say all was well).
+      if (short || untilWinter <= 2)
+        alerts.push({
+          text: short
+            ? `${when}, and ${stored < 0.1 ? 'no' : `${stored.toFixed(1)} days'`} food stored for its ${DAYS_PER_SEASON} days (nothing grows outdoors): harvest, hunt, fish and forage`
+            : `${when}: ${Math.floor(stored)} days of food stored for its ${DAYS_PER_SEASON}. Bring in the harvest`,
+          tone: short ? 'warn' : 'calm',
+        });
     }
     const researching = sim.research.current !== null;
     if (
@@ -3410,11 +3432,16 @@ export class GameController {
     if (studying && !sim.isResearched(studying.key)) {
       const { held } = researchNeeds(sim, studying);
       if (held) {
-        alerts.push({ text: `${studying.name}: ${held}`, tone: 'warn' });
+        alerts.push({ text: `${studying.name}: ${held}`, tone: 'warn', screen: 'research' });
       }
     }
     if (coldSnapOn(sim)) {
-      alerts.push({ text: 'Cold snap: keep colonists warm indoors', tone: 'warn' });
+      // (How long, as the heat wave says.)
+      const hours = Math.max(1, Math.ceil(((sim.story.coldSnapUntil ?? 0) - sim.tick) / TICKS_PER_HOUR));
+      alerts.push({
+        text: `Cold snap for ${hours} more ${hours === 1 ? 'hour' : 'hours'}: keep colonists warm indoors`,
+        tone: 'warn',
+      });
     }
     if (heatWaveOn(sim)) {
       const hours = Math.ceil(((sim.story.heatWaveUntil ?? 0) - sim.tick) / TICKS_PER_HOUR);
@@ -3521,6 +3548,9 @@ export class GameController {
     const starving: Colonist[] = [];
     const unhappy: Colonist[] = [];
     for (const c of sim.living()) {
+      if (c.needs.food > 0) {
+        this.starvingSince.delete(c.id);
+      }
       if (sim.inMentalBreak(c)) {
         alerts.push({ text: `${c.name} is having a mental break`, tone: 'danger', colonist: c.id });
       } else if (c.health.hypothermia > 0.4 || c.health.heatstroke > 0.4) {
@@ -3539,7 +3569,13 @@ export class GameController {
           colonist: c.id,
         });
       } else if (c.needs.food <= 0) {
-        starving.push(c);
+        // Said once they've gone an hour without: until then nearly all are on their way to eat ("Gale is
+        // starving" came and went within the hour seven times in ten). With no food at all, "Out of food" says it.
+        const since = this.starvingSince.get(c.id) ?? sim.tick;
+        this.starvingSince.set(c.id, since);
+        if (sim.tick - since >= TICKS_PER_HOUR) {
+          starving.push(c);
+        }
       } else if (c.mood < 25) {
         unhappy.push(c);
       }
@@ -3581,11 +3617,14 @@ export class GameController {
                   : ': plan walls and a door'
         }`,
         tone: left <= 2 ? 'danger' : 'warn',
+        // Nothing planned yet: the wall tool, as the goal offers it.
+        tool: walls === 0 && !this.wallsLeak() && !shut ? 'woodWall' : undefined,
       });
     }
     // At night, whoever sleeps in the open: worth knowing, and worth fixing tomorrow.
     if (sim.isNight()) {
-      const outside = sim.living().filter((c) => c.sleeping && !sim.isRoofed(c.tile)).length;
+      const sleepers = sim.living().filter((c) => c.sleeping && !sim.isRoofed(c.tile));
+      const outside = sleepers.length;
       if (outside > 0) {
         alerts.push({
           text: `${outside} colonist${outside > 1 ? 's are' : ' is'} sleeping outside: cold and miserable. ${
@@ -3598,6 +3637,7 @@ export class GameController {
                   : 'Build a shelter with beds'
           }`,
           tone: 'warn',
+          colonist: sleepers[0].id,
         });
       }
     }
@@ -3686,6 +3726,7 @@ export class GameController {
         alerts.push({
           text: `The fences don't make a pen yet: it needs a gate, and must be closed all round (no more than ${MAX_PEN} tiles, not touching the map edge).`,
           tone: 'warn',
+          tile: sim.buildingTiles().find((i) => featureDef(w.feature[i]).key === 'fence'),
         });
       } else if (pens.some((pen) => pen.troughs.length === 0)) {
         alerts.push({
@@ -3698,7 +3739,7 @@ export class GameController {
     // Shelves, iceboxes and drying racks are storage too.
     const storage = sim.storageTiles();
     if (storage.length === 0 && totals.some((t) => t.total > 0)) {
-      alerts.push({ text: 'No stockpile: items are left where they fall', tone: 'warn' });
+      alerts.push({ text: 'No stockpile: items are left where they fall', tone: 'warn', tool: 'stockpile' });
     }
     const far = farFromStorage(sim, storage);
     if (far) {
@@ -3767,6 +3808,7 @@ export class GameController {
       alerts.push({
         text: `Stockpiles are full: ${loose} ${loose === 1 ? 'stack' : 'stacks'} lying outside, mostly ${itemDef(most).name.toLowerCase()}. Drag out another stockpile (Z)`,
         tone: 'warn',
+        tool: 'stockpile',
       });
     } else if (loose > 0) {
       // Full for some things, not others: what a stockpile is set to take but has no room left for. (A colony's
@@ -3783,6 +3825,7 @@ export class GameController {
         alerts.push({
           text: `No room in storage for ${names.join(' or ')}${stuck.length > 2 ? ' and more' : ''}: ${stacks} ${stacks === 1 ? 'stack' : 'stacks'} lying outside${stuck.some(([type]) => type === SILVER) ? " (silver can't be spent until it's stored)" : ''}. Drag out another stockpile (Z)`,
           tone: 'warn',
+          tool: 'stockpile',
         });
       }
     }
@@ -3809,7 +3852,9 @@ export class GameController {
       const since = this.idleSince.get(c.id) ?? sim.tick;
       this.idleSince.set(c.id, since);
       // (On the first day, a little longer: the player is still finding their way around.)
-      return sim.tick - since > TICKS_PER_HOUR * (sim.day === 1 ? 2 : 1);
+      // (Two hours, three on the first day, when the player is still finding their way around: at one, a third of
+      // these came and went within the hour, a colonist between jobs.)
+      return sim.tick - since > TICKS_PER_HOUR * (sim.day === 1 ? 3 : 2);
     });
     if (idle.length > 0) {
       const names = idle.map((c) => c.name).join(', ');

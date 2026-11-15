@@ -36,11 +36,28 @@ describe('alerts and orders', () => {
     }
   });
 
+  it('when the clock stops itself, the alerts are of that moment', () => {
+    // (Stopped for a raid part-way through twenty ticks, the list was from before it: no word of the raid.)
+    const sim = colony('stale-alerts');
+    sim.tick = Math.ceil(sim.tick / 20) * 20 + 20;
+    controller.setSpeed(1);
+    controller.publish();
+    expect(controller.getState().alerts.some((a) => /^Raid/.test(a.text))).toBe(false);
+    expect(spawnRaid(sim, 0, 3)).toBe(true);
+    sim.tick += 3;
+    controller.setSpeed(0);
+    controller.publish();
+    expect(controller.getState().alerts.some((a) => /^Raid/.test(a.text))).toBe(true);
+  });
+
   it('the starving are said once for all of them', () => {
     const sim = colony('starving-once');
     for (const c of sim.living()) {
       c.needs.food = 0;
     }
+    // Not at once: most are on their way to eat. An hour on, they're said, once for all.
+    expect(alerts().filter((a) => /starving/.test(a.text))).toHaveLength(0);
+    sim.tick += HOUR;
     const starving = alerts().filter((a) => /starving/.test(a.text));
     expect(starving).toHaveLength(1);
     expect(starving[0].text).toMatch(new RegExp(`^${sim.living().length} colonists are starving: `));
@@ -120,6 +137,54 @@ describe('notifications', () => {
     controller.publish();
     expect(controller.getState().notifications.slice(-2)[0].about).toBeUndefined();
     c.away = undefined;
+  });
+
+  it("a card that starts with a colonist's name is about them, without being told", () => {
+    // ("Kip has collapsed and needs a doctor", "Pell reached mining 10": most cards never said who, and went
+    // nowhere when tapped.)
+    const sim = colony('notice-named');
+    const [a, b] = sim.living();
+    a.name = 'Ash';
+    b.name = 'Ashley';
+    sim.addLog('Ashley has collapsed and needs a doctor.', 'danger', true);
+    sim.addLog("Ash's arm wound has become infected.", 'warn', true);
+    sim.addLog('Ashen raiders are coming.', 'danger', true);
+    sim.addLog('Ash and Ashley have become friends.', 'good', true, { tile: 5 });
+    const [collapse, wound, raid, friends] = sim.storyLog.slice(-4);
+    expect(collapse.about).toEqual({ colonist: b.id });
+    expect(wound.about).toEqual({ colonist: a.id });
+    expect(raid.about).toBeUndefined();
+    // Said is kept.
+    expect(friends.about).toEqual({ tile: 5 });
+  });
+
+  it('cards wait while the game is paused, and bad news stays up longer', () => {
+    // (The clock stopped itself for a death; the card saying so counted down regardless, and was gone.)
+    const sim = colony('notice-wait');
+    const collect = (now: number, delta: number) =>
+      (controller as unknown as { collectNotifications(now: number, delta: number): void }).collectNotifications(
+        now,
+        delta,
+      );
+    const texts = () => controller.getState().notifications.map((n) => n.text);
+    const seconds = controller.settings.noticeSeconds * 1000;
+    controller.setSpeed(1);
+    collect(0, 0);
+    sim.addLog('Good news.', 'good', true);
+    sim.addLog('Bad news.', 'danger', true);
+    collect(1000, 0);
+    // The good card goes on time; the bad one later.
+    collect(1000 + seconds + 1, seconds + 1);
+    expect(texts()).not.toContain('Good news.');
+    expect(texts()).toContain('Bad news.');
+    // Paused for a minute: still there.
+    controller.setSpeed(0);
+    collect(61_000 + seconds, 60_000);
+    expect(texts()).toContain('Bad news.');
+    // Running again, it goes in its own time.
+    controller.setSpeed(1);
+    collect(61_000 + seconds * 2, 0);
+    expect(texts()).not.toContain('Bad news.');
   });
 });
 
@@ -366,5 +431,27 @@ describe('health', () => {
     expect(view.disease!.tended).toBe(false);
     expect(view.disease!.outlook).toMatch(/^(On the mend: over it|At risk: it would kill them)/);
     expect(view.healthNote).toMatch(/Off work to rest in bed: ill/);
+  });
+
+  it("an illness's alert says how it's going in words, red only when it could kill within the day", async () => {
+    // ("Severity 5%, immunity 0%" in red, for every illness from its first hour.)
+    const { infect } = await import('../sim/health');
+    const sim = colony('illness-words');
+    const patient = sim.living()[0];
+    infect(sim, patient, 'greyFlu');
+    const ill = () => alerts().find((a) => a.colonist === patient.id && a.text.includes(' has grey flu'))!;
+    expect(ill().text).not.toMatch(/severity|immunity/);
+    expect(ill().text).toMatch(new RegExp(`^${patient.name} has grey flu: (on the mend|at risk)`));
+    // Tended and in bed, early on: on the mend, and not red.
+    patient.health.disease!.tendedUntil = sim.tick + 24 * HOUR;
+    patient.sleeping = true;
+    expect(ill().text).toMatch(/on the mend/);
+    expect(ill().tone).toBe('calm');
+    // Near the end, untended: red.
+    patient.health.disease!.tendedUntil = 0;
+    patient.sleeping = false;
+    patient.health.disease!.severity = 0.95;
+    expect(ill().tone).toBe('danger');
+    expect(ill().text).toMatch(/would kill them/);
   });
 });

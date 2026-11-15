@@ -233,6 +233,8 @@ export function updateCaravan(sim: Simulation): void {
       `Traders from ${FACTIONS[caravan.faction].name} have arrived. Open Trade to deal with them.`,
       'good',
       true,
+      // (Tapped, to where they stand.)
+      { tile: caravan.visitors[0].tile },
     );
   }
   if (caravan.visitors.length === 0) {

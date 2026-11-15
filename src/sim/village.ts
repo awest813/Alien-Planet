@@ -137,6 +137,7 @@ export function elect(sim: Simulation): Colonist | null {
     'good',
     // A new leader is news; the same one again isn't worth a card.
     !again,
+    { colonist: winner.c.id },
   );
   return winner.c;
 }

@@ -1678,7 +1678,7 @@ function countBreaks(sim: Simulation): number {
   return breakCounts.get(sim) ?? 0;
 }
 const originalAddLog = Simulation.prototype.addLog;
-Simulation.prototype.addLog = function (this: Simulation, text, tone, story) {
+Simulation.prototype.addLog = function (this: Simulation, text, tone, story, about) {
   // Every story entry, kept here in full (the game keeps only the latest).
   if (story) {
     const all = fullStories.get(this) ?? [];
@@ -1747,7 +1747,8 @@ Simulation.prototype.addLog = function (this: Simulation, text, tone, story) {
       );
     }
   }
-  originalAddLog.call(this, text, tone, story);
+  // (Who or where it's about, passed on: dropped, every card in a harness game lost its link.)
+  originalAddLog.call(this, text, tone, story, about);
 };
 
 const starvingDoing: Record<string, number> = {};

@@ -2172,6 +2172,21 @@ export class Simulation {
   }
 
   // `story` marks moments worth keeping in the colony's history.
+  // The colonist a line begins with, if it does (the longest name that fits, so "Ash" isn't taken for "Ashley").
+  private namedFirst(text: string): StoryAbout | undefined {
+    let found: Colonist | undefined;
+    for (const c of this.colonists) {
+      if (
+        text.startsWith(c.name) &&
+        /^($|[\s',.:!])/.test(text.slice(c.name.length)) &&
+        (!found || c.name.length > found.name.length)
+      ) {
+        found = c;
+      }
+    }
+    return found && { colonist: found.id };
+  }
+
   public addLog(text: string, tone: LogEntry['tone'] = 'info', story = false, about?: StoryAbout): void {
     this.log.push({ tick: this.tick, text, tone });
     if (this.log.length > LOG_LIMIT) {
@@ -2179,6 +2194,10 @@ export class Simulation {
     }
     if (story) {
       this.storyCount++;
+      // A card that names a colonist first is about them, said or not: "Kip has collapsed and needs a doctor",
+      // "Pell reached mining 10", "Isla and Calla have become friends" (most cards never said, and tapped, went
+      // nowhere).
+      about ??= this.namedFirst(text);
       this.storyLog.push({ day: this.day, hour: Math.floor(this.hour), text, tone, ...(about && { about }) });
       if (this.storyLog.length > STORY_LIMIT) {
         this.storyLog.shift();
