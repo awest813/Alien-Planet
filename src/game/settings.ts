@@ -3,7 +3,7 @@
 // back to the defaults.
 
 export interface Settings {
-  // Save to the autosave slot every dawn and when the player leaves the page.
+  // Save to the autosave slot every minute of play, every dawn and when the player switches away or leaves.
   autosave: boolean;
   // Pause the game when a raid begins.
   pauseOnRaid: boolean;

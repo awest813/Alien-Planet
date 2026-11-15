@@ -74,4 +74,24 @@ describe("a newcomer's first days", () => {
     expect(full).toBeDefined();
     expect(full).toMatch(/^Stockpiles are full: 1 stack lying outside/);
   });
+
+  it('says when there is no room for silver, though there is room for other things', () => {
+    // (Stockpiles full of silver with a little room for wood: 14,000 silver lay outside, unspendable, unsaid.)
+    const { sim, w, x, y } = colony('no-room-silver');
+    for (const i of [...w.tilesWith('items')]) {
+      w.takeItem(i, w.itemCount[i]);
+    }
+    sim.apply({ type: 'zone', rect: { x0: x + 2, y0: y + 2, x1: x + 3, y1: y + 2 }, zone: STOCKPILE_ZONE });
+    w.addItem(w.idx(x + 2, y + 2), itemId('silver'), w.capacity(w.idx(x + 2, y + 2), itemId('silver')));
+    w.addItem(w.idx(x + 3, y + 2), itemId('wood'), 5);
+    w.addItem(w.idx(x + 6, y + 6), itemId('silver'), 300);
+    w.addItem(w.idx(x + 7, y + 6), itemId('wood'), 5);
+    expect(texts().find((t) => t.startsWith('Stockpiles are full'))).toBeUndefined();
+    expect(texts()).toContainEqual(
+      expect.stringMatching(/^No room in storage for silver: 1 stack lying outside \(silver can't be spent/),
+    );
+    // Room again: no word of it.
+    w.takeItem(w.idx(x + 2, y + 2), 1000);
+    expect(texts().find((t) => t.startsWith('No room in storage'))).toBeUndefined();
+  });
 });

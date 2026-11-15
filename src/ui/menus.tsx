@@ -469,7 +469,7 @@ export function PauseMenu({ onClose, actions }: { onClose: () => void; actions: 
           />
           <p className="muted">
             {state.settings.autosave
-              ? 'The game autosaves every dawn and when you leave the page.'
+              ? 'The game autosaves every minute of play, at dawn, and when you switch away or leave the page.'
               : 'Autosave is off (Settings): save by hand.'}
           </p>
         </>
@@ -784,7 +784,11 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Settings" onClose={onClose}>
       <h3>Game</h3>
-      <Toggle label="Autosave at dawn and when leaving" value={s.autosave} onChange={(v) => set({ autosave: v })} />
+      <Toggle
+        label="Autosave (every minute of play, and when leaving)"
+        value={s.autosave}
+        onChange={(v) => set({ autosave: v })}
+      />
       <Toggle label="Pause when raiders arrive" value={s.pauseOnRaid} onChange={(v) => set({ pauseOnRaid: v })} />
       <Toggle
         label="Pause on a fire, a death or a collapse"

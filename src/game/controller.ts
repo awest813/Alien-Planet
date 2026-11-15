@@ -3759,17 +3759,32 @@ export class GameController {
         loose++;
       }
     }
-    const room =
-      loose > 0 &&
-      sim
-        .storageTiles()
-        .some((i) => [...looseTypes.keys()].some((type) => w.canHoldItem(i, type) && sim.storesItem(i, type)));
-    if (!room && loose > 0 && storage.length > 0) {
+    const roomFor = new Set(
+      [...looseTypes.keys()].filter((type) => storage.some((i) => w.canHoldItem(i, type) && sim.storesItem(i, type))),
+    );
+    if (roomFor.size === 0 && loose > 0 && storage.length > 0) {
       const [most] = [...looseTypes.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
       alerts.push({
         text: `Stockpiles are full: ${loose} ${loose === 1 ? 'stack' : 'stacks'} lying outside, mostly ${itemDef(most).name.toLowerCase()}. Drag out another stockpile (Z)`,
         tone: 'warn',
       });
+    } else if (loose > 0) {
+      // Full for some things, not others: what a stockpile is set to take but has no room left for. (A colony's
+      // stockpiles took wood still while 14,000 silver lay outside, unspendable, and nothing said so: "full" was
+      // only ever said of all of it.) Silver always, the rest from a few stacks; and not what no stockpile takes,
+      // which was left out on purpose.
+      const SILVER = itemId('silver');
+      const stuck = [...looseTypes.entries()]
+        .filter(([type]) => !roomFor.has(type) && storage.some((i) => sim.storesItem(i, type)))
+        .sort((a, b) => Number(b[0] === SILVER) - Number(a[0] === SILVER) || b[1] - a[1] || a[0] - b[0]);
+      const stacks = stuck.reduce((sum, [, n]) => sum + n, 0);
+      if (stuck.some(([type]) => type === SILVER) || stacks >= 5) {
+        const names = stuck.slice(0, 2).map(([type]) => itemDef(type).name.toLowerCase());
+        alerts.push({
+          text: `No room in storage for ${names.join(' or ')}${stuck.length > 2 ? ' and more' : ''}: ${stacks} ${stacks === 1 ? 'stack' : 'stacks'} lying outside${stuck.some(([type]) => type === SILVER) ? " (silver can't be spent until it's stored)" : ''}. Drag out another stockpile (Z)`,
+          tone: 'warn',
+        });
+      }
     }
     const ateRaw = sim.colonists.some((c) => c.thoughts.some((t) => t.key === 'ateRaw'));
     if (ateRaw && sim.countBuilt((f) => featureDef(f).workbench === 'cooking') === 0) {
