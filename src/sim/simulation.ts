@@ -1050,14 +1050,35 @@ export class Simulation {
   // captive, a raider, an ally or a trader. (Raiders took the names of colonists won over from their side: "Rook-eye
   // died of their wounds", then "Rook-eye is telling the old stories".)
   public unusedNames(names: readonly string[]): string[] {
-    const taken = new Set<string>([
+    const taken = this.namesInUse();
+    return names.filter((n) => !taken.has(n));
+  }
+
+  private namesInUse(): Set<string> {
+    return new Set<string>([
       ...this.colonists.map((c) => c.name),
       ...this.captives.map((p) => p.name),
       ...this.enemies.map((e) => e.name),
       ...this.allies.map((a) => a.name),
       ...(this.caravan?.visitors ?? []).map((v) => v.name),
     ]);
-    return names.filter((n) => !taken.has(n));
+  }
+
+  // A name for one of a band: drawn from `pool` (their unusedNames, used up as it goes) while it lasts, then the
+  // first numbered one nobody has, "Flint II", "Gristle II", "Flint III"... `given` collects the band's names so
+  // far, for those not yet here. (Once a faction's names were all in use, a camp of prisoners and a raid besides,
+  // the rest came as "Raider", and the log read "paid 130 silver to have Raider back".)
+  public drawName(pool: string[], names: readonly string[], given: string[]): string {
+    let name = pool.length > 0 ? pool.splice(this.rng.int(0, pool.length - 1), 1)[0] : undefined;
+    if (name === undefined) {
+      const taken = this.namesInUse();
+      given.forEach((g) => taken.add(g));
+      for (let k = 2; name === undefined; k++) {
+        name = names.map((n) => `${n} ${numeral(k)}`).find((n) => !taken.has(n));
+      }
+    }
+    given.push(name);
+    return name;
   }
 
   // Everyone alive, here or away: the colony's count against its population cap.
@@ -9245,3 +9266,29 @@ export const OBJECTIVES: ObjectiveDef[] = [
     progress: (s) => `${Math.min(10, Math.floor(s.totalHours / 24 / DAYS_PER_YEAR))}/10 years`,
   },
 ];
+
+// 2 → II, 14 → XIV.
+function numeral(n: number): string {
+  const steps: [number, string][] = [
+    [1000, 'M'],
+    [900, 'CM'],
+    [500, 'D'],
+    [400, 'CD'],
+    [100, 'C'],
+    [90, 'XC'],
+    [50, 'L'],
+    [40, 'XL'],
+    [10, 'X'],
+    [9, 'IX'],
+    [5, 'V'],
+    [4, 'IV'],
+    [1, 'I'],
+  ];
+  let out = '';
+  for (const [value, letters] of steps) {
+    for (; n >= value; n -= value) {
+      out += letters;
+    }
+  }
+  return out;
+}

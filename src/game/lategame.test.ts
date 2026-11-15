@@ -38,6 +38,19 @@ describe('the late game', () => {
     }
   });
 
+  it('once all their names are in use, a band comes with numbered ones, not "Raider"', () => {
+    // (A camp of prisoners and a raid besides: the log read "paid 130 silver to have Raider back".)
+    const { sim } = colony('raider-numerals');
+    const faction = 1;
+    const names = FACTIONS[faction].names;
+    expect(spawnRaid(sim, faction, names.length + 4)).toBe(true);
+    const got = sim.enemies.map((e) => e.name);
+    expect(new Set(got).size).toBe(got.length);
+    expect(got).not.toContain('Raider');
+    expect(got.filter((n) => / II$/.test(n))).toHaveLength(4);
+    expect(names).toContain(got.find((n) => / II$/.test(n))!.replace(/ II$/, ''));
+  });
+
   it('the beacon goal points at a generator once the beacon stands without power', () => {
     const { sim, w, x, y } = colony('beacon-power');
     sim.research.done.push('electricity', 'engineering', 'signalBeacon');

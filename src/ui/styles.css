@@ -618,6 +618,27 @@ kbd {
   padding: 2px 7px;
 }
 
+.colonist-head {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.colonist-head .who {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+  min-height: 26px;
+}
+
+.colonist-head .actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
 .card-title {
   font-size: 14px;
 }
@@ -1400,6 +1421,16 @@ button.brush.active {
      scroll. The goals fold away while it's open.) */
   .left-column .inspector {
     max-height: 62%;
+  }
+
+  /* A colonist's card has the build bar's room too, as on a phone on its side: under the bar, an iPhone SE's card
+     showed one line of its body. Closing the card, or tapping the map for a tile's, brings the bar back. */
+  .ui:has(.left-column .inspector:not(.tile-card)) > .bottom {
+    display: none;
+  }
+
+  .ui:has(.left-column .inspector:not(.tile-card)) {
+    grid-template-rows: auto auto minmax(0, 1fr) 0;
   }
 
   .inspector.drafted > .tabs,

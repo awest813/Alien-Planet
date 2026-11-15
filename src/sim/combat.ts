@@ -279,9 +279,10 @@ export function spawnRaid(sim: Simulation, faction: number, count: number, siege
     const centre = sim.rng.pick(edge);
     const spots = edge.sort((a, b) => w.distance(a, centre) - w.distance(b, centre)).slice(0, count);
     const names = sim.unusedNames(def.names);
+    const given: string[] = [];
     const skill = def.skill + (sim.story.difficulty === 'harsh' ? 1 : 0) + Math.floor(sim.day / 20);
     for (let n = 0; n < count; n++) {
-      const name = names.length > 0 ? names.splice(sim.rng.int(0, names.length - 1), 1)[0] : 'Raider';
+      const name = sim.drawName(names, def.names, given);
       // Thieves travel light: a knife, no armour, quick on their feet.
       const armorItem = thieves ? undefined : raiderArmor(sim);
       sim.enemies.push({
@@ -1538,8 +1539,9 @@ function alliesArrive(sim: Simulation, count: number): void {
     return;
   }
   const names = sim.unusedNames(FACTIONS[friend].names);
+  const given: string[] = [];
   for (let n = 0; n < count; n++) {
-    const name = names.length > 0 ? names.splice(sim.rng.int(0, names.length - 1), 1)[0] : 'Kin fighter';
+    const name = sim.drawName(names, FACTIONS[friend].names, given);
     sim.allies.push({
       id: sim.nextEnemyId++,
       name,

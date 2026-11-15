@@ -518,51 +518,56 @@ function ColonistCard({ c }: { c: ColonistView }) {
   ];
   return (
     <section className={`panel inspector ${c.drafted ? 'drafted' : ''}`} aria-label={`${c.name} details`}>
-      <div className="card-head">
-        <span className="swatch" style={{ background: c.color }} />
-        <b className="card-title">{c.name}</b>
-        {!c.dead && (
-          <span className="mood" style={{ color: moodColor(c.mood) }} title="Mood (0–100)">
-            <span className="muted small">mood</span> {c.mood}
-          </span>
-        )}
-        {c.leader && <span className="tag good">leader</span>}
-        {c.status !== 'Healthy' && (
-          <span
-            className={`tag ${c.status === 'Injured' || c.status === 'Sick' ? 'warn' : c.status === 'Away' ? '' : 'danger'}`}
-          >
-            {c.status.toLowerCase()}
-          </span>
-        )}
-        <span className="spacer" />
-        {!c.dead && c.status !== 'Downed' && c.status !== 'Away' && (
+      {/* Who on the left, wrapping within itself; the buttons kept together on the first line. (On a tablet's
+          narrow column the ✕ wrapped onto a line of its own, under the name.) */}
+      <div className="card-head colonist-head">
+        <span className="who">
+          <span className="swatch" style={{ background: c.color }} />
+          <b className="card-title">{c.name}</b>
+          {!c.dead && (
+            <span className="mood" style={{ color: moodColor(c.mood) }} title="Mood (0–100)">
+              <span className="muted small">mood</span> {c.mood}
+            </span>
+          )}
+          {c.leader && <span className="tag good">leader</span>}
+          {c.status !== 'Healthy' && (
+            <span
+              className={`tag ${c.status === 'Injured' || c.status === 'Sick' ? 'warn' : c.status === 'Away' ? '' : 'danger'}`}
+            >
+              {c.status.toLowerCase()}
+            </span>
+          )}
+        </span>
+        <span className="actions">
+          {!c.dead && c.status !== 'Downed' && c.status !== 'Away' && (
+            <button
+              className={c.drafted ? 'active danger' : ''}
+              disabled={c.age < DRAFT_AGE || (c.inBreak && !c.drafted)}
+              onClick={() => controller.toggleDraft(c.id)}
+              title={
+                c.age < DRAFT_AGE
+                  ? `${c.name} is too young to fight`
+                  : c.inBreak && !c.drafted
+                    ? `${c.name} is in no state to fight until the break passes`
+                    : c.drafted
+                      ? `Stand down (Q). ${TOUCH ? 'Tap' : 'Right-click'} the map to move them.`
+                      : `Draft for combat (Q). ${TOUCH ? 'Tap' : 'Right-click'} the map to move them.`
+              }
+            >
+              {c.drafted ? 'Drafted' : 'Draft'}
+            </button>
+          )}
           <button
-            className={c.drafted ? 'active danger' : ''}
-            disabled={c.age < DRAFT_AGE || (c.inBreak && !c.drafted)}
-            onClick={() => controller.toggleDraft(c.id)}
-            title={
-              c.age < DRAFT_AGE
-                ? `${c.name} is too young to fight`
-                : c.inBreak && !c.drafted
-                  ? `${c.name} is in no state to fight until the break passes`
-                  : c.drafted
-                    ? `Stand down (Q). ${TOUCH ? 'Tap' : 'Right-click'} the map to move them.`
-                    : `Draft for combat (Q). ${TOUCH ? 'Tap' : 'Right-click'} the map to move them.`
-            }
+            onClick={() => controller.selectColonist(c.id, true)}
+            title="Centre the view on them"
+            aria-label="Centre the view on them"
           >
-            {c.drafted ? 'Drafted' : 'Draft'}
+            ◎
           </button>
-        )}
-        <button
-          onClick={() => controller.selectColonist(c.id, true)}
-          title="Centre the view on them"
-          aria-label="Centre the view on them"
-        >
-          ◎
-        </button>
-        <button onClick={() => controller.selectColonist(null)} title="Close" aria-label="Close">
-          ✕
-        </button>
+          <button onClick={() => controller.selectColonist(null)} title="Close" aria-label="Close">
+            ✕
+          </button>
+        </span>
       </div>
       <div className="activity">{c.activity}</div>
       {/* (No stances for someone lying downed.) */}
@@ -626,21 +631,14 @@ function OverviewTab({ c }: { c: ColonistView }) {
     { label: 'Rest', value: c.needs.rest, color: '#7fa8e0' },
     { label: 'Recreation', value: c.needs.joy, color: '#c38fe0' },
   ];
+  // What weighs on them first, the worst at the top, then what cheers them, the best first. (Mixed in the order
+  // they came, a -6 sat between two +4s and "why so unhappy?" took a read of the whole list.)
+  const thoughts = [...c.thoughts].sort(
+    (a, b) => Number(a.mood >= 0) - Number(b.mood >= 0) || Math.abs(b.mood) - Math.abs(a.mood),
+  );
   return (
     <>
       {c.carrying && <div className="muted">Carrying {c.carrying}</div>}
-      <dl className="gear">
-        <dt>Weapon</dt>
-        <dd>{c.weapon}</dd>
-        <dt>Armor</dt>
-        <dd>{c.armor}</dd>
-        <dt>Clothes</dt>
-        <dd>{c.apparel}</dd>
-        <dt>Tools</dt>
-        <dd>{c.tool}</dd>
-        <dt>Comfy at</dt>
-        <dd>{c.comfort}</dd>
-      </dl>
       <h4>Needs</h4>
       {needs.map((n) => (
         <div key={n.label} className="stat">
@@ -654,12 +652,25 @@ function OverviewTab({ c }: { c: ColonistView }) {
       </div>
       <h4>Mood {c.mood}</h4>
       {c.thoughts.length === 0 && <div className="muted">No strong feelings.</div>}
-      {c.thoughts.map((t) => (
+      {thoughts.map((t) => (
         <div key={t.label} className="row-line">
           <span>{t.label}</span>
           <span className={t.mood >= 0 ? 'good' : 'bad'}>{t.mood > 0 ? `+${t.mood}` : t.mood}</span>
         </div>
       ))}
+      <h4>Gear</h4>
+      <dl className="gear">
+        <dt>Weapon</dt>
+        <dd>{c.weapon}</dd>
+        <dt>Armor</dt>
+        <dd>{c.armor}</dd>
+        <dt>Clothes</dt>
+        <dd>{c.apparel}</dd>
+        <dt>Tools</dt>
+        <dd>{c.tool}</dd>
+        <dt>Comfy at</dt>
+        <dd>{c.comfort}</dd>
+      </dl>
     </>
   );
 }

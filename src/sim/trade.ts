@@ -173,9 +173,10 @@ export function caravanArrives(sim: Simulation): boolean {
     return false;
   }
   const names = sim.unusedNames(faction.names);
+  const given: string[] = [];
   const visitors: Visitor[] = [];
   for (let n = 0; n < 3; n++) {
-    const name = names.splice(sim.rng.int(0, names.length - 1), 1)[0] ?? 'Trader';
+    const name = sim.drawName(names, faction.names, given);
     visitors.push({ id: sim.nextVisitorId++, name, tile: edge, path: [], moveProgress: 0, restUntil: 0 });
   }
   const scale = caravanScale(sim);
