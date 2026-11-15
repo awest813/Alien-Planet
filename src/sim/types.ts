@@ -548,6 +548,8 @@ export interface Stats {
   wintersSurvived: number;
   // Games of chess played with someone.
   chessGames?: number;
+  // Steps waded through shallow water (no bridge).
+  wades?: number;
   births?: number;
   // Furniture smashed in tantrums, and legendary works made.
   smashed?: number;

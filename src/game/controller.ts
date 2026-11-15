@@ -3026,6 +3026,19 @@ export class GameController {
         tone: 'warn',
       });
     }
+    // Colonists wading the fords and soaked for it, with no bridge yet: say what keeps their feet dry (an island
+    // colony's lot, every trip to the mainland).
+    const soaked = sim.living().filter((c) => c.thoughts.some((t) => t.key === 'soaked')).length;
+    if (
+      soaked >= Math.max(2, Math.ceil(sim.living().length / 2)) &&
+      sim.countBuilt((f) => !!featureDef(f).bridge) === 0
+    ) {
+      alerts.push({
+        text: 'Colonists keep wading the fords and getting soaked: a bridge (8 wood a tile) keeps them dry, and is quicker',
+        tone: 'calm',
+        tool: 'bridge',
+      });
+    }
     if (eclipseOn(sim) && sim.countBuilt((f) => !!featureDef(f).power?.solar) > 0) {
       alerts.push({ text: 'Eclipse: solar panels are dark until the sun comes back', tone: 'warn' });
     }

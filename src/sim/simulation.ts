@@ -381,6 +381,9 @@ const FIREWOOD_RESERVE_DAYS = 3;
 const TROUGH_FOOD_DAYS = 3;
 // Wood the colonists land with.
 const SALVAGED_WOOD = 50;
+// And on an island, the boat's own timbers on top: the trees are across the ford, and one colony in six (in
+// the desert, one in three) was still without walls at day 10, the first deep cold killing whoever slept out.
+const ISLAND_TIMBER = 100;
 // Days for gear left out in the weather (unroofed, outside a stockpile) to wear away from new.
 const WEATHERING_DAYS = 30;
 const CRAWL_RANGE = 25;
@@ -437,6 +440,8 @@ const VARIETY_SHARE = 0.12;
 const SAME_OLD_TOTAL = 0.6;
 const SAME_OLD_SHARE = 0.85;
 const EAT_TICKS = 60;
+// Wading in water warmer than this (the air over it) soaks nobody's mood.
+const WARM_WADING = 20;
 // Research at a bench with a bookshelf within this many tiles goes this much faster.
 export const BOOKS_REACH = 2;
 export const BOOKS_BONUS = 0.15;
@@ -972,7 +977,7 @@ export class Simulation {
     // A little silver for the first traders who come by.
     world.dropItemNear(spawn, itemId('silver'), 100);
     // Timber salvaged from the landing: enough for a door and a bed or two, to make the first night easier.
-    world.dropItemNear(spawn, itemId('wood'), SALVAGED_WOOD);
+    world.dropItemNear(spawn, itemId('wood'), SALVAGED_WOOD + (island ? ISLAND_TIMBER : 0));
     // And on an island a fishing spot on the shore nearest the landing, rigged from the boat: the lake is what
     // feeds an island colony, and this says so.
     if (island) {
@@ -3329,8 +3334,13 @@ export class Simulation {
           patient.tile = next;
         }
       }
+      // Wading a ford soaks them, which nobody minds on a hot day. (Island colonists wade all day: across 16 island
+      // colonies it was the biggest thing between their mood and a valley's.)
       if (this.world.isWading(next)) {
-        this.addThought(c, 'soaked');
+        this.stats.wades = (this.stats.wades ?? 0) + 1;
+        if (this.outdoorTemperature() < WARM_WADING) {
+          this.addThought(c, 'soaked');
+        }
       }
     }
   }

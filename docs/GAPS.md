@@ -34,7 +34,9 @@ with esbuild for speed (see ROADMAP).
   (48 days, five seeds, Tiny: desert 4,329 to 1,983 colonist-hours, temperate 1,959 to 973, forest 1,214 to
   782, tundra 2,154 to 1,865), but that's still 5-8 times a valley's (109-367). What's left is the island
   itself: little room to farm, and the timber across the water, so building eats the hours sowing needs. The
-  tundra's valleys no longer starve more than others (268 hours, from about 2,400).
+  tundra's valleys no longer starve more than others (268 hours, from about 2,400). Now (30 days, 48 colonies
+  each, with the boat's timbers and a bridged ford): island mood about 50 against a valley's 52.5, hunger about
+  1.5-2 times a valley's, and a few island colonies with no walls by winter (see the harness note below).
 - **A busy colony's simulation still slows during raids, though less.** Three raids saved from 41-day crafting
   colonies on a Medium map (saved with `SAVE_RAID=day:file`, timed with `perf.ts from=file`) ran at 67-88 ms per 1,000 ticks and now run at 48-74 (budget 60). Path searches are now about a
   third of the worst raid (allies chasing raiders across a big map); the rest is spread thin. At top speed even
@@ -45,6 +47,24 @@ with esbuild for speed (see ROADMAP).
   loaded (the game says so).
 
 ## Closed in this pass
+
+- **A balance matrix, and islands** (16 colonies × 30 days in each of twelve settings, then 48 and 48 fresh for
+  what stood out):
+  - **The matrix:** peaceful, standard, harsh (with and without defending), river, island, desert, forest, desert
+    island, harsh tundra, a medium map and a crafting colony all keep nearly everyone; mood 50-54 in all but the
+    islands (48); hunger highest on islands and in harsh colonies that hold behind their walls (the ravagers, as
+    meant).
+  - **Islands:** "Got soaked wading" was the biggest thing between an island's mood and a valley's (a -2 for
+    three hours with every ford crossed). Now nobody minds a wade on a hot day (20°C and up); an alert says to
+    bridge the fords when colonists keep getting soaked, the bridge tool one click away; and an island landing
+    brings the boat's timbers (100 wood). Measured on two sets of 48 island colonies, with the harness bridging
+    its ford as the alert says: mental breaks 48 to 31 and 24 to 20 (desert islands 34 to 30), hunger 85 to 64
+    and 46 to 41 colonist-hours a colony (desert islands 75 to 90, within the noise of others). Rivers, bridged or
+    not, are within the noise of each other and near a valley.
+  - **The harness:** bridges a ford on islands and rivers (day 3, "nobridge" not), and reports wading steps and the
+    day each colony first has a walled bedroom. Some island colonies (one in six; desert, one in three) had none by
+    day 10, and the first deep cold killed whoever slept out: the harness's 9×7 hut finds no room on a small
+    island and goes across the water, where a player would build smaller.
 
 - **Weather, sun and wind** (four years of weather per land, hour by hour; the balance harness on 48 seeds and 48
   fresh ones, before and after, default and tundra):

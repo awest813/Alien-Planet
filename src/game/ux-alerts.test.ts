@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { spawnRaid } from '../sim/combat';
-import { featureId, itemId } from '../sim/defs';
+import { featureId, itemId, terrainId } from '../sim/defs';
 import { Designation } from '../sim/world';
 import { HOUR, clearAround } from '../sim/test-helpers';
 import { Alert, controller } from './controller';
@@ -175,5 +175,50 @@ describe('the weather in the top bar', () => {
     sim.weather = { kind: 'storm', until: sim.tick + 10 * HOUR };
     controller.publish();
     expect(controller.getState().weather.wind).toMatch(/gale|strong wind|stiff breeze/);
+  });
+});
+
+describe('fords', () => {
+  it('soaked colonists and no bridge: the alert offers the bridge tool, gone once one stands', () => {
+    const sim = colony('fords');
+    const until = sim.tick + 3 * HOUR;
+    for (const c of sim.living()) {
+      c.thoughts.push({ key: 'soaked', expires: until });
+    }
+    const ford = () => alerts().find((a) => /wading the fords/.test(a.text));
+    expect(ford()?.tool).toBe('bridge');
+    const w = sim.world;
+    const x = w.xOf(sim.colonists[0].tile) + 3;
+    const y = w.yOf(sim.colonists[0].tile);
+    w.setTerrain(w.idx(x, y), terrainId('shallowWater'));
+    w.setFeature(w.idx(x, y), featureId('bridge'));
+    expect(ford()).toBeUndefined();
+  });
+
+  it('nobody minds wading on a hot day; on a cold one it soaks them', () => {
+    const sim = colony('wading');
+    const w = sim.world;
+    const c = sim.living()[0];
+    const x = w.xOf(c.tile);
+    const y = w.yOf(c.tile);
+    const water = w.idx(x + 1, y);
+    w.setTerrain(water, terrainId('shallowWater'));
+    const wade = (hot: boolean) => {
+      sim.story.heatWaveUntil = hot ? sim.tick + 10 * HOUR : 0;
+      sim.story.coldSnapUntil = hot ? 0 : sim.tick + 10 * HOUR;
+      c.thoughts = c.thoughts.filter((t) => t.key !== 'soaked');
+      c.tile = w.idx(x, y);
+      c.job = null;
+      c.path = [water];
+      c.moveProgress = 0.999;
+      (sim as unknown as { move(c: unknown): void }).move(c);
+      return c.thoughts.some((t) => t.key === 'soaked');
+    };
+    // (A heat wave at midday is well over 20°C; a cold snap is well under it.)
+    sim.tick += Math.round(((13 - sim.hour + 24) % 24) * HOUR);
+    sim.story.heatWaveUntil = sim.tick + 10 * HOUR;
+    expect(sim.outdoorTemperature()).toBeGreaterThanOrEqual(20);
+    expect(wade(true)).toBe(false);
+    expect(wade(false)).toBe(true);
   });
 });

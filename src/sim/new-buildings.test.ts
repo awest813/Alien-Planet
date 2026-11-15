@@ -219,3 +219,13 @@ describe('their cards', () => {
     expect(details(bench)).toMatch(/A bookshelf beside it/);
   });
 });
+
+describe('an island landing', () => {
+  it('brings the boat’s timbers: a hut’s worth more wood than a valley landing', () => {
+    const wood = (map?: 'island') => {
+      const sim = Simulation.newColony(21, 'standard', 64, { map });
+      return sim.stockOf(itemId('wood'));
+    };
+    expect(wood('island')).toBeGreaterThanOrEqual(wood() + 100);
+  });
+});

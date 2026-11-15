@@ -79,6 +79,8 @@ const keepPen = process.argv.includes('pen');
 // (day 2), a stone fountain once there are blocks for it (day 12), a wind turbine once electricity is known, and
 // with "defend" a ring of barricades round the hut until sandbags can go up (day 4).
 const newBuild = process.argv.includes('newbuild');
+// On an island or a river the harness bridges a ford on day 3 (see below); "nobridge" doesn't.
+const noBridge = process.argv.includes('nobridge');
 // Nutrition a colonist eats in a day (as the top bar's "days of food" counts it).
 const DAILY_NUTRITION = 1.4;
 // "policy=frugal,long,rest" sets the colony's policies from the start.
@@ -227,6 +229,10 @@ interface Result {
   rooms: { role: string; impressiveness: number }[];
   // With "newbuild": which of the later additions stand at the end, and whether the bookshelf reaches the bench.
   built: string;
+  // Steps waded through fords.
+  wades: number;
+  // The first day with an enclosed room with beds (-1: never).
+  shelterDay: number;
   mess: number;
   births: number;
   smashed: number;
@@ -475,6 +481,7 @@ function play(seed: number): Result {
   const fell = new Set<number>();
   let beaconPlaced = false;
   let shaftPlaced = false;
+  let fordBridged = false;
   let booksPlaced = false;
   let parkBenchPlaced = false;
   let fountainPlaced = false;
@@ -523,6 +530,7 @@ function play(seed: number): Result {
     }
   };
   let friendDay = -1;
+  let shelterDay = -1;
   let starvingHours = 0;
   const starvingByDay: Record<number, number> = {};
   let moodSum = 0;
@@ -718,6 +726,31 @@ function play(seed: number): Result {
           rect: { x0: grove.x, y0: grove.y, x1: grove.x + 5, y1: grove.y + 4 },
           zone: crop('poplarPlant'),
         });
+      }
+    }
+    // An island (or a river): once there's wood to spare (day 3 on), bridge the ford on the way to the nearest wood
+    // across the water, as the game's alert says to (colonists waded it all day, soaked for it, at a third of walking
+    // pace). "nobridge" leaves them wading.
+    if (
+      (mapKind === 'island' || mapKind === 'river') &&
+      !noBridge &&
+      !fordBridged &&
+      sim.day >= 3 &&
+      sim.stockOf(itemId('wood')) >= 40
+    ) {
+      fordBridged = true;
+      const world = sim.world;
+      const anchor = (sim.living()[0] ?? sim.colonists[0]).tile;
+      const trees = [...world.tilesWith('features')]
+        .filter((i) => featureDef(world.feature[i]).key === 'tree')
+        .sort((a, b) => world.distance(anchor, a) - world.distance(anchor, b));
+      for (const tree of trees.slice(0, 40)) {
+        const path = sim.pathfinder.find(anchor, world.neighbors(tree)) ?? [];
+        const ford = path.filter((i) => world.isWading(i));
+        if (ford.length > 0) {
+          sim.apply({ type: 'build', feature: featureId('bridge'), tiles: ford });
+          break;
+        }
       }
     }
     // Fortifications known: sandbags round the hut (the ring was kept clear for them).
@@ -1307,6 +1340,13 @@ function play(seed: number): Result {
         starvingByDay[sim.day] = (starvingByDay[sim.day] ?? 0) + 1;
       }
     }
+    // The first day the colony has an enclosed room with beds (a bedroom or barracks), at dawn.
+    if (shelterDay < 0 && Math.floor(sim.hour) === 6) {
+      const roles = roomsAtEnd(sim).map((r) => r.role);
+      if (roles.includes('Barracks') || roles.includes('Bedroom')) {
+        shelterDay = sim.day;
+      }
+    }
     if (friendDay < 0) {
       const l = sim.living();
       if (l.some((a) => l.some((b) => a !== b && mutualOpinion(a, b) >= 30))) {
@@ -1416,6 +1456,8 @@ function play(seed: number): Result {
     joyLowHours,
     rooms: roomsAtEnd(sim),
     built: newBuild ? builtAtEnd(sim) : '',
+    wades: sim.stats.wades ?? 0,
+    shelterDay,
     births: sim.stats.births ?? 0,
     smashed: sim.stats.smashed ?? 0,
     infections: sim.stats.infections ?? 0,
@@ -1593,7 +1635,7 @@ for (const seed of seedList) {
   console.log(
     `seed ${String(r.seed).padStart(6)}  alive ${r.living}/${r.total}  raids ${r.raids} (kills ${r.raidKills})  ` +
       `fever ${r.diseaseCases} (deaths ${r.diseaseDeaths})  breaks ${r.breaks}  mood avg ${r.avgMood.toFixed(0)} min ${r.minMood.toFixed(0)}  ` +
-      `friends day ${r.friendDay}  rivals ${r.rivals} lovers ${r.lovers}  starving h ${r.starvingHours}  objectives ${r.objectives}/${OBJECTIVES.length}  research ${r.research} (tailoring day ${r.tailoringDay})  frost ${r.frost}${r.built ? `\n      built: ${r.built}` : ''}`,
+      `friends day ${r.friendDay}  rivals ${r.rivals} lovers ${r.lovers}  starving h ${r.starvingHours}  objectives ${r.objectives}/${OBJECTIVES.length}  research ${r.research} (tailoring day ${r.tailoringDay})  frost ${r.frost}  wades ${r.wades}  shelter day ${r.shelterDay}${r.built ? `\n      built: ${r.built}` : ''}`,
   );
   for (const d of r.deaths) {
     console.log(`    ${d}`);
