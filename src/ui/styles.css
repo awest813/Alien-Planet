@@ -1834,10 +1834,13 @@ button.active:hover:not(:disabled) {
   margin: 4px 0 6px;
 }
 
-/* A setting that's a sentence: the box beside the start of it, rather than across the card from its end. */
+/* A setting that's a sentence: the box beside the start of it, rather than across the card from its end. (Among
+   the village's policies, which have no rules between them: none under it, and the next policy's room above.) */
 .setting.check-first {
   justify-content: flex-start;
   align-items: flex-start;
+  border-bottom: none;
+  margin-bottom: 8px;
 }
 
 .setting.check-first input[type='checkbox'] {

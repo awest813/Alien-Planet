@@ -301,14 +301,27 @@ test('orders can be given on the map from the keyboard alone', async ({ page }) 
       return n;
     });
   expect(await zoned()).toBe(0);
+  // Where the view is, in tiles: an arrow is held until it has moved a few (the view pans with the time a frame
+  // took, and on a busy machine a fixed 400 ms moved it less than a tile).
+  const view = () =>
+    page.evaluate(() => {
+      const cam = (
+        window as unknown as {
+          colonyGame: { scene: { scenes: { cameras: { main: { scrollX: number; scrollY: number } } }[] } };
+        }
+      ).colonyGame.scene.scenes[0].cameras.main;
+      return { x: cam.scrollX / 16, y: cam.scrollY / 16 };
+    });
+  const hold = async (key: string, axis: 'x' | 'y') => {
+    const from = (await view())[axis];
+    await page.keyboard.down(key);
+    await expect.poll(async () => (await view())[axis] - from, { timeout: 10_000 }).toBeGreaterThan(3);
+    await page.keyboard.up(key);
+  };
   await page.keyboard.press('z');
   await page.keyboard.press('Enter');
-  await page.keyboard.down('ArrowRight');
-  await page.waitForTimeout(400);
-  await page.keyboard.up('ArrowRight');
-  await page.keyboard.down('ArrowDown');
-  await page.waitForTimeout(400);
-  await page.keyboard.up('ArrowDown');
+  await hold('ArrowRight', 'x');
+  await hold('ArrowDown', 'y');
   await page.keyboard.press('Enter');
   await expect.poll(zoned).toBeGreaterThan(1);
   expect(errors).toEqual([]);
