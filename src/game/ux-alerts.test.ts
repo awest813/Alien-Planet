@@ -175,6 +175,15 @@ describe('the weather in the top bar', () => {
     sim.weather = { kind: 'storm', until: sim.tick + 10 * HOUR };
     controller.publish();
     expect(controller.getState().weather.wind).toMatch(/gale|strong wind|stiff breeze/);
+    // A clear day in a gust says it's windy (it never did: clear weather's wind never reached the line).
+    sim.weather = { kind: 'clear', until: sim.tick + 1000 * HOUR };
+    let found = false;
+    for (let h = 0; h < 200 && !found; h++) {
+      sim.tick += HOUR;
+      controller.publish();
+      found = controller.getState().weather.label === 'Windy';
+    }
+    expect(found).toBe(true);
   });
 });
 
@@ -191,7 +200,8 @@ describe('fords', () => {
     const x = w.xOf(sim.colonists[0].tile) + 3;
     const y = w.yOf(sim.colonists[0].tile);
     w.setTerrain(w.idx(x, y), terrainId('shallowWater'));
-    w.setFeature(w.idx(x, y), featureId('bridge'));
+    // A bridge ordered counts already (the alert asked for one that was on its way).
+    sim.apply({ type: 'build', feature: featureId('bridge'), tiles: [w.idx(x, y)] });
     expect(ford()).toBeUndefined();
   });
 

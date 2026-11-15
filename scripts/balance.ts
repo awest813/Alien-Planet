@@ -736,19 +736,22 @@ function play(seed: number): Result {
       !noBridge &&
       !fordBridged &&
       sim.day >= 3 &&
+      Math.floor(sim.hour) === 6 &&
       sim.stockOf(itemId('wood')) >= 40
     ) {
-      fordBridged = true;
+      // From the hut (where everyone comes home to), to the nearest tree whose way crosses water; tried again each
+      // morning until one does (on a river the nearest trees were all on the colony's own bank).
       const world = sim.world;
-      const anchor = (sim.living()[0] ?? sim.colonists[0]).tile;
+      const anchor = hut ? at(hut.x + 4, hut.y + 3) : (sim.living()[0] ?? sim.colonists[0]).tile;
       const trees = [...world.tilesWith('features')]
         .filter((i) => featureDef(world.feature[i]).key === 'tree')
         .sort((a, b) => world.distance(anchor, a) - world.distance(anchor, b));
-      for (const tree of trees.slice(0, 40)) {
+      for (const tree of trees.filter((_, k) => k % 4 === 0).slice(0, 60)) {
         const path = sim.pathfinder.find(anchor, world.neighbors(tree)) ?? [];
         const ford = path.filter((i) => world.isWading(i));
         if (ford.length > 0) {
           sim.apply({ type: 'build', feature: featureId('bridge'), tiles: ford });
+          fordBridged = true;
           break;
         }
       }

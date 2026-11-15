@@ -2017,7 +2017,8 @@ export class GameController {
     const strength = windStrength(sim);
     const wind = windWords(strength);
     // (A strong wind on a clear day is worth a word: the turbines turn fast and the rain, when it comes, slants.)
-    if (!def.icon && strength >= 0.6) {
+    // (Clear weather's wind tops out a little over half: at 0.6 this never showed.)
+    if (!def.icon && strength >= 0.5) {
       return { label: 'Windy', icon: '💨', wind };
     }
     // Rain at about freezing is sleet ("Rain" at -1°C read as a mistake).
@@ -3028,16 +3029,23 @@ export class GameController {
     }
     // Colonists wading the fords and soaked for it, with no bridge yet: say what keeps their feet dry (an island
     // colony's lot, every trip to the mainland).
-    const soaked = sim.living().filter((c) => c.thoughts.some((t) => t.key === 'soaked')).length;
-    if (
-      soaked >= Math.max(2, Math.ceil(sim.living().length / 2)) &&
-      sim.countBuilt((f) => !!featureDef(f).bridge) === 0
-    ) {
-      alerts.push({
-        text: 'Colonists keep wading the fords and getting soaked: a bridge (8 wood a tile) keeps them dry, and is quicker',
-        tone: 'calm',
-        tool: 'bridge',
-      });
+    // (Not while a bridge stands or is planned near where they wade: one across a pond elsewhere hid it, and one
+    // already ordered was asked for again.)
+    const soaked = sim.living().filter((c) => c.thoughts.some((t) => t.key === 'soaked'));
+    if (soaked.length >= Math.max(2, Math.ceil(sim.living().length / 2))) {
+      const w = sim.world;
+      const bridges = [
+        ...[...w.tilesWith('features')].filter((i) => featureDef(w.feature[i]).bridge),
+        ...[...w.tilesWith('blueprints')].filter((i) => featureDef(w.blueprint[i]).bridge),
+      ];
+      const bridged = soaked.some((c) => bridges.some((i) => w.distance(i, c.tile) <= 12));
+      if (!bridged) {
+        alerts.push({
+          text: 'Colonists keep wading the fords and getting soaked: a bridge (8 wood a tile) keeps them dry, and is quicker',
+          tone: 'calm',
+          tool: 'bridge',
+        });
+      }
     }
     if (eclipseOn(sim) && sim.countBuilt((f) => !!featureDef(f).power?.solar) > 0) {
       alerts.push({ text: 'Eclipse: solar panels are dark until the sun comes back', tone: 'warn' });

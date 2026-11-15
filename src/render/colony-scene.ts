@@ -425,7 +425,7 @@ export class ColonyScene extends Phaser.Scene {
       for (let k = 0; k < 36; k++) {
         const t = frac(hash2(k, 21, 83) + now * 0.00005 * (0.7 + 0.6 * hash2(k, 23, 89)));
         // (Blown the way the wind blows, further the harder it does.)
-        const x = v.x + frac(hash2(k, 25, 97) + t * (0.2 + 0.8 * windStrength(sim)) * windFrom(sim)) * v.width;
+        const x = v.x + frac(hash2(k, 25, 97) + this.windDrift * 0.00005) * v.width;
         const y = v.y + t * v.height + Math.sin(now / 500 + k) * 4 * s;
         // A leaf tumbling: now edge on, now flat.
         const flat = Math.abs(Math.sin(now / 260 + k * 1.7));
@@ -449,6 +449,12 @@ export class ColonyScene extends Phaser.Scene {
   }
 
   // Rain, snow, fog and storm flashes over whatever part of the map is in view.
+  // How far the wind has carried what it blows (snow, leaves) across the screen, built up frame by frame from the
+  // wind of the moment. (Worked out as the time so far times the wind now, every flake jumped across the screen when
+  // the wind changed with the hour, and leaves turned back when it changed its way with the day.)
+  private windDrift = 0;
+  private windDriftAt = 0;
+
   private drawWeather(): void {
     const g = this.weatherFx;
     g.clear();
@@ -456,6 +462,12 @@ export class ColonyScene extends Phaser.Scene {
     const kind = sim.weather.kind;
     // For anyone whose system asks for less motion, the rain, snow and aurora hold still.
     const now = REDUCED_MOTION?.matches ? 0 : this.time.now;
+    // (A gap of more than a second, the tab hidden, say, carries nothing.)
+    const dt = now - this.windDriftAt;
+    this.windDriftAt = now;
+    if (dt > 0 && dt < 1000) {
+      this.windDrift += dt * windFrom(sim) * windStrength(sim);
+    }
     if (kind === 'clear') {
       this.drawSeason(g, this.cameras.main.worldView, now);
       this.drawAurora(g, this.cameras.main.worldView, now);
@@ -515,10 +527,10 @@ export class ColonyScene extends Phaser.Scene {
       g.fillStyle(0xffffff, 0.85);
       // Flakes swirl, and drift across with the wind.
       const wind = windStrength(sim);
-      const across = windFrom(sim) * wind * 0.00003;
+
       for (let k = 0; k < 140; k++) {
         const drift = Math.sin(now / 900 + k) * (3 + 6 * wind) * s;
-        const x = v.x + frac(hash2(k, 3, 19) + now * across) * v.width + drift;
+        const x = v.x + frac(hash2(k, 3, 19) + this.windDrift * 0.00003) * v.width + drift;
         const y = v.y + frac(hash2(k, 5, 23) + now * 0.00018 * (0.7 + 0.6 * hash2(k, 9, 29))) * v.height;
         g.fillRect(x, y, 2 * s, 2 * s);
       }
