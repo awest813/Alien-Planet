@@ -7,7 +7,7 @@ export interface Settings {
   autosave: boolean;
   // Pause the game when a raid begins.
   pauseOnRaid: boolean;
-  // Pause the game when a colonist dies or collapses (outside a raid).
+  // Pause the game on a fire near the colony, or when a colonist dies or collapses (outside a raid).
   pauseOnEmergency: boolean;
   // Size of the whole interface, as a multiple of normal.
   uiScale: number;
@@ -159,12 +159,27 @@ export function loadSettings(): Settings {
   return settings;
 }
 
+// Only what differs from the defaults is kept: the defaults that follow the screen (the interface size) and the
+// system (lightning flashes, off when it asks for less motion) were saved whole with the first change of anything,
+// and a later visit on a smaller screen opened at the big screen's size.
 export function storeSettings(settings: Settings): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(settings));
+    const changed = Object.fromEntries(
+      (Object.keys(settings) as (keyof Settings)[])
+        .filter((key) => settings[key] !== DEFAULT_SETTINGS[key])
+        .map((key) => [key, settings[key]]),
+    );
+    localStorage.setItem(KEY, JSON.stringify(changed));
   } catch {
     // Not remembered; the settings still apply for this visit.
   }
+}
+
+// What "Reset to defaults" puts back: everything but the sound being on, and the last new colony's choices (it
+// turned the sound off and forgot them, with no warning).
+export function resetSettings(settings: Settings): Settings {
+  const { sound, newDifficulty, newMapSize, newBiome, newMap } = settings;
+  return { ...DEFAULT_SETTINGS, sound, newDifficulty, newMapSize, newBiome, newMap };
 }
 
 // Whether the welcome help has been seen (it opens by itself on a first colony until then).

@@ -4,7 +4,7 @@ import { SAVE_SLOTS, UiState, controller, slotLabel, TradeLine } from '../game/c
 import { SaveMeta } from '../game/save-store';
 import {
   CHROMEBOOK_CHOICES,
-  DEFAULT_SETTINGS,
+  resetSettings,
   MAP_SHARPNESS,
   NOTICE_TIMES,
   PAN_SPEEDS,
@@ -722,7 +722,7 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
       <Toggle label="Autosave at dawn and when leaving" value={s.autosave} onChange={(v) => set({ autosave: v })} />
       <Toggle label="Pause when raiders arrive" value={s.pauseOnRaid} onChange={(v) => set({ pauseOnRaid: v })} />
       <Toggle
-        label="Pause when a colonist dies or collapses"
+        label="Pause on a fire, a death or a collapse"
         value={s.pauseOnEmergency}
         onChange={(v) => set({ pauseOnEmergency: v })}
       />
@@ -741,7 +741,7 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
       />
       <Slider label="Music" value={s.musicVolume} disabled={!s.sound} onChange={(v) => set({ musicVolume: v })} />
       <Slider
-        label="Ambience and alerts"
+        label="Effects (weather, work, fights, alerts)"
         value={s.effectsVolume}
         disabled={!s.sound}
         onChange={(v) => set({ effectsVolume: v })}
@@ -754,29 +754,46 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
         options={NOTICE_TIMES}
         onChange={(v) => set({ noticeSeconds: v })}
       />
-      <Choice label="Camera speed" value={s.panSpeed} options={PAN_SPEEDS} onChange={(v) => set({ panSpeed: v })} />
-      <Choice
-        label="Chromebook mode"
-        value={s.chromebook}
-        options={CHROMEBOOK_CHOICES}
-        onChange={(v) => set({ chromebook: v })}
-      />
-      <p className="muted small setting-note">
-        {controller.chromebook ? 'On' : 'Off'}
-        {s.chromebook === 0 && (controller.onChromeOS ? ' (this is a Chromebook)' : " (this isn't a Chromebook)")}. For
-        a Chromebook or any low-powered laptop: the map at 30 frames a second and the screen's own resolution, fewer
-        effects, and two fingers on the touchpad move the map (a pinch zooms). Easier on the battery.
-      </p>
-      <Choice
-        label="Scrolling (the wheel, or two fingers)"
-        value={s.scroll}
-        options={SCROLL_CHOICES}
-        onChange={(v) => set({ scroll: v })}
-      />
-      <p className="muted small setting-note">
-        {s.scroll === 0 && (controller.scrollMoves ? 'Auto moves the map, as Chromebook mode is on. ' : 'Auto zooms. ')}
-        A pinch, or Ctrl and the wheel, always zooms; so do + and −.
-      </p>
+      <p className="muted small setting-note">Toasts ("Game paused: …") stay as much longer or shorter.</p>
+      {/* (Neither the keyboard's panning nor a touchpad's or a wheel's scrolling means anything on a touch screen.) */}
+      {!TOUCH && (
+        <>
+          <Choice
+            label="Keyboard pan speed"
+            value={s.panSpeed}
+            options={PAN_SPEEDS}
+            onChange={(v) => set({ panSpeed: v })}
+          />
+          <p className="muted small setting-note">WASD and the arrow keys. Dragging follows the mouse.</p>
+        </>
+      )}
+      {!TOUCH && (
+        <>
+          <Choice
+            label="Chromebook mode"
+            value={s.chromebook}
+            options={CHROMEBOOK_CHOICES}
+            onChange={(v) => set({ chromebook: v })}
+          />
+          <p className="muted small setting-note">
+            {controller.chromebook ? 'On' : 'Off'}
+            {s.chromebook === 0 && (controller.onChromeOS ? ' (this is a Chromebook)' : " (this isn't a Chromebook)")}.
+            For a Chromebook or any low-powered laptop: the map at 30 frames a second and the screen's own resolution,
+            fewer effects, and two fingers on the touchpad move the map (a pinch zooms). Easier on the battery.
+          </p>
+          <Choice
+            label="Scrolling (the wheel, or two fingers)"
+            value={s.scroll}
+            options={SCROLL_CHOICES}
+            onChange={(v) => set({ scroll: v })}
+          />
+          <p className="muted small setting-note">
+            {s.scroll === 0 &&
+              (controller.scrollMoves ? 'Auto moves the map, as Chromebook mode is on. ' : 'Auto zooms. ')}
+            A pinch, or Ctrl and the wheel, always zooms; so do + and −.
+          </p>
+        </>
+      )}
       {/* (Only a sharp screen has the choice: elsewhere the map is drawn one pixel to one already.) */}
       {window.devicePixelRatio > 1 && (
         <>
@@ -811,11 +828,18 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
       <Toggle label="Names over colonists and raiders" value={s.showNames} onChange={(v) => set({ showNames: v })} />
       <Toggle label="Minimap" value={s.showMinimap} onChange={(v) => set({ showMinimap: v })} />
       <Toggle label="Lightning flashes" value={s.lightningFlashes} onChange={(v) => set({ lightningFlashes: v })} />
+      <p className="muted small setting-note">
+        The screen lights up in a storm. Off by default when the system asks for less motion.
+      </p>
       <Toggle
         label="Day and night lighting"
         value={s.dayNightLighting}
         onChange={(v) => set({ dayNightLighting: v })}
       />
+      <p className="muted small setting-note">
+        Dusk, night and dawn, with fires and lamps lighting the dark; with it, autumn's falling leaves and summer's
+        fireflies.
+      </p>
       <h3>Controls</h3>
       <table className="summary">
         <tbody>
@@ -830,14 +854,14 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
         </tbody>
       </table>
       <div className="row">
-        <button
-          onClick={() => {
+        <ConfirmButton
+          label="Reset to defaults"
+          confirm="Reset every setting here? (Sound stays as it is.)"
+          onConfirm={() => {
             retrySharp();
-            set({ ...DEFAULT_SETTINGS });
+            set(resetSettings(s));
           }}
-        >
-          Reset to defaults
-        </button>
+        />
         <button
           disabled={helpReset}
           onClick={() => {

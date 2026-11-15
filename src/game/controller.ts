@@ -2464,7 +2464,9 @@ export class GameController {
   private notify(text: string): void {
     this.toast = text;
     // Long enough to read: a long one (a siege's instructions, why a button is off) went in two and a half seconds.
-    this.toastTimer = Math.min(9000, Math.max(2500, text.length * 60));
+    // (As long as the player has the notifications stay: Long gave the cards fourteen seconds, and these, the
+    // pauses' reasons among them, the same few.)
+    this.toastTimer = Math.min(9000, Math.max(2500, text.length * 60)) * (this.settings.noticeSeconds / 8);
     this.publish();
   }
 
