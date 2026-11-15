@@ -21,6 +21,33 @@ the hardest start (see below); marriages rarely end.
 
 ## Closed in this pass
 
+- **Sports, music, settings, farming and raids** (an independent audit of each, every finding checked by running
+  it; then 48-colony harness runs before and after):
+  - **Farming:** crops were sown on a mild afternoon and killed by the night's frost: in a cold snap (more than
+    half of those sown during one), in the tundra's autumn (half of its autumn sowings), and in unheated glass
+    greenhouses all winter (sown and frozen every day). Sowing now walks the fortnight's forecast hour by hour
+    (growing by day when it's warm enough, never in winter) and sows only what will ripen before a hard frost; a
+    greenhouse needs a heater in winter; poplars, frost-proof, are sown any time (they stopped at midsummer).
+    Tundra: days with crops killed by frost 111 to 69, hunger and mood level. A crop's card says when it will be
+    ripe by the forecast, or that a frost may take it first, and what holds it back; bare ground in a field says
+    why it isn't sown. The glassmaking, sun lamp, winter and grow-tool texts say what's true (sand grows; a
+    greenhouse needs heat).
+  - **Recreation:** colonists chose the quickest fun every time, and the horseshoe pin took nine hours in sixteen
+    while "Same old thing" was felt half the time; the choice now weighs what's been most of their fun lately.
+    Concerts needed someone nearly bored at that moment, so four ten-year colonies heard none; a concert now draws
+    anyone in an "anything" hour with some fun owed them, from everyday work. They don't start with raiders about,
+    stop when raiders come, and the harp's quarter more holds at a concert. 96 colonies × 30 days: concerts 13 to
+    78, "Same old thing" -0.5 to -0.3, "Varied recreation" +0.3 to +0.45, mood level or up, hunger level. (An
+    evening hour of recreation in the default schedule did more for mood and concerts but raised hunger: left to
+    the player.) Recreation buildings' cards say their kind, pace, seats and who's at them.
+  - **Settings** (from the audit): only what was changed is kept (the screen-sized defaults froze at the first
+    change); the pause, pan speed and effects labels say what they do; touch screens don't see settings that do
+    nothing there; toasts follow "Notifications stay"; reset asks first and keeps the sound and the last new
+    colony's choices.
+  - **Raids** (from the audit, all in the new carrying off): no body left for someone lost far off; the price
+    fixed when they're taken; whoever was tending them lets go; never the last who could look after the rest;
+    only raiders who got away carry anything off; no deals while their people attack.
+
 - **Finishing the gap list:**
   - **Raids run in budget.** `scripts/perf.ts raid` sends a raid of twelve into a three-day colony on the largest
     map, the same raid every run. Before: 59 ms per 1,000 ticks (best of three; 39 on a Medium map). Three

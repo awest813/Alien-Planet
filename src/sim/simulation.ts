@@ -269,6 +269,22 @@ const doorable = (def: FeatureDef): boolean => def.blocksRoom && !def.door && !!
 // Right beside a fire it's warmer than a heater keeps a room, by up to this much.
 const FIRESIDE_EXTRA = 6;
 const HARP_GAIN = 1.25;
+// A concert draws anyone in an "anything" hour with recreation under this (see someoneFreeToPlay).
+const CONCERT_DRAWS = 0.6;
+// The everyday work a concert draws them from (not tending the hurt, fighting fires, eating, sleeping and so on).
+const CONCERT_LEAVES = new Set<string>([
+  'mine',
+  'chop',
+  'forage',
+  'construct',
+  'deconstruct',
+  'sow',
+  'harvestCrop',
+  'haul',
+  'craft',
+  'research',
+  'clean',
+]);
 const CONCERT_UNTIL = 22;
 const CONCERT_TICKS = TICKS_PER_HOUR * 2;
 const CONCERT_RADIUS = 3;
@@ -443,6 +459,10 @@ const VARIETY_MIN = 0.08;
 const VARIETY_SHARE = 0.12;
 const SAME_OLD_TOTAL = 0.6;
 const SAME_OLD_SHARE = 0.85;
+// Choosing recreation, a kind that has been all of it lately counts this much less (see freshness), once there's
+// been this much.
+const FRESHNESS_WEIGHT = 0.6;
+const FRESH_FROM = 0.3;
 const EAT_TICKS = 60;
 // Wading in water warmer than this (the air over it) soaks nobody's mood.
 const WARM_WADING = 20;
@@ -561,6 +581,11 @@ const FREEZE = -2;
 const THAW = 3;
 // Below this, crops in the field start dying.
 const FROST = -5;
+// Looking ahead for frost before sowing (see frostFreeHours).
+const FORECAST_HOURS = 24 * 14;
+const FROST_MARGIN = 2;
+// A cold snap takes this off the day's temperatures.
+const COLD_SNAP_CHILL = 12;
 
 // Plants are worked from their own tile; rock, buildings, and workbenches from an adjacent one.
 const standsOn = (type: JobType): boolean =>
@@ -1153,7 +1178,7 @@ export class Simulation {
     ) {
       return c.value;
     }
-    const coldSnap = coldSnapOn(this) ? 12 : 0;
+    const coldSnap = coldSnapOn(this) ? COLD_SNAP_CHILL : 0;
     const heatWave = heatWaveOn(this) ? 10 : 0;
     const eclipse = eclipseOn(this) ? 3 : 0;
     const value =
@@ -2293,7 +2318,7 @@ export class Simulation {
         frosted++;
         continue;
       }
-      // Sun lamps let crops grow at night and through winter; under a roof they're the only light. Glass
+      // Sun lamps let crops grow at night and through winter. Glass
       // (glassmaking) lights a field walled in as a room by day, winter or not: a warm greenhouse.
       const sunlit = (growing && w.roof[i] === NONE) || (glassDay && w.roof[i] === NONE && this.isIndoors(i));
       if ((!sunlit && !lit[i]) || w.growth[i] >= 1 || temp < CROP_MIN_TEMP) {
@@ -2687,7 +2712,11 @@ export class Simulation {
       } else if (season === 'Spring') {
         this.addLog('Spring has come.', 'info', true);
       } else if (season === 'Winter') {
-        this.addLog('Winter has arrived. Crops will not grow until spring, except under sun lamps.', 'warn', true);
+        this.addLog(
+          'Winter has arrived. Crops will not grow until spring, except under sun lamps or glass, kept warm.',
+          'warn',
+          true,
+        );
       } else {
         this.addLog(
           season === 'Autumn'
@@ -4385,31 +4414,160 @@ export class Simulation {
     return this.startWorkJob(c, 'harvestCrop', targets, region);
   }
 
-  private trySow(c: Colonist): boolean {
+  // The next fortnight's temperatures outdoors, hour by hour, as the season, the hour of day and any cold snap still
+  // on would have them: worked out once an hour (see ripenOutdoors). Two degrees' margin on frost below: rain and
+  // fog take a little more off.
+  private forecast(): Float32Array {
+    const now = Math.floor(this.totalHours);
+    const f = this.forecastCache;
+    if (f.hour !== now || f.snap !== this.story.coldSnapUntil || f.temps.length === 0) {
+      const snapHours = Math.max(0, (this.story.coldSnapUntil - this.tick) / TICKS_PER_HOUR);
+      const temps = new Float32Array(FORECAST_HOURS);
+      for (let h = 0; h < FORECAST_HOURS; h++) {
+        temps[h] = outdoorTemperature(now + h, this.seed, this.biome) - (h < snapHours ? COLD_SNAP_CHILL : 0);
+      }
+      this.forecastCache = { hour: now, snap: this.story.coldSnapUntil, temps, walks: new Map() };
+    }
+    return this.forecastCache.temps;
+  }
+  private forecastCache = {
+    hour: -1,
+    snap: -1,
+    temps: new Float32Array(0),
+    walks: new Map<string, { hours: number; end: 'ripe' | 'frost' | 'winter' }>(),
+  };
+
+  // Hours from now until the first hard frost outdoors (up to a fortnight).
+  public frostFreeHours(): number {
+    const temps = this.forecast();
+    const k = temps.findIndex((t) => t < FROST + FROST_MARGIN);
+    return k < 0 ? FORECAST_HOURS : k;
+  }
+
+  // How a crop sown (or standing, at `growth`) outdoors now would fare, by the forecast: growing by day when it's
+  // warm enough, never in winter, faster on better ground. Ripe in so many hours, or caught first by a hard frost
+  // or by winter. (Its nominal days were too few in the cold: an autumn crop grows only on warm afternoons, and
+  // frost came first. Half the tundra's autumn sowings froze.)
+  public ripenOutdoors(
+    growDays: number,
+    pace: number,
+    growth = 0,
+  ): { hours: number; end: 'ripe' | 'frost' | 'winter' } {
+    const temps = this.forecast();
+    const key = `${growDays}:${pace}:${growth.toFixed(2)}`;
+    const cached = this.forecastCache.walks.get(key);
+    if (cached) {
+      return cached;
+    }
+    const now = Math.floor(this.totalHours);
+    const perHour = pace / (growDays * 14);
+    let grown = growth;
+    let result: { hours: number; end: 'ripe' | 'frost' | 'winter' } = { hours: FORECAST_HOURS, end: 'winter' };
+    for (let h = 0; h < FORECAST_HOURS; h++) {
+      const t = temps[h];
+      if (t < FROST + FROST_MARGIN) {
+        result = { hours: h, end: 'frost' };
+        break;
+      }
+      if (seasonOf(now + h) === 'Winter') {
+        result = { hours: h, end: 'winter' };
+        break;
+      }
+      const hour = (now + h) % 24;
+      if (hour >= NIGHT_END && hour < 20 && t >= CROP_MIN_TEMP) {
+        grown += perHour;
+        if (grown >= 1) {
+          result = { hours: h + 1, end: 'ripe' };
+          break;
+        }
+      }
+    }
+    this.forecastCache.walks.set(key, result);
+    return result;
+  }
+
+  // Why a field tile isn't sown just now, in words, or null if it can be: only where the crop can ripen, under a
+  // sun lamp, under glass, or outdoors with enough season left and no frost coming first. (Its growing zone's crop.)
+  public whyNotSow(i: number, lit: ArrayLike<number | boolean> = this.litTiles()): string | null {
     const w = this.world;
+    const crop = featureDef(growZoneCrop(w.zone[i])).crop!;
+    const temp = this.temperatureAt(i);
+    if (temp < CROP_MIN_TEMP) {
+      return `Too cold to sow: ${Math.floor(temp)}°C, and seeds need ${CROP_MIN_TEMP}°C`;
+    }
+    // Frost-proof (poplars): it only waits out the winter, so any time will do. (Sowing stopped at midsummer, the
+    // field bare half the year.)
+    if (crop.hardy) {
+      return null;
+    }
+    const speed = this.isResearched('cropRotation') ? 1.25 : 1;
+    const pace = terrainDef(w.terrain[i]).fertility * speed;
+    const days = (h: number) => (h < 24 ? 'under a day' : `about ${Math.round(h / 24)} day${h < 36 ? '' : 's'}`);
+    // A sun lamp indoors beats the calendar, and so does a glass greenhouse (a field walled in as a room, open to
+    // the sky: see growCrops), if it's kept from frost: a heater in it, or no frost coming. (An unheated
+    // greenhouse in winter followed the weather down, and was sown and frozen every day.)
+    if ((lit[i] || (this.isResearched('glassmaking') && w.roof[i] === NONE)) && this.isIndoors(i)) {
+      // (Indoors it grows by night too, under lamps, so frost before its nominal days is the test.)
+      const frostFree = this.frostFreeHours();
+      return this.heatedRoom(i) || (crop.growDays / pace) * 24 <= frostFree
+        ? null
+        : `Frost would reach it before it ripens (in ${days(frostFree)}): a heater in the room keeps it growing`;
+    }
+    // Early spring frosts kill seedlings.
+    if (this.season === 'Spring' && seasonDay(this.totalHours) <= 2) {
+      return 'Too early: the first days of spring still freeze at night';
+    }
+    // Only what the forecast says will ripen before a hard frost (a cold snap's nights, or an autumn's: sown on a
+    // mild afternoon, more than half the crops sown in a cold snap froze) or before winter.
+    const walk = this.ripenOutdoors(crop.growDays, pace);
+    if (walk.end === 'winter') {
+      return `Too late to ripen before winter (${days(daysUntilWinter(this.totalHours) * 24)} off)`;
+    }
+    if (walk.end === 'frost') {
+      return coldSnapOn(this)
+        ? 'A cold snap: sowing waits until its frosts have passed'
+        : `A frost is coming in ${days(walk.hours)}, before it could ripen`;
+    }
+    return null;
+  }
+
+  // What's holding a growing crop back just now, in words, or null if it's growing.
+  public cropWaiting(i: number): string | null {
+    const w = this.world;
+    const crop = featureDef(w.feature[i]).crop;
+    if (!crop || w.growth[i] >= 1) {
+      return null;
+    }
+    const lamp = this.litTiles()[i];
+    const glass = this.isResearched('glassmaking') && w.roof[i] === NONE && this.isIndoors(i);
+    if (this.temperatureAt(i) < CROP_MIN_TEMP) {
+      return `Too cold to grow (below ${CROP_MIN_TEMP}°C)`;
+    }
+    if (lamp) {
+      return null;
+    }
+    if (this.season === 'Winter' && !glass) {
+      return crop.hardy ? 'Waiting out the winter' : 'Nothing grows outdoors in winter';
+    }
+    if (this.hour < NIGHT_END || this.hour >= 20) {
+      return 'Grows by day';
+    }
+    return null;
+  }
+
+  // Whether the room a tile is in has a heater going (fire, or electric).
+  private heatedRoom(i: number): boolean {
+    this.ensureRegions();
+    const room = this.rooms.room[i];
+    const c = room >= 0 ? this.contents()[room] : undefined;
+    return !!c && c.heat + (this.power.supply > 0 ? c.electricHeat : 0) > 0;
+  }
+
+  private trySow(c: Colonist): boolean {
     const region = this.regionOf(c.tile);
     const lit = this.litTiles();
-    const untilWinter = daysUntilWinter(this.totalHours);
-    const speed = this.isResearched('cropRotation') ? 1.25 : 1;
-    // Only sow where the crop can ripen: under a sun lamp, or outdoors with enough season left.
-    const earlySpring = this.season === 'Spring' && seasonDay(this.totalHours) <= 2;
-    const glass = this.isResearched('glassmaking');
-    const canRipen = (i: number) => {
-      if (this.temperatureAt(i) < CROP_MIN_TEMP) {
-        return false;
-      }
-      // A sun lamp indoors beats the calendar, and so does a glass greenhouse (a field walled in as a room,
-      // open to the sky: see growCrops); outdoors the night frost still kills.
-      if ((lit[i] || (glass && w.roof[i] === NONE)) && this.isIndoors(i)) {
-        return true;
-      }
-      // Early spring frosts kill seedlings; and leave a day's margin before winter.
-      if (earlySpring) {
-        return false;
-      }
-      const crop = featureDef(growZoneCrop(w.zone[i])).crop!;
-      return untilWinter > crop.growDays / (terrainDef(w.terrain[i]).fertility * speed) + 1;
-    };
+    // Only sow where the crop can ripen (see whyNotSow).
+    const canRipen = (i: number) => this.whyNotSow(i, lit) === null;
     const targets = this.nearestIn(
       'zones',
       c.tile,
@@ -5787,7 +5945,8 @@ export class Simulation {
             ? 0.9
             : COMPANY_ALONE;
       const score =
-        (this.joyEfficiency(c, joy.kind) * company) / joy.hoursToFull - w.distance(c.tile, spot) * JOY_DISTANCE_COST;
+        (this.joyEfficiency(c, joy.kind) * this.freshness(c, joy.kind) * company) / joy.hoursToFull -
+        w.distance(c.tile, spot) * JOY_DISTANCE_COST;
       if (score <= bestScore) {
         continue;
       }
@@ -5797,7 +5956,7 @@ export class Simulation {
         bestScore = score;
       }
     }
-    const walkScore = this.joyEfficiency(c, 'outdoor') / WALK_HOURS_TO_FULL;
+    const walkScore = (this.joyEfficiency(c, 'outdoor') * this.freshness(c, 'outdoor')) / WALK_HOURS_TO_FULL;
     if (best && bestScore >= walkScore) {
       this.reserve(c, `j${best.spot}.${best.seat}`);
       this.assign(c, this.makeJob('joy', best.spot, { wait: TICKS_PER_HOUR * 2 }), best.path);
@@ -5882,8 +6041,10 @@ export class Simulation {
   private joyBuiltVersion = -1;
   private joyBuilt = false;
 
-  // Whether anyone else in reach is off duty and could do with some recreation.
-  private someoneFreeToPlay(c: Colonist, region: number): boolean {
+  // Whether anyone else in reach is off duty and could do with some recreation. For a concert, anyone in an
+  // "anything" hour who could do with some fun downs tools for it (only the nearly bored did, one at a time: four
+  // colonies gave no concert in 240 days).
+  private someoneFreeToPlay(c: Colonist, region: number, concert = false): boolean {
     return this.living().some(
       (o) =>
         o !== c &&
@@ -5891,8 +6052,9 @@ export class Simulation {
         !o.sleeping &&
         !o.health.downed &&
         o.needs.joy < 0.9 &&
-        (this.slotOf(o) === 'J' || (this.slotOf(o) === 'A' && o.needs.joy < 0.3)) &&
-        (!o.job || o.job.type === 'joy' || o.job.type === 'wander') &&
+        (this.slotOf(o) === 'J' || (this.slotOf(o) === 'A' && o.needs.joy < (concert ? CONCERT_DRAWS : 0.3))) &&
+        (concert || !o.job || o.job.type === 'joy' || o.job.type === 'wander') &&
+        !this.inMentalBreak(o) &&
         this.regions.region[o.tile] === region,
     );
   }
@@ -5907,6 +6069,17 @@ export class Simulation {
   public joyEfficiency(c: Colonist, kind: JoyKind): number {
     const had = c.recentJoy[kind] ?? 0;
     return Math.max(MIN_JOY_EFFICIENCY, Math.min(1, (1 + TOLERANCE * FREE_JOY) / (1 + TOLERANCE * had)));
+  }
+
+  // How much a colonist fancies a kind of recreation, by how much of their fun lately it was: what's been nearly all
+  // of it, less (choosing by quickness alone, the horseshoe pin took 900 of 1,600 hours, and "Same old thing", which
+  // the choice never weighed, was felt half the time).
+  private freshness(c: Colonist, kind: JoyKind): number {
+    const total = Object.values(c.recentJoy).reduce((a, b) => a + b, 0);
+    if (total < FRESH_FROM) {
+      return 1;
+    }
+    return 1 - FRESHNESS_WEIGHT * ((c.recentJoy[kind] ?? 0) / total);
   }
 
   // Fills the recreation need and notes what kind of recreation it was.
@@ -5985,6 +6158,11 @@ export class Simulation {
 
   // ---- Music ----
 
+  private isHarp(i: number): boolean {
+    const f = this.world.feature[i];
+    return f !== NONE && featureDef(f).key === 'harp';
+  }
+
   // A colonist at an instrument: practice, music for anyone in earshot, and in the evening, with
   // others free to listen, a skilled player may strike up a concert.
   private playMusic(c: Colonist, job: Job, spot: number): void {
@@ -5992,7 +6170,7 @@ export class Simulation {
     if (this.tick % SLOW_TICKS === 0) {
       const fine = c.skills.artistic >= FINE_MUSIC_SKILL;
       // The harp, the finest instrument a colony can make, carries a quarter more.
-      const finest = featureDef(this.world.feature[spot]).key === 'harp' ? HARP_GAIN : 1;
+      const finest = this.isHarp(spot) ? HARP_GAIN : 1;
       for (const o of this.living()) {
         if (o === c || o.sleeping || o.health.downed || !this.inEarshot(spot, o.tile)) {
           continue;
@@ -6004,6 +6182,8 @@ export class Simulation {
     const hour = Math.floor(this.hour);
     if (
       !this.concert &&
+      // (Not with raiders about: gatherings and stories wait for peace too.)
+      !this.raid &&
       // (Not while an elder is telling stories: the audience is round the fire.)
       !this.storyCircle &&
       // Not if a gathering is on, or due before the concert would end.
@@ -6011,7 +6191,7 @@ export class Simulation {
       c.skills.artistic >= CONCERT_SKILL &&
       hour >= CONCERT_FROM &&
       hour < CONCERT_UNTIL &&
-      this.someoneFreeToPlay(c, this.regionOf(c.tile)) &&
+      this.someoneFreeToPlay(c, this.regionOf(c.tile), true) &&
       this.rng.chance(1 / TICKS_PER_HOUR)
     ) {
       this.concert = { player: c.id, tile: spot, endsAt: this.tick + CONCERT_TICKS };
@@ -6030,7 +6210,11 @@ export class Simulation {
           !o.drafted &&
           !o.sleeping &&
           !o.health.downed &&
-          (job === 'joy' || job === 'wander' || !job) &&
+          (job === 'joy' ||
+            job === 'wander' ||
+            !job ||
+            // At ordinary work in an "anything" hour, with some fun owed them: they down tools for it.
+            (this.slotOf(o) === 'A' && o.needs.joy < CONCERT_DRAWS && CONCERT_LEAVES.has(job))) &&
           !o.job?.listening &&
           !o.job?.gathering &&
           !o.job?.telling &&
@@ -6219,6 +6403,10 @@ export class Simulation {
     const p = this.colonists[concert.player];
     if (!p || p.health.dead || p.job?.type !== 'joy' || p.job.target !== concert.tile || p.job.listening) {
       this.concert = null;
+    } else if (this.raid) {
+      // Raiders coming: the music stops, and everyone sees to the colony.
+      this.concert = null;
+      this.endJob(p);
     }
   }
 
@@ -6277,7 +6465,8 @@ export class Simulation {
     this.enjoy(
       c,
       'music',
-      (musicQuality(player) * this.joyEfficiency(c, 'music')) / (TICKS_PER_HOUR * CONCERT_HOURS_TO_FULL),
+      (musicQuality(player) * this.joyEfficiency(c, 'music') * (this.isHarp(concert.tile) ? HARP_GAIN : 1)) /
+        (TICKS_PER_HOUR * CONCERT_HOURS_TO_FULL),
     );
     if (this.rng.chance(1 / TICKS_PER_HOUR)) {
       const others = this.living().filter((o) => o !== c && o.job?.listening && o.job.target === concert.tile);

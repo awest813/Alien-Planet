@@ -325,7 +325,7 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
   power: { how: 'Research Electricity, then build a wood generator.', screen: 'research' },
   coldStore: { how: 'Research Refrigeration and build an icebox, or a freezer in a sealed room.', screen: 'research' },
   recVariety: {
-    how: 'Colonists tire of doing the same thing for fun. Build different kinds: an armchair, horseshoes, a chess or card table.',
+    how: 'Colonists tire of doing the same thing for fun. Build different kinds: an armchair (relaxing), horseshoes or chess (games), a card table (social), an instrument (music).',
     tool: 'chessTable',
   },
   chess: {
@@ -523,7 +523,7 @@ export const TOOLS: ToolDef[] = [
     hotkey: 'p',
     tool: { kind: 'zone', zone: GROW_ZONE + featureId('potatoPlant') },
     group: 'zones',
-    hint: 'Drag over soil or grass to plant potatoes (food)',
+    hint: 'Drag over soil, grass or sand (slower) to plant potatoes (food)',
   },
   {
     id: 'growGrain',
@@ -531,7 +531,7 @@ export const TOOLS: ToolDef[] = [
     hotkey: '',
     tool: { kind: 'zone', zone: GROW_ZONE + featureId('grainPlant') },
     group: 'zones',
-    hint: 'Drag over soil or grass to plant grain: milled into flour and baked into bread that keeps (Milling)',
+    hint: 'Drag over soil, grass or sand (slower) to plant grain: milled into flour and baked into bread that keeps (Milling)',
   },
   {
     id: 'growCotton',
@@ -539,7 +539,7 @@ export const TOOLS: ToolDef[] = [
     hotkey: 't',
     tool: { kind: 'zone', zone: GROW_ZONE + featureId('cottonPlant') },
     group: 'zones',
-    hint: 'Drag over soil or grass to plant cotton (for cloth)',
+    hint: 'Drag over soil, grass or sand (slower) to plant cotton (for cloth)',
   },
   {
     id: 'growPoplars',
@@ -547,7 +547,7 @@ export const TOOLS: ToolDef[] = [
     hotkey: '',
     tool: { kind: 'zone', zone: GROW_ZONE + featureId('poplarPlant') },
     group: 'zones',
-    hint: 'Drag over soil or grass to plant poplars: fast-growing trees cut for wood, frost or no frost',
+    hint: 'Drag over soil, grass or sand (slower) to plant poplars: fast-growing trees cut for wood, frost or no frost',
   },
   {
     id: 'growHealroot',
@@ -555,7 +555,7 @@ export const TOOLS: ToolDef[] = [
     hotkey: 'y',
     tool: { kind: 'zone', zone: GROW_ZONE + featureId('healrootPlant') },
     group: 'zones',
-    hint: 'Drag over soil or grass to grow healroot (herbal medicine)',
+    hint: 'Drag over soil, grass or sand (slower) to grow healroot (herbal medicine)',
   },
   {
     id: 'unzone',
@@ -613,7 +613,13 @@ export const TOOLS: ToolDef[] = [
   ),
   build('table', 'Table', 'l', 'furniture', 'Colonists dislike eating without a table'),
   build('armchair', 'Armchair', '', 'furniture', 'Comfortable recreation (relaxing) and decor'),
-  build('horseshoePin', 'Horseshoe pin', 'i', 'recreation', 'Recreation spot (games)'),
+  build(
+    'horseshoePin',
+    'Horseshoe pin',
+    'i',
+    'recreation',
+    'Pitching horseshoes (games): quick fun, though it gets old',
+  ),
   build(
     'parkBench',
     'Park bench',
@@ -637,15 +643,33 @@ export const TOOLS: ToolDef[] = [
     'Morning lessons: the most skilled grown-up (a retired elder first) teaches the children here',
   ),
   build('telescope', 'Telescope', '', 'recreation', 'Stargazing on clear nights; it must stand under the open sky'),
-  build('drum', 'Drum', '', 'recreation', 'Music: players train Artistic and anyone within earshot enjoys it'),
-  build('flute', 'Flute stand', '', 'recreation', 'Music: players train Artistic and anyone within earshot enjoys it'),
-  build('lute', 'Lute stand', '', 'recreation', 'Music: a skilled player may give an evening concert'),
+  build(
+    'drum',
+    'Drum',
+    '',
+    'recreation',
+    'Music: players train Artistic, anyone in earshot enjoys it, and a skilled player (Artistic 6) may give an evening concert',
+  ),
+  build(
+    'flute',
+    'Flute stand',
+    '',
+    'recreation',
+    'Music: players train Artistic, anyone in earshot enjoys it, and a skilled player (Artistic 6) may give an evening concert',
+  ),
+  build(
+    'lute',
+    'Lute stand',
+    '',
+    'recreation',
+    'Music: players train Artistic, anyone in earshot enjoys it, and a skilled player (Artistic 6) may give an evening concert',
+  ),
   build(
     'harp',
     'Harp',
     '',
     'recreation',
-    'The finest instrument: listeners enjoy it a quarter more, and a skilled harpist can hold the whole colony',
+    'The finest instrument: listeners enjoy it a quarter more, at a concert too, and a skilled harpist can hold the whole colony',
   ),
   build(
     'sculptureSmall',
@@ -725,7 +749,7 @@ export const TOOLS: ToolDef[] = [
     'furniture',
     'Research at a bench with a bookshelf within two tiles goes 15% faster (one is enough)',
   ),
-  build('sunLamp', 'Sun lamp', '', 'farm', 'Crops nearby grow day and night, all year (300 W)'),
+  build('sunLamp', 'Sun lamp', '', 'farm', 'Crops nearby grow day and night (300 W); in a heated room, all year'),
   build('woodGenerator', 'Wood generator', '', 'power', '1000 W while fuelled; haulers refuel it with wood'),
   build('solarPanel', 'Solar panel', '', 'power', 'Up to 1200 W in daylight, less in winter'),
   build(
@@ -4049,6 +4073,13 @@ export class GameController {
     const zone = w.zone[i];
     if (zone >= GROW_ZONE) {
       orders.push(`Growing zone: ${featureDef(zone - GROW_ZONE).name.toLowerCase()}`);
+      // Bare ground in a field: why it isn't sown (too late in the year, frost coming, too cold), if anything.
+      if (w.feature[i] === NONE) {
+        const why = sim.whyNotSow(i);
+        if (why) {
+          orders.push(`Not sown: ${why[0].toLowerCase()}${why.slice(1)}`);
+        }
+      }
     } else if (zone !== 0) {
       const refused = STORAGE_GROUPS.filter((_, k) => refusedGroups(zone) & (1 << k));
       orders.push(
@@ -4229,11 +4260,51 @@ export class GameController {
           : 'The water is frozen: fishing goes on through the ice, at half the pace',
       );
     }
+    // Recreation: what kind, how quickly it lifts spirits, seats, and who's at it now (a concert, and its audience).
+    if (def?.joy) {
+      const joy = def.joy;
+      const seats = joy.seats ?? 1;
+      details.push(
+        `${joy.kind[0].toUpperCase()}${joy.kind.slice(1)} recreation: fills the need in ${joy.hoursToFull} hours${seats > 1 ? `, ${seats} at a time` : ''}${joy.company ? ' (better in company)' : ''}`,
+      );
+      const users = sim.living().filter((o) => o.job?.type === 'joy' && o.job.target === i && !o.job.listening);
+      const concert = sim.concert?.tile === i ? sim.concert : null;
+      if (concert) {
+        const audience = sim.living().filter((o) => o.job?.listening && o.job.target === i).length;
+        details.push(
+          `${sim.colonists[concert.player].name} is giving a concert${audience > 0 ? `, ${audience} listening` : ''}`,
+        );
+      } else if (users.length > 0) {
+        details.push(`In use: ${users.map((o) => o.name).join(', ')}`);
+      }
+    }
     if (def?.growLight) {
       details.push(`Grow light, ${def.growLight * 2 + 1}×${def.growLight * 2 + 1} tiles`);
     }
     if (def?.crop) {
-      details.push(w.growth[i] >= 1 ? 'Ready to harvest' : `${Math.floor(w.growth[i] * 100)}% grown`);
+      if (w.growth[i] >= 1) {
+        details.push('Ready to harvest');
+      } else {
+        // Growing days (fourteen hours of light) to go, about, at this ground's pace: the card said only how far
+        // along it was, never when it would be ready, or why it had stopped.
+        const speed = sim.isResearched('cropRotation') ? 1.25 : 1;
+        const pace = terrainDef(w.terrain[i]).fertility * speed;
+        const waiting = sim.cropWaiting(i);
+        // Outdoors, by the forecast (by day, when it's warm enough; frost and winter first, if they come first);
+        // under lamps or glass, or frost-proof, by its growing days.
+        const sheltered =
+          !!sim.litTiles()[i] || (sim.isResearched('glassmaking') && w.roof[i] === NONE && sim.isIndoors(i));
+        const walk = sheltered || def.crop.hardy ? null : sim.ripenOutdoors(def.crop.growDays, pace, w.growth[i]);
+        const days = (h: number) => (h < 24 ? 'under a day' : `about ${Math.round(h / 24)} day${h < 36 ? '' : 's'}`);
+        const when = !walk
+          ? `ripe in ${days(((1 - w.growth[i]) * def.crop.growDays * 24) / pace)} of growing`
+          : walk.end === 'ripe'
+            ? `ripe in ${days(walk.hours)}`
+            : walk.end === 'frost'
+              ? `a frost may take it first, in ${days(walk.hours)}: harvest it, or heat it`
+              : "won't ripen before winter";
+        details.push(`${Math.floor(w.growth[i] * 100)}% grown, ${when}${waiting ? ` · ${waiting}` : ''}`);
+      }
     }
     // What a tree, bush, rock or vein gives, and the order that gets it (unless it's already marked).
     if (def?.natural && def.harvest && !def.shaft && w.designation[i] === Designation.NONE) {

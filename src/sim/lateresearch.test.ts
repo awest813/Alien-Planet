@@ -131,8 +131,8 @@ describe('late research', () => {
     expect(grown(true)).toBeGreaterThan(0);
   });
 
-  it('and a greenhouse can be sown in winter too', () => {
-    const sows = (glass: boolean) => {
+  it('and a heated greenhouse can be sown in winter too, an unheated one not (frost would kill it)', () => {
+    const sows = (glass: boolean, heated = true) => {
       const sim = Simulation.newColony(5);
       const w = sim.world;
       const { x, y } = clearAround(sim, 10);
@@ -147,6 +147,12 @@ describe('late research', () => {
           w.zone[w.idx(x + dx, y + dy)] = GROW_ZONE + featureId('potatoPlant');
         }
       }
+      if (heated) {
+        const fire = w.idx(x + 4, y + 4);
+        w.setFeature(fire, featureId('campfire'));
+        w.fuel[fire] = 100;
+        sim.fuelVersion++;
+      }
       const c = sim.colonists[0];
       c.tile = w.idx(x + 3, y + 3);
       sim.tick = (18 * 24 + 12) * HOUR;
@@ -156,6 +162,8 @@ describe('late research', () => {
     };
     expect(sows(false)).toBe(false);
     expect(sows(true)).toBe(true);
+    // (Warm at noon, but with no heater it follows the winter nights down: sown and frozen, day after day.)
+    expect(sows(true, false)).toBe(false);
   });
 
   it('further study goes on round after round, each dearer, each speeding work a little', () => {

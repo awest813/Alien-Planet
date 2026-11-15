@@ -143,6 +143,8 @@ describe('stargazing', () => {
     sim.tick = (24 + 22 - START_HOUR) * HOUR;
     sim.syncClock();
     c.needs.joy = 0.1;
+    // (Fresh for it: the afternoon's walk was outdoor fun too, and they'd fancy something else.)
+    c.recentJoy = {};
     let gazed = false;
     for (let t = 0; t < HOUR * 3 && !gazed; t++) {
       sim.step();
@@ -174,5 +176,59 @@ describe('nature walks', () => {
       return c.recentJoy.outdoor ?? 0;
     };
     expect(gain(true)).toBeGreaterThan(gain(false));
+  });
+});
+
+describe('choosing for variety, and concerts', () => {
+  it('a kind that has been nearly all of their fun lately is chosen less, before it is worth less', () => {
+    // (The horseshoe pin, the quickest fun there is, was nine hours in sixteen, and "same old thing" half the time.)
+    const { sim, w, x, y } = park(4);
+    const c = sim.colonists[0];
+    for (const o of sim.colonists.slice(1)) {
+      o.schedule.fill('W');
+      o.needs.joy = 1;
+    }
+    const pin = w.idx(x + 3, y);
+    const lute = w.idx(x - 3, y);
+    w.setFeature(pin, featureId('horseshoePin'));
+    w.setFeature(lute, featureId('lute'));
+    // Fresh: the pin, quicker.
+    (sim as unknown as { tryJoy(c: unknown): boolean }).tryJoy(c);
+    expect(c.job?.target).toBe(pin);
+    sim.endJob(c);
+    // Within the free allowance (worth as much as ever), but all of it games: the lute.
+    c.recentJoy = { gaming: 0.45 };
+    expect(sim.joyEfficiency(c, 'gaming')).toBe(1);
+    (sim as unknown as { tryJoy(c: unknown): boolean }).tryJoy(c);
+    expect(c.job?.target).toBe(lute);
+  });
+
+  it('no concert starts with raiders about, and one under way stops for them', async () => {
+    const { spawnRaid } = await import('./combat');
+    const { FACTIONS } = await import('./defs');
+    const { sim, w, x, y } = park(6);
+    const harp = w.idx(x + 3, y);
+    w.setFeature(harp, featureId('harp'));
+    const [player] = sim.colonists;
+    player.skills.artistic = 12;
+    sim.tick = (24 + 19 - START_HOUR) * HOUR;
+    sim.syncClock();
+    // A concert under way.
+    sim.concert = { player: player.id, tile: harp, endsAt: sim.tick + 2 * HOUR };
+    player.job = { ...(sim as unknown as { makeJob(t: string, i: number): object }).makeJob('joy', harp) } as never;
+    expect(
+      spawnRaid(
+        sim,
+        FACTIONS.findIndex((f) => f.hostile),
+        3,
+      ),
+    ).toBe(true);
+    (sim as unknown as { checkConcert(): void }).checkConcert();
+    expect(sim.concert).toBeNull();
+    // And none starts while it lasts, however long they play.
+    for (let t = 0; t < HOUR * 2 && sim.raid; t++) {
+      sim.step();
+      expect(sim.concert).toBeNull();
+    }
   });
 });
