@@ -368,6 +368,30 @@ test.describe('on a Chromebook', () => {
     const pinched = (await camera(page)).zoom;
     await page.keyboard.press('Equal');
     await expect.poll(async () => (await camera(page)).zoom).toBeGreaterThan(pinched);
+    // Turned off and on again as the game runs, the map keeps drawing (turned off, the frame limit had frozen it).
+    type Loop = { colonyGame: { loop: { fpsLimit: number }; events: { on(e: string, f: () => void): void } } };
+    await page.evaluate(() => {
+      const w = window as unknown as Loop & { drawn: number };
+      w.drawn = 0;
+      w.colonyGame.events.on('step', () => w.drawn++);
+    });
+    const drawing = async () => {
+      const before = await page.evaluate(() => (window as unknown as { drawn: number }).drawn);
+      await expect
+        .poll(() => page.evaluate(() => (window as unknown as { drawn: number }).drawn))
+        .toBeGreaterThan(before + 5);
+    };
+    for (const chromebook of [2, 1, 2]) {
+      await page.evaluate(
+        (value) =>
+          (window as unknown as { colony: { setSettings(s: object): void } }).colony.setSettings({ chromebook: value }),
+        chromebook,
+      );
+      expect(await page.evaluate(() => (window as unknown as Loop).colonyGame.loop.fpsLimit)).toBe(
+        chromebook === 1 ? 30 : 0,
+      );
+      await drawing();
+    }
     expect(errors).toEqual([]);
   });
 

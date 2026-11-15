@@ -75,13 +75,29 @@ watchDensity();
 
 // Chromebook mode holds the map to 30 frames a second (Phaser's frame limit, set as it runs; the game's clock
 // keeps its own time, so nothing slows but the drawing).
+// (Phaser chooses its frame function, limited or not, when its loop starts: changing the limit alone didn't
+// switch it. Turned off, the limited one went on with no limit, divided by it, and the map froze. So a running loop
+// is stopped and started again, which chooses afresh, with the time it had built up cleared.)
 const capFrames = () => {
   const limit = controller.chromebook ? CHROMEBOOK_FPS : 0;
-  const loop = game.loop as unknown as { fpsLimit: number; hasFpsLimit: boolean; _limitRate: number };
+  const loop = game.loop as unknown as {
+    fpsLimit: number;
+    hasFpsLimit: boolean;
+    _limitRate: number;
+    delta: number;
+    running: boolean;
+    sleep(): void;
+    wake(): void;
+  };
   if (loop.fpsLimit !== limit) {
     loop.fpsLimit = limit;
     loop.hasFpsLimit = limit > 0;
     loop._limitRate = limit > 0 ? 1000 / limit : 0;
+    loop.delta = 0;
+    if (loop.running) {
+      loop.sleep();
+      loop.wake();
+    }
   }
 };
 capFrames();

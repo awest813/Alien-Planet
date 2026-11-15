@@ -64,6 +64,9 @@ describe('zooming with the wheel', () => {
 
   it('a pinch zooms more for its size, and no one event jumps far', () => {
     expect(wheelZoom(-10, 0, true)).toBeGreaterThan(wheelZoom(-10, 0, false));
+    // Ctrl and a mouse wheel's notch: the same step as without Ctrl, not a pinch's rate on 100 pixels.
+    expect(wheelZoom(-100, 0, true)).toBeCloseTo(1.15, 3);
+    expect(wheelZoom(-53, 0, true)).toBeCloseTo(1.15, 3);
     expect(wheelZoom(-5000, 0, false)).toBeLessThan(1.5);
     expect(wheelZoom(5000, 0, false)).toBeGreaterThan(1 / 1.5);
   });

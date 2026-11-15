@@ -45,12 +45,14 @@ const STEP = 1.15;
 const LINE = 33;
 export function wheelZoom(deltaY: number, deltaMode: number, pinch: boolean): number {
   const pixels = deltaMode === 1 ? deltaY * LINE : deltaMode === 2 ? deltaY * 800 : deltaY;
-  const rate = pinch ? 0.01 : Math.log(STEP) / NOTCH;
-  let power = -pixels * rate;
   // A scroll of 50 pixels or more at once is a mouse wheel's notch, whatever the browser counts it as (Chrome on
-  // Linux says 53, on Windows 100): at least the old step, so no mouse zooms at half speed. (A touchpad's steps
-  // are far smaller.)
-  if (!pinch && Math.abs(pixels) >= 50) {
+  // Linux says 53, on Windows 100), Ctrl held or not: a touchpad's steps, pinch or scroll, are far smaller. (Taken
+  // for a pinch, Ctrl and a mouse wheel zoomed half as far again each notch.)
+  const notch = Math.abs(pixels) >= 50;
+  const rate = pinch && !notch ? 0.01 : Math.log(STEP) / NOTCH;
+  let power = -pixels * rate;
+  // At least the old step for a notch, so no mouse zooms at half speed.
+  if (notch) {
     power = Math.sign(power) * Math.max(Math.abs(power), Math.log(STEP));
   }
   const factor = Math.exp(power);
