@@ -209,6 +209,7 @@ describe('fords', () => {
     }
     const asked = () => alerts().find((a) => /wading the fords/.test(a.text));
     expect(asked()?.tool).toBe('bridge');
+    expect(asked()?.tone).toBe('warn');
     // A bridge across a pond by the hut is no answer to it.
     const pond = w.idx(x + 2, y + 2);
     w.setTerrain(pond, terrainId('shallowWater'));

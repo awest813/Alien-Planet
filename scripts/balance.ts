@@ -265,6 +265,8 @@ interface Result {
   built: string;
   // Steps waded through fords.
   wades: number;
+  // Ford tiles bridged as the alert asked.
+  fordTiles: number;
   // The first day with an enclosed room with beds (-1: never).
   shelterDay: number;
   mess: number;
@@ -552,6 +554,8 @@ function play(seed: number): Result {
   let shaftPlaced = false;
   let fordBridged = false;
   let fordTriedDay = -1;
+  let fordChecked = -1;
+  let fordsBridged = 0;
   let booksPlaced = false;
   let parkBenchPlaced = false;
   let fountainPlaced = false;
@@ -846,6 +850,24 @@ function play(seed: number): Result {
           fordBridged = true;
           break;
         }
+      }
+    }
+    // And as the game's alert asks, bridge the fords colonists keep getting soaked at, when there's the wood: an
+    // island has several, and the one bridged on day 3 left the rest waded all year ("Got soaked wading" -0.8 over
+    // ten years). Looked at three times a day.
+    const checkHour = Math.floor(sim.hour);
+    if (
+      (mapKind === 'island' || mapKind === 'river') &&
+      !noBridge &&
+      sim.day >= 3 &&
+      (checkHour === 7 || checkHour === 13 || checkHour === 19) &&
+      fordChecked !== sim.day * 24 + checkHour
+    ) {
+      fordChecked = sim.day * 24 + checkHour;
+      const fords = sim.recentFords().filter((i) => sim.world.blueprint[i] === NONE);
+      if (fords.length > 0 && sim.stockOf(itemId('wood')) >= fords.length * 8 + 40) {
+        sim.apply({ type: 'build', feature: featureId('bridge'), tiles: fords });
+        fordsBridged += fords.length;
       }
     }
     // Fortifications known: sandbags round the hut (the ring was kept clear for them).
@@ -1572,6 +1594,7 @@ function play(seed: number): Result {
     rooms: roomsAtEnd(sim),
     built: newBuild ? builtAtEnd(sim) : '',
     wades: sim.stats.wades ?? 0,
+    fordTiles: fordsBridged,
     shelterDay,
     births: sim.stats.births ?? 0,
     smashed: sim.stats.smashed ?? 0,
@@ -1750,7 +1773,7 @@ for (const seed of seedList) {
   console.log(
     `seed ${String(r.seed).padStart(6)}  alive ${r.living}/${r.total}  raids ${r.raids} (kills ${r.raidKills})  ` +
       `fever ${r.diseaseCases} (deaths ${r.diseaseDeaths})  breaks ${r.breaks}  mood avg ${r.avgMood.toFixed(0)} min ${r.minMood.toFixed(0)}  ` +
-      `friends day ${r.friendDay}  rivals ${r.rivals} lovers ${r.lovers}  starving h ${r.starvingHours}  objectives ${r.objectives}/${OBJECTIVES.length}  research ${r.research} (tailoring day ${r.tailoringDay})  frost ${r.frost}  wades ${r.wades}  shelter day ${r.shelterDay}${r.built ? `\n      built: ${r.built}` : ''}`,
+      `friends day ${r.friendDay}  rivals ${r.rivals} lovers ${r.lovers}  starving h ${r.starvingHours}  objectives ${r.objectives}/${OBJECTIVES.length}  research ${r.research} (tailoring day ${r.tailoringDay})  frost ${r.frost}  wades ${r.wades} (fords bridged ${r.fordTiles})  shelter day ${r.shelterDay}${r.built ? `\n      built: ${r.built}` : ''}`,
   );
   for (const d of r.deaths) {
     console.log(`    ${d}`);

@@ -3157,7 +3157,8 @@ export class GameController {
       if (sim.recentFords().some((ford) => !bridgeBy(ford))) {
         alerts.push({
           text: 'Colonists keep wading the fords and getting soaked: a bridge (8 wood a tile) keeps them dry, and is quicker',
-          tone: 'calm',
+          // (A warning, not news: on an island every unbridged ford a colony used doubled its mental breaks.)
+          tone: 'warn',
           tool: 'bridge',
         });
       }

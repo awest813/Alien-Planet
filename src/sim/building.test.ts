@@ -274,3 +274,38 @@ describe('a door into a finished wall', () => {
     expect(sim.regionOf(inside.tile)).toBe(sim.regionOf(w.idx(x - 2, y)));
   });
 });
+
+describe('something in the way of a building', () => {
+  it('is cleared by the builders, though nobody mines or cuts plants', () => {
+    // (A wall on a clay bank waited for a miner who never came, the fields always first: the hut never closed,
+    // and the colony froze in its first winter.)
+    const sim = Simulation.newColony(21);
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    const bank = w.idx(x + 3, y + 1);
+    const bush = w.idx(x + 4, y + 1);
+    w.setFeature(bank, featureId('clayBank'));
+    w.setFeature(bush, featureId('berryBush'));
+    w.addItem(w.idx(x, y + 2), itemId('wood'), 50);
+    for (const c of sim.colonists) {
+      c.priorities.mining = 0;
+      c.priorities.plantCutting = 0;
+      c.priorities.construction = 1;
+      c.needs.food = c.needs.rest = c.needs.joy = 1;
+    }
+    sim.apply({ type: 'build', feature: featureId('woodWall'), tiles: [bank, bush] });
+    for (
+      let h = 0;
+      h < 12 && (w.feature[bank] !== featureId('woodWall') || w.feature[bush] !== featureId('woodWall'));
+      h++
+    ) {
+      for (const c of sim.colonists) {
+        c.needs.food = c.needs.rest = c.needs.joy = 1;
+      }
+      run(sim, HOUR);
+    }
+    expect(w.feature[bank]).toBe(featureId('woodWall'));
+    expect(w.feature[bush]).toBe(featureId('woodWall'));
+  });
+});

@@ -3638,7 +3638,15 @@ export class Simulation {
           this.trySoothe(c)
         );
       case 'construction':
-        return this.tryConstruct(c) || this.tryDeliver(c) || this.tryDesignations(c, [Designation.DECONSTRUCT]);
+        // (And clearing a tree, bush or bank that stands where something is to be built: left to the miners and
+        // plant cutters, a wall on a clay bank waited for one who never came (the fields always came first), the
+        // hut was never closed, and a whole colony froze in its first winter with 1,300 wood in store.)
+        return (
+          this.tryConstruct(c) ||
+          this.tryDeliver(c) ||
+          this.tryDesignations(c, [Designation.DECONSTRUCT]) ||
+          this.tryDesignations(c, [Designation.MINE, Designation.CHOP, Designation.FORAGE], false, true)
+        );
       case 'growing':
         return this.tryHarvestCrop(c) || this.trySow(c);
       case 'mining':
@@ -4582,7 +4590,8 @@ export class Simulation {
   }
 
   // `shafts`: dig mine shafts (which never run out) rather than everything else.
-  private tryDesignations(c: Colonist, kinds: number[], shafts = false): boolean {
+  // `inTheWay`: only what stands where something is to be built.
+  private tryDesignations(c: Colonist, kinds: number[], shafts = false, inTheWay = false): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
     const targets = this.nearestIn(
@@ -4590,6 +4599,7 @@ export class Simulation {
       c.tile,
       (i) =>
         kinds.includes(w.designation[i]) &&
+        (!inTheWay || w.blueprint[i] !== NONE) &&
         this.isShaftDig(i) === shafts &&
         this.designationValid(i) &&
         !this.isReserved(`w${i}`, c) &&
