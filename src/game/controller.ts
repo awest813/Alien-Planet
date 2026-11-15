@@ -36,7 +36,7 @@ import { comfortRange, qualityLabel } from '../sim/apparel';
 import { MAX_SKILL, SKILL_LABELS, xpToNext } from '../sim/skills';
 import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
-import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
+import { SAVE_VERSION, SaveData, deserialize, serialize } from '../sim/serialize';
 import {
   BOOKS_BONUS,
   BOOKS_REACH,
@@ -125,7 +125,7 @@ import {
   stockpilePriority,
 } from '../sim/world';
 import { Difficulty, coldSnapOn, eclipseOn, heatWaveOn } from '../sim/storyteller';
-import { SaveMeta, deleteSave, listSaves, readSave, writeSave } from './save-store';
+import { SaveMeta, copySave, deleteSave, listSaves, readSave, saveProblem, writeSave } from './save-store';
 import { Settings, loadSettings, storeSettings } from './settings';
 import { chromebookMode, isChromeOS, scrollMoves } from './device';
 import { share } from './share';
@@ -839,9 +839,17 @@ const STEP_BUDGET_MS = 12;
 // How the clock's pace is judged (see measurePace).
 const PACE_WINDOW_MS = 3000;
 const PACE_SHORT = 0.85;
-export const SAVE_SLOTS = ['autosave', 'slot-1', 'slot-2', 'slot-3'];
+// The autosave, the one before it (a different colony's, kept when another took the slot), and the player's own.
+// A save the game can't run (missing parts, or one that fails once loaded).
+class DamagedSave extends Error {}
 
-export const slotLabel = (slot: string): string => (slot === 'autosave' ? 'Autosave' : `Slot ${slot.slice(5)}`);
+// Autosaving a colony that has moved on, this often (real time).
+const AUTOSAVE_EVERY_MS = 60_000;
+
+export const SAVE_SLOTS = ['autosave', 'autosave-2', 'slot-1', 'slot-2', 'slot-3'];
+
+export const slotLabel = (slot: string): string =>
+  slot === 'autosave' ? 'Autosave' : slot === 'autosave-2' ? 'Earlier autosave' : `Slot ${slot.slice(5)}`;
 
 export interface ColonistView {
   id: number;
@@ -1274,6 +1282,8 @@ export interface UiState {
   power: PowerView;
   overlay: Overlay;
   saves: SaveMeta[];
+  // Why the saves couldn't be read (no storage allowed, say), or null.
+  savesProblem: string | null;
   toast: string | null;
   // Everyone has died.
   fallen: boolean;
@@ -1383,8 +1393,31 @@ export class GameController {
         sound.setHidden(document.hidden);
         if (document.hidden) {
           this.autosave();
+        } else {
+          this.claimTab();
         }
       });
+      // A page being closed or reloaded mostly doesn't live to finish a save (it was started, and never written):
+      // so the colony is also autosaved every minute it has moved on, and when the window loses focus, and leaving
+      // with orders not yet saved asks first.
+      window.addEventListener('blur', () => {
+        if (this.unsaved) {
+          this.autosave();
+        }
+      });
+      window.addEventListener('focus', () => this.claimTab());
+      setInterval(() => {
+        if (this.unsaved && !document.hidden) {
+          this.autosave();
+        }
+      }, AUTOSAVE_EVERY_MS);
+      window.addEventListener('beforeunload', (event) => {
+        if (this.unsavedOrders || (this.unsaved && !this.settings.autosave)) {
+          event.preventDefault();
+          event.returnValue = '';
+        }
+      });
+      this.listenForTabs();
     }
   }
 
@@ -1539,9 +1572,36 @@ export class GameController {
     // colony carries on and is worth saving.
     // A colony whose clock was never started has nothing to keep, and mustn't replace the last
     // colony's autosave.
-    if (this.inPlay && this.settings.autosave && this.sim.headcount() > 0 && !this.notStarted) {
+    if (this.inPlay && this.settings.autosave && this.sim.headcount() > 0 && !this.notStarted && !this.otherTab) {
       this.save('autosave', true);
     }
+  }
+
+  // ---- Another tab of the game ----
+  // The tab last played in claims the autosave: one left open behind it saved its older day over the newer one's
+  // when it was hidden. (Saving to a slot by hand still works in either.)
+  private readonly tabId = Math.random().toString(36).slice(2);
+  private tabs: BroadcastChannel | null = null;
+  private otherTab = false;
+
+  private claimTab(): void {
+    this.otherTab = false;
+    this.tabs?.postMessage({ playing: this.tabId });
+  }
+
+  private listenForTabs(): void {
+    if (typeof BroadcastChannel === 'undefined') {
+      return;
+    }
+    this.tabs = new BroadcastChannel('colony-alpha-tabs');
+    this.tabs.onmessage = (event: MessageEvent<{ playing?: string }>) => {
+      if (event.data?.playing && event.data.playing !== this.tabId && !this.otherTab) {
+        this.otherTab = true;
+        if (this.inPlay) {
+          this.notify('The game is open in another tab: this one stops autosaving, so as not to undo it.');
+        }
+      }
+    };
   }
 
   // The most recent save made by this version of the game.
@@ -2308,7 +2368,16 @@ export class GameController {
   // Returns whether the save was written.
   public async save(slot: string, auto = false): Promise<boolean> {
     const sim = this.sim;
+    const mark = { version: this.simVersion, tick: sim.tick, commands: this.commandCount };
     try {
+      // Another colony's autosave isn't lost to this one's: it moves to the earlier slot. (Loading a slot from the
+      // title, then leaving, put the loaded colony over the only save of the one played before.)
+      if (slot === 'autosave') {
+        const last = this.saves.find((s) => s.slot === 'autosave');
+        if (last && last.seed !== sim.seed && last.version === SAVE_VERSION) {
+          await copySave('autosave', 'autosave-2');
+        }
+      }
       await writeSave(
         {
           slot,
@@ -2322,9 +2391,21 @@ export class GameController {
           difficulty: sim.story.difficulty,
           mapSize: sim.world.width,
           biome: sim.biome,
+          names: sim
+            .living()
+            .slice(0, 3)
+            .map((c) => c.name),
         },
         serialize(sim),
       );
+      if (mark.version === this.simVersion) {
+        this.lastSaved = { ...mark, at: Date.now() };
+      }
+      // Asked once: that the browser keep the saves rather than clear them to make room.
+      if (!this.askedToPersist) {
+        this.askedToPersist = true;
+        void navigator.storage?.persist?.().catch(() => undefined);
+      }
       await this.refreshSaves();
       if (!auto) {
         this.notify(`Saved to ${slotLabel(slot).toLowerCase()}.`);
@@ -2332,9 +2413,31 @@ export class GameController {
       return true;
     } catch (error) {
       console.error(error);
-      this.notify('Saving failed.');
+      // (Said why: "Saving failed." at every dawn told the player nothing they could do about it.)
+      this.notify(`${auto ? 'Autosave' : 'Saving'} failed: ${saveProblem(error)}.`);
       return false;
     }
+  }
+
+  // What was last saved (any slot): the colony, how far on, and the orders given by then.
+  private lastSaved = { version: -1, tick: -1, commands: -1, at: 0 };
+  private askedToPersist = false;
+
+  // Whether the colony in play has moved on, or had orders, since it was last saved.
+  public get unsaved(): boolean {
+    const l = this.lastSaved;
+    return (
+      this.inPlay &&
+      !this.notStarted &&
+      this.sim.headcount() > 0 &&
+      (l.version !== this.simVersion || l.tick !== this.sim.tick || l.commands !== this.commandCount)
+    );
+  }
+
+  // Orders given since the last save (what leaving the page now would lose, with time ticking on in between saves).
+  private get unsavedOrders(): boolean {
+    const l = this.lastSaved;
+    return this.unsaved && (l.version !== this.simVersion || l.commands !== this.commandCount);
   }
 
   // Returns whether the save loaded.
@@ -2351,11 +2454,12 @@ export class GameController {
         return false;
       }
       if (data.version !== SAVE_VERSION) {
-        this.notify('That save is from an older version and cannot be loaded.');
+        this.notify(
+          `That save is from ${data.version > SAVE_VERSION ? 'a newer' : 'an older'} version and cannot be loaded.`,
+        );
         return false;
       }
-      this.replaceSim(deserialize(data));
-      this.inPlay = true;
+      this.takeOver(data);
       // A loaded game waits for the player, as a new one does: it ran on at the old speed, a raid two hours off
       // and all, with the card that had paused it gone.
       if (this.heldSpeed !== null) {
@@ -2367,7 +2471,84 @@ export class GameController {
       return true;
     } catch (error) {
       console.error(error);
-      this.notify('That save could not be loaded.');
+      this.notify(
+        error instanceof DamagedSave
+          ? 'That save is damaged and could not be loaded. The colony you had is still here.'
+          : `That save could not be loaded: ${saveProblem(error)}.`,
+      );
+      return false;
+    }
+  }
+
+  // A save (from a slot or a file) in place of the colony in play, paused. Checked first, and if the game can't
+  // run it after all, the colony that was there stays: a damaged save swapped in, then failed, and left the screen
+  // frozen on the old colony with every update failing.
+  private takeOver(data: SaveData): void {
+    const missing = ['weather', 'animals', 'research', 'power', 'story', 'timers', 'layers', 'colonists'].filter(
+      (key) => !(data as unknown as Record<string, unknown>)[key],
+    );
+    if (
+      missing.length > 0 ||
+      !data.colonists.every((c: { needs?: unknown; health?: unknown }) => c?.needs && c.health)
+    ) {
+      throw new DamagedSave(`missing ${missing.join(', ') || "colonists' state"}`);
+    }
+    let next: Simulation;
+    try {
+      next = deserialize(data);
+    } catch (error) {
+      throw new DamagedSave(String(error));
+    }
+    const previous = { sim: this.sim, inPlay: this.inPlay };
+    try {
+      this.replaceSim(next);
+    } catch (error) {
+      this.sim = previous.sim;
+      this.inPlay = previous.inPlay;
+      this.simVersion++;
+      this.publish();
+      throw new DamagedSave(String(error));
+    }
+    this.inPlay = true;
+    this.lastSaved = { version: this.simVersion, tick: next.tick, commands: this.commandCount, at: Date.now() };
+    this.claimTab();
+  }
+
+  // ---- Colonies as files ----
+
+  // The colony in play as a file to keep (a backup the browser can't clear, or to move to another machine).
+  public exportColony(): { name: string; text: string } {
+    const sim = this.sim;
+    const text = JSON.stringify(serialize(sim), (_k, v: unknown) =>
+      ArrayBuffer.isView(v) ? Array.from(v as Uint8Array) : v,
+    );
+    return { name: `colony-alpha-${sim.seed}-day-${sim.day}.json`, text };
+  }
+
+  // A colony from a file, in place of the one in play. Returns whether it loaded.
+  public importColony(text: string): boolean {
+    try {
+      const data = JSON.parse(text) as SaveData;
+      if (!data || typeof data !== 'object' || typeof data.version !== 'number') {
+        throw new DamagedSave('not a save');
+      }
+      if (data.version !== SAVE_VERSION) {
+        this.notify(
+          `That file is from ${data.version > SAVE_VERSION ? 'a newer' : 'an older'} version and cannot be loaded.`,
+        );
+        return false;
+      }
+      this.takeOver(data);
+      if (this.heldSpeed !== null) {
+        this.heldSpeed = 0;
+      } else {
+        this.setSpeed(0);
+      }
+      this.notify("Loaded the colony from the file. Paused: carry on when you're ready.");
+      return true;
+    } catch (error) {
+      console.error(error);
+      this.notify("That file isn't a colony the game can load. The colony you had is still here.");
       return false;
     }
   }
@@ -2398,6 +2579,8 @@ export class GameController {
 
   private replaceSim(sim: Simulation): void {
     this.sim = sim;
+    // (This tab plays it: another left open stops autosaving over it.)
+    this.claimTab();
     this.simVersion++;
     this.idleSince.clear();
     // (A new colony sets it again; a loaded one is under way, whatever was showing before.)
@@ -2432,11 +2615,16 @@ export class GameController {
   private async refreshSaves(): Promise<void> {
     try {
       this.saves = await listSaves();
+      this.savesProblem = null;
       this.publish();
     } catch (error) {
       console.error(error);
+      // (Every slot showed "Empty", as if nothing had been saved.)
+      this.savesProblem = `The saves can't be read: ${saveProblem(error)}.`;
+      this.publish();
     }
   }
+  private savesProblem: string | null = null;
 
   // A message from the interface itself (why a button is off, on a touch screen).
   public hint(text: string): void {
@@ -2715,6 +2903,7 @@ export class GameController {
       },
       overlay: this.overlay,
       saves: this.saves,
+      savesProblem: this.savesProblem,
       toast: this.toast,
       fallen: this.fallen,
       ship: sim.departed

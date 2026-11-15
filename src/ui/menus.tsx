@@ -45,6 +45,8 @@ export interface MenuActions {
 
 const saveDetails = (meta: SaveMeta) =>
   [
+    // (Its people first: two colonies of a size, on a day, read alike.)
+    meta.names && meta.names.length > 0 ? meta.names.join(', ') : null,
     `Day ${meta.day}, ${String(meta.hour).padStart(2, '0')}:00`,
     meta.colonists !== undefined ? `${meta.colonists} colonist${meta.colonists === 1 ? '' : 's'}` : null,
     DIFFICULTIES.find((d) => d.key === meta.difficulty)?.label ?? null,
@@ -173,58 +175,111 @@ function SaveSlots({
   manage,
   onLoaded,
 }: {
-  state: Pick<UiState, 'saves'>;
+  state: Pick<UiState, 'saves' | 'savesProblem'>;
   manage: boolean;
   onLoaded: () => void;
 }) {
   const savesBySlot = new Map(state.saves.map((s) => [s.slot, s]));
+  const fileInput = useRef<HTMLInputElement>(null);
+  // A colony to a file (a backup the browser can't clear), and one back from a file.
+  const exportColony = () => {
+    const { name, text } = controller.exportColony();
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const importColony = async (file: File | undefined) => {
+    if (file && controller.importColony(await file.text())) {
+      onLoaded();
+    }
+  };
   const load = async (slot: string) => {
     if (await controller.load(slot)) {
       onLoaded();
     }
   };
   return (
-    <table className="saves">
-      <tbody>
-        {SAVE_SLOTS.map((slot) => {
-          const meta = savesBySlot.get(slot);
-          const outdated = !!meta && meta.version !== SAVE_VERSION;
-          return (
-            <tr key={slot}>
-              <td>{slotLabel(slot)}</td>
-              <td className="muted">
-                {meta ? saveDetails(meta) : 'Empty'}
-                {outdated && <span className="tag warn">older version</span>}
-              </td>
-              <td>
-                {manage &&
-                  slot !== 'autosave' &&
-                  (meta ? (
-                    <ConfirmButton label="Save" confirm="Overwrite?" onConfirm={() => controller.save(slot)} />
+    <>
+      {state.savesProblem && <p className="warn small">{state.savesProblem}</p>}
+      <table className="saves">
+        <tbody>
+          {SAVE_SLOTS.map((slot) => {
+            const meta = savesBySlot.get(slot);
+            const outdated = !!meta && meta.version !== SAVE_VERSION;
+            // (Nothing is ever saved by hand to the autosaves: an empty one isn't worth a row.)
+            if (!meta && slot === 'autosave-2') {
+              return null;
+            }
+            return (
+              <tr key={slot}>
+                <td>{slotLabel(slot)}</td>
+                <td className="muted">
+                  {meta ? saveDetails(meta) : 'Empty'}
+                  {outdated && (
+                    <span
+                      className="tag warn"
+                      title="Saves from another version of the game can't be loaded: delete it to tidy up"
+                    >
+                      {(meta.version ?? 0) > SAVE_VERSION ? 'newer version' : 'older version'}
+                    </span>
+                  )}
+                </td>
+                <td>
+                  {manage &&
+                    slot !== 'autosave' &&
+                    (meta ? (
+                      <ConfirmButton label="Save" confirm="Overwrite?" onConfirm={() => controller.save(slot)} />
+                    ) : (
+                      <button onClick={() => controller.save(slot)}>Save</button>
+                    ))}
+                  {manage ? (
+                    <ConfirmButton
+                      label="Load"
+                      confirm="Lose this colony?"
+                      disabled={!meta || outdated}
+                      onConfirm={() => load(slot)}
+                    />
                   ) : (
-                    <button onClick={() => controller.save(slot)}>Save</button>
-                  ))}
-                {manage ? (
-                  <ConfirmButton
-                    label="Load"
-                    confirm="Lose this colony?"
-                    disabled={!meta || outdated}
-                    onConfirm={() => load(slot)}
-                  />
-                ) : (
-                  <button disabled={!meta || outdated} onClick={() => load(slot)}>
-                    Load
-                  </button>
-                )}
-                {meta && manage && (
-                  <ConfirmButton label="Delete" confirm="Delete?" onConfirm={() => controller.deleteSave(slot)} />
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+                    <button disabled={!meta || outdated} onClick={() => load(slot)}>
+                      Load
+                    </button>
+                  )}
+                  {meta && (
+                    <ConfirmButton label="Delete" confirm="Delete?" onConfirm={() => controller.deleteSave(slot)} />
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="row">
+        {manage && (
+          <button
+            onClick={exportColony}
+            title="Download this colony as a file: a backup, or to carry to another device"
+          >
+            Export to a file
+          </button>
+        )}
+        <button onClick={() => fileInput.current?.click()} title="Load a colony from a file exported before">
+          Import from a file
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          onChange={(e) => {
+            void importColony(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
+      </div>
+    </>
   );
 }
 
@@ -265,7 +320,7 @@ function useMenuView<V extends string>(): [V | 'main', (view: V | 'main') => voi
 }
 
 // The first thing a player sees: carry on, start fresh, or load.
-const pickTitle = (s: UiState) => ({ ...fields('latestSave', 'saves')(s), sound: s.settings.sound });
+const pickTitle = (s: UiState) => ({ ...fields('latestSave', 'saves', 'savesProblem')(s), sound: s.settings.sound });
 
 export function TitleScreen({ actions }: { actions: MenuActions }) {
   const state = useUi(pickTitle);
@@ -351,7 +406,17 @@ export function TitleScreen({ actions }: { actions: MenuActions }) {
 }
 
 // Esc or the Menu button: the game is paused behind it.
-const pickPause = fields('biome', 'colonists', 'day', 'difficulty', 'mapSize', 'seed', 'settings', 'saves');
+const pickPause = fields(
+  'biome',
+  'colonists',
+  'day',
+  'difficulty',
+  'mapSize',
+  'seed',
+  'settings',
+  'saves',
+  'savesProblem',
+);
 
 export function PauseMenu({ onClose, actions }: { onClose: () => void; actions: MenuActions }) {
   const state = useUi(pickPause);
@@ -415,7 +480,7 @@ export function PauseMenu({ onClose, actions }: { onClose: () => void; actions: 
 }
 
 // Everyone has died: how it went, and where to go next.
-const pickFallen = fields('colonists', 'day', 'objectives', 'stats', 'saves');
+const pickFallen = fields('colonists', 'day', 'objectives', 'stats', 'saves', 'savesProblem');
 
 export function FallenScreen({ actions }: { actions: MenuActions }) {
   const state = useUi(pickFallen);

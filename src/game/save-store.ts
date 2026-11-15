@@ -21,6 +21,8 @@ export interface SaveMeta {
   // Tiles per side.
   mapSize?: number;
   biome?: string;
+  // A few of its people, so two colonies of a size and a day can be told apart.
+  names?: string[];
 }
 
 interface SaveRecord {
@@ -137,4 +139,48 @@ export async function deleteSave(slot: string): Promise<void> {
 
 export async function listSaves(): Promise<SaveMeta[]> {
   return run<SaveMeta[]>('readonly', (store) => store.getAll(), META);
+}
+
+// One slot's save copied to another (the last colony's autosave kept, when a different colony takes the slot).
+export async function copySave(from: string, to: string): Promise<boolean> {
+  const db = await openDb();
+  return new Promise<boolean>((resolve, reject) => {
+    const tx = db.transaction([STORE, META], 'readwrite');
+    let copied = false;
+    const get = tx.objectStore(STORE).get(from);
+    get.onsuccess = () => {
+      const record = get.result as SaveRecord | undefined;
+      if (record) {
+        const meta = { ...record.meta, slot: to };
+        tx.objectStore(STORE).put({ meta, data: record.data } satisfies SaveRecord, to);
+        tx.objectStore(META).put(meta, to);
+        copied = true;
+      }
+    };
+    tx.oncomplete = () => resolve(copied);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+// Why saving (or reading the saves) failed, in words a player can act on.
+export function saveProblem(error: unknown): string {
+  const name = error instanceof DOMException || error instanceof Error ? error.name : '';
+  const message = error instanceof Error ? error.message : String(error);
+  if (name === 'QuotaExceededError') {
+    return 'there is no room left in the browser’s storage (free some, or delete old saves)';
+  }
+  if (/another tab/.test(message)) {
+    return message.replace(/\.$/, '').replace(/^T/, 't');
+  }
+  if (
+    typeof indexedDB === 'undefined' ||
+    name === 'SecurityError' ||
+    name === 'InvalidStateError' ||
+    name === 'UnknownError' ||
+    /indexedDB/i.test(message)
+  ) {
+    return 'this browser isn’t letting the game store anything (private browsing, or site data blocked)';
+  }
+  return 'the browser’s storage refused it';
 }
