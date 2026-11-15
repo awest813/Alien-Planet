@@ -1,3 +1,4 @@
+import type { Taken } from './taken';
 import { addQuarry, maxHp } from './animals';
 import { maybeSendAllies } from './combat';
 import { TICKS_PER_HOUR, populationFor } from './constants';
@@ -68,6 +69,8 @@ export interface Diplomacy {
   call?: AllyCall | null;
   // Colonists off the map (see expeditions.ts).
   expeditions?: Expedition[];
+  // Colonists raiders carried off (see taken.ts).
+  taken?: Taken[];
   nextExpeditionId?: number;
 }
 

@@ -1,3 +1,4 @@
+import { buyBack, exchange } from './taken';
 import { TICKS_PER_HOUR } from './constants';
 import { FACTIONS, itemId, quantity } from './defs';
 import { askForFood, buySettler, changeGoodwill, fightersHired, friendly, proposeTruce } from './diplomacy';
@@ -312,6 +313,10 @@ export function worldAction(sim: Simulation, action: WorldAction): string | null
       return answerCall(sim, action.answer);
     case 'expedition':
       return sendExpedition(sim, action.to, action.purpose, action.colonists);
+    case 'buyBack':
+      return buyBack(sim, action.colonist);
+    case 'exchange':
+      return exchange(sim, action.colonist, action.captive);
   }
 }
 

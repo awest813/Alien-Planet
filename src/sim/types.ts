@@ -528,7 +528,10 @@ export type WorldAction =
   | { kind: 'dispute'; side: number | null }
   | { kind: 'envoy'; accept: boolean }
   | { kind: 'call'; answer: 'goods' | 'refuse' | number }
-  | { kind: 'expedition'; to: number; purpose: 'trade' | 'salvage'; colonists: number[] };
+  | { kind: 'expedition'; to: number; purpose: 'trade' | 'salvage'; colonists: number[] }
+  // A colonist raiders carried off: paid for, or exchanged for one of their own held here.
+  | { kind: 'buyBack'; colonist: number }
+  | { kind: 'exchange'; colonist: number; captive: number };
 
 export interface LogEntry {
   tick: number;
@@ -583,6 +586,12 @@ export interface Stats {
   truces?: number;
   settlers?: number;
   ransomed?: number;
+  // Colonists carried off by raiders (see taken.ts): taken, bought back, exchanged, got away, never seen again.
+  taken?: number;
+  boughtBack?: number;
+  exchanged?: number;
+  escaped?: number;
+  lostToRaiders?: number;
   disputes?: number;
   alliances?: number;
   callsAnswered?: number;

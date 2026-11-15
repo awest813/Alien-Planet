@@ -282,3 +282,44 @@ describe('the clock’s pace', () => {
     }
   });
 });
+
+describe('a colonist carried off', () => {
+  it('is an alert to the Factions screen, shown there with the price and any swap, and bought back from it', async () => {
+    const { carryOff } = await import('../sim/taken');
+    const { FACTIONS } = await import('../sim/defs');
+    const sim = colony('carried-off');
+    sim.story.difficulty = 'harsh';
+    const w = sim.world;
+    const home = sim.colonists[0].tile;
+    sim.apply({
+      type: 'zone',
+      rect: { x0: w.xOf(home) - 2, y0: w.yOf(home) + 3, x1: w.xOf(home) + 2, y1: w.yOf(home) + 5 },
+      zone: 1,
+    });
+    for (const c of sim.colonists) {
+      c.health.downed = true;
+      c.age = Math.max(c.age, 20);
+    }
+    const raiders = FACTIONS.find((f) => f.hostile)!;
+    const next = sim.rng.next;
+    sim.rng.next = () => 0;
+    const c = carryOff(sim, raiders.id)!;
+    sim.rng.next = next;
+    const alert = alerts().find((a) => a.text.startsWith(`${c.name} is held by ${raiders.name}`))!;
+    expect(alert.text).toMatch(/6 days to buy them back \(\d+ silver\)$/);
+    expect(alert.tone).toBe('danger');
+    expect(alert.screen).toBe('factions');
+    controller.publish();
+    const held = controller.getState().diplomacy.taken;
+    expect(held).toHaveLength(1);
+    expect(held[0]).toMatchObject({ id: c.id, name: c.name, faction: raiders.name, daysLeft: 6, swaps: [] });
+    expect(controller.getState().colonists.find((v) => v.id === c.id)!.activity).toBe(`Held by ${raiders.name}`);
+    // With the silver stored, the button's command brings them home.
+    w.addItem(w.idx(w.xOf(home), w.yOf(home) + 4), itemId('silver'), held[0].cost);
+    controller.command({ type: 'world', action: { kind: 'buyBack', colonist: c.id } });
+    controller.publish();
+    expect(controller.getState().diplomacy.taken).toEqual([]);
+    expect(c.away).toBeUndefined();
+    expect(alerts().some((a) => a.text.includes('is held by'))).toBe(false);
+  });
+});

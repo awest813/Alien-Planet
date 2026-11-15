@@ -108,6 +108,7 @@ import { Rng, hash2 } from './rng';
 import { Caravan, sellArt, updateCaravan } from './trade';
 import { updateAlliances, updateVisitors, worldAction } from './alliances';
 import { travel, updateExpeditions } from './expeditions';
+import { takenList, updateTaken } from './taken';
 import { WET_CHILL, WeatherState, douse, freshWeather, isWet, updateFires, updateWeather, weatherDef } from './weather';
 import {
   converse,
@@ -1298,6 +1299,7 @@ export class Simulation {
       updateDiplomacy(this);
       updateAlliances(this);
       updateExpeditions(this);
+      updateTaken(this);
       this.weatherFilth();
     }
 
@@ -2778,6 +2780,10 @@ export class Simulation {
     }
     if (h.poisoned > 0) {
       keys.push('foodPoisoning');
+    }
+    // One of theirs carried off by raiders, until they're home (or lost).
+    if (takenList(this).length > 0) {
+      keys.push('heldByRaiders');
     }
     if (isWet(this, c.tile)) {
       keys.push('rainedOn');

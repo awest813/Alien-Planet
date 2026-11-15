@@ -98,6 +98,7 @@ import {
   expeditions,
   supplyCost,
 } from '../sim/expeditions';
+import { buyBackCost, takenBy, takenList } from '../sim/taken';
 import { weatherDef } from '../sim/weather';
 import {
   Colonist,
@@ -1082,6 +1083,16 @@ export interface DiplomacyView {
   aid: { goodwill: number; cost: number; waitDays: number };
   // Parties away, and what a new one could do.
   expeditions: { where: string; who: string; daysLeft: number; leaving: boolean }[];
+  // Colonists raiders carried off: who, by whom, days left to get them back, the price, and the raiders' own people
+  // held here who could go back in exchange.
+  taken: {
+    id: number;
+    name: string;
+    faction: string;
+    daysLeft: number;
+    cost: number;
+    swaps: { id: number; name: string }[];
+  }[];
   destinations: { to: number; purpose: 'trade' | 'salvage'; label: string; days: number; open: boolean }[];
   // Colonists who could go (and why not, for the rest).
   travellers: { id: number; name: string; why: string | null }[];
@@ -3123,6 +3134,16 @@ export class GameController {
         });
       }
     }
+    // Someone carried off by raiders: the days left to get them back, and how.
+    for (const t of takenList(sim)) {
+      const days = Math.max(1, Math.ceil((t.until - sim.tick) / (TICKS_PER_HOUR * 24)));
+      const swap = sim.captives.some((p) => p.faction === t.faction && p.state === 'prisoner');
+      alerts.push({
+        text: `${sim.colonists[t.colonist].name} is held by ${FACTIONS[t.faction].name}: ${days} day${days === 1 ? '' : 's'} to buy them back (${buyBackCost(sim)} silver)${swap ? ' or exchange a prisoner' : ''}`,
+        tone: 'danger',
+        screen: 'factions',
+      });
+    }
     if (eclipseOn(sim) && sim.countBuilt((f) => !!featureDef(f).power?.solar) > 0) {
       alerts.push({ text: 'Eclipse: solar panels are dark until the sun comes back', tone: 'warn' });
     }
@@ -3825,6 +3846,16 @@ export class GameController {
         room: roomToJoin(sim),
       },
       aid: { goodwill: AID_GOODWILL, cost: AID_COST, waitDays: aidDays(sim) },
+      taken: takenList(sim).map((t) => ({
+        id: t.colonist,
+        name: sim.colonists[t.colonist].name,
+        faction: FACTIONS[t.faction].name,
+        daysLeft: Math.max(1, Math.ceil(hoursTo(t.until) / 24)),
+        cost: buyBackCost(sim),
+        swaps: sim.captives
+          .filter((p) => p.faction === t.faction && p.state === 'prisoner')
+          .map((p) => ({ id: p.id, name: p.name })),
+      })),
       expeditions: expeditions(sim).map((e) => ({
         where: destinationName(e.to),
         who: e.members.map((id) => sim.colonists[id].name).join(', '),
@@ -3864,6 +3895,10 @@ export class GameController {
 
   // What a colonist is doing, in a few words (or where they've gone).
   private activityOf(c: Colonist): string {
+    const held = takenBy(this.sim, c.id);
+    if (held) {
+      return `Held by ${FACTIONS[held.faction].name}`;
+    }
     const e = awayWith(this.sim, c);
     if (e) {
       return c.away === 'leaving' ? `Setting off for ${destinationName(e.to)}` : `Away at ${destinationName(e.to)}`;

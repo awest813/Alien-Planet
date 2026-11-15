@@ -631,6 +631,20 @@
     "mood": -5,
     "hours": 24
   },
+  "wasTaken": {
+    "label": "Carried off by raiders",
+    "mood": -8,
+    "hours": 72
+  },
+  "broughtHome": {
+    "label": "One of ours brought home from the raiders",
+    "mood": 4,
+    "hours": 24
+  },
+  "heldByRaiders": {
+    "label": "One of ours held by raiders",
+    "mood": -4
+  },
   "execution": {
     "label": "A prisoner was put to death",
     "mood": -8,

@@ -12,13 +12,6 @@ with esbuild for speed (see ROADMAP).
 
 ## Still open
 
-- **Goals reach 53–55 of 65 by year 10** in the test colony; the rest are niche or need a player's choices
-  (masterwork crafts, winter greenhouses, all research).
-- **A walled, armed colony still rarely loses anyone to raids.** From the second year, raids against wooden
-  walls bring firebrands who set them alight once each, though not in winter or wet weather (stone doesn't burn), on top of sappers, thieves and wreckers; but in
-  ten-year runs the test colony, which now buys truces, sees only 19–25 raids and loses nobody to them. Since this pass, about one raider in four (from day 12) is a ravager who lays waste to
-  fields and livestock outside the walls instead of fighting its way in: about 1.5 crops or animals lost a raid
-  in the test colony, so walls cost something, though still no lives.
 - **Separations are rare** (one in six ten-year runs). Mood is lower late (yearly average about 47–52, from
   52–56); breaks no longer come in bursts after a death (no new break within a day of the last: seed 7919 went
   from 9 breaks in ten years to 2, mean mood 48.8).
@@ -54,6 +47,20 @@ with esbuild for speed (see ROADMAP).
   - **Timings are checked by a machine.** `npm run perf` times the quiet colony and the raid against the
     budget, failing a quarter over (timings vary by a fifth from run to run); the weekly playtest runs it.
   - **The long press** is tested in WebKit and Firefox as well as Chromium (it was Chromium's alone).
+  - **Raiders carry off the fallen.** Raids came close but never killed: on Harsh, 45 of 48 colonies had half or
+    more of their people down at once, about 20 colonists downed a colony in 48 days, and only one or two bled out
+    in 144 colonies (raiders pass over anyone down; doctors patch them up). Ten-year Harsh colonies took 27-34
+    raids and lost nobody to them. Now raiders who overrun a colony (everyone down: about a raid in four on Harsh,
+    one in seven on Standard) may take one of the fallen adults with them: 35% of the time on Harsh, 15% on
+    Standard, never on Peaceful, never the last colonist. The Factions screen and an alert give six days to buy
+    them back (tribute's price) or exchange a prisoner of theirs; some slip away; the rest are never seen again,
+    and mourned. Over 96 colonies × 48 days, the harness paying or exchanging as a player would: on Harsh 83
+    taken, 52 bought back, 14 exchanged, 6 escaped, 9 lost (one colony in eleven), mood level (53.8 and 53.0
+    against 54.0 and 53.1); on Standard 14 taken and 1 lost, mood level. Harsh's description says so.
+  - **Goals:** the 10-15 goals ten-year test colonies miss are the harness's doing, not the game's: it builds no
+    smelter or kiln (so no iron, steel or last research), sandbags, icebox, memorial or tame animals, and doesn't
+    shelter everyone the first night; a third generation came by year 20 on a Medium map. Every goal says how in
+    the Goals panel (a test now holds that, the ones shown after a death included, and that a goal's tool exists).
 
 - **An audit of the last passes** (ten years in three colonies, before and after today's changes; a review of the
   code):

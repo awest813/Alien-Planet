@@ -1,3 +1,4 @@
+import { isTaken } from './taken';
 import { TICKS_PER_HOUR, populationFor } from './constants';
 import { FACTIONS, itemDef, itemId, quantity } from './defs';
 import { changeGoodwill } from './diplomacy';
@@ -205,7 +206,7 @@ export function travel(sim: Simulation, c: Colonist): void {
   }
   if (c.path.length === 0) {
     const region = sim.regionOf(c.tile);
-    const exit = sim.nearest(c.tile, (i) => onEdge(sim, i) && sim.regionOf(i) === region, 1)[0];
+    const exit = sim.nearestEdge(c.tile, (i) => sim.regionOf(i) === region, 1)[0];
     c.path = exit !== undefined ? (sim.pathfinder.find(c.tile, [exit]) ?? []) : [];
     if (c.path.length === 0) {
       depart(c);
@@ -252,9 +253,10 @@ export function updateExpeditions(sim: Simulation): void {
       }
     }
   }
-  // Nobody stays away without a party to be with (a save edited by hand, say): they walk back in.
+  // Nobody stays away without a party to be with (a save edited by hand, say), or raiders holding them: they walk
+  // back in.
   for (const c of sim.colonists) {
-    if (c.away && !c.health.dead && !expeditions(sim).some((e) => e.members.includes(c.id))) {
+    if (c.away && !c.health.dead && !expeditions(sim).some((e) => e.members.includes(c.id)) && !isTaken(sim, c.id)) {
       c.away = undefined;
       c.path = [];
     }
@@ -263,12 +265,12 @@ export function updateExpeditions(sim: Simulation): void {
 
 // Where a party comes back in: the edge nearest home, or (with nobody home to find it from) wherever they
 // left.
-function arrival(sim: Simulation, members: Colonist[]): number {
+export function arrival(sim: Simulation, members: Colonist[]): number {
   const w = sim.world;
   const home = sim.homeTile();
   const region = sim.outsideRegion();
   if (home !== undefined && region !== undefined) {
-    const edge = sim.nearest(home, (i) => onEdge(sim, i) && sim.regionOf(i) === region, 1)[0];
+    const edge = sim.nearestEdge(home, (i) => sim.regionOf(i) === region, 1)[0];
     if (edge !== undefined) {
       return edge;
     }

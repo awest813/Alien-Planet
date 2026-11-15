@@ -12,6 +12,7 @@
 // first K seeds; "nohunt" leaves the wildlife alone. With DEBUG=1 in the environment, a trace also
 // shows research, production, bills, rooms and heaters; with STOCKS=1, each colony ends with its stocks of
 // workshop materials, their bills and the workshops built.
+import { buyBackCost, takenList } from '../src/sim/taken';
 import { Biome, MapKind } from '../src/sim/biomes';
 import { colonistTarget, lineOfSight } from '../src/sim/combat';
 import {
@@ -145,7 +146,14 @@ const researchOrder = reorder(
 const ARMS = ['crossbow', 'recurveBow', 'scaleArmor', 'leather'];
 
 // Finds the nearest w×h rectangle to the colonists where every tile can take a blueprint.
-function findSite(sim: Simulation, w: number, h: number, avoid: Set<number>): { x: number; y: number } | null {
+// `within`, if given, is where the site must lie (see dryGround).
+function findSite(
+  sim: Simulation,
+  w: number,
+  h: number,
+  avoid: Set<number>,
+  within?: Set<number>,
+): { x: number; y: number } | null {
   const world = sim.world;
   // Around (and reachable from) someone still alive.
   const anchor = (sim.living()[0] ?? sim.colonists[0]).tile;
@@ -168,6 +176,7 @@ function findSite(sim: Simulation, w: number, h: number, avoid: Set<number>): { 
           ok =
             !avoid.has(i) &&
             sim.regionOf(i) === home &&
+            (!within || within.has(i)) &&
             terrainDef(world.terrain[i]).buildable &&
             terrainDef(world.terrain[i]).fertility > 0 &&
             (f === NONE || !!FEATURES[f - 1].harvest) &&
@@ -180,6 +189,24 @@ function findSite(sim: Simulation, w: number, h: number, avoid: Set<number>): { 
     }
   }
   return best;
+}
+
+// The ground the colonists can reach from where they stand without wading: on an island, the island.
+function dryGround(sim: Simulation): Set<number> {
+  const w = sim.world;
+  const start = (sim.living()[0] ?? sim.colonists[0]).tile;
+  const seen = new Set<number>([start]);
+  const queue = [start];
+  while (queue.length > 0) {
+    const i = queue.pop()!;
+    for (const n of w.neighbors(i)) {
+      if (!seen.has(n) && w.isPassable(n) && !w.isWading(n)) {
+        seen.add(n);
+        queue.push(n);
+      }
+    }
+  }
+  return seen;
 }
 
 function claim(avoid: Set<number>, sim: Simulation, x: number, y: number, w: number, h: number): void {
@@ -200,6 +227,8 @@ interface Result {
   deathCauses: Record<string, number>;
   raids: number;
   raidKills: number;
+  raidDowns: number;
+  raidMostDown: number;
   diseaseCases: number;
   diseaseDeaths: number;
   breaks: number;
@@ -393,15 +422,38 @@ function play(seed: number): Result {
   sim.apply({ type: 'designate', rect: { x0: cx - 15, y0: cy - 15, x1: cx + 15, y1: cy + 15 }, kind: 'chop' });
   sim.apply({ type: 'designate', rect: { x0: cx - 20, y0: cy - 20, x1: cx + 20, y1: cy + 20 }, kind: 'forage' });
   sim.apply({ type: 'designate', rect: { x0: cx - 10, y0: cy - 10, x1: cx + 10, y1: cy + 10 }, kind: 'mine' });
-  const hut = findSite(sim, 9, 7, avoid);
-  // Up to twelve beds in two rows, clear of the door, fire and armchair.
-  const bedSlots = [...[1, 2, 3, 4, 5, 6, 7].map((k) => [k, 1]), ...[1, 2, 3, 4, 5].map((k) => [k, 2])];
+  // 9x7 on ground they can reach dry; on an island too small for one, 7x5 (a player builds what fits rather
+  // than across the water, where the hut took the boat's timbers over the ford a log at a time); failing both, 9x7
+  // anywhere. (Valleys, as before: the nearest 9x7.)
+  const dry = mapKind === 'valley' ? undefined : dryGround(sim);
+  let hutW = 9;
+  let hutH = 7;
+  let hut = findSite(sim, 9, 7, avoid, dry);
+  if (!hut && dry) {
+    hut = findSite(sim, 7, 5, avoid, dry);
+    if (hut) {
+      hutW = 7;
+      hutH = 5;
+    }
+    hut ??= findSite(sim, 9, 7, avoid);
+  }
+  const small = hutW === 7;
+  // The hut's inside, from its walls: the middle column (the door's), the fire's column by the east wall, the
+  // row against the south wall.
+  const mid = hutW >> 1;
+  const east = hutW - 2;
+  const south = hutH - 2;
+  // Up to twelve beds in two rows, clear of the door, fire and armchair (six in the small hut: a row, and one more
+  // by the door).
+  const bedSlots = small
+    ? [...[1, 2, 3, 4, 5].map((k) => [k, 1]), [2, 3]]
+    : [...[1, 2, 3, 4, 5, 6, 7].map((k) => [k, 1]), ...[1, 2, 3, 4, 5].map((k) => [k, 2])];
   let bedsBuilt = 0;
   // The sandbag ring two tiles out from the hut, and the line just inside it where defenders stand.
   const ring = (offset: number) => {
     const tiles: number[] = [];
     if (hut) {
-      const [x0, y0, x1, y1] = [hut.x - offset, hut.y - offset, hut.x + 8 + offset, hut.y + 6 + offset];
+      const [x0, y0, x1, y1] = [hut.x - offset, hut.y - offset, hut.x + hutW - 1 + offset, hut.y + hutH - 1 + offset];
       for (let y = y0; y <= y1; y++) {
         for (let x = x0; x <= x1; x++) {
           if ((x === x0 || x === x1 || y === y0 || y === y1) && w.inBounds(x, y)) {
@@ -416,11 +468,18 @@ function play(seed: number): Result {
   const holdLine = ring(1);
   let sandbagsPlaced = false;
   if (hut) {
-    claim(avoid, sim, hut.x - (defend ? 2 : 0), hut.y - (defend ? 2 : 0), defend ? 13 : 9, defend ? 11 : 7);
+    claim(
+      avoid,
+      sim,
+      hut.x - (defend ? 2 : 0),
+      hut.y - (defend ? 2 : 0),
+      hutW + (defend ? 4 : 0),
+      hutH + (defend ? 4 : 0),
+    );
     const walls: number[] = [];
-    for (let y = hut.y; y < hut.y + 7; y++) {
-      for (let x = hut.x; x < hut.x + 9; x++) {
-        if (x === hut.x || y === hut.y || x === hut.x + 8 || y === hut.y + 6) {
+    for (let y = hut.y; y < hut.y + hutH; y++) {
+      for (let x = hut.x; x < hut.x + hutW; x++) {
+        if (x === hut.x || y === hut.y || x === hut.x + hutW - 1 || y === hut.y + hutH - 1) {
           walls.push(at(x, y));
         }
       }
@@ -428,16 +487,21 @@ function play(seed: number): Result {
     sim.apply({ type: 'build', feature: featureId('woodWall'), tiles: walls });
     // The door on the side with ground to walk out onto (a door onto a rock sealed one colony's only room, and four
     // of its five froze outside it in a cold snap); failing both, the rock outside it mined.
-    const outside = (y: number) => (w.inBounds(hut.x + 4, y) ? at(hut.x + 4, y) : -1);
-    const below = outside(hut.y + 7);
+    const outside = (y: number) => (w.inBounds(hut.x + mid, y) ? at(hut.x + mid, y) : -1);
+    const below = outside(hut.y + hutH);
     const above = outside(hut.y - 1);
-    const doorY = below >= 0 && w.isPassable(below) ? hut.y + 6 : above >= 0 && w.isPassable(above) ? hut.y : hut.y + 6;
-    sim.apply({ type: 'build', feature: featureId('door'), tiles: [at(hut.x + 4, doorY)] });
+    const doorY =
+      below >= 0 && w.isPassable(below)
+        ? hut.y + hutH - 1
+        : above >= 0 && w.isPassable(above)
+          ? hut.y
+          : hut.y + hutH - 1;
+    sim.apply({ type: 'build', feature: featureId('door'), tiles: [at(hut.x + mid, doorY)] });
     const out = doorY === hut.y ? above : below;
     if (out >= 0 && !w.isPassable(out)) {
       sim.apply({
         type: 'designate',
-        rect: { x0: hut.x + 4, y0: w.yOf(out), x1: hut.x + 4, y1: w.yOf(out) },
+        rect: { x0: hut.x + mid, y0: w.yOf(out), x1: hut.x + mid, y1: w.yOf(out) },
         kind: 'mine',
       });
     }
@@ -447,7 +511,7 @@ function play(seed: number): Result {
       tiles: bedSlots.slice(0, sim.colonists.length).map(([bx, by]) => at(hut.x + bx, hut.y + by)),
     });
     bedsBuilt = sim.colonists.length;
-    sim.apply({ type: 'build', feature: featureId('campfire'), tiles: [at(hut.x + 7, hut.y + 3)] });
+    sim.apply({ type: 'build', feature: featureId('campfire'), tiles: [at(hut.x + east, hut.y + (hutH >> 1))] });
   }
   const stock = findSite(sim, 5, 3, avoid);
   if (stock) {
@@ -545,8 +609,27 @@ function play(seed: number): Result {
   let colonistHours = 0;
   let joyLowHours = 0;
 
+  // How near raids come to killing: colonists downed while raiders are about, and the most down at once.
+  let raidDowns = 0;
+  let raidMostDown = 0;
+  const downNow = new Set<number>();
   for (let hour = 0; hour < hours; hour++) {
     for (let t = 0; t < TICKS_PER_HOUR; t += 20) {
+      if (sim.raid || sim.enemies.some((e) => e.hp > 0)) {
+        const down = sim.living().filter((c) => c.health.downed);
+        for (const c of down) {
+          if (!downNow.has(c.id)) {
+            raidDowns++;
+          }
+        }
+        raidMostDown = Math.max(raidMostDown, down.length);
+        downNow.clear();
+        for (const c of down) {
+          downNow.add(c.id);
+        }
+      } else {
+        downNow.clear();
+      }
       // Raid response, checked frequently like a player would: draft once the raiders close in
       // (on a big map they can take hours to walk in from the edge).
       // Maddened animals get the same answer as raiders.
@@ -655,7 +738,7 @@ function play(seed: number): Result {
         sim.apply({ type: 'build', feature: featureId('horseshoePin'), tiles: [at(kitchen.x + 6, kitchen.y)] });
       }
       if (hut) {
-        sim.apply({ type: 'build', feature: featureId('armchair'), tiles: [at(hut.x + 1, hut.y + 5)] });
+        sim.apply({ type: 'build', feature: featureId('armchair'), tiles: [at(hut.x + 1, hut.y + south)] });
       }
       const lab = findSite(sim, 1, 1, avoid);
       if (lab) {
@@ -748,7 +831,7 @@ function play(seed: number): Result {
       // the hour lasts ten of these steps.
       fordTriedDay = sim.day;
       const world = sim.world;
-      const anchor = hut ? at(hut.x + 4, hut.y + 3) : (sim.living()[0] ?? sim.colonists[0]).tile;
+      const anchor = hut ? at(hut.x + mid, hut.y + (hutH >> 1)) : (sim.living()[0] ?? sim.colonists[0]).tile;
       const trees = [...world.tilesWith('features')]
         .filter((i) => featureDef(world.feature[i]).key === 'tree')
         .sort((a, b) => world.distance(anchor, a) - world.distance(anchor, b));
@@ -953,16 +1036,16 @@ function play(seed: number): Result {
     // Some art and flowers in the hut on day 4, and a banner once there's cloth to spare.
     if (hut && !artPlaced && sim.day >= 4) {
       artPlaced = true;
-      sim.apply({ type: 'build', feature: featureId('sculptureSmall'), tiles: [at(hut.x + 4, hut.y + 4)] });
+      sim.apply({ type: 'build', feature: featureId('sculptureSmall'), tiles: [at(hut.x + mid, hut.y + hutH - 3)] });
       sim.apply({
         type: 'build',
         feature: featureId('flowerPot'),
-        tiles: [at(hut.x + 2, hut.y + 4), at(hut.x + 6, hut.y + 4)],
+        tiles: [at(hut.x + 2, hut.y + hutH - 3), at(hut.x + hutW - 3, hut.y + hutH - 3)],
       });
     }
     if (hut && !bannerPlaced && sim.stockOf(itemId('cloth')) >= 20) {
       bannerPlaced = true;
-      sim.apply({ type: 'build', feature: featureId('banner'), tiles: [at(hut.x + 6, hut.y + 5)] });
+      sim.apply({ type: 'build', feature: featureId('banner'), tiles: [at(hut.x + hutW - 3, hut.y + south)] });
     }
     // A games corner on day 3, and a telescope once Optics is in.
     if (!gamesPlaced && sim.day >= 3) {
@@ -1037,7 +1120,7 @@ function play(seed: number): Result {
     }
     if (hut && !hearthPlaced && sim.isResearched('hearths')) {
       hearthPlaced = true;
-      sim.apply({ type: 'build', feature: featureId('hearth'), tiles: [at(hut.x + 7, hut.y + 4)] });
+      sim.apply({ type: 'build', feature: featureId('hearth'), tiles: [at(hut.x + east, hut.y + (hutH >> 1) + 1)] });
     }
     // Research that waits only on materials (the Research screen says what): lay them in, as a player would,
     // rather than spending them as fast as they come.
@@ -1314,6 +1397,16 @@ function play(seed: number): Result {
       }
     }
 
+    // Someone carried off by raiders: one of theirs held here goes back in exchange, or the silver is paid once
+    // there's enough, as a player would.
+    for (const t of takenList(sim)) {
+      const swap = sim.captives.find((p) => p.faction === t.faction && p.state === 'prisoner');
+      if (swap) {
+        sim.apply({ type: 'world', action: { kind: 'exchange', colonist: t.colonist, captive: swap.id } });
+      } else if (colonyStock(sim, itemId('silver')) >= buyBackCost(sim)) {
+        sim.apply({ type: 'world', action: { kind: 'buyBack', colonist: t.colonist } });
+      }
+    }
     if (flow && Math.floor(sim.hour) === 6) {
       daily.push(snapshot(sim));
     }
@@ -1394,6 +1487,13 @@ function play(seed: number): Result {
     feasts: sim.stats.feasts ?? 0,
     festivals: count(/^(It's Planting Day|The harvest festival is tonight|The midwinter bonfire will be lit)/),
     weddings: sim.stats.weddings ?? 0,
+    separations: sim.stats.separations ?? 0,
+    overrun: count(/^The raiders left the colony for dead/),
+    taken: sim.stats.taken ?? 0,
+    boughtBack: sim.stats.boughtBack ?? 0,
+    exchanged: sim.stats.exchanged ?? 0,
+    escaped: sim.stats.escaped ?? 0,
+    lostToRaiders: sim.stats.lostToRaiders ?? 0,
     funerals: sim.stats.funerals ?? 0,
     beaconHours: sim.beacon.hours,
     shipsLanded,
@@ -1433,6 +1533,8 @@ function play(seed: number): Result {
     deathCauses: { ...(sim.stats.deaths ?? {}) },
     raids: events.raid,
     raidKills: sim.stats.kills,
+    raidDowns,
+    raidMostDown,
     diseaseCases: story
       .filter((s) => s.includes('came down with'))
       .reduce((n, s) => n + (s.includes(' and ') ? 2 : 1), 0),
@@ -1672,7 +1774,7 @@ console.log(
         return all;
       }, {}),
     )}\n` +
-    `  raids ${sum((r) => r.raids)}, kills ${sum((r) => r.raidKills)}\n` +
+    `  raids ${sum((r) => r.raids)}, kills ${sum((r) => r.raidKills)}, colonists downed in raids ${sum((r) => r.raidDowns)}, most down at once ${Math.max(...results.map((r) => r.raidMostDown))} (colonies with half or more down at once: ${results.filter((r) => r.raidMostDown * 2 >= r.total).length})\n` +
     `  fever cases ${sum((r) => r.diseaseCases)}, fever deaths ${sum((r) => r.diseaseDeaths)}\n` +
     `  mental breaks ${sum((r) => r.breaks)}, mean mood ${(sum((r) => r.avgMood) / results.length).toFixed(1)}\n` +
     `  first friendship day (median) ${results.map((r) => r.friendDay).sort((a, b) => a - b)[Math.floor(results.length / 2)]}\n` +

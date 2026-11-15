@@ -1,3 +1,4 @@
+import { carryOff } from './taken';
 import { HURRIED } from './pathfinding';
 import { animalName, hurtAnimal } from './animals';
 import { scarAim } from './body';
@@ -1244,6 +1245,10 @@ export function updateEnemies(sim: Simulation): void {
       }
     } else if (sim.living().length > 0) {
       sim.addLog(`The raiders left the colony for dead${plunder(sim)}.`, 'danger', true);
+      // (Thieves take goods, not people.)
+      if (!raid.thieves) {
+        carryOff(sim, raid.faction);
+      }
     }
     for (const c of sim.living()) {
       if (c.drafted && !sim.story.manhuntersActive) {

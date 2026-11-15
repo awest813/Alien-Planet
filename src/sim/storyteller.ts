@@ -20,7 +20,12 @@ export type Difficulty = 'peaceful' | 'standard' | 'harsh';
 export const DIFFICULTIES: { key: Difficulty; label: string; description: string }[] = [
   { key: 'peaceful', label: 'Peaceful', description: 'No raids. Illness and hardship still happen, more gently.' },
   { key: 'standard', label: 'Standard', description: 'Raids grow over time. A well-defended colony usually holds.' },
-  { key: 'harsh', label: 'Harsh', description: 'Bigger, harder-hitting, more frequent raids. Expect losses.' },
+  {
+    key: 'harsh',
+    label: 'Harsh',
+    description:
+      'Bigger, harder-hitting, more frequent raids, and raiders who overrun the colony often carry someone off. Expect losses.',
+  },
 ];
 
 export interface StoryState {

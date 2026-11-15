@@ -214,6 +214,9 @@ export function ransom(sim: Simulation, id: number): string | null {
   return null;
 }
 
+// A captive handed back to their people (in exchange for a colonist they hold: see taken.ts).
+export const handOver = (sim: Simulation, p: Captive): void => remove(sim, p);
+
 function remove(sim: Simulation, p: Captive): void {
   sim.captives = sim.captives.filter((q) => q !== p);
   // Anyone on their way to capture, feed or visit them gives up.

@@ -937,6 +937,7 @@ export function FactionsScreen({ onClose }: { onClose: () => void }) {
   const left = (hours: number) => `${timeLeft(hours)} left`;
   return (
     <Modal title="Factions" onClose={onClose}>
+      <Taken state={state} />
       <h3>Request</h3>
       {r ? (
         <>
@@ -1131,6 +1132,52 @@ export function FactionsScreen({ onClose }: { onClose: () => void }) {
       </div>
       <Expeditions state={state} />
     </Modal>
+  );
+}
+
+// Colonists raiders carried off: buy them back, or exchange one of the raiders' own people held here.
+function Taken({ state }: { state: FactionsState }) {
+  const d = state.diplomacy;
+  if (d.taken.length === 0) {
+    return null;
+  }
+  const world = (action: WorldAction) => controller.command({ type: 'world', action });
+  return (
+    <>
+      <h3>Carried off</h3>
+      {d.taken.map((t) => (
+        <div key={t.id} className="taken">
+          <p>
+            <b>{t.name}</b> is held by {t.faction}.{' '}
+            <span className="muted">
+              {t.daysLeft} day{t.daysLeft === 1 ? '' : 's'} left before they give up on being paid.
+            </span>
+          </p>
+          <div className="row">
+            <button
+              disabled={d.silver < t.cost}
+              onClick={() => world({ kind: 'buyBack', colonist: t.id })}
+              title={
+                d.silver < t.cost
+                  ? `The colony has ${d.silver} silver in storage of the ${t.cost} they want`
+                  : `Pay ${t.cost} silver and ${t.name} comes home`
+              }
+            >
+              Buy back: {t.cost} silver
+            </button>
+            {t.swaps.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => world({ kind: 'exchange', colonist: t.id, captive: p.id })}
+                title={`${p.name} goes back to ${t.faction}, and ${t.name} comes home`}
+              >
+                Exchange {p.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 

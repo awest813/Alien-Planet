@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ANIMALS, featureId, itemId } from '../sim/defs';
 import { clearAround } from '../sim/test-helpers';
-import { controller } from './controller';
+import { OBJECTIVES } from '../sim/simulation';
+import { TOOLS, controller } from './controller';
 
 // Review of "Fixes from a mid-game playthrough": the staged goal help and goals under way.
 
@@ -16,6 +17,25 @@ function colony(seed: string) {
 }
 
 describe('goal help', () => {
+  it('every goal says how, the ones shown only after a death included, and names a tool that exists', () => {
+    const { sim } = colony('every-goal');
+    // (A colonist fallen, so the funeral and memorial goals show.)
+    sim.colonists[0].health.dead = true;
+    controller.publish();
+    const shown = controller.getState().objectives;
+    for (const o of OBJECTIVES) {
+      const view = shown.find((v) => v.id === o.id);
+      expect(view, o.id).toBeDefined();
+      expect(view!.how.length, o.id).toBeGreaterThan(10);
+      if (view!.tool) {
+        expect(
+          TOOLS.some((t) => t.id === view!.tool),
+          `${o.id}: ${view!.tool}`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it('bread with a millstone and grain but no stove asks for the stove, not for targets', () => {
     const { sim, w, x, y } = colony('bread-stove');
     sim.research.done.push('milling');
