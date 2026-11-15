@@ -107,6 +107,43 @@ describe('sowing before a frost', () => {
   });
 });
 
+describe('who sows and harvests', () => {
+  it('a field tile says whether anyone will sow it, or harvest it once ripe', async () => {
+    // (A field with nobody on Growing work sat bare, and its card said nothing.)
+    const { controller } = await import('../game/controller');
+    controller.newColony('field-who');
+    const sim = controller.sim;
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    // A mild spring noon, nothing in the way of sowing.
+    sim.tick = (4 * 24 + 12) * HOUR;
+    sim.syncClock();
+    const bare = w.idx(x + 3, y + 3);
+    w.zone[bare] = GROW_ZONE + featureId('poplarPlant');
+    const card = (i: number) => {
+      controller.selectTile(i);
+      controller.publish();
+      const t = controller.getState().selectedTile!;
+      return [...t.orders, ...t.details].join(' | ');
+    };
+    expect(sim.whyNotSow(bare)).toBeNull();
+    for (const c of sim.colonists) {
+      c.priorities.growing = 0;
+    }
+    expect(card(bare)).toMatch(/Not sown: nobody has Growing work turned on/);
+    sim.colonists[0].priorities.growing = 2;
+    expect(card(bare)).toMatch(/Waiting to be sown/);
+    // Ripe, and nobody to pick it.
+    const ripe = w.idx(x + 4, y + 3);
+    w.setFeature(ripe, featureId('potatoPlant'));
+    w.growth[ripe] = 1;
+    expect(card(ripe)).toMatch(/Ready to harvest$|Ready to harvest \|/);
+    sim.colonists[0].priorities.growing = 0;
+    expect(card(ripe)).toMatch(/Ready to harvest, but nobody has Growing work turned on/);
+  });
+});
+
 describe('a greenhouse in winter', () => {
   // A glass greenhouse, walled in as a room, `size` across inside, with `fires` campfires lit in it, in early winter.
   function greenhouse(size: number, fires: number) {

@@ -2608,6 +2608,16 @@ export class GameController {
   }
 
   // "On the mend: over it in about 20 hours" or "At risk: fatal in about 9 hours unless it's tended and they rest".
+  // Why nobody will sow or harvest a field tile, if nobody will: no grower at all, or none who can get there.
+  private noGrower(i: number): string | null {
+    const sim = this.sim;
+    const growers = sim.living().filter((c) => c.priorities.growing > 0 && canWork(c, 'growing') && !c.health.downed);
+    if (growers.length === 0) {
+      return 'nobody has Growing work turned on (Work)';
+    }
+    return growers.some((c) => sim.regionOf(c.tile) === sim.regionOf(i)) ? null : 'no grower can get to it';
+  }
+
   private diseaseOutlookText(c: Colonist): string {
     const o = diseaseOutlook(this.sim, c);
     if (!o) {
@@ -4494,6 +4504,10 @@ export class GameController {
         const why = sim.whyNotSow(i);
         if (why) {
           orders.push(`Not sown: ${why[0].toLowerCase()}${why.slice(1)}`);
+        } else {
+          // Nothing in the way of sowing it: whether anyone will. (A field with no grower said nothing at all.)
+          const who = this.noGrower(i);
+          orders.push(who ? `Not sown: ${who}` : 'Waiting to be sown');
         }
       }
     } else if (zone !== 0) {
@@ -4699,7 +4713,8 @@ export class GameController {
     }
     if (def?.crop) {
       if (w.growth[i] >= 1) {
-        details.push('Ready to harvest');
+        const who = this.noGrower(i);
+        details.push(`Ready to harvest${who ? `, but ${who}` : ''}`);
       } else {
         // Growing days (fourteen hours of light) to go, about, at this ground's pace: the card said only how far
         // along it was, never when it would be ready, or why it had stopped.
@@ -4717,7 +4732,8 @@ export class GameController {
           : walk.end === 'ripe'
             ? `ripe in ${days(walk.hours)}`
             : walk.end === 'frost'
-              ? `a frost may take it first, in ${days(walk.hours)}: harvest it, or heat it`
+              ? // (It said "harvest it": an unripe crop can't be.)
+                `a frost may take it first, in ${days(walk.hours)}: only warmth saves it (a heated greenhouse)`
               : "won't ripen before winter";
         details.push(`${Math.floor(w.growth[i] * 100)}% grown, ${when}${waiting ? ` · ${waiting}` : ''}`);
       }
