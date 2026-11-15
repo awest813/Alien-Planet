@@ -322,7 +322,7 @@ How the storytelling layer works:
 - **Weather:** clear skies, rain, storms, fog, summer droughts (a day or two) and winter snow come and go in spells
   (shown in the top bar, with the wind). Rain soaks anyone outside, who feel the cold more and grumble about it;
   rain helps crops and droughts halve their growth; fog (mostly of a night and a morning: it lifts through the
-  afternoon) and rain spoil aim for both sides. Below freezing, rain falls as snow; snow settles on the ground while
+  afternoon) and rain spoil aim for both sides. Below freezing, rain falls as snow (rain about freezing is sleet); snow settles on the ground while
   it falls and lies while it's cold, melting in a thaw (faster in the rain), so a mild, wet winter stays bare. One
   wind blows for everything: turbines turn in it, and rain, snow and leaves slant and drift with it, its way
   changing day to day.

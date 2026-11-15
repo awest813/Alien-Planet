@@ -46,6 +46,20 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Weather, sun and wind** (four years of weather per land, hour by hour; the balance harness on 48 seeds and 48
+  fresh ones, before and after, default and tundra):
+  - **Fixed:** droughts of two to four days took a third to two thirds of every six-day summer (now a day or two);
+    fog came at any hour (now mostly of a night and a morning, lifting through the afternoon); solar panels gave
+    as much in a storm as in sun, and spring and autumn sun was summer's (now cloud dims them and the seasons step
+    down, about a fifth less a year in temperate land, which turbines make up in the wet); snow lay all winter
+    whatever fell (now it settles and melts, and is saved); rain at about freezing is called sleet.
+  - **One wind:** turbines, the sound, the rain's slant and the snow's and leaves' drift, and the top bar.
+  - **Tried and taken back:** turning rain to snow two degrees higher (so no rain ever showed below freezing) sent
+    nobody indoors on the tundra's coldest wet days, as cold rain does: five froze to death across 96 tundra
+    colonies, against none. With the old line and sleet on the label: tundra hunger the same or better (55 to 51
+    colonist-hours a colony over 30 days; the worst tenth 104 to 82), two frozen in one colony on one night, mood
+    level; default colonies level on the fresh seeds.
+
 - **The build bar, and five new buildings** (balanced against what was there, and weighed in the harness with a
   new `newbuild` mode over 16 seeds and 30 days, with and without `defend`):
   - **The bar:** Furniture (14 tools, beds beside the harp) and Production (14, wrapping to a second row) are

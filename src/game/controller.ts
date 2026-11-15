@@ -49,6 +49,7 @@ import {
   TICKS_PER_HOUR,
 } from '../sim/simulation';
 import { sunStrength, windStrength, windWords } from '../sim/power';
+import { SLEET_BELOW } from '../sim/weather';
 import { DOWNED_TICKS, persuasion, ransomBlocked, ransomPrice, roomToJoin } from '../sim/prisoners';
 import { DRAFT_AGE, ELDER, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans';
 import { LEGEND } from '../sim/minds';
@@ -2018,6 +2019,10 @@ export class GameController {
     // (A strong wind on a clear day is worth a word: the turbines turn fast and the rain, when it comes, slants.)
     if (!def.icon && strength >= 0.6) {
       return { label: 'Windy', icon: '💨', wind };
+    }
+    // Rain at about freezing is sleet ("Rain" at -1°C read as a mistake).
+    if ((sim.weather.kind === 'rain' || sim.weather.kind === 'storm') && sim.outdoorTemperature() <= SLEET_BELOW) {
+      return { label: sim.weather.kind === 'storm' ? 'Sleet storm' : 'Sleet', icon: '🌨', wind };
     }
     return { label: def.label, icon: def.icon, wind };
   }

@@ -18,16 +18,16 @@ function years(biome: Biome, n: number, each: (sim: Simulation) => void): Simula
 }
 
 describe('rain and snow', () => {
-  it('rain never shows below freezing, nor snow well above it', () => {
+  it('rain below freezing is at most a degree or two, and called sleet; snow never well above freezing', () => {
     for (const biome of ['temperate', 'tundra', 'forest'] as Biome[]) {
       let rainBelow = 0;
       let snowAbove = 0;
       years(biome, 3, (sim) => {
         const t = sim.outdoorTemperature();
-        rainBelow += (sim.weather.kind === 'rain' || sim.weather.kind === 'storm') && t < 0 ? 1 : 0;
+        // (Rain's own two degrees of chill can take the air to -2: the top bar calls that sleet.)
+        rainBelow += (sim.weather.kind === 'rain' || sim.weather.kind === 'storm') && t < -2 ? 1 : 0;
         snowAbove += sim.weather.kind === 'snow' && t > 3 ? 1 : 0;
       });
-      // (Rain at -1°C showed in the top bar: rain's own chill took it below the line it was checked against.)
       expect(rainBelow, biome).toBe(0);
       expect(snowAbove, biome).toBe(0);
     }

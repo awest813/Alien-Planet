@@ -51,11 +51,15 @@ export const WEATHER: Record<WeatherKind, WeatherDef> = {
   snow: { label: 'Snow', icon: '❄', temp: -1, crops: 1, aim: 0.85, wet: false, hours: [4, 14], sun: 0.5 },
 };
 
-// Rain turns to snow below this temperature before the weather's own (so rain never shows below freezing: at 0 it
-// did, rain cooling the air by two degrees), and snow back to rain above the second (a little higher, so a day
-// hovering about freezing doesn't flick between them).
-const SNOW_BELOW = 2;
-const RAIN_ABOVE = 3;
+// Rain turns to snow below this temperature before the weather's own, and snow back to rain above the second. (Raised
+// so rain never showed below freezing, rain came down as snow on the tundra's coldest wet days, which sent nobody
+// indoors as cold rain does: across 96 tundra colonies, five froze to death against none. Rain just below freezing
+// is sleet, and the top bar says so.)
+const SNOW_BELOW = 0;
+const RAIN_ABOVE = 2;
+
+// Rain is called sleet at or below this (the air as it is, rain's own chill counted).
+export const SLEET_BELOW = 1;
 
 // Fog forms at night and in the morning (twice as likely then, so there's as much over a day as there was), and
 // through the afternoon it lifts (one hour in three) and none rolls in.

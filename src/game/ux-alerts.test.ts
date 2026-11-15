@@ -159,3 +159,21 @@ describe('what the sound hears', () => {
     expect(away.fire).toBe(0);
   });
 });
+
+describe('the weather in the top bar', () => {
+  it('rain about freezing is sleet, and a windy clear day says so', () => {
+    const sim = colony('weather-bar');
+    sim.weather = { kind: 'rain', until: sim.tick + 10 * HOUR };
+    sim.story.coldSnapUntil = sim.tick + 10 * HOUR;
+    // (Find a cold enough hour in the snap.)
+    for (let h = 0; h < 24 && sim.outdoorTemperature() > 1; h++) {
+      sim.tick += HOUR;
+    }
+    controller.publish();
+    expect(controller.getState().weather.label).toBe('Sleet');
+    sim.story.coldSnapUntil = 0;
+    sim.weather = { kind: 'storm', until: sim.tick + 10 * HOUR };
+    controller.publish();
+    expect(controller.getState().weather.wind).toMatch(/gale|strong wind|stiff breeze/);
+  });
+});
