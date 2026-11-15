@@ -244,7 +244,9 @@ const STORY_LIMIT = 200;
 
 // Need rates, per tick.
 const FOOD_DECAY = 1 / (TICKS_PER_HOUR * 16);
-const REST_DECAY = 1 / (TICKS_PER_HOUR * 18);
+// Rest lasts twenty waking hours: up rested at 6:00, tired about 21:00. (At eighteen, everyone was tired from
+// 19:00 or 20:00 to bed every evening, a mood tax nothing a player built or chose could lift.)
+const REST_DECAY = 1 / (TICKS_PER_HOUR * 20);
 const REST_GAIN_BED = 1 / (TICKS_PER_HOUR * 7);
 const REST_GAIN_GROUND = 1 / (TICKS_PER_HOUR * 9);
 const JOY_DECAY = 1 / (TICKS_PER_HOUR * 24);
@@ -2785,9 +2787,11 @@ export class Simulation {
     } else if (food < 0.25) {
       keys.push('hungry');
     }
-    if (rest <= 0.02) {
+    // Tired is felt awake: asleep, they're seeing to it. (Asleep from 22:00 at a tenth of their rest, everyone went
+    // on "tired" for the first hour or two of the night as well.)
+    if (!c.sleeping && rest <= 0.02) {
       keys.push('exhausted');
-    } else if (rest < 0.25) {
+    } else if (!c.sleeping && rest < 0.25) {
       keys.push('tired');
     }
     if (joy < 0.25) {
