@@ -438,7 +438,7 @@ const SAME_OLD_TOTAL = 0.6;
 const SAME_OLD_SHARE = 0.85;
 const EAT_TICKS = 60;
 // Research at a bench with a bookshelf within this many tiles goes this much faster.
-const BOOKS_REACH = 2;
+export const BOOKS_REACH = 2;
 export const BOOKS_BONUS = 0.15;
 
 // Mood below this for a couple of hours risks a mental break.

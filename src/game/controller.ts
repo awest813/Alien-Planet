@@ -38,6 +38,8 @@ import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
 import { SAVE_VERSION, deserialize, serialize } from '../sim/serialize';
 import {
+  BOOKS_BONUS,
+  BOOKS_REACH,
   MAP_SIZE,
   NIGHT_START,
   OBJECTIVES,
@@ -46,6 +48,7 @@ import {
   StoryEntry,
   TICKS_PER_HOUR,
 } from '../sim/simulation';
+import { sunStrength, windStrength, windWords } from '../sim/power';
 import { DOWNED_TICKS, persuasion, ransomBlocked, ransomPrice, roomToJoin } from '../sim/prisoners';
 import { DRAFT_AGE, ELDER, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans';
 import { LEGEND } from '../sim/minds';
@@ -390,7 +393,7 @@ const GOAL_HELP: Record<string, { how: string; tool?: string; screen?: Objective
   },
   decade: { how: 'Keep going: ten years of the valley.' },
   instrument: {
-    how: 'Build a drum, flute or lute (Furniture). Colonists play it for fun, and everyone nearby enjoys the music.',
+    how: 'Build a drum, flute or lute (Recreation). Colonists play it for fun, and everyone nearby enjoys the music.',
     tool: 'lute',
   },
   concert: {
@@ -3986,7 +3989,16 @@ export class GameController {
               : `Producing ${def.power.output} W`,
         );
       } else if (def.power.solar) {
-        details.push(`Producing up to ${def.power.output} W in daylight`);
+        // (What it gives now, not only its best: at night "up to 1200 W" read as a panel at work.)
+        const now = Math.round(def.power.output * sunStrength(sim));
+        details.push(now > 0 ? `Producing ${now} W of its ${def.power.output} W` : 'Dark: no sun on it');
+      } else if (def.power.wind) {
+        const strength = windStrength(sim);
+        details.push(
+          sim.isRoofed(i)
+            ? 'Under a roof: its blades cannot turn'
+            : `Producing ${Math.round(def.power.output * strength)} W of its ${def.power.output} W, in ${windWords(strength)}`,
+        );
       }
       if (def.power.storage) {
         details.push(`Grid storage ${Math.round(sim.power.stored)}/${sim.power.capacity} Wh`);
@@ -4004,6 +4016,32 @@ export class GameController {
     }
     if (def?.icebox) {
       details.push(sim.power.powered ? 'Keeping food fresh' : 'Unpowered: food will spoil');
+    }
+    // A bookshelf and a research bench: whether they're near enough to count.
+    if (def?.books) {
+      let reaches = false;
+      for (let dy = -BOOKS_REACH; dy <= BOOKS_REACH && !reaches; dy++) {
+        for (let dx = -BOOKS_REACH; dx <= BOOKS_REACH && !reaches; dx++) {
+          const x = w.xOf(i) + dx;
+          const y = w.yOf(i) + dy;
+          const f = w.inBounds(x, y) ? w.feature[w.idx(x, y)] : NONE;
+          reaches = f !== NONE && featureDef(f).researchStation;
+        }
+      }
+      const bonus = `${Math.round(BOOKS_BONUS * 100)}%`;
+      details.push(
+        reaches
+          ? `Research at the bench beside it goes ${bonus} faster`
+          : `No research bench within ${BOOKS_REACH} tiles: it speeds the study at one that is`,
+      );
+    }
+    if (def?.researchStation) {
+      const bonus = `${Math.round(BOOKS_BONUS * 100)}%`;
+      details.push(
+        sim.booksBeside(i)
+          ? `A bookshelf beside it: research here goes ${bonus} faster`
+          : `A bookshelf within ${BOOKS_REACH} tiles would speed research here by ${bonus}`,
+      );
     }
     if (def?.cooler) {
       details.push(`Cools its room towards ${def.cooler.target}°C`);

@@ -182,3 +182,40 @@ describe('the build bar', () => {
     expect(featureId('windTurbine')).not.toBe(NONE);
   });
 });
+
+describe('their cards', () => {
+  it('say what a turbine, a solar panel and a bookshelf are doing now', async () => {
+    const { controller } = await import('../game/controller');
+    controller.newColony('cards');
+    const sim = controller.sim;
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    const { x, y } = clearAround(sim, 12);
+    const w = sim.world;
+    const details = (i: number) => {
+      controller.selectTile(i);
+      controller.publish();
+      return controller.getState().selectedTile!.details.join(' | ');
+    };
+    const turbine = w.idx(x + 4, y + 4);
+    w.setFeature(turbine, featureId('windTurbine'));
+    sim.weather = { kind: 'storm', until: sim.tick + 10 * HOUR };
+    expect(details(turbine)).toMatch(/Producing \d+ W of its 700 W, in a (gale|strong wind)/);
+    w.roof[turbine] = featureId('roof');
+    expect(details(turbine)).toMatch(/Under a roof/);
+    // A solar panel at night says it's dark, not "up to 1200 W".
+    const panel = w.idx(x + 6, y + 4);
+    w.setFeature(panel, featureId('solarPanel'));
+    sim.tick += Math.round(((23 - sim.hour + 24) % 24) * HOUR);
+    expect(details(panel)).toMatch(/Dark: no sun/);
+    // A bookshelf and a bench: out of reach, then in reach.
+    const bench = w.idx(x - 4, y - 4);
+    w.setFeature(bench, featureId('researchBench'));
+    const far = w.idx(x - 8, y - 4);
+    w.setFeature(far, featureId('bookshelf'));
+    expect(details(far)).toMatch(/No research bench within 2 tiles/);
+    expect(details(bench)).toMatch(/would speed research here by 15%/);
+    w.setFeature(w.idx(x - 6, y - 4), featureId('bookshelf'));
+    expect(details(w.idx(x - 6, y - 4))).toMatch(/goes 15% faster/);
+    expect(details(bench)).toMatch(/A bookshelf beside it/);
+  });
+});

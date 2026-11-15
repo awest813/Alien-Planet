@@ -52,6 +52,24 @@ export function windStrength(sim: Simulation): number {
   return Math.max(0, Math.min(1, base + gust * base));
 }
 
+// How strongly the sun falls on a solar panel now, 0 to 1: by the hour, weaker in winter, and none in an eclipse.
+export function sunStrength(sim: Simulation): number {
+  return eclipseOn(sim) ? 0 : daylight(sim.hour) * (sim.season === 'Winter' ? WINTER_SOLAR : 1);
+}
+
+// The wind in words, for a turbine's card.
+export function windWords(strength: number): string {
+  return strength >= 0.85
+    ? 'a gale'
+    : strength >= 0.6
+      ? 'a strong wind'
+      : strength >= 0.35
+        ? 'a stiff breeze'
+        : strength >= 0.15
+          ? 'a light breeze'
+          : 'barely a breath of wind';
+}
+
 // Advances the grid by `hours`, burning generator fuel and charging or draining batteries.
 export function updatePower(sim: Simulation, tiles: number[], hours: number): void {
   const w = sim.world;
@@ -59,7 +77,7 @@ export function updatePower(sim: Simulation, tiles: number[], hours: number): vo
   let supply = 0;
   let demand = 0;
   let capacity = 0;
-  const sun = eclipseOn(sim) ? 0 : daylight(sim.hour) * (sim.season === 'Winter' ? WINTER_SOLAR : 1);
+  const sun = sunStrength(sim);
   const generators: number[] = [];
   let wind: number | undefined;
   for (const i of tiles) {
