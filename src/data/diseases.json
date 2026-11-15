@@ -1,7 +1,7 @@
 {
   "marshFever": {
     "label": "Marsh fever",
-    "description": "Fatal if it outpaces immunity. Bed rest and tending slow it down.",
+    "description": "Fatal if it outpaces immunity, as it does in anyone who stays on their feet. Bed rest sees most grown-ups through; tending makes it safe; the old need both.",
     "severityPerHour": 0.04,
     "immunityPerHour": 0.032
   },

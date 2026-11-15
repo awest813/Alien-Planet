@@ -185,7 +185,7 @@ import {
 import { BeaconState, TRANSMIT_HOURS, chooseToStay, depart, freshBeacon, updateBeacon } from './beacon';
 import { FEED_BELOW, PRISONER_BED, TALK_TICKS, execute, release, talk, updateCaptives, visitDue } from './prisoners';
 import { ADULT, CARER_HUNGER, DRAFT_AGE, ELDER, agePace, canWork, rollPast, updateLifespans } from './lifespans';
-import { inHospitalBed, isInfected, scarMove, scarWork } from './body';
+import { inHospitalBed, isInfected, scarMove, scarWork, worthMedicine } from './body';
 import {
   Village,
   freshVillage,
@@ -8431,9 +8431,11 @@ export class Simulation {
   private tryTend(c: Colonist, bleedingOnly = false): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
-    // Others first (self-treatment is a last resort), then the most urgent: downed, then bleeding.
+    // Others first (self-treatment is a last resort), then the most urgent: downed, then bleeding. A doctor who is
+    // bleeding sees to that before anyone who isn't (one with a deep cut walked off to tend a fever first).
+    const selfFirst = bleedingOf(c) > 0;
     const urgency = (p: Colonist) =>
-      (p === c ? 1000 : 0) -
+      (p === c ? (selfFirst ? -50 + c.health.bloodLoss * -200 : 1000) : 0) -
       (p.health.downed ? 100 : 0) -
       (bleedingOf(p) > 0 ? 50 + p.health.bloodLoss * 200 : 0) +
       w.distance(c.tile, p.tile);
@@ -8450,8 +8452,9 @@ export class Simulation {
       return false;
     }
     this.reserve(c, `t${patient.id}`);
-    // Medicine helps with fresh wounds, and cures an infected one outright; an illness only needs looking after.
-    const wounded = patient.health.injuries.some((injury) => injury.tended === 0 || isInfected(injury));
+    // Medicine helps with fresh wounds that could fester, and cures an infected one outright; a bruise or an
+    // illness only needs looking after.
+    const wounded = patient.health.injuries.some(worthMedicine);
     const medicine = wounded
       ? this.nearestIn(
           'items',

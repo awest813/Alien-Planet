@@ -31,7 +31,15 @@ import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, seasonOf, yearOf } from '.
 import { ChronicleKind } from '../sim/chronicle';
 import { animalName } from '../sim/animals';
 import { armorOf, besieging } from '../sim/combat';
-import { POISONING_HOURS, bleedingOf, needsBedRest } from '../sim/health';
+import {
+  POISONING_HOURS,
+  bleedingOf,
+  diseaseOutlook,
+  healthFactor,
+  needsBedRest,
+  needsTending,
+  painOf,
+} from '../sim/health';
 import { comfortRange, qualityLabel } from '../sim/apparel';
 import { MAX_SKILL, SKILL_LABELS, xpToNext } from '../sim/skills';
 import { relationLabel } from '../sim/social';
@@ -54,7 +62,7 @@ import { SLEET_BELOW } from '../sim/weather';
 import { DOWNED_TICKS, persuasion, ransomBlocked, ransomPrice, roomToJoin } from '../sim/prisoners';
 import { DRAFT_AGE, ELDER, TEEN, backstoryOf, canWork, stageOf } from '../sim/lifespans';
 import { LEGEND } from '../sim/minds';
-import { PART_LABELS, SCAR_LABELS, isInfected, scarsOf } from '../sim/body';
+import { PART_LABELS, SCAR_LABELS, isInfected, scarsOf, worthMedicine } from '../sim/body';
 import { AILMENTS, ailmentsOf } from '../sim/ageing';
 import { MAX_PEN, penMap } from '../sim/pens';
 import { GOOD_LEADER_MOOD, Hours, Hunting, POOR_LEADER_MOOD, Rations, leaderBar, tally } from '../sim/village';
@@ -883,7 +891,10 @@ export interface ColonistView {
   // Lasting marks of old wounds, as lines ("Limp: walks slower").
   scars: string[];
   bloodLoss: number;
-  disease: { label: string; severity: number; immunity: number } | null;
+  // An illness: how far along, whether it's being seen to, and how it will go as things stand.
+  disease: { label: string; severity: number; immunity: number; tended: boolean; outlook: string } | null;
+  // Why they're laid up, and how much slower they work for being hurt or ill (null: neither).
+  healthNote: string | null;
   relations: { name: string; opinion: number; label: string | null }[];
   drafted: boolean;
   dead: boolean;
@@ -2574,6 +2585,48 @@ export class GameController {
     }
   }
 
+  // "On the mend: over it in about 20 hours" or "At risk: fatal in about 9 hours unless it's tended and they rest".
+  private diseaseOutlookText(c: Colonist): string {
+    const o = diseaseOutlook(this.sim, c);
+    if (!o) {
+      return '';
+    }
+    const when = o.hours < 1.5 ? 'within the hour' : `in about ${Math.round(o.hours)} hours`;
+    if (o.recovers) {
+      return `On the mend: over it ${when}`;
+    }
+    const untended = c.health.disease!.tendedUntil <= this.sim.tick;
+    const up = !c.sleeping && !c.health.downed;
+    const unless =
+      untended && up
+        ? ", unless it's tended and they rest in bed"
+        : untended
+          ? ", unless it's tended"
+          : up
+            ? ', unless they rest in bed'
+            : '';
+    return `At risk: it would kill them ${when}${unless}`;
+  }
+
+  // Why they're in bed, and what being hurt does to their work (a colonist laid up by a chill showed only "Resting
+  // in bed", and nothing said how much slower the wounded worked).
+  private healthNote(c: Colonist): string | null {
+    const lines: string[] = [];
+    if (needsBedRest(c)) {
+      const why = c.health.disease
+        ? 'ill'
+        : bleedingOf(c) > 0
+          ? 'bleeding'
+          : `in pain (${Math.round(painOf(c) * 100)}%)`;
+      lines.push(`Off work to rest in bed: ${why}`);
+    }
+    const speed = healthFactor(c);
+    if (speed < 0.98) {
+      lines.push(`Works at ${Math.round(speed * 100)}% of their pace while it lasts`);
+    }
+    return lines.length > 0 ? lines.join('. ') : null;
+  }
+
   // The dead don't change, but every one was built over again five times a second, thoughts, skills and all: by a
   // colony's thirtieth year, more of the interface's work than the living. Kept until the colony's makeup changes
   // (a death, a birth, a load: their family and who they knew among the living are part of it).
@@ -2815,7 +2868,10 @@ export class GameController {
               label: c.health.disease.label,
               severity: c.health.disease.severity,
               immunity: c.health.disease.immunity,
+              tended: c.health.disease.tendedUntil > sim.tick,
+              outlook: this.diseaseOutlookText(c),
             },
+            healthNote: c.health.dead ? null : this.healthNote(c),
             relations: sim.colonists
               .filter((o) => o !== c && !o.health.dead)
               .map((o) => ({ name: o.name, opinion: Math.round(c.opinions[o.id] ?? 0), label: kinLabel(c, o) }))
@@ -3143,6 +3199,19 @@ export class GameController {
         alerts.push({ text: `The prisoner ${p.name} is starving`, tone: 'danger', tile: p.tile });
       }
     }
+    // Someone needs a doctor, and nobody on their feet does Doctor work (non-doctors never tend: the only doctor lay
+    // untended for 58 hours, with nothing said).
+    const needDoctor = sim.living().filter((c) => needsTending(sim, c));
+    const doctors = sim
+      .living()
+      .filter((d) => !d.health.downed && d.priorities.doctor > 0 && d.age >= DRAFT_AGE && !sim.inMentalBreak(d));
+    if (needDoctor.length > 0 && doctors.length === 0) {
+      alerts.push({
+        text: `Nobody is on Doctor work to tend ${needDoctor[0].name}${needDoctor.length > 1 ? ` and ${needDoctor.length - 1} more` : ''}: set someone to Doctor`,
+        tone: 'danger',
+        screen: 'work',
+      });
+    }
     for (const c of sim.living()) {
       if (c.health.downed) {
         alerts.push({ text: `${c.name} has collapsed and needs a doctor`, tone: 'danger', colonist: c.id });
@@ -3178,7 +3247,9 @@ export class GameController {
       }
     }
     // (Wounds and sickness: medicine does nothing for the cold.)
-    const hurt = sim.living().some((c) => c.health.injuries.length > 0 || c.health.disease);
+    // (Only for wounds medicine would help: it does nothing for an illness or a bruise, and the alert came up for
+    // a fever, or a bruise already seen to, sending players to grow healroot that went on scratches.)
+    const hurt = sim.living().some((c) => c.health.injuries.some(worthMedicine));
     if (hurt && sim.stockOf(itemId('herbalMedicine')) === 0) {
       alerts.push({ text: 'No medicine: grow healroot for better treatment', tone: 'warn', tool: 'growHealroot' });
     }

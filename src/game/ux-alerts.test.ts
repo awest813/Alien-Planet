@@ -344,3 +344,27 @@ describe('drafting', () => {
     expect(sick.drafted).toBe(true);
   });
 });
+
+describe('health', () => {
+  it('says when nobody is on Doctor work to tend the hurt, and what an illness will do', async () => {
+    const { infect } = await import('../sim/health');
+    const sim = colony('no-doctor');
+    const [patient, ...rest] = sim.living();
+    infect(sim, patient, 'marshFever');
+    const nobody = () => alerts().find((a) => a.text.startsWith('Nobody is on Doctor work'));
+    expect(nobody()).toBeUndefined();
+    for (const c of sim.colonists) {
+      c.priorities.doctor = 0;
+    }
+    expect(nobody()?.text).toMatch(new RegExp(`to tend ${patient.name}: set someone to Doctor`));
+    expect(nobody()?.screen).toBe('work');
+    rest[0].priorities.doctor = 2;
+    expect(nobody()).toBeUndefined();
+    // The Health tab: untended, its outlook, and why they're off work.
+    controller.publish();
+    const view = controller.getState().colonists.find((c) => c.id === patient.id)!;
+    expect(view.disease!.tended).toBe(false);
+    expect(view.disease!.outlook).toMatch(/^(On the mend: over it|At risk: it would kill them)/);
+    expect(view.healthNote).toMatch(/Off work to rest in bed: ill/);
+  });
+});

@@ -181,13 +181,16 @@ export function damage(sim: Simulation, c: Colonist, amount: number, kind: Damag
 
 // Just over this illness: it can't be caught again for a while.
 export const immune = (sim: Simulation, c: Colonist, key: string): boolean =>
-  c.health.recovered?.key === key && c.health.recovered.until > sim.tick;
+  (c.health.immunities?.[key] ?? 0) > sim.tick ||
+  (c.health.recovered?.key === key && c.health.recovered.until > sim.tick);
 
 export function infect(sim: Simulation, c: Colonist, key: string): void {
   if (c.health.dead || c.health.disease || immune(sim, c, key)) {
     return;
   }
   c.health.disease = { key, label: DISEASES[key].label, severity: 0.05, immunity: 0, tendedUntil: 0 };
+  sim.stats.illnesses ??= {};
+  sim.stats.illnesses[key] = (sim.stats.illnesses[key] ?? 0) + 1;
 }
 
 // `mess`: levels of mess around the patient, which make for worse tending (see messAround).
@@ -266,23 +269,50 @@ export function updateHealth(sim: Simulation, c: Colonist, hours: number): void 
   h.injuries = h.injuries.filter((injury) => injury.severity > 0);
 
   if (h.disease) {
-    const def = DISEASES[h.disease.key];
-    const tended = h.disease.tendedUntil > sim.tick;
-    // Any illness weighs on the old (more the older they are, and they throw it off more slowly); a catching
-    // one is hard on the very young too.
-    const old = c.age >= ELDER ? 1.3 + (c.age - ELDER) * 0.02 : 1;
-    const frail = Math.max(old, def.contagious && c.age < TODDLER * 2 ? 1.4 : 1);
-    // Tending slows an illness; field medicine slows it more.
-    const care = tended ? (sim.isResearched('fieldMedicine') ? 0.35 : 0.45) : 1;
-    h.disease.severity += def.severityPerHour * care * frail * hours;
-    h.disease.immunity += def.immunityPerHour * restBonus * (c.age >= ELDER ? 0.85 : 1) * hours;
+    const { severity, immunity } = diseaseRates(sim, c, restBonus);
+    h.disease.severity += severity * hours;
+    h.disease.immunity += immunity * hours;
     if (h.disease.immunity >= 1 && h.disease.severity < 1) {
       sim.addLog(`${c.name} has recovered from ${h.disease.label.toLowerCase()}.`, 'good');
-      h.recovered = { key: h.disease.key, until: sim.tick + IMMUNE_DAYS * 24 * TICKS_PER_HOUR };
+      const until = sim.tick + IMMUNE_DAYS * 24 * TICKS_PER_HOUR;
+      h.recovered = { key: h.disease.key, until };
+      h.immunities = { ...h.immunities, [h.disease.key]: until };
       h.disease = null;
     }
   }
   checkHealth(sim, c);
+}
+
+// How fast an illness worsens and immunity builds, an hour, as things stand (`restBonus`: lying down, a hospital
+// bed).
+function diseaseRates(sim: Simulation, c: Colonist, restBonus: number): { severity: number; immunity: number } {
+  const h = c.health;
+  const def = DISEASES[h.disease!.key];
+  const tended = h.disease!.tendedUntil > sim.tick;
+  // Any illness weighs on the old (more the older they are, and they throw it off more slowly); a catching
+  // one is hard on the very young too.
+  const old = c.age >= ELDER ? 1.3 + (c.age - ELDER) * 0.02 : 1;
+  const frail = Math.max(old, def.contagious && c.age < TODDLER * 2 ? 1.4 : 1);
+  // Tending slows an illness; field medicine slows it more.
+  const care = tended ? (sim.isResearched('fieldMedicine') ? 0.35 : 0.45) : 1;
+  return {
+    severity: def.severityPerHour * care * frail,
+    immunity: def.immunityPerHour * restBonus * (c.age >= ELDER ? 0.85 : 1),
+  };
+}
+
+// How an illness will go if it carries on as now (tended or not, in bed or not): whether immunity wins, and in about
+// how many hours either way. (The Health tab showed two bars, and nothing of which would get there first.)
+export function diseaseOutlook(sim: Simulation, c: Colonist): { recovers: boolean; hours: number } | null {
+  const h = c.health;
+  if (!h.disease) {
+    return null;
+  }
+  const restBonus = (c.sleeping || h.downed ? 1.5 : 1) * (inHospitalBed(sim, c) ? HOSPITAL_HEALING : 1);
+  const r = diseaseRates(sim, c, restBonus);
+  const toImmune = (1 - h.disease.immunity) / Math.max(1e-6, r.immunity);
+  const toDeath = (1 - h.disease.severity) / Math.max(1e-6, r.severity);
+  return { recovers: toImmune < toDeath, hours: Math.max(0, Math.min(toImmune, toDeath)) };
 }
 
 // Applies collapse, recovery and death.

@@ -86,6 +86,14 @@ export const scarPain = (c: Colonist): number => 0.03 * count(c, 'scar') + ailme
 
 export const isInfected = (injury: Injury): boolean => (injury.infection ?? 0) > 0 && !injury.treated;
 
+// Whether an injury is worth a dose of medicine: an infected one, or a fresh open wound big enough to fester (a dose
+// went on a bruise of 0.03, which can't).
+export const worthMedicine = (injury: Injury): boolean =>
+  isInfected(injury) ||
+  (injury.tended === 0 &&
+    (injury.label === 'Cut' || injury.label === 'Arrow wound') &&
+    injury.severity >= INFECTION_MIN_SEVERITY);
+
 // Whether a colonist lies in a hospital bed.
 export function inHospitalBed(sim: Simulation, c: Colonist): boolean {
   const f = sim.world.feature[c.tile];

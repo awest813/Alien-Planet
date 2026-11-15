@@ -338,6 +338,9 @@ export interface Health {
   disease: Disease | null;
   // Got over this illness, and can't catch it again until this tick.
   recovered?: { key: string; until: number };
+  // Disease key → the tick its immunity ends: each illness got over keeps its own (recovered held only the last,
+  // and getting over a second wiped the first). Older saves have only `recovered`.
+  immunities?: Record<string, number>;
   // Collapsed from pain or blood loss: can't move or work until it eases.
   downed: boolean;
   dead: boolean;
@@ -586,6 +589,8 @@ export interface Stats {
   truces?: number;
   settlers?: number;
   ransomed?: number;
+  // Illnesses caught, by disease.
+  illnesses?: Record<string, number>;
   // Colonists carried off by raiders (see taken.ts): taken, bought back, exchanged, got away, never seen again.
   taken?: number;
   boughtBack?: number;

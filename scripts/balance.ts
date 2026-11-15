@@ -30,7 +30,7 @@ import {
   terrainDef,
   weaponDef,
 } from '../src/sim/defs';
-import { painOf } from '../src/sim/health';
+import { DISEASES, painOf } from '../src/sim/health';
 import {
   SETTLER_GOODWILL,
   atPeace,
@@ -1560,10 +1560,11 @@ function play(seed: number): Result {
     raidKills: sim.stats.kills,
     raidDowns,
     raidMostDown,
-    diseaseCases: story
-      .filter((s) => s.includes('came down with'))
-      .reduce((n, s) => n + (s.includes(' and ') ? 2 : 1), 0),
-    diseaseDeaths: count(/died of marsh fever/),
+    // Every illness, not only marsh fever (grey flu and the shaking sickness went uncounted).
+    diseaseCases: Object.values(sim.stats.illnesses ?? {}).reduce((a, b) => a + b, 0),
+    diseaseDeaths: Object.values(DISEASES)
+      .map((d) => sim.stats.deaths?.[d.label.toLowerCase()] ?? 0)
+      .reduce((a, b) => a + b, 0),
     breaks: sim.log.length >= 0 ? countBreaks(sim) : 0,
     avgMood: moodSum / Math.max(1, moodSamples),
     minMood,
@@ -1772,7 +1773,7 @@ for (const seed of seedList) {
   messIndoors += r.mess;
   console.log(
     `seed ${String(r.seed).padStart(6)}  alive ${r.living}/${r.total}  raids ${r.raids} (kills ${r.raidKills})  ` +
-      `fever ${r.diseaseCases} (deaths ${r.diseaseDeaths})  breaks ${r.breaks}  mood avg ${r.avgMood.toFixed(0)} min ${r.minMood.toFixed(0)}  ` +
+      `illness ${r.diseaseCases} (deaths ${r.diseaseDeaths})  breaks ${r.breaks}  mood avg ${r.avgMood.toFixed(0)} min ${r.minMood.toFixed(0)}  ` +
       `friends day ${r.friendDay}  rivals ${r.rivals} lovers ${r.lovers}  starving h ${r.starvingHours}  objectives ${r.objectives}/${OBJECTIVES.length}  research ${r.research} (tailoring day ${r.tailoringDay})  frost ${r.frost}  wades ${r.wades} (fords bridged ${r.fordTiles})  shelter day ${r.shelterDay}${r.built ? `\n      built: ${r.built}` : ''}`,
   );
   for (const d of r.deaths) {
@@ -1801,7 +1802,7 @@ console.log(
       }, {}),
     )}\n` +
     `  raids ${sum((r) => r.raids)}, kills ${sum((r) => r.raidKills)}, colonists downed in raids ${sum((r) => r.raidDowns)}, most down at once ${Math.max(...results.map((r) => r.raidMostDown))} (colonies with half or more down at once: ${results.filter((r) => r.raidMostDown * 2 >= r.total).length})\n` +
-    `  fever cases ${sum((r) => r.diseaseCases)}, fever deaths ${sum((r) => r.diseaseDeaths)}\n` +
+    `  illnesses ${sum((r) => r.diseaseCases)}, deaths from them ${sum((r) => r.diseaseDeaths)}\n` +
     `  mental breaks ${sum((r) => r.breaks)}, mean mood ${(sum((r) => r.avgMood) / results.length).toFixed(1)}\n` +
     `  first friendship day (median) ${results.map((r) => r.friendDay).sort((a, b) => a - b)[Math.floor(results.length / 2)]}\n` +
     `  rivals ${sum((r) => r.rivals)}, couples ${sum((r) => r.lovers)}, starving colonist-hours ${sum((r) => r.starvingHours)}\n` +

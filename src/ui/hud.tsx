@@ -675,6 +675,7 @@ function HealthTab({ c }: { c: ColonistView }) {
   return (
     <>
       {healthy && <div className="muted">Healthy.</div>}
+      {c.healthNote && <div className="muted small">{c.healthNote}.</div>}
       {c.needs.food <= 0 && !c.dead && <div className="bad">Starving: works and walks slower until they eat.</div>}
       {c.injuries.map((injury, index) => (
         <div key={index} className="row-line">
@@ -712,7 +713,15 @@ function HealthTab({ c }: { c: ColonistView }) {
       )}
       {c.disease && (
         <>
-          <h4>{c.disease.label}</h4>
+          <h4>
+            {c.disease.label}{' '}
+            {c.disease.tended ? <span className="muted">(tended)</span> : <span className="bad">(untended)</span>}
+          </h4>
+          {c.disease.outlook && (
+            <div className={`small ${c.disease.outlook.startsWith('At risk') ? 'bad' : 'muted'}`}>
+              {c.disease.outlook}
+            </div>
+          )}
           <div className="stat">
             <span>Severity</span>
             <Bar value={c.disease.severity} color="#ff8a5c" label="Severity" />
