@@ -55,6 +55,8 @@ export interface RaidState {
   sapped?: boolean;
   // Who was standing when it began (to tell a raid seen off with nobody lost or down).
   standing?: number[];
+  // Raiders who got away off the map (only they carry off plunder, or one of the fallen).
+  escaped?: number;
   // Thieves after the stores rather than a fight; what they got away with.
   thieves?: boolean;
   // On a small map they gather at the edge until then, so there's time to get ready (see arrivals.ts).
@@ -681,6 +683,9 @@ function flee(sim: Simulation, e: Enemy, ally = false): void {
   if (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) {
     e.hp = 0;
     e.fleeing = true;
+    if (sim.raid && !ally) {
+      sim.raid.escaped = (sim.raid.escaped ?? 0) + 1;
+    }
     if (e.loot) {
       const value = itemDef(e.loot.item).value * e.loot.count;
       if (sim.raid) {
@@ -703,6 +708,9 @@ function flee(sim: Simulation, e: Enemy, ally = false): void {
         e.loot = undefined;
       }
       e.hp = 0;
+      if (sim.raid && !ally) {
+        sim.raid.escaped = (sim.raid.escaped ?? 0) + 1;
+      }
       return;
     }
   }
@@ -1243,12 +1251,16 @@ export function updateEnemies(sim: Simulation): void {
       ) {
         sim.stats.cleanDefences = (sim.stats.cleanDefences ?? 0) + 1;
       }
-    } else if (sim.living().length > 0) {
+    } else if (sim.living().length > 0 && (raid.escaped ?? 0) > 0) {
       sim.addLog(`The raiders left the colony for dead${plunder(sim)}.`, 'danger', true);
       // (Thieves take goods, not people.)
       if (!raid.thieves) {
         carryOff(sim, raid.faction);
       }
+    } else if (sim.living().length > 0) {
+      // (Every one of them fell on the way out, to guard animals or to colonists back on their feet: they took
+      // nothing, and nobody, with them.)
+      sim.addLog('The raiders overran the colony, but none of them got away. Colonists stand down.', 'warn', true);
     }
     for (const c of sim.living()) {
       if (c.drafted && !sim.story.manhuntersActive) {

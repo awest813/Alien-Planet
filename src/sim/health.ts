@@ -337,8 +337,9 @@ export function checkHealth(sim: Simulation, c: Colonist): void {
   h.downed = downed;
 }
 
-// `told`, if given, is what the log says in place of "has died of (cause)".
-export function die(sim: Simulation, c: Colonist, cause: string, told?: string): void {
+// `told`, if given, is what the log says in place of "has died of (cause)". Without a `body` (someone lost far
+// off), nobody waits to be buried.
+export function die(sim: Simulation, c: Colonist, cause: string, told?: string, body = true): void {
   sim.endJob(c);
   sim.dropCarried(c);
   const weapon = weaponDef(c.weapon).item;
@@ -366,7 +367,9 @@ export function die(sim: Simulation, c: Colonist, cause: string, told?: string):
   c.expectingWith = undefined;
   c.drafted = false;
   // Waiting to be buried (a grave and a funeral), and remembered by name.
-  sim.unburied.push({ id: c.id, name: c.name, day: sim.day, cause });
+  if (body) {
+    sim.unburied.push({ id: c.id, name: c.name, day: sim.day, cause });
+  }
   sim.addLog(told ?? `${c.name} has died of ${cause}.`, 'danger', true, told ? undefined : { tile: c.tile });
   if (sim.village.leader === c.id) {
     sim.village.leader = -1;

@@ -306,7 +306,8 @@ describe('a colonist carried off', () => {
     const c = carryOff(sim, raiders.id)!;
     sim.rng.next = next;
     const alert = alerts().find((a) => a.text.startsWith(`${c.name} is held by ${raiders.name}`))!;
-    expect(alert.text).toMatch(/6 days to buy them back \(\d+ silver\)$/);
+    // (The landing's 100 silver lies about, not yet in storage: the alert says so.)
+    expect(alert.text).toMatch(/6 days to buy them back \(\d+ silver; 100 silver lies about, to haul into storage\)$/);
     expect(alert.tone).toBe('danger');
     expect(alert.screen).toBe('factions');
     controller.publish();

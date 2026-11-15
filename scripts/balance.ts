@@ -1406,7 +1406,7 @@ function play(seed: number): Result {
       const swap = sim.captives.find((p) => p.faction === t.faction && p.state === 'prisoner');
       if (swap) {
         sim.apply({ type: 'world', action: { kind: 'exchange', colonist: t.colonist, captive: swap.id } });
-      } else if (colonyStock(sim, itemId('silver')) >= buyBackCost(sim)) {
+      } else if (colonyStock(sim, itemId('silver')) >= buyBackCost(sim, t)) {
         sim.apply({ type: 'world', action: { kind: 'buyBack', colonist: t.colonist } });
       }
     }

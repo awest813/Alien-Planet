@@ -1155,12 +1155,13 @@ function Taken({ state }: { state: FactionsState }) {
           </p>
           <div className="row">
             <button
-              disabled={d.silver < t.cost}
+              disabled={d.silver < t.cost || t.blocked !== null}
               onClick={() => world({ kind: 'buyBack', colonist: t.id })}
               title={
-                d.silver < t.cost
-                  ? `The colony has ${d.silver} silver in storage of the ${t.cost} they want`
-                  : `Pay ${t.cost} silver and ${t.name} comes home`
+                t.blocked ??
+                (d.silver < t.cost
+                  ? `The colony has ${d.silver} silver in storage of the ${t.cost} they want${d.looseSilver > 0 ? ` (${d.looseSilver} more lies about: haul it to a stockpile)` : ''}`
+                  : `Pay ${t.cost} silver and ${t.name} comes home`)
               }
             >
               Buy back: {t.cost} silver
@@ -1168,8 +1169,9 @@ function Taken({ state }: { state: FactionsState }) {
             {t.swaps.map((p) => (
               <button
                 key={p.id}
+                disabled={t.blocked !== null}
                 onClick={() => world({ kind: 'exchange', colonist: t.id, captive: p.id })}
-                title={`${p.name} goes back to ${t.faction}, and ${t.name} comes home`}
+                title={t.blocked ?? `${p.name} goes back to ${t.faction}, and ${t.name} comes home`}
               >
                 Exchange {p.name}
               </button>

@@ -9,7 +9,8 @@
 
 import { FACTIONS, itemId } from './defs';
 import { hostileDealing, tributeCost } from './diplomacy';
-import { arrival } from './expeditions';
+import { arrival, letGo } from './expeditions';
+import { DRAFT_AGE } from './lifespans';
 import { die } from './health';
 import { handOver } from './prisoners';
 import { TICKS_PER_HOUR } from './constants';
@@ -23,6 +24,9 @@ export interface Taken {
   faction: number;
   // When the raiders give up on being paid: the colonist is lost.
   until: number;
+  // Their price, fixed when they were taken (tribute's rises by the day: a colony that put by what was asked
+  // found it short). Missing in a save from before it was kept: today's tribute.
+  cost?: number;
 }
 
 const DAY = TICKS_PER_HOUR * 24;
@@ -41,27 +45,41 @@ export const takenBy = (sim: Simulation, id: number): Taken | undefined =>
   takenList(sim).find((t) => t.colonist === id);
 // What the raiders ask: as much as a season's peace from them.
 // (A function, not tributeCost itself: this module and expeditions.ts import each other.)
-export const buyBackCost = (sim: Simulation): number => tributeCost(sim);
+export const buyBackCost = (sim: Simulation, t?: Taken): number => t?.cost ?? tributeCost(sim);
+
+// Why the colony can't deal for someone just now (their people attacking: the one handed back walked in among
+// them), or null.
+export function dealBlocked(sim: Simulation, t: Taken): string | null {
+  return sim.enemies.some((e) => e.faction === t.faction && e.hp > 0 && !e.fleeing)
+    ? `Not while ${FACTIONS[t.faction].name} are attacking.`
+    : null;
+}
 
 // After a raid that overran the colony: maybe one of the fallen goes with the raiders. Returns who.
 export function carryOff(sim: Simulation, faction: number): Colonist | undefined {
   const living = sim.living();
   const fallen = living.filter((c) => c.health.downed && c.age >= TAKEN_AGE);
-  if (living.length < 2 || fallen.length === 0 || sim.rng.next() >= TAKEN_CHANCE[sim.story.difficulty]) {
+  if (fallen.length === 0 || sim.rng.next() >= TAKEN_CHANCE[sim.story.difficulty]) {
     return undefined;
   }
+  // Never the last who could look after the rest: someone old enough to fight stays (taking a lone parent left a
+  // baby with nobody, and a child who could neither haul the silver nor send anyone).
   const c = sim.rng.pick(fallen);
-  sim.endJob(c);
-  sim.dropCarried(c);
-  c.drafted = false;
+  if (!living.some((o) => o !== c && o.age >= DRAFT_AGE)) {
+    return undefined;
+  }
+  // (As anyone leaving the map: whoever was on their way to tend them, a concert they were giving, an animal
+  // after them, all let go. A doctor walked to where they had lain and tended them, held miles off.)
+  letGo(sim, c);
   c.away = 'gone';
   c.path = [];
   c.moveProgress = 0;
+  const cost = buyBackCost(sim);
   const d = sim.diplomacy;
-  d.taken = [...takenList(sim), { colonist: c.id, faction, until: sim.tick + HELD_DAYS * DAY }];
+  d.taken = [...takenList(sim), { colonist: c.id, faction, until: sim.tick + HELD_DAYS * DAY, cost }];
   sim.stats.taken = (sim.stats.taken ?? 0) + 1;
   sim.addLog(
-    `${FACTIONS[faction].name} carried ${c.name} off with them. They'll give ${c.name} back for ${buyBackCost(sim)} silver, or one of their own you hold, within ${HELD_DAYS} days (Factions).`,
+    `${FACTIONS[faction].name} carried ${c.name} off with them. They'll give ${c.name} back for ${cost} silver, or one of their own you hold, within ${HELD_DAYS} days (Factions).`,
     'danger',
     true,
     { colonist: c.id },
@@ -75,7 +93,11 @@ export function buyBack(sim: Simulation, id: number): string | null {
   if (!t) {
     return 'Nobody by that name is held.';
   }
-  const cost = buyBackCost(sim);
+  const blocked = dealBlocked(sim, t);
+  if (blocked) {
+    return blocked;
+  }
+  const cost = buyBackCost(sim, t);
   if (colonyStock(sim, itemId('silver')) < cost) {
     return `They want ${cost} silver.`;
   }
@@ -90,6 +112,10 @@ export function exchange(sim: Simulation, id: number, captive: number): string |
   const t = takenBy(sim, id);
   if (!t) {
     return 'Nobody by that name is held.';
+  }
+  const blocked = dealBlocked(sim, t);
+  if (blocked) {
+    return blocked;
   }
   // (A prisoner: one of theirs lying wounded where they fell isn't held, and was a swap for the taking.)
   const p = sim.captives.find((q) => q.id === captive && q.state === 'prisoner');
@@ -111,7 +137,6 @@ export function updateTaken(sim: Simulation): void {
       forget(sim, t);
     } else if (sim.tick >= t.until) {
       forget(sim, t);
-      c.away = undefined;
       sim.stats.lostToRaiders = (sim.stats.lostToRaiders ?? 0) + 1;
       // (Their gear went with them.)
       c.weapon = 'fists';
@@ -123,7 +148,9 @@ export function updateTaken(sim: Simulation): void {
         c,
         'raiders',
         `${c.name} was never seen again: ${FACTIONS[t.faction].name} gave up waiting to be paid and took them beyond the hills.`,
+        false,
       );
+      // (Still away, as they were: no body lies where they fell. They're mourned, but there's nobody to bury.)
     } else if (Math.floor(sim.hour) === 6 && sim.rng.next() < ESCAPE_CHANCE) {
       sim.stats.escaped = (sim.stats.escaped ?? 0) + 1;
       bringBack(sim, t, `${c.name} slipped away from ${FACTIONS[t.faction].name} in the night.`);

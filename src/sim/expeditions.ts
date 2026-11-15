@@ -164,10 +164,16 @@ export function sendExpedition(sim: Simulation, to: number, purpose: Purpose, id
 
 // A member drops what they're doing and heads for the edge of the map.
 function leave(sim: Simulation, c: Colonist): void {
+  letGo(sim, c);
+  c.away = 'leaving';
+}
+
+// Someone leaving the map (on an expedition, or carried off by raiders): they drop what they're doing and what
+// they carry, and everyone and everything that was busy with them lets them go.
+export function letGo(sim: Simulation, c: Colonist): void {
   sim.endJob(c);
   sim.dropCarried(c);
   c.drafted = false;
-  c.away = 'leaving';
   // Anyone on their way to tend or feed them gives up.
   for (const o of sim.colonists) {
     if (o !== c && o.job && o.job.patient === c.id && ['tend', 'soothe', 'feed', 'rescue'].includes(o.job.type)) {

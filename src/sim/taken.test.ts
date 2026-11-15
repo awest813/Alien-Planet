@@ -8,7 +8,7 @@ import { Simulation } from './simulation';
 import { HELD_DAYS, TAKEN_CHANCE, buyBack, buyBackCost, carryOff, exchange, takenList, updateTaken } from './taken';
 import { HOUR, clearAround } from './test-helpers';
 import { colonyStock } from './trade';
-import type { Captive } from './types';
+import type { Captive, Colonist } from './types';
 
 // Colonists carried off by raiders who overran the colony, and getting them back.
 
@@ -69,7 +69,9 @@ describe('carried off by raiders', () => {
     expect(c).toBeDefined();
     expect(c.away).toBe('gone');
     expect(sim.living()).toHaveLength(before - 1);
-    expect(takenList(sim)).toEqual([{ colonist: c.id, faction: RAIDERS, until: sim.tick + HELD_DAYS * 24 * HOUR }]);
+    expect(takenList(sim)).toEqual([
+      { colonist: c.id, faction: RAIDERS, until: sim.tick + HELD_DAYS * 24 * HOUR, cost: tributeCost(sim) },
+    ]);
     expect(sim.log.at(-1)!.text).toMatch(new RegExp(`carried ${c.name} off.*${buyBackCost(sim)} silver`));
     // Everyone else feels it, until they're home.
     const other = sim.living()[0];
@@ -138,7 +140,9 @@ describe('carried off by raiders', () => {
     sim.tick += HELD_DAYS * 24 * HOUR;
     updateTaken(sim);
     expect(c.health.dead).toBe(true);
-    expect(c.away).toBeUndefined();
+    // Lost far off: no body where they fell, and nobody waiting to be buried.
+    expect(c.away).toBe('gone');
+    expect(sim.unburied.some((u) => u.id === c.id)).toBe(false);
     expect(sim.stats.lostToRaiders).toBe(1);
     expect(sim.stats.deaths?.raiders).toBe(1);
     expect(sim.storyLog.at(-1)?.text ?? sim.log.at(-1)!.text).toMatch(/never seen again/);
@@ -175,11 +179,73 @@ describe('carried off by raiders', () => {
     certain(sim);
     expect(spawnRaid(sim, RAIDERS, 3)).toBe(true);
     sim.raid!.outcome = 'overrun';
+    // (One of them got away off the map.)
+    sim.raid!.escaped = 1;
     for (const e of sim.enemies) {
       e.hp = 0;
     }
     sim.step();
     expect(sim.raid).toBeNull();
     expect(takenList(sim)).toHaveLength(1);
+  });
+
+  it('raiders who all fell on the way out take nothing, and nobody', () => {
+    const { sim } = overrun();
+    certain(sim);
+    expect(spawnRaid(sim, RAIDERS, 3)).toBe(true);
+    sim.raid!.outcome = 'overrun';
+    for (const e of sim.enemies) {
+      e.hp = 0;
+    }
+    sim.step();
+    expect(sim.raid).toBeNull();
+    expect(takenList(sim)).toEqual([]);
+    expect(sim.log.some((l) => /none of them got away/.test(l.text))).toBe(true);
+  });
+
+  it('the price asked stays the price, however long it takes to find', () => {
+    const { sim } = overrun();
+    certain(sim);
+    const c = carryOff(sim, RAIDERS)!;
+    const t = takenList(sim)[0];
+    const asked = buyBackCost(sim, t);
+    sim.tick += 5 * 24 * HOUR;
+    sim.syncClock();
+    expect(tributeCost(sim)).toBeGreaterThan(asked);
+    expect(buyBackCost(sim, takenList(sim)[0])).toBe(asked);
+    expect(c.away).toBe('gone');
+  });
+
+  it('nobody is taken who leaves no one old enough to look after the rest', () => {
+    const { sim } = overrun();
+    certain(sim);
+    const [adult, child, ...rest] = sim.colonists;
+    for (const c of rest) {
+      c.health.dead = true;
+    }
+    adult.age = 30;
+    child.age = 8;
+    expect(carryOff(sim, RAIDERS)).toBeUndefined();
+  });
+
+  it('whoever was on the way to tend them lets them go, and no deal is made while their people attack', () => {
+    const { sim } = overrun();
+    certain(sim);
+    // A doctor on the way to tend the first of the fallen (the one these rolls take).
+    const [first, doctor] = sim.colonists;
+    doctor.health.downed = false;
+    const tend = (sim as unknown as { makeJob(type: string, target: number, extra: object): Colonist['job'] }).makeJob(
+      'tend',
+      first.tile,
+      { patient: first.id },
+    );
+    doctor.job = tend;
+    const c = carryOff(sim, RAIDERS)!;
+    expect(c).toBe(first);
+    // (They walked to where the taken had lain, and tended them there, held miles off.)
+    expect(doctor.job).toBeNull();
+    expect(spawnRaid(sim, RAIDERS, 2)).toBe(true);
+    expect(buyBack(sim, c.id)).toMatch(/Not while .* attacking/);
+    expect(exchange(sim, c.id, 1)).toMatch(/Not while .* attacking/);
   });
 });

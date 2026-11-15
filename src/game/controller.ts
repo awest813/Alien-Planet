@@ -98,7 +98,7 @@ import {
   expeditions,
   supplyCost,
 } from '../sim/expeditions';
-import { buyBackCost, takenBy, takenList } from '../sim/taken';
+import { buyBackCost, dealBlocked, takenBy, takenList } from '../sim/taken';
 import { weatherDef } from '../sim/weather';
 import {
   Colonist,
@@ -1092,6 +1092,8 @@ export interface DiplomacyView {
     daysLeft: number;
     cost: number;
     swaps: { id: number; name: string }[];
+    // Why no deal can be made just now (their people attacking), or null.
+    blocked: string | null;
   }[];
   destinations: { to: number; purpose: 'trade' | 'salvage'; label: string; days: number; open: boolean }[];
   // Colonists who could go (and why not, for the rest).
@@ -3140,8 +3142,13 @@ export class GameController {
     for (const t of takenList(sim)) {
       const days = Math.max(1, Math.ceil((t.until - sim.tick) / (TICKS_PER_HOUR * 24)));
       const swap = sim.captives.some((p) => p.faction === t.faction && p.state === 'prisoner');
+      const cost = buyBackCost(sim, t);
+      // Silver lying about (a ransom paid for a prisoner is dropped at home) doesn't count until it's stored.
+      const stored = colonyStock(sim, itemId('silver'));
+      const loose = sim.stockOf(itemId('silver')) - stored;
+      const short = stored < cost && stored + loose >= cost ? `; ${loose} silver lies about, to haul into storage` : '';
       alerts.push({
-        text: `${sim.colonists[t.colonist].name} is held by ${FACTIONS[t.faction].name}: ${days} day${days === 1 ? '' : 's'} to buy them back (${buyBackCost(sim)} silver)${swap ? ' or exchange a prisoner' : ''}`,
+        text: `${sim.colonists[t.colonist].name} is held by ${FACTIONS[t.faction].name}: ${days} day${days === 1 ? '' : 's'} to buy them back (${cost} silver${short})${swap ? ' or exchange a prisoner' : ''}`,
         tone: 'danger',
         screen: 'factions',
       });
@@ -3853,7 +3860,8 @@ export class GameController {
         name: sim.colonists[t.colonist].name,
         faction: FACTIONS[t.faction].name,
         daysLeft: Math.max(1, Math.ceil(hoursTo(t.until) / 24)),
-        cost: buyBackCost(sim),
+        cost: buyBackCost(sim, t),
+        blocked: dealBlocked(sim, t),
         swaps: sim.captives
           .filter((p) => p.faction === t.faction && p.state === 'prisoner')
           .map((p) => ({ id: p.id, name: p.name })),
