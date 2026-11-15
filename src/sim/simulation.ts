@@ -4501,7 +4501,7 @@ export class Simulation {
     const crop = featureDef(growZoneCrop(w.zone[i])).crop!;
     const temp = this.temperatureAt(i);
     if (temp < CROP_MIN_TEMP) {
-      return `Too cold to sow: ${Math.floor(temp)}°C, and seeds need ${CROP_MIN_TEMP}°C`;
+      return `Too cold (${Math.floor(temp)}°C; seeds need ${CROP_MIN_TEMP}°C)`;
     }
     // Frost-proof (poplars): it only waits out the winter, so any time will do. (Sowing stopped at midsummer, the
     // field bare half the year.)
@@ -4533,7 +4533,7 @@ export class Simulation {
     }
     if (walk.end === 'frost') {
       return coldSnapOn(this)
-        ? 'A cold snap: sowing waits until its frosts have passed'
+        ? 'A cold snap: waiting until its frosts have passed'
         : `A frost is coming in ${days(walk.hours)}, before it could ripen`;
     }
     return null;
