@@ -37,10 +37,17 @@ describe('arrivals from the edge', () => {
   it('say when the raiders will get there', () => {
     const sim = quiet(64);
     spawnRaid(sim, RAIDERS, 3);
-    expect(sim.log.at(-1)!.text).toMatch(/will reach the colony (within the hour|in about (an hour|\d+ hours))/);
+    expect(sim.log.at(-1)!.text).toMatch(
+      /will reach the colony (within the hour|in about (an hour( and a half)?|\d+( and a half)? hours))/,
+    );
     expect(inAbout(HOUR * 0.4)).toBe('within the hour');
     expect(inAbout(HOUR)).toBe('in about an hour');
     expect(inAbout(HOUR * 3.2)).toBe('in about 3 hours');
+    // The usual warning, an hour and a half, said the same at the announcement and a few minutes on (it was
+    // "2 hours" then "an hour").
+    expect(inAbout(HOUR * 1.5)).toBe('in about an hour and a half');
+    expect(inAbout(HOUR * 1.4)).toBe('in about an hour and a half');
+    expect(inAbout(HOUR * 2.5)).toBe('in about 2 and a half hours');
   });
 
   it('come on at once if a colonist goes out to meet them', () => {

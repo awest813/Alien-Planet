@@ -221,7 +221,7 @@ describe('a raid on the way', () => {
     ).toBe(true);
     const raid = texts().find((t) => t.startsWith('Raid:'));
     expect(raid).toMatch(
-      /gathering at the edge: here (within the hour|in about (an hour|\d+ hours))\. Draft with Q\.$/,
+      /gathering at the edge: here (within the hour|in about (an hour( and a half)?|\d+( and a half)? hours))\. Draft with Q\.$/,
     );
   });
 });
@@ -389,7 +389,26 @@ describe('fourth audit: a newcomer playing', () => {
     const { w, x, y } = colony('stove');
     expect(goal('meals').how).toMatch(/Build a stove/);
     w.setFeature(w.idx(x + 3, y), featureId('stove'));
-    expect(goal('meals').how).toMatch(/raw food/);
+    // (A new colony's rations are more meals than Production keeps: so it says why nobody cooks yet.)
+    expect(goal('meals').how).toMatch(/raw food|meals already, the \d+ Production keeps/);
+  });
+
+  it('says why the stove stands idle when the meals in store meet the target, and asks for granite first', () => {
+    const { sim, w, x, y } = colony('stove-idle');
+    // Planned, with no granite: mine for it.
+    sim.apply({ type: 'build', feature: featureId('stove'), tiles: [w.idx(x + 3, y)] });
+    for (const i of [...w.tilesWith('items')]) {
+      if (w.itemType[i] === itemId('stone')) {
+        w.takeItem(i, w.itemCount[i]);
+      }
+    }
+    expect(goal('meals').how).toMatch(/waits for granite: mine rock/);
+    expect(goal('meals').tool).toBe('mine');
+    // Built, with meals enough: raise the target.
+    w.setFeature(w.idx(x + 3, y), featureId('stove'));
+    w.addItem(w.idx(x - 3, y), itemId('meal'), 20);
+    expect(goal('meals').how).toMatch(/Raise the target \(Production\)/);
+    expect(goal('meals').screen).toBe('production');
   });
 
   it('says so when a hunt drag catches no animals', () => {

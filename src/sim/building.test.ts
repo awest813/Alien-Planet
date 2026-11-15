@@ -309,3 +309,23 @@ describe('something in the way of a building', () => {
     expect(w.feature[bush]).toBe(featureId('woodWall'));
   });
 });
+
+describe('deconstructing a wall half built, half planned', () => {
+  it('marks the built part and calls off the plans, refunding what was brought for them', () => {
+    // (The planned half stayed, and went up all the same.)
+    const sim = Simulation.newColony(22);
+    sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    const built = [w.idx(x + 2, y + 3), w.idx(x + 3, y + 3)];
+    const planned = [w.idx(x + 4, y + 3), w.idx(x + 5, y + 3)];
+    for (const i of built) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    sim.apply({ type: 'build', feature: featureId('woodWall'), tiles: planned });
+    expect(planned.every((i) => w.blueprint[i] === featureId('woodWall'))).toBe(true);
+    sim.apply({ type: 'designate', rect: { x0: x + 2, y0: y + 3, x1: x + 5, y1: y + 3 }, kind: 'deconstruct' });
+    expect(built.every((i) => w.designation[i] !== 0)).toBe(true);
+    expect(planned.every((i) => w.blueprint[i] === NONE)).toBe(true);
+  });
+});

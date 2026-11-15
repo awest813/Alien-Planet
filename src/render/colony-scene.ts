@@ -1961,7 +1961,10 @@ export class ColonyScene extends Phaser.Scene {
           let n = 0;
           for (let y = Math.min(rect.y0, rect.y1); y <= Math.max(rect.y0, rect.y1); y++) {
             for (let x = Math.min(rect.x0, rect.x1); x <= Math.max(rect.x0, rect.x1); x++) {
-              n += world.designation[world.idx(x, y)] !== 0 ? 1 : 0;
+              const i = world.idx(x, y);
+              // (Plans count: a Deconstruct drag calls off a building not yet built.)
+              n +=
+                world.designation[i] !== 0 || (tool.designation === 'deconstruct' && world.blueprint[i] !== 0) ? 1 : 0;
             }
           }
           return n;

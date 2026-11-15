@@ -1396,8 +1396,10 @@ button.brush.active {
 
   /* The card keeps to the top half of the map, so there's ground to tap below it (it covered 60% of the screen,
      and the colonist it was about with it); drafted, it's only the head: name, Draft, stances. */
+  /* (At half the height, a colonist's card showed four rows: their needs and mood, why they're unhappy, behind a
+     scroll. The goals fold away while it's open.) */
   .left-column .inspector {
-    max-height: 48%;
+    max-height: 62%;
   }
 
   .inspector.drafted > .tabs,
@@ -1476,15 +1478,17 @@ button.brush.active {
   .choice-note {
     display: block;
   }
+}
 
-  .title-panel .start-row {
-    position: sticky;
-    bottom: -24px;
-    margin: 0 -24px -24px;
-    padding: 12px 24px 24px;
-    background: var(--panel);
-    box-shadow: 0 -8px 12px rgba(16, 20, 28, 0.9);
-  }
+/* Start stays in reach at the bottom of the new-colony form on any screen it doesn't fit (at 1280×800 it sat below
+   the fold, to be scrolled to). */
+.title-panel .start-row {
+  position: sticky;
+  bottom: -24px;
+  margin: 0 -24px -24px;
+  padding: 12px 24px 24px;
+  background: var(--panel);
+  box-shadow: 0 -8px 12px rgba(16, 20, 28, 0.9);
 }
 
 /* Phase headers in the goals list fold and unfold. */
@@ -2649,5 +2653,29 @@ input[type='checkbox'] {
   .colonists-table th .sort {
     min-width: 44px;
     min-height: 36px;
+  }
+}
+
+/* Draft all: in the colonist row on a wide screen, in the top bar's scrolling row on a phone (see DraftAll). In the
+   row, solid as the chips are, and taking clicks (the row lets them through to the map). */
+.draft-all.in-nav {
+  display: none;
+}
+
+.draft-all.in-bar {
+  pointer-events: auto;
+  background: var(--panel);
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  padding: 4px 12px;
+}
+
+@media (max-width: 720px) {
+  .draft-all.in-nav {
+    display: inline-flex;
+  }
+
+  .draft-all.in-bar {
+    display: none;
   }
 }

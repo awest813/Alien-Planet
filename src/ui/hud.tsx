@@ -121,12 +121,35 @@ const pickTopBar = (s: UiState) => ({
     'settings',
     'ship',
   )(s),
-  // Someone who could still be drafted.
+  anyDrafted: s.colonists.some((c) => !c.dead && c.drafted),
+});
+
+// Draft all (or Stand down all), in a fight or while anyone is drafted: in the colonist row on a wide screen (in the
+// top bar, it wrapped the bar to two rows and everything below jumped down), and in the top bar's scrolling row on a
+// phone.
+const pickDraftAll = (s: UiState) => ({
+  fight: !!s.raid || s.animalsAttacking,
   anyFree: s.colonists.some(
     (c) => !c.dead && c.status !== 'Downed' && c.status !== 'Away' && !c.drafted && !c.inBreak && c.age >= DRAFT_AGE,
   ),
   anyDrafted: s.colonists.some((c) => !c.dead && c.drafted),
 });
+
+function DraftAll({ where }: { where: 'in-nav' | 'in-bar' }) {
+  const { fight, anyFree, anyDrafted } = useUi(pickDraftAll);
+  if (!((fight && (anyFree || anyDrafted)) || anyDrafted)) {
+    return null;
+  }
+  return (
+    <button
+      className={`danger draft-all ${where}`}
+      onClick={() => controller.toggleDraftAll()}
+      title="Draft or stand down everyone (Q, with no colonist selected)"
+    >
+      {fight && anyFree ? 'Draft all' : 'Stand down all'}
+    </button>
+  );
+}
 
 const pickClock = fields('night', 'season', 'day', 'time', 'year');
 
@@ -159,7 +182,6 @@ export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
   const state = useUi(pickTopBar);
   const p = state.power;
   const net = p.supply - p.demand;
-  const anyFree = state.anyFree;
   const fit = useTopBarFit(state);
   // Something from the neighbours waiting on an answer.
   const d = state.diplomacy;
@@ -232,15 +254,7 @@ export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
       <nav className="screens">
         {/* In a fight, Draft all (or Stand down all); otherwise Stand down all while anyone is drafted (left so after a
             fight with one animal, they starved: drafted, nobody eats, and the button had gone). */}
-        {(((state.raid || state.animalsAttacking) && (anyFree || state.anyDrafted)) || state.anyDrafted) && (
-          <button
-            className="danger draft-all"
-            onClick={() => controller.toggleDraftAll()}
-            title="Draft or stand down everyone (Q, with no colonist selected)"
-          >
-            {(state.raid || state.animalsAttacking) && anyFree ? 'Draft all' : 'Stand down all'}
-          </button>
-        )}
+        <DraftAll where="in-nav" />
         {/* The ship waits a day: its choice stays one click away after the dialog is closed. (At the front: on a
             phone the bar scrolls, and at the end it was off the screen.) */}
         {state.ship === 'landed' && (
@@ -460,6 +474,7 @@ export function ColonistBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
         .map((c) => (
           <Chip key={c.id} c={c} selected={state.selectedColonist === c.id} />
         ))}
+      <DraftAll where="in-bar" />
       <button
         className="chip"
         onClick={() => onOpen('colonists')}
@@ -983,7 +998,7 @@ type SideTab = 'goals' | 'log';
 const ALERTS_SHOWN = 3;
 
 const pickSidePanel = (s: UiState) => ({
-  ...fields('alerts', 'day', 'log', 'objectives', 'toolId')(s),
+  ...fields('alerts', 'day', 'log', 'objectives', 'toolId', 'selectedColonist')(s),
   afternoon: parseInt(s.time, 10) >= 12,
 });
 
@@ -1000,6 +1015,13 @@ export function SidePanel({ onOpen }: { onOpen: (screen: Screen) => void }) {
       setOpen(false);
     }
   }, [toolId]);
+  // And so does picking a colonist: their card and the goals stacked up, the card cut off at the side.
+  const picked = state.selectedColonist;
+  useEffect(() => {
+    if (picked !== null && window.innerWidth <= 720) {
+      setOpen(false);
+    }
+  }, [picked]);
   // Starting a goal there folds the panel away too, even when its tool is already in hand.
   const foldOnPhone = () => {
     if (window.innerWidth <= 720) {
@@ -1325,6 +1347,19 @@ export function Architect() {
       setGroup(current.group);
     }
   }, [current]);
+  // The tool picked (from a goal's button, say) is scrolled into sight in its row: on a phone, Door was picked
+  // with its button off the end of the row, and nothing on screen showed it.
+  useEffect(() => {
+    if (state.toolId === 'select') {
+      return;
+    }
+    const raf = requestAnimationFrame(() => {
+      tools0.current
+        ?.querySelector<HTMLElement>('button.active')
+        ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [state.toolId, group]);
   // A tab switch moves the buttons out from under the mouse, which never sends a mouseleave.
   useEffect(() => setHovered(null), [group]);
   // Back to Select (Esc, right-click): the button last pressed keeps no focus ring, so it doesn't look

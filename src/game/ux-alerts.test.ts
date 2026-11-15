@@ -325,3 +325,22 @@ describe('a colonist carried off', () => {
     expect(alerts().some((a) => a.text.includes('is held by'))).toBe(false);
   });
 });
+
+describe('drafting', () => {
+  it('puts a building tool down, so a tap sends the drafted, and leaves the sick in bed when drafting everyone', () => {
+    // (Bed, picked for the shelter long before, took the tap meant to send a drafted colonist: a bed in the open.)
+    const sim = colony('draft-tool');
+    controller.selectToolById('bed');
+    expect(controller.tool.kind).toBe('build');
+    const [sick, ...rest] = sim.living();
+    sick.health.disease = { key: 'marshFever', label: 'Marsh fever', severity: 0.35, immunity: 0, tendedUntil: 0 };
+    expect(spawnRaid(sim, 0, 3)).toBe(true);
+    controller.toggleDraftAll();
+    expect(controller.tool.kind).toBe('select');
+    expect(sick.drafted).toBe(false);
+    expect(rest.every((c) => c.drafted)).toBe(true);
+    // One at a time, the sick can still be drafted.
+    controller.toggleDraft(sick.id);
+    expect(sick.drafted).toBe(true);
+  });
+});

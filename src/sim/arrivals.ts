@@ -31,8 +31,21 @@ export const musterTicks = (walk: number): number => Math.max(0, Math.round(MIN_
 export const raiderTilesPerTick = (speed: number): number => MOVE_SPEED * speed;
 export const animalTilesPerTick = (speed: number): number => MOVE_SPEED * 0.8 * speed;
 
-// "within the hour", "in about an hour", "in about 3 hours".
+// "within the hour", "in about an hour", "in about an hour and a half", "in about 3 hours". (In half hours under
+// three: the warning is most often an hour and a half, which the announcement rounded to two hours and the alert,
+// a few minutes on, to one.)
 export function inAbout(ticks: number): string {
-  const hours = Math.round(ticks / TICKS_PER_HOUR);
-  return hours < 1 ? 'within the hour' : hours === 1 ? 'in about an hour' : `in about ${hours} hours`;
+  const exact = ticks / TICKS_PER_HOUR;
+  if (exact < 0.75) {
+    return 'within the hour';
+  }
+  if (exact < 3) {
+    const halves = Math.round(exact * 2) / 2;
+    const whole = Math.floor(halves);
+    const half = halves !== whole;
+    return whole === 1
+      ? `in about an hour${half ? ' and a half' : ''}`
+      : `in about ${whole}${half ? ' and a half' : ''} hours`;
+  }
+  return `in about ${Math.round(exact)} hours`;
 }

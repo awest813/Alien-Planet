@@ -603,6 +603,15 @@ export function ProductionScreen({ onClose }: { onClose: () => void }) {
           {bill.short && !bill.mend && bill.stock < bill.target && (
             <span className="tag warn">short of {bill.short}</span>
           )}
+          {/* (Why the bench stands idle: a gift of meals met the target, and nobody cooked.) */}
+          {!bill.mend && !bill.locked && bill.target > 0 && bill.stock >= bill.target && (
+            <span
+              className="tag"
+              title="Nobody makes more until the stock falls below the target: raise it to make more now"
+            >
+              target met
+            </span>
+          )}
         </div>
       </td>
       <td className="muted stock">{bill.mend ? `${bill.stock} worn` : `${bill.stock} in stock`}</td>

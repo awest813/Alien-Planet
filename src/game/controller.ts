@@ -41,6 +41,7 @@ import {
   BOOKS_BONUS,
   BOOKS_REACH,
   MAP_SIZE,
+  NIGHT_END,
   NIGHT_START,
   OBJECTIVES,
   Simulation,
@@ -1961,7 +1962,18 @@ export class GameController {
   public toggleDraft(id: number): void {
     const c = this.sim.colonists[id];
     if (c) {
+      if (!c.drafted) {
+        this.putToolDown();
+      }
       this.command({ type: 'draft', colonist: id, drafted: !c.drafted });
+    }
+  }
+
+  // Drafting is for orders, not building: a tool still in hand (Bed, picked for the shelter long before) took the
+  // tap meant to send a drafted colonist, and put a bed out in the open.
+  private putToolDown(): void {
+    if (this.tool.kind !== 'select') {
+      this.setTool({ kind: 'select' });
     }
   }
 
@@ -1974,7 +1986,13 @@ export class GameController {
   public toggleDraftAll(): void {
     // (Not anyone in a mental break: the colony can't draft them, and counting them would keep this drafting
     // everyone again rather than standing them down.)
-    const able = this.sim.living().filter((c) => !c.health.downed && c.age >= DRAFT_AGE && !this.sim.inMentalBreak(c));
+    // (Nor anyone sick: Q drafted a colonist with a fever out of bed. They can still be drafted on their own; the
+    // wounded who can stand are, though, in a fight.)
+    const able = this.sim
+      .living()
+      .filter(
+        (c) => !c.health.downed && c.age >= DRAFT_AGE && !this.sim.inMentalBreak(c) && (c.drafted || !c.health.disease),
+      );
     // With nothing to fight, anyone drafted is stood down (they don't eat while drafted: two left so after a boar
     // fought back starved for a day with the stores full, and pressing Q drafted everyone else).
     const threat = !!this.sim.raid || this.animalsAttacking();
@@ -1985,6 +2003,9 @@ export class GameController {
     }
     // (Standing down takes in a drafted colonist who has since collapsed: left drafted, they got up and stood
     // about doing nothing.)
+    if (draft) {
+      this.putToolDown();
+    }
     for (const c of draft ? able : this.sim.living().filter((c) => c.drafted)) {
       this.command({ type: 'draft', colonist: c.id, drafted: draft });
     }
@@ -3788,6 +3809,51 @@ export class GameController {
             how: `The bench is up: crafters weave cotton into cloth there (Production: Weave cloth). ${cloth} of the 6 cloth an armchair takes; cotton comes from a harvest.`,
             tool: 'growCotton',
           };
+    }
+    // Cooking: a stove still waiting for its granite, or meals enough in stock that nobody cooks (a gift of ten
+    // meals met the target, the stove stood idle and the goal stayed at 0/5 a day and more, unexplained).
+    if (id === 'meals') {
+      const w = this.sim.world;
+      const stoves = [...w.tilesWith('blueprints')].filter((i) => featureDef(w.blueprint[i]).key === 'stove');
+      const built = this.sim.countBuilt((f) => featureDef(f).key === 'stove') > 0;
+      if (!built && stoves.length > 0) {
+        const short = w.blueprintNeeds(stoves[0]).filter((n) => n.count > 0);
+        if (short.some((n) => n.item === itemId('stone'))) {
+          return {
+            how: `The stove is planned, and waits for granite: mine rock (M) for it.`,
+            tool: 'mine',
+          };
+        }
+      }
+      const recipe = RECIPES.find((r) => r.key === 'cookMeal');
+      if (built && recipe) {
+        const target = this.sim.bills[recipe.id]?.target ?? 0;
+        const stock = this.sim.stockOf(itemId('meal'));
+        if (stock >= target) {
+          return {
+            how: `The stove is up, but there are ${stock} meals already, the ${target} Production keeps: nobody cooks more until they're eaten. Raise the target (Production) to cook now.`,
+            screen: 'production',
+          };
+        }
+      }
+    }
+    // Chopping: trees already marked, being cut (it went back to "Pick Chop and drag over trees" with 22 marked).
+    if (
+      id === 'wood' &&
+      [...this.sim.world.tilesWith('designations')].some((i) => this.sim.world.designation[i] === Designation.CHOP)
+    ) {
+      return {
+        how: 'Trees are marked: colonists on Plant cutting work cut them, and the wood comes in as they do. Mark more with Chop (C) if they run out.',
+        tool: 'chop',
+      };
+    }
+    // The first night, under way: nothing to build now, only to wait for dawn.
+    if (
+      id === 'night' &&
+      this.sim.firstNight === 'pending' &&
+      (this.sim.hour >= NIGHT_START || this.sim.hour < NIGHT_END)
+    ) {
+      return { how: 'The night is on: hold on until 06:00, with everyone asleep indoors.' };
     }
     if (id === 'shelter' && this.wallsLeak()) {
       return {

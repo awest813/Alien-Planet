@@ -1379,13 +1379,27 @@ export class Simulation {
         let buildingsOnly = false;
         if (cmd.kind === 'deconstruct') {
           this.forRect(cmd.rect, (i) => {
-            buildingsOnly ||= w.feature[i] !== NONE && !!featureDef(w.feature[i]).build;
+            buildingsOnly ||=
+              (w.feature[i] !== NONE && !!featureDef(w.feature[i]).build) ||
+              (w.blueprint[i] !== NONE && !featureDef(w.blueprint[i]).layer);
           });
         }
         this.forRect(cmd.rect, (i) => {
           const f = w.feature[i];
           if (cmd.kind === 'deconstruct') {
             const target = this.deconstructTarget(i);
+            // A building still only planned, with nothing built there to take down: the plan is called off (a drag
+            // over a wall half built and half planned took the built half, and the rest went up all the same).
+            const plan = w.blueprint[i];
+            if (plan !== NONE && (!buildingsOnly || !featureDef(plan).layer) && (f === NONE || !featureDef(f).build)) {
+              this.cancelBlueprint(i);
+              if (w.designation[i] !== Designation.NONE && w.designation[i] !== Designation.DECONSTRUCT) {
+                // (What was to be cleared for it stays as it is.)
+                w.designation[i] = Designation.NONE;
+              }
+              w.markDirty(i);
+              return;
+            }
             if (target !== NONE && (!buildingsOnly || !featureDef(target).layer)) {
               w.designation[i] = value;
               w.progress[i] = 0;
