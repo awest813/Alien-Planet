@@ -24,7 +24,7 @@ import { burnTime, ignite } from './weather';
 import { learn } from './skills';
 import { traitValue } from './social';
 import type { Simulation } from './simulation';
-import { Animal, Colonist, Enemy } from './types';
+import { Animal, Colonist, Enemy, Stance } from './types';
 import { fightersHired } from './diplomacy';
 import { ALLY_HELP, alliedWith, helperFaction } from './alliances';
 import { goodwillOf } from './trade';
@@ -108,6 +108,8 @@ const POST_RETHINK = 60;
 // How often (ticks) a badly hurt raider weighs running for it.
 const NERVE_CHECK = 60;
 const FISTS = weaponDef('fists');
+// How much surer a bow is shot at someone right beside the archer (see hitChance).
+const POINT_BLANK = 0.75;
 
 const chebyshev = (w: World, a: number, b: number) =>
   Math.max(Math.abs(w.xOf(a) - w.xOf(b)), Math.abs(w.yOf(a) - w.yOf(b)));
@@ -208,20 +210,20 @@ function hitChance(
     return Math.min(0.95, weapon.accuracy + (skill - 5) * 0.015 + bonus) * over;
   }
   const base = weapon.accuracy + (skill - 5) * 0.03 + bonus - w.distance(from, to) * weapon.falloff;
+  // Point-blank, with someone right there to fend off: a quarter less sure.
+  const close = chebyshev(w, from, to) <= 1 ? POINT_BLANK : 1;
   return (
-    Math.max(0.08, Math.min(0.95, base)) * coverFactor(w, from, to) * weatherDef(sim).aim * (1 - 0.5 * suppression)
+    Math.max(0.08, Math.min(0.95, base)) *
+    close *
+    coverFactor(w, from, to) *
+    weatherDef(sim).aim *
+    (1 - 0.5 * suppression)
   );
 }
 
 // Damage after armor: armor turns aside its share, less against piercing weapons.
 export const throughArmor = (amount: number, armor: number, weapon: WeaponDef) =>
   amount * (1 - armor * (1 - weapon.pierce));
-
-// The weapon actually used against a target this close: a bow at arm's length is a club.
-const weaponAt = (key: string, adjacent: boolean): WeaponDef => {
-  const weapon = weaponDef(key);
-  return adjacent && weapon.range > 1 ? FISTS : weapon;
-};
 
 // ---- Raids ----
 
@@ -971,8 +973,7 @@ export function armorTakes(sim: Simulation, target: Colonist, amount: number, pi
 }
 
 function enemyAttack(sim: Simulation, e: Enemy, target: Colonist): void {
-  const adjacent = chebyshev(sim.world, e.tile, target.tile) <= 1;
-  const weapon = weaponAt(e.weapon, adjacent);
+  const weapon = weaponDef(e.weapon);
   const ranged = weapon.range > 1;
   const hit = sim.rng.next() < hitChance(sim, weapon, e.skill, e.tile, target.tile, RAIDER_AIM, e.suppression);
   recordShot(sim, e.tile, target.tile, hit, ranged);
@@ -1307,13 +1308,13 @@ function colonistAttack(sim: Simulation, c: Colonist, target: number, weapon: We
 
 function attackEnemy(sim: Simulation, c: Colonist, e: Enemy): void {
   const adjacent = chebyshev(sim.world, c.tile, e.tile) <= 1;
-  const weapon = weaponAt(c.weapon, adjacent);
+  const weapon = weaponDef(c.weapon);
   // Said once: four in five of an archer's blows were struck with their fists, a charge on them before a second
   // shot, and nothing said why or what answers it.
-  if (weapon === FISTS && c.weapon !== FISTS.key && !sim.story.toldHandToHand) {
+  if (weapon.range > 1 && adjacent && !sim.story.toldHandToHand) {
     sim.story.toldHandToHand = true;
     sim.addLog(
-      `${c.name} has a ${weaponDef(c.weapon).name.toLowerCase()}, but with a raider right beside them they fight with their fists. Fighters set to Charge, with a spear or a sword, keep raiders off the archers, and sandbags slow a charge.`,
+      `${c.name} has a raider right beside them, and shoots point-blank: a quarter less surely, and a charge is on an archer before a second shot. Fighters with a spear or a sword keep raiders off the archers, and sandbags slow a charge.`,
       'warn',
       true,
       { colonist: c.id },
@@ -1335,8 +1336,7 @@ function attackEnemy(sim: Simulation, c: Colonist, e: Enemy): void {
 
 // Hunting, or fending off an angry animal.
 export function attackAnimal(sim: Simulation, c: Colonist, a: Animal): void {
-  const adjacent = chebyshev(sim.world, c.tile, a.tile) <= 1;
-  const dealt = colonistAttack(sim, c, a.tile, weaponAt(c.weapon, adjacent));
+  const dealt = colonistAttack(sim, c, a.tile, weaponDef(c.weapon));
   if (dealt > 0) {
     hurtAnimal(sim, a, dealt, c);
   }
@@ -1487,8 +1487,17 @@ export function armorOf(c: Colonist): { protection: number; speed: number } {
   return c.armor ? itemDef(c.armor.item).armor! : { protection: 0, speed: 1 };
 }
 
+// Which weapon a colonist would rather carry, by their stance. Taking cover, a hand weapon counts for more than its
+// score says: most fights come to blows (raiders cross a bow's reach in about one reload), and a sword did twice
+// what a bow shot did, so a sword is taken over any bow, a spear over a short bow. Charging, hand weapons by far;
+// holding their ground, bows.
+const MELEE_PREFERENCE: Record<Stance, number> = { cover: 1.25, charge: 2.8, hold: 0.6 };
+export function equipScore(key: string, quality: number, stance: Stance): number {
+  return weaponScore(key, quality) * (weaponDef(key).range <= 1 && key !== 'fists' ? MELEE_PREFERENCE[stance] : 1);
+}
+
 // How well a weapon of this make suits a colonist: rough damage per tick, with reach counting
-// for a lot (most of the colony's fighting is done from behind cover).
+// for a lot (what the raids and the goals go by; equipping goes by equipScore).
 export function weaponScore(key: string, quality: number): number {
   const w = weaponDef(key);
   const perHit = ((w.damage[0] + w.damage[1]) / 2) * qualityFactor(quality) * w.accuracy * (1 + w.pierce * 0.3);
@@ -1627,7 +1636,7 @@ export function updateAllies(sim: Simulation): void {
       continue;
     }
     const adjacent = chebyshev(w, a.tile, target.tile) <= 1;
-    const weapon = weaponAt(a.weapon, adjacent);
+    const weapon = weaponDef(a.weapon);
     const canShoot =
       weapon.range > 1 && w.distance(a.tile, target.tile) <= weapon.range && lineOfSight(w, a.tile, target.tile);
     if (adjacent || canShoot) {
@@ -1704,7 +1713,7 @@ function strikeAlly(sim: Simulation, e: Enemy): boolean {
     e.moveProgress = 0;
     return true;
   }
-  const used = weaponAt(e.weapon, chebyshev(w, e.tile, ally.tile) <= 1);
+  const used = weaponDef(e.weapon);
   e.path = [];
   e.moveProgress = 0;
   const hit = sim.rng.next() < hitChance(sim, used, e.skill, e.tile, ally.tile, RAIDER_AIM, e.suppression);

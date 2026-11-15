@@ -623,9 +623,13 @@ const STANCES: { key: Stance; label: string; hint: string }[] = [
   {
     key: 'cover',
     label: 'Take cover',
-    hint: 'Move to nearby cover with a clear shot, then fight from there (an archer with a raider right beside them fights with their fists)',
+    hint: 'Move to nearby cover with a clear shot, then fight from there (hand weapons are preferred when equipping: most fights come to blows)',
   },
-  { key: 'hold', label: 'Hold', hint: 'Stay exactly where ordered and shoot whatever comes in range' },
+  {
+    key: 'hold',
+    label: 'Hold',
+    hint: 'Stay exactly where ordered and shoot whatever comes in range (bows are preferred when equipping)',
+  },
   { key: 'charge', label: 'Charge', hint: 'Close in on the enemy (melee weapons are preferred when equipping)' },
 ];
 

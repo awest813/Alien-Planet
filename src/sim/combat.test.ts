@@ -4,6 +4,7 @@ import {
   colonistCombat,
   colonistTarget,
   coverSpot,
+  equipScore,
   lineOfSight,
   spawnRaid,
   throughArmor,
@@ -639,7 +640,7 @@ function colonistCombatFor(sim: Simulation, c: Simulation['colonists'][number]):
 }
 
 describe('an archer caught hand to hand', () => {
-  it('fights with their fists, and the player is told once why and what answers it', () => {
+  it('shoots point-blank, a quarter less surely, and the player is told once what helps', () => {
     const { sim, w, x, y } = field(51);
     const archer = sim.colonists[0];
     archer.tile = w.idx(x, y);
@@ -648,14 +649,23 @@ describe('an archer caught hand to hand', () => {
     raider(sim, w.idx(x + 1, y), 'club', { repathAt: forever });
     archer.cooldown = 0;
     colonistCombat(sim, archer);
-    const told = sim.storyLog.filter((s) => /fight with their fists/.test(s.text));
+    // A bow shot, not a punch.
+    expect(sim.shots[sim.shots.length - 1].ranged).toBe(true);
+    const told = sim.storyLog.filter((s) => /point-blank/.test(s.text));
     expect(told).toHaveLength(1);
-    expect(told[0].text).toMatch(/has a recurve bow, but with a raider right beside them.*Charge.*sandbags/);
+    expect(told[0].text).toMatch(/spear or a sword.*sandbags/);
     expect(told[0].about).toEqual({ colonist: archer.id });
-    // Not again.
     archer.cooldown = 0;
     colonistCombat(sim, archer);
-    expect(sim.storyLog.filter((s) => /fight with their fists/.test(s.text))).toHaveLength(1);
-    expect(sim.story.toldHandToHand).toBe(true);
+    expect(sim.storyLog.filter((s) => /point-blank/.test(s.text))).toHaveLength(1);
+  });
+
+  it('taking cover, a colonist prefers a sword to any bow; holding, a bow; a spear only over a short bow', () => {
+    for (const bow of ['shortBow', 'recurveBow', 'longbow', 'crossbow']) {
+      expect(equipScore('ironSword', 10, 'cover')).toBeGreaterThan(equipScore(bow, 10, 'cover'));
+      expect(equipScore('ironSword', 10, 'hold')).toBeLessThan(equipScore(bow, 10, 'hold'));
+    }
+    expect(equipScore('spear', 10, 'cover')).toBeGreaterThan(equipScore('shortBow', 10, 'cover'));
+    expect(equipScore('spear', 10, 'cover')).toBeLessThan(equipScore('recurveBow', 10, 'cover'));
   });
 });

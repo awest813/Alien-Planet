@@ -72,6 +72,7 @@ import {
   coverSpot,
   lineOfSight,
   updateEnemies,
+  equipScore,
   weaponScore,
 } from './combat';
 import {
@@ -7649,9 +7650,7 @@ export class Simulation {
     }
     const w = this.world;
     const region = this.regionOf(c.tile);
-    const melee = c.stance === 'charge';
-    const score = (key: string, quality: number) =>
-      weaponScore(key, quality) * (melee && weaponDef(key).range <= 1 ? 2.5 : 1);
+    const score = (key: string, quality: number) => equipScore(key, quality, c.stance);
     const current = score(c.weapon, c.weaponQuality);
     const armorValue = (item: number, wear: number) => itemDef(item).armor!.protection * (0.5 + 0.5 * wear);
     const armorNow = c.armor ? armorValue(c.armor.item, c.armor.wear) : 0;
