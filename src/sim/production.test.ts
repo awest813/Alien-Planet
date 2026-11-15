@@ -144,3 +144,28 @@ describe('kilns and smelters', () => {
     expect(count(sim, 'bricks')).toBe(0);
   });
 });
+
+describe('the crafting bench', () => {
+  it('makes what is furthest short of its target first, not whatever comes first in the list', () => {
+    // (Cloth, first in the list and always wanted, came first every time: tool kits were short nine-tenths of it.)
+    const { sim, w, x, y } = workshop(12);
+    w.setFeature(w.idx(x + 3, y), featureId('craftingBench'));
+    w.addItem(w.idx(x - 2, y + 3), itemId('cotton'), 30);
+    w.addItem(w.idx(x - 1, y + 3), itemId('wood'), 40);
+    w.addItem(w.idx(x, y + 3), itemId('stone'), 20);
+    w.addItem(w.idx(x + 1, y + 3), itemId('cloth'), 15);
+    for (const i of [...w.tilesWith('items')]) {
+      if (w.itemType[i] === itemId('toolKit')) {
+        w.takeItem(i, w.itemCount[i]);
+      }
+    }
+    const crafter = sim.colonists[0];
+    crafter.priorities.crafting = 1;
+    let line: string | undefined;
+    for (let t = 0; t < HOUR && !line; t++) {
+      sim.step();
+      line = crafter.job?.type === 'craft' ? RECIPES[crafter.job.line].key : undefined;
+    }
+    expect(line).toBe('makeTools');
+  });
+});

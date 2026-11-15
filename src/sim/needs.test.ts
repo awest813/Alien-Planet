@@ -3,7 +3,7 @@ import { comfortRange } from './apparel';
 import { featureId, itemDef, itemId } from './defs';
 import { STARVING_MOVE, STARVING_WORK, damage, healthFactor, updateExposure } from './health';
 import { deserialize, serialize } from './serialize';
-import { Simulation, START_HOUR } from './simulation';
+import { Simulation, START_HOUR, splitBundle } from './simulation';
 import { HOUR, clearAround, outline, run } from './test-helpers';
 
 const PARKA = itemId('parka');
@@ -181,6 +181,73 @@ describe('cooking', () => {
     expect(sim.stockOf(itemId('berries'))).toBe(3);
     expect(sim.stockOf(itemId('potatoes'))).toBe(3);
     void fed;
+  });
+
+  it('cooks in batches: the food for several fetched at once, each meal set down as it is done', () => {
+    // (A cook spent half again as long fetching six vegetables and walking to the stove as cooking, for one meal.)
+    const { sim, w, x, y, fed } = bareKitchen(34);
+    // Room for one cook only, so the batch is theirs.
+    for (const c of sim.colonists.slice(1)) {
+      c.priorities.cooking = 0;
+    }
+    w.addItem(w.idx(x - 3, y + 3), itemId('berries'), 16);
+    w.addItem(w.idx(x - 1, y + 3), itemId('potatoes'), 10);
+    // A batch of four: six apiece, from both stacks, carried together.
+    let batch = 0;
+    for (let t = 0; t < HOUR * 2 && batch === 0; t++) {
+      sim.step();
+      const job = sim.colonists[0].job;
+      batch = job?.type === 'craft' ? (job.batch ?? 0) : 0;
+    }
+    expect(batch).toBe(4);
+    let activity = '';
+    for (let t = 0; t < HOUR * 2 && !activity.includes('of 4'); t++) {
+      sim.step();
+      activity = sim.describe(sim.colonists[0]);
+    }
+    expect(activity).toMatch(/^Cook simple meal \(\d of 4\)$/);
+    fed(6);
+    // Four meals, and the two left over (not enough for a fifth) still about.
+    expect(sim.stockOf(itemId('meal'))).toBe(4);
+    expect(sim.stockOf(itemId('berries')) + sim.stockOf(itemId('potatoes'))).toBe(2);
+  });
+
+  it("a batch takes the stock no further than half the target again, and an interrupted one gives back what's left", () => {
+    const { sim, w, x, y } = bareKitchen(35);
+    for (const c of sim.colonists.slice(1)) {
+      c.priorities.cooking = 0;
+    }
+    sim.bills[0].target = 2;
+    w.addItem(w.idx(x - 3, y + 3), itemId('potatoes'), 40);
+    let job;
+    for (let t = 0; t < HOUR * 2 && !job; t++) {
+      sim.step();
+      job = sim.colonists[0].job?.type === 'craft' ? sim.colonists[0].job : undefined;
+    }
+    // Two wanted: up to three made.
+    expect(job!.batch).toBe(3);
+    // Pulled off it once the first meal is done: one meal, and the rest of the food back on the ground.
+    const cook = sim.colonists[0];
+    for (let t = 0; t < HOUR * 3 && sim.stockOf(itemId('meal')) === 0; t++) {
+      cook.needs.food = 1;
+      sim.step();
+    }
+    expect(sim.stockOf(itemId('meal'))).toBe(1);
+    sim.endJob(cook);
+    sim.dropCarried(cook);
+    expect(sim.stockOf(itemId('potatoes'))).toBe(34);
+  });
+
+  it('takes one share of a mixed bundle, the stalest first, and keeps the rest as it was', () => {
+    const berries = { item: itemId('berries'), count: 4, fresh: 2 };
+    const potatoes = { item: itemId('potatoes'), count: 8, fresh: 20 };
+    const [taken, rest] = splitBundle({ ...berries, count: 12, fresh: 14, mix: [berries, potatoes] }, 6);
+    expect(taken.count).toBe(6);
+    expect(taken.mix).toEqual([berries, { ...potatoes, count: 2 }]);
+    expect(taken.fresh).toBeCloseTo((4 * 2 + 2 * 20) / 6);
+    expect(rest).toMatchObject({ item: itemId('potatoes'), count: 6, fresh: 20, mix: undefined });
+    // The last share leaves nothing.
+    expect(splitBundle(rest!, 6)[1]).toBeNull();
   });
 
   it('cannot turn food on the turn into fresh meals', () => {

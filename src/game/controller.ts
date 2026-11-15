@@ -1024,6 +1024,8 @@ export interface BillView {
   step: number;
   // What the colony hasn't enough of for another batch, e.g. "leather (1 of 6)" (null: it has what it needs).
   short: string | null;
+  // Nobody to make it: "nobody on Cooking work", or "nobody has Cooking 6" (null: someone can).
+  staffing: string | null;
 }
 
 export interface TradeLine {
@@ -2947,6 +2949,17 @@ export class GameController {
       })),
       bills: sim.bills.map((bill) => {
         const recipe = RECIPES[bill.recipe];
+        // Who could make it. (A bill for fine meals waited for ever with nobody at Cooking 6, and nothing said so:
+        // "needs Cooking 6" read the same whether three cooks had it or none did.)
+        const work = recipe.bench === 'cooking' || recipe.bench === 'mill' ? 'cooking' : 'crafting';
+        const skill = recipe.bench === 'cooking' || recipe.bench === 'mill' ? 'cooking' : 'crafting';
+        const able = sim.living().filter((c) => c.priorities[work] > 0 && canWork(c, work));
+        const staffing =
+          able.length === 0
+            ? `nobody on ${work === 'cooking' ? 'Cooking' : 'Crafting'} work`
+            : recipe.minSkill > 0 && !able.some((c) => c.skills[skill] >= recipe.minSkill)
+              ? `nobody has ${work === 'cooking' ? 'Cooking' : 'Crafting'} ${recipe.minSkill}`
+              : null;
         const input = recipe.ingredients.map((ing) => `${ing.count} ${ingredientName(ing)}`).join(' + ');
         const product = itemDef(recipe.product.item);
         return {
@@ -2978,6 +2991,7 @@ export class GameController {
                   return have < ing.count ? `${ingredientName(ing)} (${have} of ${ing.count})` : null;
                 })
                 .find((x) => x) ?? null),
+          staffing,
         };
       }),
       alerts: this.alertsFor(totals),

@@ -467,6 +467,24 @@ describe('mid-game: what the screens say', () => {
     expect(view?.short).toMatch(/leather/i);
   });
 
+  it('says when nobody can make what a bill wants: nobody on the work, or nobody skilled enough', () => {
+    const { sim } = colony('bill-staff');
+    const bill = (name: RegExp) => {
+      controller.publish();
+      return controller.getState().bills.find((b) => name.test(b.name))!;
+    };
+    for (const c of sim.colonists) {
+      c.skills.cooking = 3;
+      c.priorities.cooking = 0;
+    }
+    expect(bill(/simple meal/).staffing).toBe('nobody on Cooking work');
+    sim.colonists[0].priorities.cooking = 2;
+    expect(bill(/simple meal/).staffing).toBeNull();
+    expect(bill(/fine meal/).staffing).toBe('nobody has Cooking 6');
+    sim.colonists[0].skills.cooking = 6;
+    expect(bill(/fine meal/).staffing).toBeNull();
+  });
+
   it('warns that raiders are already on colonists working by the edge they come from', () => {
     const { sim } = colony('edge');
     sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;

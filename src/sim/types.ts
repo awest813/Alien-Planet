@@ -61,6 +61,9 @@ export interface Job {
   // An elder telling stories by the fire at `target`, or someone listening to them.
   telling?: boolean;
   hearing?: boolean;
+  // Crafting: how many are still to make in this batch (the one under way included), and how many made so far.
+  batch?: number;
+  made?: number;
 }
 
 export interface Skills {

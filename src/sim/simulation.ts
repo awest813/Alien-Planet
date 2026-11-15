@@ -18,6 +18,7 @@ import {
   NONE,
   NORMAL_QUALITY,
   RECIPES,
+  RecipeDef,
   RESEARCH,
   THOUGHTS,
   researchDef,
@@ -302,6 +303,8 @@ const STORY_LESSON = 0.5;
 const musicQuality = (c: Colonist) => 0.5 + c.skills.artistic / 20;
 // Below this after a meal, a colonist eats again straight away.
 const STILL_HUNGRY = 0.3;
+// How much further a colonist walks for a cooked meal than for raw food (see tryEat).
+const MEAL_WALK = 25;
 // Downed with nobody to help: below this much food they crawl to something to eat, this far at most.
 // How often a step in off bare ground leaves dirt on a floor (dry, and in the wet).
 const TRACK_DIRT = 0.04;
@@ -2048,8 +2051,11 @@ export class Simulation {
         return `Hauling ${itemDef(job.item).name.toLowerCase()}`;
       case 'deliver':
         return `Delivering ${itemDef(job.item).name.toLowerCase()} to ${blueprintName(job.target)}`;
-      case 'craft':
-        return RECIPES[job.line].name;
+      case 'craft': {
+        // A batch says how far along it is.
+        const of = (job.made ?? 0) + (job.batch ?? 1);
+        return of > 1 ? `${RECIPES[job.line].name} (${(job.made ?? 0) + 1} of ${of})` : RECIPES[job.line].name;
+      }
       case 'eat':
         return job.stage === 2 ? 'Eating' : 'Getting something to eat';
       case 'joy':
@@ -5629,7 +5635,18 @@ export class Simulation {
     let totals: ReturnType<Simulation['resourceTotals']> | undefined;
     // The nearest free bench of this kind is the same for every recipe; found on first need.
     let station: number | undefined | null = null;
-    for (const recipe of RECIPES) {
+    // At a crafting bench, whatever is furthest short of its target first (in the list's order, tool kits were
+    // short nine-tenths of the time: cloth, above them and always wanted, came first every time). A stove keeps
+    // its order: simple meals, the most food for the vegetables, before fine ones.
+    let order: readonly RecipeDef[] = RECIPES;
+    if (bench === 'crafting') {
+      totals ??= this.resourceTotals();
+      const t = totals;
+      const filled = (r: RecipeDef) =>
+        r.mend ? MEND_FILLED : this.bills[r.id].target > 0 ? t[r.product.item - 1].total / this.bills[r.id].target : 1;
+      order = RECIPES.filter((r) => r.bench === bench).sort((a, b) => filled(a) - filled(b));
+    }
+    for (const recipe of order) {
       if (
         recipe.bench !== bench ||
         !this.isResearched(recipe.research) ||
@@ -5666,12 +5683,23 @@ export class Simulation {
         return false;
       }
       // Every ingredient must be on hand (possibly spread over several small stacks) before
-      // starting; the crafter gathers them in order.
-      const source = this.ingredientSource(c, recipe.ingredients[0], region);
-      if (
-        source === undefined ||
-        !recipe.ingredients.slice(1).every((ing) => this.ingredientSource(c, ing, region) !== undefined)
-      ) {
+      // starting; the crafter gathers them in order, for as many as make a batch (see batchSize), as long as
+      // there's enough for them and the stock comes to no more than half the target again. (Held to the target,
+      // a batch was nearly always one: the stock sits just under it, and each meal eaten called for one more.)
+      const room = recipe.mend
+        ? 1
+        : Math.ceil(
+            (this.bills[recipe.id].target * BATCH_OVER - totals![recipe.product.item - 1].total) / recipe.product.count,
+          );
+      let batch = Math.min(batchSize(recipe), Math.max(1, room));
+      for (const ing of recipe.ingredients) {
+        batch = Math.min(batch, Math.floor(this.ingredientAvailable(c, ing, region) / ing.count));
+      }
+      if (batch < 1) {
+        continue;
+      }
+      const source = this.ingredientSource(c, scaled(recipe.ingredients[0], batch), region);
+      if (source === undefined) {
         continue;
       }
       const path = this.pathfinder.find(c.tile, [source]);
@@ -5683,7 +5711,7 @@ export class Simulation {
       this.dropCarried(c);
       this.assign(
         c,
-        this.makeJob('craft', station, { source, item: w.itemType[source], line: recipe.id, count: 0 }),
+        this.makeJob('craft', station, { source, item: w.itemType[source], line: recipe.id, count: 0, batch, made: 0 }),
         path,
       );
       return true;
@@ -5694,20 +5722,30 @@ export class Simulation {
   // Where to start gathering `ing`, if there's enough of it about in total (any mix of matching
   // stacks: five berries and five potatoes make a meal). Food that will spoil soonest goes first.
   private ingredientSource(c: Colonist, ing: Ingredient, region: number): number | undefined {
+    if (this.ingredientAvailable(c, ing, region) < ing.count) {
+      return undefined;
+    }
+    const tiles = this.world.tilesWithItems((item) => matchesIngredient(item, ing));
+    return this.nearestAmong(
+      tiles,
+      c.tile,
+      (i) => this.ingredientUsable(c, ing, region, i),
+      1,
+      (i) => this.stalenessBias(i),
+    )[0];
+  }
+
+  // How much of an ingredient there is to be had here.
+  private ingredientAvailable(c: Colonist, ing: Ingredient, region: number): number {
     const w = this.world;
-    const usable = (i: number) => this.ingredientUsable(c, ing, region, i);
     // Building comes first: materials that blueprints are waiting for aren't crafted away.
     let available = ing.item !== undefined ? -this.blueprintDemand(ing.item, region) : 0;
-    const tiles = w.tilesWithItems((item) => matchesIngredient(item, ing));
-    for (const i of tiles) {
-      if (usable(i)) {
+    for (const i of w.tilesWithItems((item) => matchesIngredient(item, ing))) {
+      if (this.ingredientUsable(c, ing, region, i)) {
         available += w.itemCount[i];
       }
     }
-    if (available < ing.count) {
-      return undefined;
-    }
-    return this.nearestAmong(tiles, c.tile, usable, 1, (i) => this.stalenessBias(i))[0];
+    return available;
   }
 
   // How much of an item the blueprints builders here can get at still need delivered.
@@ -5750,7 +5788,7 @@ export class Simulation {
     const recipe = RECIPES[job.line];
     const stationOk = w.feature[job.target] !== NONE && featureDef(w.feature[job.target]).workbench === recipe.bench;
     if (job.stage === 0) {
-      const ing = recipe.ingredients[job.count];
+      const ing = scaled(recipe.ingredients[job.count], job.batch ?? 1);
       const bundles = this.bundles(c);
       const held = bundles[job.count];
       if (
@@ -5798,7 +5836,7 @@ export class Simulation {
       } else if (job.count + 1 < recipe.ingredients.length) {
         // This ingredient's done: start on the next one.
         job.count++;
-        next = this.ingredientSource(c, recipe.ingredients[job.count], region);
+        next = this.ingredientSource(c, scaled(recipe.ingredients[job.count], job.batch ?? 1), region);
       }
       if (next !== undefined) {
         const path = this.pathfinder.find(c.tile, [next]);
@@ -5844,7 +5882,12 @@ export class Simulation {
     job.progress += this.workSpeed(c, bench);
     learn(this, c, bench);
     if (job.progress >= recipe.work) {
-      const used = this.bundles(c);
+      // One of the batch: its share of what's carried, the rest kept for the next.
+      const carried = this.bundles(c);
+      const split = carried.map((b, k) => splitBundle(b, recipe.ingredients[k]?.count ?? b.count));
+      const used = split.map(([taken]) => taken);
+      const left = split.map(([, rest]) => rest);
+      const more = (job.batch ?? 1) > 1 && left.every((b) => b !== null);
       c.carrying = null;
       if (recipe.mend) {
         // The same garment back, as good as new (its quality doesn't change).
@@ -5883,6 +5926,14 @@ export class Simulation {
       if (rolled) {
         this.addLog(`${c.name} made ${aOrAn(qualityLabel(quality))} ${itemDef(product).name.toLowerCase()}.`);
       }
+      if (more) {
+        // On to the next of the batch, at the same bench.
+        this.setBundles(c, left as Carried[]);
+        job.batch = job.batch! - 1;
+        job.made = (job.made ?? 0) + 1;
+        job.progress = 0;
+        return;
+      }
       this.endJob(c);
     }
   }
@@ -5898,8 +5949,11 @@ export class Simulation {
       (i) =>
         w.itemType[i] !== NONE && isFood(w.itemType[i]) && this.regions.region[i] === region && !this.itemTaken(i, c),
       1,
-      // Walk a bit further for a cooked meal.
-      (i) => (itemDef(w.itemType[i]).category === 'meal' ? 0 : 10),
+      // Walk further for a cooked meal: up to 25 tiles, about half an hour. (At 10, three raw meals in ten were
+      // eaten with a meal waiting, on average 13 tiles further: "Ate raw food" instead of "Ate a cooked meal", nine
+      // points of mood for most of a day, and half as much food again used up.)
+      // (Not the starving: the nearest food, whatever it is.)
+      (i) => (itemDef(w.itemType[i]).category === 'meal' || c.needs.food <= 0 ? 0 : MEAL_WALK),
     )[0];
     if (source === undefined) {
       return false;
@@ -9310,4 +9364,64 @@ function numeral(n: number): string {
     }
   }
   return out;
+}
+
+// Up to this many of a quick recipe are made in one go, the ingredients for all of them fetched at once: a cook
+// spent half again as long fetching six vegetables and walking to the stove as cooking the meal, for one meal,
+// and one cook kept up with a third of what a colony of eight ate. As long as the batch is no more than
+// BATCH_WORK, so a long craft (a parka, a bow) is still made one at a time, and an interrupted batch loses little
+// (each is set down as it's done; only the one under way is lost).
+const MAX_BATCH = 4;
+const BATCH_WORK = 500;
+// How far past the target a batch may take the stock (see tryBill).
+const BATCH_OVER = 1.5;
+// Mending, among a crafting bench's bills: after anything below nine-tenths of its target (see tryBill).
+const MEND_FILLED = 0.9;
+export function batchSize(recipe: RecipeDef): number {
+  return recipe.mend ? 1 : Math.max(1, Math.min(MAX_BATCH, Math.floor(BATCH_WORK / recipe.work)));
+}
+
+// An ingredient, for `n` of the recipe.
+const scaled = (ing: Ingredient, n: number): Ingredient => (n === 1 ? ing : { ...ing, count: ing.count * n });
+
+// `n` taken from a carried bundle (from its parts in the order gathered, the stalest first), and what's left (null
+// when nothing is).
+export function splitBundle(b: Carried, n: number): [Carried, Carried | null] {
+  const one = (parts: Carried[], item: number): Carried => {
+    const count = parts.reduce((sum, p) => sum + p.count, 0);
+    const avg = (key: 'fresh' | 'quality') =>
+      parts.every((p) => p[key] === undefined)
+        ? undefined
+        : parts.reduce((sum, p) => sum + (p[key] ?? 0) * p.count, 0) / Math.max(1, count);
+    return {
+      item: parts[0]?.item ?? item,
+      count,
+      fresh: avg('fresh'),
+      quality: avg('quality'),
+      mix: parts.length > 1 ? parts : undefined,
+    };
+  };
+  if (n >= b.count) {
+    return [{ ...b, extra: undefined }, null];
+  }
+  if (!b.mix) {
+    return [
+      { ...b, count: n, extra: undefined },
+      { ...b, count: b.count - n, extra: undefined },
+    ];
+  }
+  const taken: Carried[] = [];
+  const rest: Carried[] = [];
+  let need = n;
+  for (const part of b.mix) {
+    const take = Math.min(need, part.count);
+    need -= take;
+    if (take > 0) {
+      taken.push({ ...part, count: take });
+    }
+    if (part.count > take) {
+      rest.push({ ...part, count: part.count - take });
+    }
+  }
+  return [one(taken, b.item), one(rest, b.item)];
 }

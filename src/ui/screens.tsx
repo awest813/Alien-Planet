@@ -591,73 +591,88 @@ export function ProductionScreen({ onClose }: { onClose: () => void }) {
   const open = state.bills.filter((b) => !b.locked);
   const later = state.bills.filter((b) => b.locked);
   const [showLater, setShowLater] = useState(false);
-  const row = (bill: (typeof state.bills)[number]) => (
-    <tr key={bill.recipe}>
-      <td>
-        {bill.name}
-        <div className="muted small">
-          {bill.recipeText} at a {bill.bench}
-          {!bill.hasBench && <span className="tag warn">no {bill.bench} yet</span>}
-          {bill.locked && <span className="tag warn">🔒 needs {bill.locked}</span>}
-          {bill.minSkill && <span className="tag">needs {bill.minSkill}</span>}
-          {bill.short && !bill.mend && bill.stock < bill.target && (
-            <span className="tag warn">short of {bill.short}</span>
-          )}
-          {/* (Why the bench stands idle: a gift of meals met the target, and nobody cooked.) */}
-          {!bill.mend && !bill.locked && bill.target > 0 && bill.stock >= bill.target && (
-            <span
-              className="tag"
-              title="Nobody makes more until the stock falls below the target: raise it to make more now"
-            >
-              target met
-            </span>
-          )}
-        </div>
-      </td>
-      <td className="muted stock">{bill.mend ? `${bill.stock} worn` : `${bill.stock} in stock`}</td>
-      {bill.mend ? (
+  const row = (bill: (typeof state.bills)[number]) => {
+    // Nobody to make what's wanted (said only while it's wanted).
+    const unstaffed =
+      bill.staffing && !bill.locked && (bill.mend ? bill.target > 0 : bill.stock < bill.target) ? bill.staffing : null;
+    return (
+      <tr key={bill.recipe}>
         <td>
-          <button
-            className={bill.target > 0 ? 'active' : ''}
-            aria-pressed={bill.target > 0}
-            title={forTouch(bill.target > 0 ? 'Click to stop mending' : 'Click to start mending')}
-            onClick={() => set(bill.recipe, bill.target > 0 ? 0 : 1)}
-          >
-            {bill.target > 0 ? 'Mending: on' : 'Mending: off'}
-          </button>
+          {bill.name}
+          <div className="muted small">
+            {bill.recipeText} at a {bill.bench}
+            {!bill.hasBench && <span className="tag warn">no {bill.bench} yet</span>}
+            {bill.locked && <span className="tag warn">🔒 needs {bill.locked}</span>}
+            {/* (Not beside "nobody has Cooking 6", which says it.) */}
+            {bill.minSkill && !unstaffed?.startsWith('nobody has') && (
+              <span className="tag">needs {bill.minSkill}</span>
+            )}
+            {bill.short && !bill.mend && bill.stock < bill.target && (
+              <span className="tag warn">short of {bill.short}</span>
+            )}
+            {unstaffed && (
+              <span className="tag warn" title="Set someone to it on the Work screen">
+                {unstaffed}
+              </span>
+            )}
+            {/* (Why the bench stands idle: a gift of meals met the target, and nobody cooked.) */}
+            {!bill.mend && !bill.locked && bill.target > 0 && bill.stock >= bill.target && (
+              <span
+                className="tag"
+                title="Nobody makes more until the stock falls below the target: raise it to make more now"
+              >
+                target met
+              </span>
+            )}
+          </div>
         </td>
-      ) : (
-        <td>
-          <span className="bill-controls">
+        <td className="muted stock">{bill.mend ? `${bill.stock} worn` : `${bill.stock} in stock`}</td>
+        {bill.mend ? (
+          <td>
             <button
-              className="less"
-              disabled={bill.target <= 0}
-              onClick={() => set(bill.recipe, bill.target - bill.step)}
-              aria-label={`Keep ${bill.step} fewer ${bill.name}`}
+              className={bill.target > 0 ? 'active' : ''}
+              aria-pressed={bill.target > 0}
+              title={forTouch(bill.target > 0 ? 'Click to stop mending' : 'Click to start mending')}
+              onClick={() => set(bill.recipe, bill.target > 0 ? 0 : 1)}
             >
-              −{bill.step}
+              {bill.target > 0 ? 'Mending: on' : 'Mending: off'}
             </button>
-            {/* (Said aloud as it changes: the button's own name stays "Keep 5 more ...".) */}
-            <span className="target" aria-live="polite">
-              Keep {bill.target}
+          </td>
+        ) : (
+          <td>
+            <span className="bill-controls">
+              <button
+                className="less"
+                disabled={bill.target <= 0}
+                onClick={() => set(bill.recipe, bill.target - bill.step)}
+                aria-label={`Keep ${bill.step} fewer ${bill.name}`}
+              >
+                −{bill.step}
+              </button>
+              {/* (Said aloud as it changes: the button's own name stays "Keep 5 more ...".) */}
+              <span className="target" aria-live="polite">
+                Keep {bill.target}
+              </span>
+              <button
+                className="more"
+                onClick={() => set(bill.recipe, bill.target + bill.step)}
+                aria-label={`Keep ${bill.step} more ${bill.name}`}
+              >
+                +{bill.step}
+              </button>
             </span>
-            <button
-              className="more"
-              onClick={() => set(bill.recipe, bill.target + bill.step)}
-              aria-label={`Keep ${bill.step} more ${bill.name}`}
-            >
-              +{bill.step}
-            </button>
-          </span>
-        </td>
-      )}
-    </tr>
-  );
+          </td>
+        )}
+      </tr>
+    );
+  };
   return (
     <Modal title="Production" onClose={onClose} medium>
       <p className="muted">
         Colonists keep making each product until the colony holds the target amount (bows, clothes and tool kits already
-        in use don't count, so the target is how many spares to keep).
+        in use don't count, so the target is how many spares to keep). Quick ones, meals, bread, cloth and blocks, are
+        made a few at a time, so the stock can run a little past it. At a crafting bench, what's furthest short of its
+        target is made first.
       </p>
       <div className="production-list">
         <table className="saves production">
