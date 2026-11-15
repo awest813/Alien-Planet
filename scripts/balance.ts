@@ -482,6 +482,7 @@ function play(seed: number): Result {
   let beaconPlaced = false;
   let shaftPlaced = false;
   let fordBridged = false;
+  let fordTriedDay = -1;
   let booksPlaced = false;
   let parkBenchPlaced = false;
   let fountainPlaced = false;
@@ -735,12 +736,15 @@ function play(seed: number): Result {
       (mapKind === 'island' || mapKind === 'river') &&
       !noBridge &&
       !fordBridged &&
+      fordTriedDay !== sim.day &&
       sim.day >= 3 &&
       Math.floor(sim.hour) === 6 &&
       sim.stockOf(itemId('wood')) >= 40
     ) {
       // From the hut (where everyone comes home to), to the nearest tree whose way crosses water; tried again each
-      // morning until one does (on a river the nearest trees were all on the colony's own bank).
+      // morning until one does (on a river the nearest trees were all on the colony's own bank). Once a morning:
+      // the hour lasts ten of these steps.
+      fordTriedDay = sim.day;
       const world = sim.world;
       const anchor = hut ? at(hut.x + 4, hut.y + 3) : (sim.living()[0] ?? sim.colonists[0]).tile;
       const trees = [...world.tilesWith('features')]

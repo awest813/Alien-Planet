@@ -48,6 +48,20 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **An audit of the last passes** (ten years in three colonies, before and after today's changes; a review of the
+  code):
+  - **Ten years:** all three colonies hold up: mood on average 45 / 56 / 52 (before: 45 / 45 / 51), fewer hours
+    hungry, the same raids and deaths of old age, and one death of heatstroke in a heat wave (one of three).
+  - **The bridge alert** measured from where soaked colonists stood when it was checked, home by then, not from
+    where they waded: a bridge ordered at a far ford was asked for again for three hours, and one across a pond by
+    the hut hid it. It now asks about the fords they were soaked at in the last three hours, and stops for each
+    one with a bridge built or ordered beside it.
+  - **The clock's pace:** a new speed clears "≈2.6×" at once (the old speed's figure stayed up to three seconds,
+    and the next one mixed the two).
+  - **Tests:** "no snow on a mild day" ran the whole colony for 120 days (five seconds; it timed out on a busy
+    machine); it steps only the weather now, through four years in three biomes, in a tenth of a second.
+  - **The balance harness** tried bridging a river's ford ten times each morning, not once.
+
 - **Animals, hunting, time, state and energy** (wildlife over 30 days in four settings; colonists' rest sampled
   hour by hour in three one-year colonies; the clock under load; the interface's state on ten-year colonies):
   - **Energy:** everyone was tired (-5) from 20:00 to bed and for the first hour or two asleep, every day, whatever

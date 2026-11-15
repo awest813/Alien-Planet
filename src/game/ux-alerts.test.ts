@@ -188,21 +188,43 @@ describe('the weather in the top bar', () => {
 });
 
 describe('fords', () => {
-  it('soaked colonists and no bridge: the alert offers the bridge tool, gone once one stands', () => {
+  it('soaked colonists and no bridge by the ford they waded: the alert offers the bridge tool', () => {
     const sim = colony('fords');
-    const until = sim.tick + 3 * HOUR;
-    for (const c of sim.living()) {
-      c.thoughts.push({ key: 'soaked', expires: until });
-    }
-    const ford = () => alerts().find((a) => /wading the fords/.test(a.text));
-    expect(ford()?.tool).toBe('bridge');
     const w = sim.world;
-    const x = w.xOf(sim.colonists[0].tile) + 3;
-    const y = w.yOf(sim.colonists[0].tile);
-    w.setTerrain(w.idx(x, y), terrainId('shallowWater'));
-    // A bridge ordered counts already (the alert asked for one that was on its way).
-    sim.apply({ type: 'build', feature: featureId('bridge'), tiles: [w.idx(x, y)] });
-    expect(ford()).toBeUndefined();
+    const home = sim.colonists[0].tile;
+    const x = w.xOf(home);
+    const y = w.yOf(home);
+    // A ford 16 tiles from home, waded in the cold; everyone back home after.
+    const ford = w.idx(x + 16, y);
+    w.setTerrain(ford, terrainId('shallowWater'));
+    sim.story.coldSnapUntil = sim.tick + 10 * HOUR;
+    for (const c of sim.living()) {
+      c.tile = w.idx(x + 15, y);
+      c.job = null;
+      c.path = [ford];
+      c.moveProgress = 0.999;
+      (sim as unknown as { move(c: unknown): void }).move(c);
+      expect(c.thoughts.some((t) => t.key === 'soaked')).toBe(true);
+      c.tile = home;
+    }
+    const asked = () => alerts().find((a) => /wading the fords/.test(a.text));
+    expect(asked()?.tool).toBe('bridge');
+    // A bridge across a pond by the hut is no answer to it.
+    const pond = w.idx(x + 2, y + 2);
+    w.setTerrain(pond, terrainId('shallowWater'));
+    w.setFeature(pond, featureId('bridge'));
+    expect(asked()).toBeDefined();
+    // One ordered at the ford is, though they're all home, far from it.
+    sim.apply({ type: 'build', feature: featureId('bridge'), tiles: [ford] });
+    expect(asked()).toBeUndefined();
+    // And once the soaking's over, the ford's forgotten.
+    sim.apply({ type: 'cancel', rect: { x0: x + 16, y0: y, x1: x + 16, y1: y } });
+    expect(asked()).toBeDefined();
+    for (const c of sim.living()) {
+      c.thoughts = c.thoughts.filter((t) => t.key !== 'soaked');
+    }
+    sim.tick += 4 * HOUR;
+    expect(sim.recentFords()).toEqual([]);
   });
 
   it('nobody minds wading on a hot day; on a cold one it soaks them', () => {
@@ -247,6 +269,10 @@ describe('the clock’s pace', () => {
       const pace = controller.getState().pace;
       expect(pace).not.toBeNull();
       expect(pace!).toBeLessThan(4 * 0.85);
+      // A new speed: the old one's figure goes at once (and the next is measured at the new speed alone).
+      controller.setSpeed(2);
+      controller.frame();
+      expect(controller.getState().pace).toBeNull();
       // Paused: nothing to keep up with.
       controller.setSpeed(0);
       controller.frame();

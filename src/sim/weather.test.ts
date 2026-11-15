@@ -4,7 +4,7 @@ import { damage, updateExposure } from './health';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
 import { HOUR, clearAround, outline, run } from './test-helpers';
-import { WeatherKind, ignite, isWet } from './weather';
+import { WeatherKind, ignite, isWet, updateWeather } from './weather';
 
 const forever = Number.MAX_SAFE_INTEGER;
 
@@ -223,17 +223,26 @@ describe('third audit: fire and weather', () => {
   });
 
   it("doesn't start snow on a mild day", () => {
+    // (Only the weather stepped, hour by hour, through four years: running the whole colony for it took five seconds,
+    // and timed out on a busy machine.)
     let warmSnow = 0;
-    for (const seed of [1, 2, 3]) {
-      const sim = Simulation.newColony(seed);
-      for (let h = 0; h < 24 * 40; h++) {
-        const before = sim.weather.kind;
-        run(sim, HOUR);
-        if (sim.weather.kind === 'snow' && before !== 'snow' && sim.outdoorTemperature() + 1 > 3) {
-          warmSnow++;
+    let snowfalls = 0;
+    for (const biome of ['temperate', 'tundra', 'forest'] as const) {
+      for (const seed of [1, 2, 3]) {
+        const sim = Simulation.newColony(seed, 'standard', 64, { biome });
+        sim.story.lastEventTick = Number.MAX_SAFE_INTEGER;
+        for (let h = 0; h < 24 * 24 * 4; h++) {
+          const before = sim.weather.kind;
+          sim.tick += HOUR;
+          updateWeather(sim);
+          if (sim.weather.kind === 'snow' && before !== 'snow') {
+            snowfalls++;
+            warmSnow += sim.outdoorTemperature() + 1 > 3 ? 1 : 0;
+          }
         }
       }
     }
+    expect(snowfalls).toBeGreaterThan(10);
     expect(warmSnow).toBe(0);
   });
 

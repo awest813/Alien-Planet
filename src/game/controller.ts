@@ -1093,6 +1093,8 @@ export interface DiplomacyView {
 // carry home. Past this distance from any storage, and this many of them, the colony is told.
 export const FAR_ITEMS_RANGE = 40;
 const FAR_ITEMS = 60;
+// A bridge this near a ford colonists were soaked wading (built or ordered) answers the alert asking for one.
+const FORD_BRIDGED = 3;
 
 // Loose goods far from every stockpile: how many, and where most of them lie. (Storage is looked at by
 // 16×16 block, so this stays cheap on a big map.)
@@ -1619,14 +1621,18 @@ export class GameController {
   private paceWanted = 0;
   private paceRun = 0;
   private paceSince = 0;
+  private paceSpeed = 0;
   private measurePace(deltaMs: number, ran: number, stopped: boolean, now: number): void {
     const speed = SPEEDS[this.speedIndex];
-    // (A pause, an emergency stop or a hidden tab isn't the machine falling behind: start the count again.)
-    if (speed === 0 || stopped || deltaMs >= 1000) {
+    // (A pause, an emergency stop or a hidden tab isn't the machine falling behind: start the count again. So does
+    // a new speed: the figure for the old one stayed up, and the next mixed the two.)
+    const changed = speed !== this.paceSpeed;
+    this.paceSpeed = speed;
+    if (speed === 0 || stopped || deltaMs >= 1000 || changed) {
       this.paceWanted = 0;
       this.paceRun = 0;
       this.paceSince = now;
-      if (speed === 0 && this.pace !== null) {
+      if ((speed === 0 || changed) && this.pace !== null) {
         this.pace = null;
         this.publish();
       }
@@ -3076,17 +3082,29 @@ export class GameController {
     }
     // Colonists wading the fords and soaked for it, with no bridge yet: say what keeps their feet dry (an island
     // colony's lot, every trip to the mainland).
-    // (Not while a bridge stands or is planned near where they wade: one across a pond elsewhere hid it, and one
-    // already ordered was asked for again.)
+    // (Not where a bridge stands or is planned by the fords they waded: measured from where they stood afterwards,
+    // home by then, one ordered far off at the ford was asked for again, and one across a pond by the hut hid it.)
     const soaked = sim.living().filter((c) => c.thoughts.some((t) => t.key === 'soaked'));
     if (soaked.length >= Math.max(2, Math.ceil(sim.living().length / 2))) {
       const w = sim.world;
-      const bridges = [
-        ...[...w.tilesWith('features')].filter((i) => featureDef(w.feature[i]).bridge),
-        ...[...w.tilesWith('blueprints')].filter((i) => featureDef(w.blueprint[i]).bridge),
-      ];
-      const bridged = soaked.some((c) => bridges.some((i) => w.distance(i, c.tile) <= 12));
-      if (!bridged) {
+      const bridgeBy = (ford: number) => {
+        const x = w.xOf(ford);
+        const y = w.yOf(ford);
+        for (let dy = -FORD_BRIDGED; dy <= FORD_BRIDGED; dy++) {
+          for (let dx = -FORD_BRIDGED; dx <= FORD_BRIDGED; dx++) {
+            if (w.inBounds(x + dx, y + dy)) {
+              const i = w.idx(x + dx, y + dy);
+              const f = w.feature[i];
+              const b = w.blueprint[i];
+              if ((f !== NONE && featureDef(f).bridge) || (b !== NONE && featureDef(b).bridge)) {
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      };
+      if (sim.recentFords().some((ford) => !bridgeBy(ford))) {
         alerts.push({
           text: 'Colonists keep wading the fords and getting soaked: a bridge (8 wood a tile) keeps them dry, and is quicker',
           tone: 'calm',

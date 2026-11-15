@@ -444,6 +444,7 @@ const SAME_OLD_SHARE = 0.85;
 const EAT_TICKS = 60;
 // Wading in water warmer than this (the air over it) soaks nobody's mood.
 const WARM_WADING = 20;
+const SOAKED_HOURS = THOUGHTS.soaked.hours ?? 3;
 // Research at a bench with a bookshelf within this many tiles goes this much faster.
 export const BOOKS_REACH = 2;
 export const BOOKS_BONUS = 0.15;
@@ -710,6 +711,8 @@ const FIRE_INTERRUPTS = new Set<JobType>([
 export class Simulation {
   public tick = 0;
   public readonly reservations = new Map<string, number>();
+  // Ford tile → the tick a colonist was last soaked wading it (see recentFords).
+  private readonly soakedAt = new Map<number, number>();
   public stats: Stats = {
     produced: {},
     hauled: 0,
@@ -3344,6 +3347,7 @@ export class Simulation {
         this.stats.wades = (this.stats.wades ?? 0) + 1;
         if (this.outdoorTemperature() < WARM_WADING) {
           this.addThought(c, 'soaked');
+          this.soakedAt.set(next, this.tick);
         }
       }
     }
@@ -6852,6 +6856,18 @@ export class Simulation {
     // A research session lasts a couple of hours before the colonist reconsiders.
     this.assign(c, this.makeJob('research', bench, { wait: TICKS_PER_HOUR * 2 }), path);
     return true;
+  }
+
+  // The fords colonists got soaked wading in the last few hours (as long as the soaking is felt), for the alert
+  // that asks for a bridge where they cross. (Not saved: after a load it fills again with the next soaking.)
+  public recentFords(): number[] {
+    const since = this.tick - SOAKED_HOURS * TICKS_PER_HOUR;
+    for (const [i, at] of this.soakedAt) {
+      if (at < since || !this.world.isWading(i)) {
+        this.soakedAt.delete(i);
+      }
+    }
+    return [...this.soakedAt.keys()];
   }
 
   // Whether a bookshelf stands within reach of this research bench (one is enough; more don't add).
