@@ -207,3 +207,22 @@ describe('work left on a bench', () => {
     expect(sim.benchWork.has(bench)).toBe(false);
   });
 });
+
+describe('work left on a bench, saved', () => {
+  it('is kept in a save, and the bench says so', async () => {
+    const { serialize, deserialize } = await import('./serialize');
+    const { controller } = await import('../game/controller');
+    controller.newColony('bench-work');
+    const sim = controller.sim;
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    const bench = w.idx(x + 3, y);
+    w.setFeature(bench, featureId('craftingBench'));
+    sim.benchWork.set(bench, { recipe: recipe('tailorParka'), progress: 240 });
+    const loaded = deserialize(JSON.parse(JSON.stringify(serialize(sim))));
+    expect(loaded.benchWork.get(bench)).toEqual({ recipe: recipe('tailorParka'), progress: 240 });
+    controller.selectTile(bench);
+    controller.publish();
+    expect(controller.getState().selectedTile!.details.join(' | ')).toMatch(/Tailor parka begun: 40% done/);
+  });
+});

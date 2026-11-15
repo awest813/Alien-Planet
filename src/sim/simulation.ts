@@ -949,7 +949,7 @@ export class Simulation {
   public shots: Shot[] = [];
   // Work left on a bench by a craft cut short (for supper, for bed, for a fight): the recipe and how far it had
   // got, for the next to make it there to carry on from. (Each interruption threw the work away: half the parkas
-  // begun were never finished, three hours of tailoring lost each time.) Not saved: jobs aren't either.
+  // begun were never finished, three hours of tailoring lost each time.) Saved with the colony.
   public benchWork = new Map<number, { recipe: number; progress: number }>();
   public firstNight: NightResult = 'pending';
   public objectivesDone: Record<string, boolean> = {};

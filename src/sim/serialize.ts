@@ -160,6 +160,8 @@ export interface SaveData {
   departed?: boolean;
   unburied?: Fallen[];
   graves?: [number, Fallen][];
+  // Work left on benches by crafts cut short: [bench tile, recipe, progress] (older saves: none).
+  benchWork?: [number, number, number][];
   story: StoryState;
   // The land the colony started in (older saves: temperate).
   biome?: Biome;
@@ -296,6 +298,7 @@ export function serialize(sim: Simulation): SaveData {
     departed: sim.departed,
     // Only graves still standing (one taken down leaves its record behind).
     graves: [...sim.graves].filter(([i]) => sim.graveAt(i)).map(([i, f]) => [i, { ...f }]),
+    benchWork: [...sim.benchWork].map(([i, b]) => [i, b.recipe, b.progress]),
     artworks: [...sim.artworks].filter(([i]) => sim.artworkAt(i)).map(([i, art]) => [i, { ...art }]),
     story: structuredClone(sim.story),
     biome: sim.biome,
@@ -437,6 +440,7 @@ export function deserialize(data: SaveData): Simulation {
   sim.beacon = data.beacon ? structuredClone(data.beacon) : { hours: 0 };
   sim.departed = !!data.departed;
   sim.graves = new Map((data.graves ?? []).map(([i, f]) => [i, { ...f }]));
+  sim.benchWork = new Map((data.benchWork ?? []).map(([i, recipe, progress]) => [i, { recipe, progress }]));
   sim.artworks = new Map((data.artworks ?? []).map(([i, art]) => [i, { ...art }]));
   sim.storyCount = sim.storyLog.length;
   // Saves from before difficulty settings play on standard.

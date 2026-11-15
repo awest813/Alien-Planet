@@ -4589,6 +4589,14 @@ export class GameController {
       details.push(`${mess} on the ground (${amount})`);
     }
     const def = f !== NONE ? featureDef(f) : undefined;
+    // Work left on it by a craft cut short (see benchWork): what, and how far along.
+    const left = def?.workbench ? sim.benchWork.get(i) : undefined;
+    if (left) {
+      const recipe = RECIPES[left.recipe];
+      details.push(
+        `${recipe.name} begun: ${Math.min(99, Math.round((100 * left.progress) / recipe.work))}% done, for the next to carry on`,
+      );
+    }
     if (def?.workbench === 'cooking' && sim.messAround(i) > 0) {
       details.push('Mess nearby makes for worse, riskier meals: clean it up');
     }
