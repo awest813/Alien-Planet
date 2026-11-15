@@ -6,6 +6,10 @@ const SQRT2 = Math.SQRT2;
 // Buffers are allocated once and reused between searches via a generation counter.
 // The cheapest a step can be (stone tiles).
 const MIN_STEP_COST = 0.8;
+// The weight for those in a hurry and not fussy about the way (raiders, allies): measured on a raid saved from a
+// ten-year colony, their searches went from a quarter of the time to (see the commit) for routes a step or two
+// longer.
+export const HURRIED = 1.6;
 
 export class Pathfinder {
   private readonly g: Float32Array;
@@ -29,8 +33,10 @@ export class Pathfinder {
   }
 
   // Returns the tiles to walk (excluding `start`, ending on one of `goals`), or null if unreachable.
-  // `blocked` rules out tiles others can walk (animals don't pass gates).
-  public find(start: number, goals: number[], blocked?: (i: number) => boolean): number[] | null {
+  // `blocked` rules out tiles others can walk (animals don't pass gates). `weight` over 1 trades the shortest way
+  // for a quicker search, heading for the goal more boldly (see HURRIED): for raiders and allies on the move, whose
+  // searches across a big map were a quarter of a raid's time, and who needn't take the very shortest way.
+  public find(start: number, goals: number[], blocked?: (i: number) => boolean, weight = 1): number[] | null {
     if (goals.length === 0) {
       return null;
     }
@@ -60,7 +66,7 @@ export class Pathfinder {
           const y = world.yOf(i);
           const dx = x < x0 ? x0 - x : x > x1 ? x - x1 : 0;
           const dy = y < y0 ? y0 - y : y > y1 ? y - y1 : 0;
-          return (Math.max(dx, dy) + (SQRT2 - 1) * Math.min(dx, dy)) * MIN_STEP_COST;
+          return (Math.max(dx, dy) + (SQRT2 - 1) * Math.min(dx, dy)) * MIN_STEP_COST * weight;
         },
         gen,
         blocked,
@@ -81,7 +87,7 @@ export class Pathfinder {
             best = h;
           }
         }
-        return best;
+        return best * weight;
       },
       gen,
       blocked,

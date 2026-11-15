@@ -1,3 +1,4 @@
+import { HURRIED } from './pathfinding';
 import { animalName, hurtAnimal } from './animals';
 import { scarAim } from './body';
 import { beaconTile, transmitting } from './beacon';
@@ -470,7 +471,7 @@ function breach(sim: Simulation, e: Enemy): boolean {
   }
   if (e.path.length === 0) {
     const spots = w.neighbors(wall, false).filter((n) => w.isPassable(n) && sim.regionOf(n) === region);
-    e.path = sim.pathfinder.find(e.tile, spots) ?? [];
+    e.path = sim.pathfinder.find(e.tile, spots, undefined, HURRIED) ?? [];
     if (e.path.length === 0) {
       e.breachTarget = undefined;
       return false;
@@ -701,7 +702,7 @@ function flee(sim: Simulation, e: Enemy, ally = false): void {
       },
       3,
     );
-    e.path = sim.pathfinder.find(e.tile, exits) ?? [];
+    e.path = sim.pathfinder.find(e.tile, exits, undefined, HURRIED) ?? [];
     if (e.path.length === 0) {
       // Nowhere to run: vanish rather than linger forever (a thief leaving what they took).
       if (e.loot) {
@@ -809,7 +810,7 @@ function wreckBeacon(sim: Simulation, e: Enemy): boolean {
   if (e.path.length === 0 || e.repathAt <= sim.tick) {
     e.repathAt = sim.tick + 200;
     const spots = w.neighbors(beacon).filter((n) => w.isPassable(n) && sim.regionOf(n) === region);
-    e.path = spots.length > 0 ? (sim.pathfinder.find(e.tile, spots) ?? []) : [];
+    e.path = spots.length > 0 ? (sim.pathfinder.find(e.tile, spots, undefined, HURRIED) ?? []) : [];
     if (e.path.length === 0) {
       // Walled off from it: get at the colony instead.
       e.wrecker = false;
@@ -850,7 +851,7 @@ function ravage(sim: Simulation, e: Enemy): boolean {
     if (e.ravageAt === undefined) {
       return false;
     }
-    e.path = sim.pathfinder.find(e.tile, [e.ravageAt, ...w.neighbors(e.ravageAt)]) ?? [];
+    e.path = sim.pathfinder.find(e.tile, [e.ravageAt, ...w.neighbors(e.ravageAt)], undefined, HURRIED) ?? [];
     if (e.path.length === 0 && e.tile !== e.ravageAt && !w.neighbors(e.ravageAt).includes(e.tile)) {
       e.ravageAt = undefined;
       return false;
@@ -939,7 +940,7 @@ function thiefTurn(sim: Simulation, e: Enemy): boolean {
       }
     }
     e.stealFrom = best;
-    e.path = best !== undefined ? (sim.pathfinder.find(e.tile, [best]) ?? []) : [];
+    e.path = best !== undefined ? (sim.pathfinder.find(e.tile, [best], undefined, HURRIED) ?? []) : [];
     if (best === undefined || (e.path.length === 0 && e.tile !== best)) {
       e.stealFrom = undefined;
       return false;
@@ -1127,7 +1128,7 @@ export function updateEnemies(sim: Simulation): void {
         const post = choosePost(sim, e, target);
         if (post !== undefined && post !== e.tile && inCover(w, target.tile, post)) {
           e.post = post;
-          e.path = sim.pathfinder.find(e.tile, [post]) ?? [];
+          e.path = sim.pathfinder.find(e.tile, [post], undefined, HURRIED) ?? [];
         }
       }
       const toPost = e.post !== undefined && e.path.length > 0 && e.path[e.path.length - 1] === e.post;
@@ -1150,7 +1151,7 @@ export function updateEnemies(sim: Simulation): void {
       e.post = post;
       const goals =
         post !== undefined ? [post] : [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))];
-      e.path = sim.pathfinder.find(e.tile, goals) ?? [];
+      e.path = sim.pathfinder.find(e.tile, goals, undefined, HURRIED) ?? [];
     }
     if (e.path.length > 0) {
       moveEnemy(sim, e);
@@ -1631,7 +1632,12 @@ export function updateAllies(sim: Simulation): void {
     if (a.path.length === 0 || (a.repathAt <= sim.tick && !stillLeadsTo(w, a, target.tile, false))) {
       a.repathAt = sim.tick + 30;
       a.path =
-        sim.pathfinder.find(a.tile, [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))]) ?? [];
+        sim.pathfinder.find(
+          a.tile,
+          [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))],
+          undefined,
+          HURRIED,
+        ) ?? [];
     }
     if (a.path.length > 0) {
       moveEnemy(sim, a, true);
@@ -1826,7 +1832,9 @@ function siegeTurn(sim: Simulation, e: Enemy, siege: SiegeState): boolean {
   if (chebyshev(w, e.tile, siege.camp) > 2) {
     if (e.path.length === 0 || e.repathAt <= sim.tick) {
       e.repathAt = sim.tick + 60;
-      e.path = sim.pathfinder.find(e.tile, [post, ...w.neighbors(post).filter((n) => w.isPassable(n))]) ?? [];
+      e.path =
+        sim.pathfinder.find(e.tile, [post, ...w.neighbors(post).filter((n) => w.isPassable(n))], undefined, HURRIED) ??
+        [];
     }
     if (e.path.length > 0) {
       moveEnemy(sim, e);
