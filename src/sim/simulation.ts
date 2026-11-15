@@ -3381,7 +3381,8 @@ export class Simulation {
         job !== 'shelter' &&
         // Woken to fight a fire or to feed someone bedridden: that comes first.
         job !== 'extinguish' &&
-        job !== 'feed'
+        job !== 'feed' &&
+        !this.windDown(c)
       ) {
         this.endJob(c);
         this.startSleep(c);
@@ -5693,7 +5694,13 @@ export class Simulation {
           );
       let batch = Math.min(batchSize(recipe), Math.max(1, room));
       for (const ing of recipe.ingredients) {
-        batch = Math.min(batch, Math.floor(this.ingredientAvailable(c, ing, region) / ing.count));
+        const available = this.ingredientAvailable(c, ing, region);
+        batch = Math.min(batch, Math.floor(available / ing.count));
+        // Food: no more than half of what there is, the rest left for the hungry. (Twenty-four vegetables in a
+        // cook's hands for three hours, of thirty, and the rest of a young colony starved meanwhile.)
+        if (ingredientIsFood(ing)) {
+          batch = Math.min(batch, Math.max(1, Math.floor(available / (2 * ing.count))));
+        }
       }
       if (batch < 1) {
         continue;
@@ -5934,8 +5941,31 @@ export class Simulation {
         job.progress = 0;
         return;
       }
+      // A batch cut short (see windDown): what's left is set down by the bench.
+      const rest = left.filter((b): b is Carried => b !== null);
+      if (rest.length > 0) {
+        this.setBundles(c, rest);
+        this.dropCarried(c);
+      }
       this.endJob(c);
     }
+  }
+
+  // Bedtime with a batch on the bench: the one under way is finished first (cut off, it was lost, the cook having
+  // started four meals an hour before bed), then the rest of the ingredients are set down. Not when exhausted.
+  private windDown(c: Colonist): boolean {
+    const job = c.job;
+    if (
+      job?.type !== 'craft' ||
+      job.stage === 0 ||
+      job.progress <= 0 ||
+      c.needs.rest < 0.2 ||
+      !this.isAtWorkSpot(c, job.target, false)
+    ) {
+      return false;
+    }
+    job.batch = 1;
+    return true;
   }
 
   // ---- Eating ----
@@ -9380,6 +9410,10 @@ const MEND_FILLED = 0.9;
 export function batchSize(recipe: RecipeDef): number {
   return recipe.mend ? 1 : Math.max(1, Math.min(MAX_BATCH, Math.floor(BATCH_WORK / recipe.work)));
 }
+
+// Whether an ingredient is something the colonists could eat instead.
+const ingredientIsFood = (ing: Ingredient): boolean =>
+  ing.category === 'rawFood' || ing.foodKind !== undefined || (ing.item !== undefined && isFood(ing.item));
 
 // An ingredient, for `n` of the recipe.
 const scaled = (ing: Ingredient, n: number): Ingredient => (n === 1 ? ing : { ...ing, count: ing.count * n });

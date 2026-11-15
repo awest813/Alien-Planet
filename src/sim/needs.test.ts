@@ -190,8 +190,8 @@ describe('cooking', () => {
     for (const c of sim.colonists.slice(1)) {
       c.priorities.cooking = 0;
     }
-    w.addItem(w.idx(x - 3, y + 3), itemId('berries'), 16);
-    w.addItem(w.idx(x - 1, y + 3), itemId('potatoes'), 10);
+    w.addItem(w.idx(x - 3, y + 3), itemId('berries'), 30);
+    w.addItem(w.idx(x - 1, y + 3), itemId('potatoes'), 20);
     // A batch of four: six apiece, from both stacks, carried together.
     let batch = 0;
     for (let t = 0; t < HOUR * 2 && batch === 0; t++) {
@@ -206,9 +206,10 @@ describe('cooking', () => {
       activity = sim.describe(sim.colonists[0]);
     }
     expect(activity).toMatch(/^Cook simple meal \(\d of 4\)$/);
-    fed(6);
-    // Four meals, and the two left over (not enough for a fifth) still about.
-    expect(sim.stockOf(itemId('meal'))).toBe(4);
+    fed(12);
+    // Batches of four, then two, then one and one, as the food runs down (no more than half of it at a time):
+    // eight meals, and the two left over (not enough for another) still about.
+    expect(sim.stockOf(itemId('meal'))).toBe(8);
     expect(sim.stockOf(itemId('berries')) + sim.stockOf(itemId('potatoes'))).toBe(2);
   });
 
@@ -236,6 +237,54 @@ describe('cooking', () => {
     sim.endJob(cook);
     sim.dropCarried(cook);
     expect(sim.stockOf(itemId('potatoes'))).toBe(34);
+  });
+
+  it('takes no more than half the food there is for a batch, leaving the rest for the hungry', () => {
+    for (const [potatoes, expected] of [
+      [13, 1],
+      [24, 2],
+      [60, 4],
+    ]) {
+      const { sim, w, x, y } = bareKitchen(37);
+      for (const c of sim.colonists.slice(1)) {
+        c.priorities.cooking = 0;
+      }
+      w.addItem(w.idx(x - 3, y + 3), itemId('potatoes'), potatoes);
+      let batch: number | undefined;
+      for (let t = 0; t < HOUR * 2 && batch === undefined; t++) {
+        sim.colonists[0].needs.food = 1;
+        sim.step();
+        batch = sim.colonists[0].job?.type === 'craft' ? sim.colonists[0].job.batch : undefined;
+      }
+      expect(batch).toBe(expected);
+    }
+  });
+
+  it('at bedtime a cook finishes the meal on the stove, sets the rest of the batch down, and goes to bed', () => {
+    const { sim, w, x, y } = bareKitchen(36);
+    for (const c of sim.colonists.slice(1)) {
+      c.priorities.cooking = 0;
+    }
+    w.addItem(w.idx(x - 3, y + 3), itemId('potatoes'), 48);
+    const cook = sim.colonists[0];
+    cook.schedule.fill('W');
+    for (let t = 0; t < HOUR * 3 && !(cook.job?.type === 'craft' && cook.job.progress > 10); t++) {
+      cook.needs.food = 1;
+      sim.step();
+    }
+    expect(cook.job?.batch).toBe(4);
+    // Bedtime, not yet tired out.
+    cook.schedule.fill('S');
+    cook.needs.rest = 0.6;
+    for (let t = 0; t < HOUR && cook.job?.type === 'craft'; t++) {
+      cook.needs.food = 1;
+      sim.step();
+    }
+    expect(cook.job?.type).not.toBe('craft');
+    // The meal on the stove was finished, and nothing went missing.
+    expect(sim.stockOf(itemId('meal'))).toBe(1);
+    expect(sim.stockOf(itemId('potatoes'))).toBe(42);
+    expect(cook.carrying).toBeNull();
   });
 
   it('takes one share of a mixed bundle, the stalest first, and keeps the rest as it was', () => {
