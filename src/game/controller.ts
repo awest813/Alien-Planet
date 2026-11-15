@@ -1611,7 +1611,7 @@ export class GameController {
     return {
       musicians,
       creatures,
-      talkers,
+      talkers: this.settings.chatter ? talkers : [],
       paused: this.speedIndex === 0 || !this.inPlay,
       night: sim.isNight(),
       rain: weather === 'rain' || weather === 'storm',
@@ -4906,7 +4906,7 @@ export function gearSummary(item: number): string | null {
   if (def.weapon) {
     const w = weaponDef(def.weapon);
     const pace = w.cooldown <= 42 ? 'quick' : w.cooldown <= 60 ? 'steady' : w.cooldown <= 80 ? 'slow' : 'very slow';
-    const pierce = w.pierce >= 0.4 ? 'cuts through armour' : w.pierce >= 0.15 ? 'pierces some armour' : null;
+    const pierce = w.pierce >= 0.4 ? 'cuts through armor' : w.pierce >= 0.15 ? 'pierces some armor' : null;
     return [
       w.range > 1 ? `Reach ${w.range} tiles` : 'Hand to hand',
       `damage ${Math.round(w.damage[0] * 100)}–${Math.round(w.damage[1] * 100)}`,

@@ -479,7 +479,7 @@ describe('mid-game: what the screens say', () => {
       controller.publish();
       return controller.getState().selectedTile!.details.join(' | ');
     };
-    expect(card(bow)).toMatch(/Reach 12 tiles · damage 28–40 · slow · pierces some armour/);
+    expect(card(bow)).toMatch(/Reach 12 tiles · damage 28–40 · slow · pierces some armor/);
     expect(card(mail)).toMatch(/Turns aside 55% of a blow · 10% slower on foot/);
   });
 

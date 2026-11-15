@@ -250,6 +250,11 @@ describe('animals and people, heard', () => {
     // The two side by side talk; the one off on their own doesn't.
     expect(scene.talkers!.map((t) => t.id).sort()).toEqual([a.id, b.id].sort());
     expect(scene.shots[0].struck).toEqual({ who: 'colonist', pitch: voiceOf(a) });
+    // "Colonists talking" off in Settings: no murmur (cries are still heard).
+    controller.setSettings({ chatter: false });
+    const quiet = (controller as unknown as { soundScene(): import('./audio').SoundScene }).soundScene();
+    expect(quiet.talkers).toEqual([]);
+    controller.setSettings({ chatter: true });
     // A colonist's voice is their own, the same each time; a child's is higher.
     expect(voiceOf(a)).toBe(voiceOf(a));
     expect(voiceOf({ ...a, age: 8 })).toBeGreaterThan(260);

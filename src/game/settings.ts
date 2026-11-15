@@ -33,6 +33,8 @@ export interface Settings {
   sound: boolean;
   // The soundtrack, under the colonists' own playing.
   score: boolean;
+  // Colonists in company heard talking (a murmur; cries in a fight are heard whatever this says).
+  chatter: boolean;
   masterVolume: number;
   musicVolume: number;
   effectsVolume: number;
@@ -78,6 +80,7 @@ export const DEFAULT_SETTINGS: Settings = {
   scroll: 0,
   sound: false,
   score: true,
+  chatter: true,
   masterVolume: 0.7,
   musicVolume: 0.8,
   effectsVolume: 0.8,

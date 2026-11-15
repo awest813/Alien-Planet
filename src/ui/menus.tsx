@@ -797,7 +797,7 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
       />
       <h3>Sound</h3>
       <Toggle
-        label="Sound (instruments, weather, work and alerts)"
+        label="Sound (music, weather, work, animals, voices and alerts)"
         value={s.sound}
         onChange={(v) => set({ sound: v })}
       />
@@ -810,10 +810,16 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
       />
       <Slider label="Music" value={s.musicVolume} disabled={!s.sound} onChange={(v) => set({ musicVolume: v })} />
       <Slider
-        label="Effects (weather, work, fights, alerts)"
+        label="Effects (weather, work, animals, voices, fights, alerts)"
         value={s.effectsVolume}
         disabled={!s.sound}
         onChange={(v) => set({ effectsVolume: v })}
+      />
+      <Toggle
+        label="Colonists talking (a murmur when they're together)"
+        value={s.chatter}
+        disabled={!s.sound}
+        onChange={(v) => set({ chatter: v })}
       />
       <h3>Display</h3>
       <Choice label="Interface size" value={s.uiScale} options={UI_SCALES} onChange={(v) => set({ uiScale: v })} />
