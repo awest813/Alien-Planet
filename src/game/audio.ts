@@ -43,6 +43,8 @@ export interface SoundScene {
   speed: number;
   // The soundtrack's mood.
   mood: Mood;
+  // How hard the wind blows, 0 to 1: the simulation's own (the one turbines turn in).
+  wind: number;
 }
 
 export type Alert = 'raid' | 'death' | 'goal' | 'concert' | 'fire' | 'collapse' | 'birth';
@@ -278,7 +280,9 @@ class Sound {
     }
     const now = ctx.currentTime;
     this.keepScoring(scene, now);
-    const wind = scene.storm ? 0.22 : scene.rain ? 0.1 : scene.cold ? 0.09 : 0.05;
+    // (The colony's own wind, which the turbines turn in: a gale howls, fog is near still. It went by the weather
+    // alone before, steady for any spell.)
+    const wind = 0.02 + 0.2 * scene.wind * scene.wind;
     const rain = scene.storm ? 0.12 : scene.rain ? 0.07 : 0;
     if (wind !== this.windLevel || rain !== this.rainLevel) {
       this.windLevel = wind;

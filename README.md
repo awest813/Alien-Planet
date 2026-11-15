@@ -301,7 +301,7 @@ How the storytelling layer works:
   sandbags, the stone hearth, the fine bed, tailoring and all the electrical tech below, or improve insulation, crop growth and
   doctoring.
 - **Power:** the colony shares one grid. Wood-fired generators (kept fuelled by haulers), solar panels (daytime
-  only, weaker in winter) and wind turbines (night and day, with the weather: strong in a storm, weak in fog, and
+  only, weaker in winter and under cloud: rain, storms, fog and snow dim them) and wind turbines (night and day, with the weather: strong in a storm, weak in fog, and
   only under the open sky) supply it; batteries store the surplus. If demand outstrips supply and storage,
   everything electric switches off. Generators idle to save fuel while the batteries are full and nothing
   else needs them, and haulers refuel a generator that's running low before anything else.
@@ -319,9 +319,13 @@ How the storytelling layer works:
 - **Tool kits:** a crafting bench turns wood and granite chunks into tool kits. Anyone who mines, builds, grows or
   cuts plants picks one up from storage and works 30% faster at those jobs (more with a well-made kit, less with
   a poor one) until it wears out after about 80 hours of use; the Production screen keeps two spares in stock.
-- **Weather:** clear skies, rain, storms, fog, summer droughts and winter snow come and go in spells (shown in the
-  top bar). Rain soaks anyone outside, who feel the cold more and grumble about it; rain helps crops and
-  droughts halve their growth; fog and rain spoil aim for both sides. Below freezing, rain falls as snow.
+- **Weather:** clear skies, rain, storms, fog, summer droughts (a day or two) and winter snow come and go in spells
+  (shown in the top bar, with the wind). Rain soaks anyone outside, who feel the cold more and grumble about it;
+  rain helps crops and droughts halve their growth; fog (mostly of a night and a morning: it lifts through the
+  afternoon) and rain spoil aim for both sides. Below freezing, rain falls as snow; snow settles on the ground while
+  it falls and lies while it's cold, melting in a thaw (faster in the rain), so a mild, wet winter stays bare. One
+  wind blows for everything: turbines turn in it, and rain, snow and leaves slant and drift with it, its way
+  changing day to day.
 - **Fire:** lightning in storms can set trees, crops and wooden buildings alight near the colony. Fire spreads to
   anything flammable next to it (faster in a drought); rain stops it spreading and soon puts it out. Whatever
   burns through is destroyed along with any items on the tile, and a lost building is marked for rebuilding (as

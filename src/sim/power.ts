@@ -1,8 +1,6 @@
 import { NONE, featureDef } from './defs';
-import { hash2 } from './rng';
-import { TICKS_PER_HOUR } from './constants';
 import type { Simulation } from './simulation';
-import { eclipseOn } from './storyteller';
+import { sunStrength, windStrength } from './weather';
 
 // The colony shares a single power grid: every generator feeds it, every consumer draws
 // from it, and batteries smooth out the gaps. If supply and storage can't cover demand,
@@ -26,49 +24,8 @@ export const freshPower = (): PowerState => ({
   idle: false,
 });
 
-// Solar output through the day: nothing at night, full strength at 13:00.
-export function daylight(hour: number): number {
-  return hour < 6 || hour > 20 ? 0 : Math.sin(((hour - 6) / 14) * Math.PI);
-}
-
-// Weaker winter sun.
-const WINTER_SOLAR = 0.6;
-
-// How hard the wind blows, as a share of a turbine's full output: by the weather, and gusting hour to hour (the
-// same in a replay of the same colony). Over a year it comes to about half, night and day alike: a 700 W turbine
-// gives about 350 W where a 1200 W solar panel gives about 450 W, all of it by day.
-const WIND_BY_WEATHER: Record<string, number> = {
-  storm: 1,
-  rain: 0.75,
-  snow: 0.65,
-  clear: 0.45,
-  drought: 0.4,
-  fog: 0.12,
-};
-export function windStrength(sim: Simulation): number {
-  const base = WIND_BY_WEATHER[sim.weather.kind] ?? 0.45;
-  const hour = Math.floor(sim.tick / TICKS_PER_HOUR);
-  const gust = (hash2(hour, 7, 911) - 0.5) * 0.5;
-  return Math.max(0, Math.min(1, base + gust * base));
-}
-
-// How strongly the sun falls on a solar panel now, 0 to 1: by the hour, weaker in winter, and none in an eclipse.
-export function sunStrength(sim: Simulation): number {
-  return eclipseOn(sim) ? 0 : daylight(sim.hour) * (sim.season === 'Winter' ? WINTER_SOLAR : 1);
-}
-
-// The wind in words, for a turbine's card.
-export function windWords(strength: number): string {
-  return strength >= 0.85
-    ? 'a gale'
-    : strength >= 0.6
-      ? 'a strong wind'
-      : strength >= 0.35
-        ? 'a stiff breeze'
-        : strength >= 0.15
-          ? 'a light breeze'
-          : 'barely a breath of wind';
-}
+// Sun and wind are the weather's (weather.ts); here for the power code that used to keep them.
+export { daylight, sunStrength, windStrength, windWords } from './weather';
 
 // Advances the grid by `hours`, burning generator fuel and charging or draining batteries.
 export function updatePower(sim: Simulation, tiles: number[], hours: number): void {

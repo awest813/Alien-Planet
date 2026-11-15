@@ -77,6 +77,7 @@ const scene = (patch: Partial<import('./audio').SoundScene> = {}): import('./aud
   fire: 0,
   speed: 1,
   mood: 'day',
+  wind: 0.45,
   ...patch,
 });
 

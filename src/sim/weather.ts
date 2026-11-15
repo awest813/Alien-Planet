@@ -1,4 +1,6 @@
 import { biomeDef } from './biomes';
+import { hash2 } from './rng';
+import { eclipseOn } from './storyteller';
 import { TICKS_PER_HOUR } from './constants';
 import { NONE, featureDef, itemDef, itemId } from './defs';
 import { damage } from './health';
@@ -16,6 +18,9 @@ export interface WeatherState {
   kind: WeatherKind;
   // Tick when this spell ends and the next is rolled.
   until: number;
+  // Snow lying on the ground, 0 (none) to 1: it settles while snow falls and melts above freezing, faster in the
+  // rain. (Missing from older saves: none.)
+  snow?: number;
 }
 
 interface WeatherDef {
@@ -31,16 +36,33 @@ interface WeatherDef {
   wet: boolean;
   // Spell length in hours.
   hours: [number, number];
+  // Sunlight getting through the cloud, for solar panels (1: a clear sky).
+  sun: number;
 }
 
+// (Droughts last a day or two: at two to four, one took half of a six-day summer, at half the crops, in a forest
+// as in a desert.)
 export const WEATHER: Record<WeatherKind, WeatherDef> = {
-  clear: { label: 'Clear', icon: '', temp: 0, crops: 1, aim: 1, wet: false, hours: [8, 20] },
-  rain: { label: 'Rain', icon: '🌧', temp: -2, crops: 1.2, aim: 0.9, wet: true, hours: [4, 12] },
-  storm: { label: 'Storm', icon: '⛈', temp: -2, crops: 1.1, aim: 0.8, wet: true, hours: [3, 7] },
-  fog: { label: 'Fog', icon: '🌫', temp: -1, crops: 1, aim: 0.6, wet: false, hours: [3, 8] },
-  drought: { label: 'Drought', icon: '🔥', temp: 3, crops: 0.5, aim: 1, wet: false, hours: [48, 96] },
-  snow: { label: 'Snow', icon: '❄', temp: -1, crops: 1, aim: 0.85, wet: false, hours: [4, 14] },
+  clear: { label: 'Clear', icon: '', temp: 0, crops: 1, aim: 1, wet: false, hours: [8, 20], sun: 1 },
+  rain: { label: 'Rain', icon: '🌧', temp: -2, crops: 1.2, aim: 0.9, wet: true, hours: [4, 12], sun: 0.55 },
+  storm: { label: 'Storm', icon: '⛈', temp: -2, crops: 1.1, aim: 0.8, wet: true, hours: [3, 7], sun: 0.35 },
+  fog: { label: 'Fog', icon: '🌫', temp: -1, crops: 1, aim: 0.6, wet: false, hours: [3, 8], sun: 0.65 },
+  drought: { label: 'Drought', icon: '🔥', temp: 3, crops: 0.5, aim: 1, wet: false, hours: [24, 48], sun: 1 },
+  snow: { label: 'Snow', icon: '❄', temp: -1, crops: 1, aim: 0.85, wet: false, hours: [4, 14], sun: 0.5 },
 };
+
+// Rain turns to snow below this temperature before the weather's own (so rain never shows below freezing: at 0 it
+// did, rain cooling the air by two degrees), and snow back to rain above the second (a little higher, so a day
+// hovering about freezing doesn't flick between them).
+const SNOW_BELOW = 2;
+const RAIN_ABOVE = 3;
+
+// Fog forms at night and in the morning (twice as likely then, so there's as much over a day as there was), and
+// through the afternoon it lifts (one hour in three) and none rolls in.
+const FOG_LIFTS_FROM = 13;
+const FOG_LIFTS_TO = 19;
+const FOG_LIFT_CHANCE = 1 / 3;
+const FOG_EARLY = 2;
 
 // How likely each kind of weather is when a spell ends, by season.
 const CHANCES: Record<Season, Partial<Record<WeatherKind, number>>> = {
@@ -59,11 +81,14 @@ export const WET_CHILL = 3;
 export function updateWeather(sim: Simulation): void {
   const weather = sim.weather;
   // A spell that no longer fits ends early: droughts with the summer, snow once it thaws.
-  const thawed = weather.kind === 'snow' && sim.outdoorTemperature() - weatherDef(sim).temp > 2;
+  const base = () => sim.outdoorTemperature() - weatherDef(sim).temp;
+  const thawed = weather.kind === 'snow' && base() > RAIN_ABOVE;
   // And rain that runs into a freezing night turns to snow.
-  const frozen =
-    (weather.kind === 'rain' || weather.kind === 'storm') && sim.outdoorTemperature() - weatherDef(sim).temp < 0;
-  const outOfSeason = (weather.kind === 'drought' && sim.season !== 'Summer') || thawed || frozen;
+  const frozen = (weather.kind === 'rain' || weather.kind === 'storm') && base() < SNOW_BELOW;
+  const afternoon = sim.hour >= FOG_LIFTS_FROM && sim.hour < FOG_LIFTS_TO;
+  const lifted = weather.kind === 'fog' && afternoon && sim.rng.next() < FOG_LIFT_CHANCE;
+  settle(sim);
+  const outOfSeason = (weather.kind === 'drought' && sim.season !== 'Summer') || thawed || frozen || lifted;
   if (sim.tick < weather.until && !outOfSeason) {
     if (weather.kind === 'storm') {
       lightning(sim);
@@ -71,7 +96,13 @@ export function updateWeather(sim: Simulation): void {
     return;
   }
   // A desert sees little rain and long droughts; the tundra snows from autumn.
-  const chances = biomeDef(sim.biome).weather?.[sim.season] ?? CHANCES[sim.season];
+  const seasonal = biomeDef(sim.biome).weather?.[sim.season] ?? CHANCES[sim.season];
+  // (Fog likelier of a night and a morning, none of an afternoon.)
+  const early = sim.hour >= FOG_LIFTS_TO || sim.hour < 10;
+  const chances: Partial<Record<WeatherKind, number>> = {
+    ...seasonal,
+    fog: (seasonal.fog ?? 0) * (afternoon ? 0 : early ? FOG_EARLY : 1),
+  };
   let roll = sim.rng.next() * Object.values(chances).reduce((sum, p) => sum + (p ?? 0), 0);
   let kind: WeatherKind = 'clear';
   for (const [key, p] of Object.entries(chances) as [WeatherKind, number][]) {
@@ -87,10 +118,10 @@ export function updateWeather(sim: Simulation): void {
   }
   // Below freezing, rain and storms come down as snow; and well above it, snow comes down as rain (snow chosen on
   // a mild winter's day thawed and cleared within the hour).
-  const base = sim.outdoorTemperature() - weatherDef(sim).temp;
-  if ((kind === 'rain' || kind === 'storm') && base < 0) {
+  const air = base();
+  if ((kind === 'rain' || kind === 'storm') && air < SNOW_BELOW) {
     kind = 'snow';
-  } else if (kind === 'snow' && base > 2) {
+  } else if (kind === 'snow' && air > RAIN_ABOVE) {
     kind = 'rain';
   }
   const [lo, hi] = WEATHER[kind].hours;
@@ -112,6 +143,73 @@ export function updateWeather(sim: Simulation): void {
 }
 
 export const weatherDef = (sim: Simulation): WeatherDef => WEATHER[sim.weather.kind];
+
+// An hour's snow settling or melting: falling snow covers the ground in about eight hours; above freezing it melts,
+// faster the warmer it is, and faster still in the rain. At or below freezing it lies.
+function settle(sim: Simulation): void {
+  const w = sim.weather;
+  const t = sim.outdoorTemperature();
+  let snow = w.snow ?? 0;
+  if (w.kind === 'snow') {
+    snow += 0.12;
+  } else if (t > 0) {
+    snow -= 0.02 * t * (WEATHER[w.kind].wet ? 2 : 1);
+  }
+  w.snow = Math.max(0, Math.min(1, snow));
+}
+
+// Snow lying deep enough to show.
+export const snowOnGround = (sim: Simulation): boolean => (sim.weather.snow ?? 0) >= 0.35;
+
+// ---- Sun and wind ----
+
+// Solar output through the day: nothing at night, full strength at 13:00.
+export function daylight(hour: number): number {
+  return hour < 6 || hour > 20 ? 0 : Math.sin(((hour - 6) / 14) * Math.PI);
+}
+
+// How strong the sun is by season (lower and shorter in winter, between in spring and autumn).
+const SEASON_SUN: Record<Season, number> = { Spring: 0.9, Summer: 1, Autumn: 0.85, Winter: 0.6 };
+
+// How strongly the sun falls on a solar panel now, 0 to 1: by the hour and the season, through the cloud, and none
+// in an eclipse. (It once ignored the weather: a panel gave as much in a storm as on a clear day.)
+export function sunStrength(sim: Simulation): number {
+  return eclipseOn(sim) ? 0 : daylight(sim.hour) * SEASON_SUN[sim.season] * weatherDef(sim).sun;
+}
+
+// How hard the wind blows, as a share of a turbine's full output: by the weather, and gusting hour to hour (the
+// same in a replay of the same colony). Over a year it comes to about half, night and day alike. The one wind:
+// turbines turn with it, and the rain, the snow, the leaves and the sound of it follow it too.
+const WIND_BY_WEATHER: Record<WeatherKind, number> = {
+  storm: 1,
+  rain: 0.75,
+  snow: 0.65,
+  clear: 0.45,
+  drought: 0.4,
+  fog: 0.12,
+};
+export function windStrength(sim: Simulation): number {
+  const base = WIND_BY_WEATHER[sim.weather.kind] ?? 0.45;
+  const hour = Math.floor(sim.tick / TICKS_PER_HOUR);
+  const gust = (hash2(hour, 7, 911) - 0.5) * 0.5;
+  return Math.max(0, Math.min(1, base + gust * base));
+}
+
+// Which way it blows across the map: from the west (1) or the east (-1), changing day to day.
+export const windFrom = (sim: Simulation): number => (hash2(sim.day, 13, 577) < 0.5 ? 1 : -1);
+
+// The wind in words.
+export function windWords(strength: number): string {
+  return strength >= 0.85
+    ? 'a gale'
+    : strength >= 0.6
+      ? 'a strong wind'
+      : strength >= 0.35
+        ? 'a stiff breeze'
+        : strength >= 0.15
+          ? 'a light breeze'
+          : 'barely a breath of wind';
+}
 
 // Whether someone (or something) on this tile is out in the rain (dry snow doesn't soak); a
 // roof or an enclosed room keeps it off.

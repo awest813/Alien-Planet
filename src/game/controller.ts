@@ -1257,7 +1257,8 @@ export interface UiState {
   // A favour the neighbours have asked, and what the colony can pay with.
   diplomacy: DiplomacyView;
   // Current weather, e.g. { label: 'Rain', icon: '🌧' } (no icon when clear).
-  weather: { label: string; icon: string };
+  // The weather, and the wind in words. A clear day shows nothing unless it's windy.
+  weather: { label: string; icon: string; wind: string };
   // Tiles on fire anywhere on the map.
   fires: number;
   stats: {
@@ -1481,6 +1482,7 @@ export class GameController {
               ? 'winter'
               : 'day',
       speed: SPEEDS[this.speedIndex] || 1,
+      wind: windStrength(sim),
     };
   }
   // The last tick whose shots have been heard.
@@ -2006,6 +2008,18 @@ export class GameController {
       return undefined;
     }
     return c.health.dead ? { tile: c.tile } : about;
+  }
+
+  private weatherView(): UiState['weather'] {
+    const sim = this.sim;
+    const def = weatherDef(sim);
+    const strength = windStrength(sim);
+    const wind = windWords(strength);
+    // (A strong wind on a clear day is worth a word: the turbines turn fast and the rain, when it comes, slants.)
+    if (!def.icon && strength >= 0.6) {
+      return { label: 'Windy', icon: '💨', wind };
+    }
+    return { label: def.label, icon: def.icon, wind };
   }
 
   // Takes the camera to whoever or wherever a notification is about.
@@ -2621,7 +2635,7 @@ export class GameController {
       mapSoftened: autoSharpness.slow,
       inPlay: this.inPlay,
       latestSave: this.latestSave(),
-      weather: { label: weatherDef(sim).label, icon: weatherDef(sim).icon },
+      weather: this.weatherView(),
       trade: this.tradeView(),
       captives: this.captivesView(),
       factions: FACTIONS.map((f) => ({

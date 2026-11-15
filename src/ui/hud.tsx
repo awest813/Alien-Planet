@@ -146,8 +146,8 @@ function Weather({ weather, phone }: { weather: UiState['weather']; phone?: bool
     <span
       className={phone ? 'weather phone-only' : 'weather not-phone'}
       role="img"
-      title={`Weather: ${weather.label}`}
-      aria-label={`Weather: ${weather.label}`}
+      title={`Weather: ${weather.label}, ${weather.wind}`}
+      aria-label={`Weather: ${weather.label}, ${weather.wind}`}
     >
       {weather.icon} <span className="weather-label">{weather.label}</span>
     </span>

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { TOOLS, Tool, controller } from '../game/controller';
 import { NONE, featureDef, itemDef, terrainId } from '../sim/defs';
 import { wheelPixels, wheelZoom } from '../game/device';
+import { snowOnGround, windFrom, windStrength } from '../sim/weather';
 import { hash2 } from '../sim/rng';
 import { beaconTile, transmitting } from '../sim/beacon';
 import { EXCELLENT, MASTERWORK } from '../sim/art';
@@ -184,7 +185,10 @@ export class ColonyScene extends Phaser.Scene {
   private artFx!: Phaser.GameObjects.Graphics;
   private ship: Phaser.GameObjects.Image | undefined;
   // The season the ground is drawn for (0 spring … 3 winter); a change repaints it.
+  // The ground's look (snowy only while snow lies; a bare winter looks like late autumn), and the season plants are
+  // tinted for, which is the calendar's.
   private terrainSeason = 1;
+  private plantSeason = 1;
   // Which of the grass looks the colony's land uses.
   private land(): number {
     return Math.max(0, TERRAIN_LANDS.indexOf(controller.sim.biome));
@@ -420,7 +424,8 @@ export class ColonyScene extends Phaser.Scene {
       const colors = [0xff8c1a, 0xd8342a, 0xffd23f, 0xe0602a];
       for (let k = 0; k < 36; k++) {
         const t = frac(hash2(k, 21, 83) + now * 0.00005 * (0.7 + 0.6 * hash2(k, 23, 89)));
-        const x = v.x + frac(hash2(k, 25, 97) + t * 0.6) * v.width;
+        // (Blown the way the wind blows, further the harder it does.)
+        const x = v.x + frac(hash2(k, 25, 97) + t * (0.2 + 0.8 * windStrength(sim)) * windFrom(sim)) * v.width;
         const y = v.y + t * v.height + Math.sin(now / 500 + k) * 4 * s;
         // A leaf tumbling: now edge on, now flat.
         const flat = Math.abs(Math.sin(now / 260 + k * 1.7));
@@ -465,17 +470,18 @@ export class ColonyScene extends Phaser.Scene {
       const storm = kind === 'storm';
       // An overcast sky, a storm's darker (at 0.2 a storm looked like a clear day with a few specks falling).
       g.fillStyle(0x0c1424, storm ? 0.3 : 0.12).fillRect(v.x, v.y, v.width, v.height);
-      // Streaks slanting with the wind, a storm's longer, harder and more of them.
+      // Streaks slanting with the wind (the one the turbines turn in: its way and its strength), a storm's longer,
+      // harder and more of them.
       const length = (storm ? 14 : 9) * s;
-      const slant = (storm ? 0.35 : 0.18) * length;
-      g.lineStyle(s, 0xb4d0ff, storm ? 0.6 : 0.45);
+      const slant = (0.05 + 0.45 * windStrength(sim)) * length * windFrom(sim);
+      g.lineStyle(s, 0xb4d0ff, storm ? 0.65 : 0.55);
       // (Half as many in Chromebook mode, and no splashes: still plainly rain.)
       const light = controller.chromebook;
       const drops = (storm ? 340 : 180) / (light ? 2 : 1);
       // Each drop has its own place and pace (hashed), so they scatter rather than fall in lines.
       for (let k = 0; k < drops; k++) {
         const fall = frac(hash2(k, 5, 13) + now * (storm ? 0.0016 : 0.0011) * (0.8 + 0.4 * hash2(k, 7, 17)));
-        const x = v.x + frac(hash2(k, 3, 11) + now * 0.00004 + fall * (slant / v.width)) * v.width;
+        const x = v.x + frac(hash2(k, 3, 11) + fall * (slant / v.width)) * v.width;
         const y = v.y + fall * v.height;
         g.lineBetween(x, y, x + slant, y + length);
       }
@@ -507,9 +513,12 @@ export class ColonyScene extends Phaser.Scene {
       // A pale, close sky while it falls.
       g.fillStyle(0xdfe8f4, 0.1).fillRect(v.x, v.y, v.width, v.height);
       g.fillStyle(0xffffff, 0.85);
+      // Flakes swirl, and drift across with the wind.
+      const wind = windStrength(sim);
+      const across = windFrom(sim) * wind * 0.00003;
       for (let k = 0; k < 140; k++) {
-        const drift = Math.sin(now / 900 + k) * 6 * s;
-        const x = v.x + frac(hash2(k, 3, 19)) * v.width + drift;
+        const drift = Math.sin(now / 900 + k) * (3 + 6 * wind) * s;
+        const x = v.x + frac(hash2(k, 3, 19) + now * across) * v.width + drift;
         const y = v.y + frac(hash2(k, 5, 23) + now * 0.00018 * (0.7 + 0.6 * hash2(k, 9, 29))) * v.height;
         g.fillRect(x, y, 2 * s, 2 * s);
       }
@@ -601,7 +610,8 @@ export class ColonyScene extends Phaser.Scene {
     this.ship = undefined;
     // A new or loaded map can share the old one's version numbers: work the lights out afresh.
     this.glowVersion = -1;
-    this.terrainSeason = SEASON_INDEX[controller.sim.season] ?? 1;
+    this.terrainSeason = this.groundSeason();
+    this.plantSeason = SEASON_INDEX[controller.sim.season] ?? 1;
     // A drag or pan begun on the old map mustn't carry its tile indexes onto the new one.
     this.drag = null;
     this.pan = null;
@@ -767,7 +777,7 @@ export class ColonyScene extends Phaser.Scene {
       return world.growth[i] >= 1 ? 0xffe27a : 0xffffff;
     }
     const plant = def.natural && (def.harvest?.work === 'chop' || def.harvest?.work === 'forage');
-    return !plant ? 0xffffff : this.terrainSeason === 2 ? 0xffb36b : this.terrainSeason === 3 ? 0xc4d0de : 0xffffff;
+    return !plant ? 0xffffff : this.plantSeason === 2 ? 0xffb36b : this.plantSeason === 3 ? 0xc4d0de : 0xffffff;
   }
 
   // The signal beacon: a pulse spreading from it while it transmits, and the ship beside it once landed.
@@ -838,13 +848,23 @@ export class ColonyScene extends Phaser.Scene {
     }
   }
 
-  // The ground changes with the seasons: green in spring and summer, golden in autumn, frosted in winter.
-  private syncSeason(world: World): void {
+  // The ground's look: snow while snow lies on it (it settles while snow falls and melts above freezing), and
+  // otherwise the season's, a bare winter like late autumn. (It was white all winter, rain at 4°C and all.)
+  private groundSeason(): number {
     const season = SEASON_INDEX[controller.sim.season] ?? 1;
-    if (season === this.terrainSeason) {
+    return snowOnGround(controller.sim) ? 3 : season === 3 ? 2 : season;
+  }
+
+  // The ground changes with the seasons and the snow: green in spring and summer, golden in autumn and a bare
+  // winter, white under snow. Plants are tinted for the season.
+  private syncSeason(world: World): void {
+    const season = this.groundSeason();
+    const plants = SEASON_INDEX[controller.sim.season] ?? 1;
+    if (season === this.terrainSeason && plants === this.plantSeason) {
       return;
     }
     this.terrainSeason = season;
+    this.plantSeason = plants;
     for (let i = 0; i < world.size; i++) {
       const x = world.xOf(i);
       const y = world.yOf(i);
