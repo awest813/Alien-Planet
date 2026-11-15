@@ -37,8 +37,8 @@ export interface Caravan {
 
 export const STARTING_GOODWILL = 20;
 // Goodwill from trading: a point per this much silver's worth dealt in a visit, up to this many a visit.
-const GOODWILL_PER = 80;
-const VISIT_GOODWILL = 5;
+export const GOODWILL_PER = 80;
+export const VISIT_GOODWILL = 5;
 // Raiders start out hostile; the hill clans start out guarded (they keep to themselves at first).
 export const HOSTILE_GOODWILL = -50;
 const GUARDED_GOODWILL = 5;
@@ -410,11 +410,10 @@ export function applyTrade(sim: Simulation, buy: [number, number][], sell: [numb
   // Good trading warms relations, a little at a time: a point for every 80 silver's worth dealt this visit, up to
   // five a visit. (Reckoned a deal at a time, ten small sales earned twice what one big one did, and a sale under
   // 80 silver nothing at all.)
+  const gain = dealGoodwill(caravan, cost + income);
   caravan.turnover = (caravan.turnover ?? 0) + cost + income;
-  const earned = Math.min(VISIT_GOODWILL, Math.floor(caravan.turnover / GOODWILL_PER));
-  const gain = earned - (caravan.goodwillEarned ?? 0);
   if (gain > 0) {
-    caravan.goodwillEarned = earned;
+    caravan.goodwillEarned = (caravan.goodwillEarned ?? 0) + gain;
     shiftGoodwill(sim, caravan.faction, gain);
   }
   sim.addLog(
@@ -422,6 +421,13 @@ export function applyTrade(sim: Simulation, buy: [number, number][], sell: [numb
     'good',
   );
   return null;
+}
+
+// The goodwill a deal worth `value` would earn this visit (see applyTrade): shown before it's made.
+export const dealGoodwill = (caravan: Caravan, value: number): number =>
+  visitGoodwill(caravan.turnover ?? 0, caravan.goodwillEarned ?? 0, value);
+export function visitGoodwill(turnover: number, earned: number, value: number): number {
+  return Math.max(0, Math.min(VISIT_GOODWILL, Math.floor((turnover + value) / GOODWILL_PER)) - earned);
 }
 
 // Everything the colony could put on the table, by item.

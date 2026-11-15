@@ -19,7 +19,7 @@ import type { Simulation } from './simulation';
 import { seasonOf } from './seasons';
 import { Filth } from './world';
 import { ELDER, TODDLER } from './lifespans';
-import { Colonist, Health } from './types';
+import { Colonist, Health, Injury } from './types';
 
 interface DiseaseDef {
   label: string;
@@ -281,6 +281,17 @@ export function updateHealth(sim: Simulation, c: Colonist, hours: number): void 
     }
   }
   checkHealth(sim, c);
+}
+
+// About how many hours a wound takes to heal as things stand (tended or not, lying down or not, a hospital bed), or
+// null for one that festers instead.
+export function healHours(sim: Simulation, c: Colonist, injury: Injury): number | null {
+  if (isInfected(injury)) {
+    return null;
+  }
+  const restBonus = (c.sleeping || c.health.downed ? 1.5 : 1) * (inHospitalBed(sim, c) ? HOSPITAL_HEALING : 1);
+  const rate = injury.tended > 0 ? 0.015 + 0.03 * injury.tended : 0.004;
+  return injury.severity / (rate * restBonus);
 }
 
 // How fast an illness worsens and immunity builds, an hour, as things stand (`restBonus`: lying down, a hospital

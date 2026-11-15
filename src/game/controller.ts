@@ -35,6 +35,7 @@ import {
   POISONING_HOURS,
   bleedingOf,
   diseaseOutlook,
+  healHours,
   healthFactor,
   needsBedRest,
   needsTending,
@@ -887,7 +888,8 @@ export interface ColonistView {
   status: 'Healthy' | 'Injured' | 'Sick' | 'Downed' | 'Dead' | 'Away';
   bleeding: boolean;
   sleeping: boolean;
-  injuries: { label: string; severity: number; tended: boolean; infected: boolean }[];
+  // Each wound, and about how long it takes to heal as things stand (null: festering, it won't).
+  injuries: { label: string; severity: number; tended: boolean; infected: boolean; heals: number | null }[];
   // Lasting marks of old wounds, as lines ("Limp: walks slower").
   scars: string[];
   bloodLoss: number;
@@ -1044,7 +1046,12 @@ export interface TradeView {
   leavesIn: number;
   // Silver in the colony's stockpiles, and the traders' purse.
   silver: number;
+  // Silver lying about, not yet in a stockpile (it can't be spent until it is).
+  looseSilver: number;
   traderSilver: number;
+  // Trade so far this visit, and the goodwill it has earned (see dealGoodwill).
+  turnover: number;
+  goodwillEarned: number;
   theirs: TradeLine[];
   ours: TradeLine[];
   // Sculptures the traders would buy, where they stand.
@@ -2363,7 +2370,10 @@ export class GameController {
       goodwill,
       leavesIn: Math.max(0, Math.ceil((caravan.leaveAt - sim.tick) / TICKS_PER_HOUR)),
       silver: stock.get(silver) ?? 0,
+      looseSilver: Math.max(0, sim.stockOf(silver) - (stock.get(silver) ?? 0)),
       traderSilver: caravan.silver,
+      turnover: caravan.turnover ?? 0,
+      goodwillEarned: caravan.goodwillEarned ?? 0,
       theirs: caravan.stock.map((s) => ({
         item: s.item,
         name: itemDef(s.item).name,
@@ -2861,6 +2871,7 @@ export class GameController {
               severity: injury.severity,
               tended: injury.tended > 0,
               infected: isInfected(injury),
+              heals: c.health.dead ? null : healHours(sim, c, injury),
             })),
             scars: [...scarsOf(c).map((s) => SCAR_LABELS[s.kind]), ...ailmentsOf(c).map((a) => AILMENTS[a].label)],
             bloodLoss: c.health.bloodLoss,

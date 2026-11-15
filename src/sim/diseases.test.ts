@@ -129,3 +129,20 @@ describe('after an audit of health', () => {
     expect(doctor.job?.patient).toBe(doctor.id);
   });
 });
+
+describe('a wound healing', () => {
+  it('says how long: sooner tended, and lying down; never, festering', async () => {
+    const { healHours } = await import('./health');
+    const sim = Simulation.newColony(34);
+    const c = sim.colonists[0];
+    const cut = { label: 'Cut', severity: 0.3, tended: 0, bleeding: 0, infection: 0 } as never as Parameters<
+      typeof healHours
+    >[2];
+    const untended = healHours(sim, c, cut)!;
+    const tended = healHours(sim, c, { ...cut, tended: 0.6 })!;
+    expect(tended).toBeLessThan(untended);
+    c.sleeping = true;
+    expect(healHours(sim, c, { ...cut, tended: 0.6 })!).toBeLessThan(tended);
+    expect(healHours(sim, c, { ...cut, infection: 0.2 })).toBeNull();
+  });
+});

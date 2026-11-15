@@ -689,7 +689,18 @@ function HealthTab({ c }: { c: ColonistView }) {
               <span className="bad">(untended)</span>
             )}
           </span>
-          <span className="muted">{Math.round(injury.severity * 100)}%</span>
+          <span className="muted">
+            {Math.round(injury.severity * 100)}%
+            {/* (How long to heal: nothing said, the wounded's days off were a guess.) */}
+            {injury.heals !== null && !c.dead && (
+              <span className="small">
+                {' '}
+                · heals in{' '}
+                {injury.heals < 24 ? `${Math.max(1, Math.round(injury.heals))}h` : `${Math.round(injury.heals / 24)}d`}
+                {!injury.tended && ', faster tended'}
+              </span>
+            )}
+          </span>
         </div>
       ))}
       {c.scars.map((s, index) => (

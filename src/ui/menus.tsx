@@ -18,7 +18,7 @@ import { SAVE_VERSION } from '../sim/serialize';
 import { MAP_SIZE, MAP_SIZES } from '../sim/simulation';
 import { DIFFICULTIES, Difficulty } from '../sim/storyteller';
 import { BIOME_LIST, Biome, MAP_KINDS, MapKind } from '../sim/biomes';
-import { dealBalance, lotsValue } from '../sim/trade';
+import { GOODWILL_PER, VISIT_GOODWILL, dealBalance, lotsValue, visitGoodwill } from '../sim/trade';
 
 // One price, or the range when the stacks differ (worn, spoiling or finely made); the worst go first.
 function priceLabel(line: TradeLine): string {
@@ -963,6 +963,7 @@ export function TradeScreen({ onClose }: { onClose: () => void }) {
     0,
   );
   const balance = dealBalance(cost, income);
+  const goodwill = visitGoodwill(trade.turnover, trade.goodwillEarned, cost + income);
   // A pick can outlast the stock it was made from (eaten, used, hauled out of the stockpiles meanwhile).
   const stale = [
     ...trade.ours.filter((l) => (sell[l.item] ?? 0) > l.count),
@@ -978,11 +979,14 @@ export function TradeScreen({ onClose }: { onClose: () => void }) {
       ? `Only ${stale.count} ${stale.name.toLowerCase()} left now: lower the amount.`
       : gone > 0
         ? 'Something picked is no longer there: clear and pick again.'
-        : balance > trade.silver
-          ? 'Not enough silver.'
-          : -balance > trade.traderSilver
-            ? 'The traders cannot afford that.'
-            : null;
+        : balance === 0 && cost > 0 !== income > 0
+          ? // (A potato sold for 0.54 went for nothing, "Even trade".)
+            'Too little to come to any silver: add more.'
+          : balance > trade.silver
+            ? 'Not enough silver.'
+            : -balance > trade.traderSilver
+              ? 'The traders cannot afford that.'
+              : null;
   const lines = (side: 'buy' | 'sell') => {
     const list = side === 'buy' ? trade.theirs : trade.ours;
     const picked = side === 'buy' ? buy : sell;
@@ -1011,6 +1015,13 @@ export function TradeScreen({ onClose }: { onClose: () => void }) {
                   {line.name}
                   <div className="muted small">
                     {line.count} · {priceLabel(line)} silver each
+                    {/* What the picked come to (stacks of different condition fetch different prices). */}
+                    {(picked[line.item] ?? 0) > 0 &&
+                      ` · ${picked[line.item]} for ${Math.round(
+                        side === 'sell' && line.lots
+                          ? lotsValue(line.lots, picked[line.item] ?? 0)
+                          : (picked[line.item] ?? 0) * line.price,
+                      )}`}
                   </div>
                 </td>
                 <td className="qty">
@@ -1060,6 +1071,7 @@ export function TradeScreen({ onClose }: { onClose: () => void }) {
         <>
           <span>
             {balance > 0 ? `You pay ${balance} silver` : balance < 0 ? `You receive ${-balance} silver` : 'Even trade'}
+            {goodwill > 0 && <span className="muted"> · goodwill +{goodwill}</span>}
           </span>
           {problem && <span className="tag warn">{problem}</span>}
           <button
@@ -1078,8 +1090,13 @@ export function TradeScreen({ onClose }: { onClose: () => void }) {
       }
     >
       <p className="muted">
-        {trade.relation} (goodwill {trade.goodwill}) · leaving in {trade.leavesIn}h · your silver {trade.silver} · their
-        silver {trade.traderSilver}. Better goodwill means better prices; trading builds it.
+        {trade.relation} (goodwill {trade.goodwill}) · leaving in {trade.leavesIn}h · your silver {trade.silver}
+        {trade.looseSilver > 0 && ` (and ${trade.looseSilver} lying about: haul it to a stockpile to spend it)`} · their
+        silver {trade.traderSilver}. Better goodwill means better prices; trading builds it, a point for each{' '}
+        {GOODWILL_PER} silver dealt, {VISIT_GOODWILL} a visit
+        {trade.goodwillEarned > 0 &&
+          ` (${trade.goodwillEarned >= VISIT_GOODWILL ? 'all earned' : `${trade.goodwillEarned} so far`} this visit)`}
+        .
       </p>
       <div className="trade-columns">
         <div>

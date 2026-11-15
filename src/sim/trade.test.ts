@@ -227,3 +227,14 @@ describe('goodwill from trading', () => {
     expect(goodwillFrom(12)).toBe(one);
   });
 });
+
+describe('the deal shown before it is made', () => {
+  it('previews the goodwill a deal would earn, as the visit stands', async () => {
+    const { visitGoodwill, VISIT_GOODWILL } = await import('./trade');
+    expect(visitGoodwill(0, 0, 79)).toBe(0);
+    expect(visitGoodwill(0, 0, 160)).toBe(2);
+    // Earlier deals count towards it, and what they earned is taken off.
+    expect(visitGoodwill(70, 0, 20)).toBe(1);
+    expect(visitGoodwill(400, VISIT_GOODWILL, 400)).toBe(0);
+  });
+});

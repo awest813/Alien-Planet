@@ -2544,7 +2544,7 @@ input[type='checkbox'] {
 /* The narrowest phones: Production's and the saves' buttons wrap rather than run off the edge, and the top bar
    keeps food and two resources. */
 @media (max-width: 720px) {
-  .saves td:last-child:not(:has(.target)) {
+  .saves td:last-child:not(:has(.target), .qty) {
     white-space: normal;
   }
 }
