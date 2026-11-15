@@ -1308,6 +1308,17 @@ function colonistAttack(sim: Simulation, c: Colonist, target: number, weapon: We
 function attackEnemy(sim: Simulation, c: Colonist, e: Enemy): void {
   const adjacent = chebyshev(sim.world, c.tile, e.tile) <= 1;
   const weapon = weaponAt(c.weapon, adjacent);
+  // Said once: four in five of an archer's blows were struck with their fists, a charge on them before a second
+  // shot, and nothing said why or what answers it.
+  if (weapon === FISTS && c.weapon !== FISTS.key && !sim.story.toldHandToHand) {
+    sim.story.toldHandToHand = true;
+    sim.addLog(
+      `${c.name} has a ${weaponDef(c.weapon).name.toLowerCase()}, but with a raider right beside them they fight with their fists. Fighters set to Charge, with a spear or a sword, keep raiders off the archers, and sandbags slow a charge.`,
+      'warn',
+      true,
+      { colonist: c.id },
+    );
+  }
   const dealt = colonistAttack(sim, c, e.tile, weapon);
   // Shots landing close rattle whoever they're aimed at (and anyone beside them).
   if (weapon.range > 1) {

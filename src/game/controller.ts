@@ -903,6 +903,9 @@ export interface ColonistView {
   skillList: { key: string; label: string; level: number; passion: number; progress: number }[];
   weapon: string;
   armor: string;
+  // What their weapon and armour do (see gearSummary).
+  weaponNote: string | null;
+  armorNote: string | null;
   // How they fight when drafted, and the raider they were told to concentrate on.
   stance: Stance;
   focus: string | null;
@@ -2926,6 +2929,8 @@ export class GameController {
             armor: c.armor
               ? `${itemDef(c.armor.item).name} (${Math.round(armorOf(c).protection * 100)}%, ${Math.round(c.armor.wear * 100)}% condition)`
               : 'None',
+            weaponNote: weaponDef(c.weapon).item !== undefined ? gearSummary(weaponDef(c.weapon).item!) : null,
+            armorNote: c.armor ? gearSummary(c.armor.item) : null,
             stance: c.stance,
             focus: sim.enemies.find((e) => e.id === c.focus && e.hp > 0)?.name ?? null,
             tool: c.tool ? `${qualityLabel(c.tool.quality)} tool kit (${Math.round(c.tool.wear * 100)}%)` : 'None',
@@ -4785,6 +4790,12 @@ export class GameController {
     // (Weapons and armor too: left out in the weather, it wears away.)
     if (item !== NONE && (itemDef(item).apparel || itemDef(item).tool || itemDef(item).weapon || itemDef(item).armor)) {
       details.push(`${qualityLabel(w.quality[i])}, ${Math.round(w.fresh[i] * 100)}% condition`);
+      // What it does, to weigh one against another (a longbow and a recurve bow lay side by side with nothing to
+      // tell them apart but their names).
+      const said = gearSummary(item);
+      if (said) {
+        details.push(said);
+      }
     } else if (item !== NONE && itemDef(item).category === 'meal') {
       details.push(`Cooked with ${qualityLabel(w.quality[i]).toLowerCase()} skill`);
     }
@@ -4838,3 +4849,25 @@ export class GameController {
 }
 
 export const controller = new GameController();
+
+// A weapon's reach, damage and pace, or armour's protection, in a line: "Reach 9 tiles · damage 24–34 · steady ·
+// pierces some armour". Damage is per hundred of a raider's health, for a weapon of ordinary make.
+export function gearSummary(item: number): string | null {
+  const def = itemDef(item);
+  if (def.weapon) {
+    const w = weaponDef(def.weapon);
+    const pace = w.cooldown <= 42 ? 'quick' : w.cooldown <= 60 ? 'steady' : w.cooldown <= 80 ? 'slow' : 'very slow';
+    const pierce = w.pierce >= 0.4 ? 'cuts through armour' : w.pierce >= 0.15 ? 'pierces some armour' : null;
+    return [
+      w.range > 1 ? `Reach ${w.range} tiles` : 'Hand to hand',
+      `damage ${Math.round(w.damage[0] * 100)}–${Math.round(w.damage[1] * 100)}`,
+      pace,
+      ...(pierce ? [pierce] : []),
+    ].join(' · ');
+  }
+  if (def.armor) {
+    const slows = def.armor.speed < 1 ? ` · ${Math.round((1 - def.armor.speed) * 100)}% slower on foot` : '';
+    return `Turns aside ${Math.round(def.armor.protection * 100)}% of a blow${slows}`;
+  }
+  return null;
+}

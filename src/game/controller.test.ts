@@ -467,6 +467,22 @@ describe('mid-game: what the screens say', () => {
     expect(view?.short).toMatch(/leather/i);
   });
 
+  it('a weapon or armour on the ground says what it does, to weigh it against another', () => {
+    const { sim, x, y } = colony('gear-card');
+    const w = sim.world;
+    const bow = w.idx(x + 4, y + 4);
+    const mail = w.idx(x + 5, y + 4);
+    w.addItem(bow, itemId('longbow'), 1);
+    w.addItem(mail, itemId('ironMail'), 1);
+    const card = (i: number) => {
+      controller.selectTile(i);
+      controller.publish();
+      return controller.getState().selectedTile!.details.join(' | ');
+    };
+    expect(card(bow)).toMatch(/Reach 12 tiles · damage 28–40 · slow · pierces some armour/);
+    expect(card(mail)).toMatch(/Turns aside 55% of a blow · 10% slower on foot/);
+  });
+
   it('says when nobody can make what a bill wants: nobody on the work, or nobody skilled enough', () => {
     const { sim } = colony('bill-staff');
     const bill = (name: RegExp) => {

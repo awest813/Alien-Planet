@@ -637,3 +637,25 @@ function colonistCombatFor(sim: Simulation, c: Simulation['colonists'][number]):
   c.cooldown = 99;
   return colonistCombat(sim, c);
 }
+
+describe('an archer caught hand to hand', () => {
+  it('fights with their fists, and the player is told once why and what answers it', () => {
+    const { sim, w, x, y } = field(51);
+    const archer = sim.colonists[0];
+    archer.tile = w.idx(x, y);
+    archer.drafted = true;
+    archer.weapon = 'recurveBow';
+    raider(sim, w.idx(x + 1, y), 'club', { repathAt: forever });
+    archer.cooldown = 0;
+    colonistCombat(sim, archer);
+    const told = sim.storyLog.filter((s) => /fight with their fists/.test(s.text));
+    expect(told).toHaveLength(1);
+    expect(told[0].text).toMatch(/has a recurve bow, but with a raider right beside them.*Charge.*sandbags/);
+    expect(told[0].about).toEqual({ colonist: archer.id });
+    // Not again.
+    archer.cooldown = 0;
+    colonistCombat(sim, archer);
+    expect(sim.storyLog.filter((s) => /fight with their fists/.test(s.text))).toHaveLength(1);
+    expect(sim.story.toldHandToHand).toBe(true);
+  });
+});

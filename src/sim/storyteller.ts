@@ -56,6 +56,8 @@ export interface StoryState {
   nextThreatTick?: number;
   // The colony keeps the seasonal festivals (on unless the player turns them off).
   festivals?: boolean;
+  // The player has been told, once, why an archer with a raider beside them fights with their fists.
+  toldHandToHand?: boolean;
   difficulty: Difficulty;
 }
 

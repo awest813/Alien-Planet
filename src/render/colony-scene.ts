@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TOOLS, Tool, controller } from '../game/controller';
-import { NONE, featureDef, itemDef, terrainId } from '../sim/defs';
+import { NONE, featureDef, itemDef, terrainId, weaponDef } from '../sim/defs';
 import { wheelPixels, wheelZoom } from '../game/device';
 import { snowOnGround, windFrom, windStrength } from '../sim/weather';
 import { hash2 } from '../sim/rng';
@@ -1557,6 +1557,12 @@ export class ColonyScene extends Phaser.Scene {
     if (selected && selected.away !== 'gone') {
       const { x, y } = this.pawnPosition(selected);
       g.lineStyle(1, 0xffffff, 0.9).strokeCircle(x, y, 8);
+      // Drafted with a bow: how far it reaches, faintly, to place them by (nothing said how far a longbow carries,
+      // nor whether a raider was in reach of it).
+      const reach = selected.drafted ? weaponDef(selected.weapon).range : 0;
+      if (reach > 1) {
+        g.lineStyle(1, 0xffe08a, 0.38).strokeCircle(x, y, reach * TILE);
+      }
       if (selected.path.length > 0) {
         g.lineStyle(1, 0xffffff, 0.35).beginPath();
         g.moveTo(x, y);

@@ -620,7 +620,11 @@ function ColonistCard({ c }: { c: ColonistView }) {
 }
 
 const STANCES: { key: Stance; label: string; hint: string }[] = [
-  { key: 'cover', label: 'Take cover', hint: 'Move to nearby cover with a clear shot, then fight from there' },
+  {
+    key: 'cover',
+    label: 'Take cover',
+    hint: 'Move to nearby cover with a clear shot, then fight from there (an archer with a raider right beside them fights with their fists)',
+  },
   { key: 'hold', label: 'Hold', hint: 'Stay exactly where ordered and shoot whatever comes in range' },
   { key: 'charge', label: 'Charge', hint: 'Close in on the enemy (melee weapons are preferred when equipping)' },
 ];
@@ -661,9 +665,15 @@ function OverviewTab({ c }: { c: ColonistView }) {
       <h4>Gear</h4>
       <dl className="gear">
         <dt>Weapon</dt>
-        <dd>{c.weapon}</dd>
+        <dd>
+          {c.weapon}
+          {c.weaponNote && <div className="muted small">{c.weaponNote}</div>}
+        </dd>
         <dt>Armor</dt>
-        <dd>{c.armor}</dd>
+        <dd>
+          {c.armor}
+          {c.armorNote && <div className="muted small">{c.armorNote}</div>}
+        </dd>
         <dt>Clothes</dt>
         <dd>{c.apparel}</dd>
         <dt>Tools</dt>
