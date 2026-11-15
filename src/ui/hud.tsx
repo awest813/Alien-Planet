@@ -1100,7 +1100,14 @@ export function SidePanel({ onOpen }: { onOpen: (screen: Screen) => void }) {
       {alerts.length > 0 && (
         <ul className="alerts" aria-label="Alerts">
           {shown.map((alert, index) => (
-            <AlertLine key={`${index}-${alert.text}`} alert={alert} onJump={foldOnPhone} onOpen={onOpen} />
+            // (Keyed without its numbers: a countdown, "30 more hours", made a new line every game hour, and a
+            // keyboard user on it lost their place.)
+            <AlertLine
+              key={`${index}-${alert.text.replace(/\d+/g, '#')}`}
+              alert={alert}
+              onJump={foldOnPhone}
+              onOpen={onOpen}
+            />
           ))}
           {alerts.length > ALERTS_SHOWN && (
             <li className="more">

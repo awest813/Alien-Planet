@@ -169,8 +169,16 @@ describe('alerts', () => {
     kid.age = 7;
     kid.schedule.fill('W');
     const idleSince = (controller as unknown as { idleSince: Map<number, number> }).idleSince;
-    idleSince.set(kid.id, sim.tick - HOUR * 3);
+    idleSince.set(kid.id, sim.tick - HOUR * 5);
     expect(texts().some((t) => t.startsWith('Nothing to do') && t.includes(kid.name))).toBe(false);
+    // Nor the retired: their time is their own.
+    const elder = sim.colonists[2];
+    elder.age = 72;
+    elder.retired = true;
+    elder.schedule.fill('W');
+    elder.job = null;
+    idleSince.set(elder.id, sim.tick - HOUR * 5);
+    expect(texts().some((t) => t.startsWith('Nothing to do') && t.includes(elder.name))).toBe(false);
     // An obsession whose artist has died: no alert, even before the hourly update notices.
     const artist = sim.colonists[1];
     const tile = w.idx(x + 4, y + 4);

@@ -3836,8 +3836,11 @@ export class GameController {
     const idle = sim.living().filter((c) => {
       // Only working hours count: wandering during recreation time is expected.
       const slot = sim.slotOf(c);
+      // (Not the retired: their time is their own. "Nothing to do: Gale", a retired elder, was up a tenth of
+      // the time in a long game.)
       const isIdle =
         c.age >= TEEN &&
+        !c.retired &&
         (slot === 'A' || slot === 'W') &&
         raiders === 0 &&
         !needsBedRest(c) &&
