@@ -2603,9 +2603,7 @@ export class GameController {
       ),
       selectedColonist: this.selectedColonist,
       resources: totals.map((r) => ({ item: r.item, name: itemDef(r.item).name, stored: r.stored, total: r.total })),
-      foodDays:
-        totals.reduce((sum, t) => sum + itemDef(t.item).nutrition * t.total, 0) /
-        (Math.max(1, sim.living().length) * DAILY_NUTRITION),
+      foodDays: this.foodDays(totals),
       objectives: OBJECTIVES.filter((o) => !o.hidden?.(sim)).map((o) => ({
         id: o.id,
         // (A label that names its research drops it once that's learned: "Dress everyone in a parka (research
@@ -2734,6 +2732,12 @@ export class GameController {
 
   // Problems worth the player's attention right now, most urgent first.
   // Alerts scan the map, so they're worked out once per game tick, not on every mouse move.
+  // How many days the food on hand (stored and lying about) feeds everyone, as the top bar shows it.
+  private foodDays(totals: ReturnType<Simulation['resourceTotals']>): number {
+    const nutrition = totals.reduce((sum, t) => sum + itemDef(t.item).nutrition * t.total, 0);
+    return nutrition / (Math.max(1, this.sim.living().length) * DAILY_NUTRITION);
+  }
+
   private alertsFor(totals: ReturnType<Simulation['resourceTotals']>): Alert[] {
     // Orders given while paused change alerts too, so they count as well as ticks.
     const key = `${this.simVersion}:${Math.floor(this.sim.tick / 20)}:${this.commandCount}`;
@@ -3049,9 +3053,16 @@ export class GameController {
         tone: 'danger',
       });
     } else if (untilWinter > 0 && untilWinter <= 5) {
+      // What's stored against the winter, when nothing grows outdoors: "stock food" said nothing of how much, and
+      // a colony with a day's food in store read it the same as one with a month's.
+      const stored = this.foodDays(totals);
+      const when = `Winter in ${Math.ceil(untilWinter)} day${untilWinter > 1 ? 's' : ''}`;
+      const short = stored < DAYS_PER_SEASON;
       alerts.push({
-        text: `Winter in ${Math.ceil(untilWinter)} day${untilWinter > 1 ? 's' : ''}: harvest crops and stock food`,
-        tone: 'warn',
+        text: short
+          ? `${when}, and ${stored < 0.1 ? 'no' : `${stored.toFixed(1)} days'`} food stored for its ${DAYS_PER_SEASON} days (nothing grows outdoors): harvest, hunt, fish and forage`
+          : `${when}: ${Math.floor(stored)} days of food stored for its ${DAYS_PER_SEASON}. Bring in the harvest`,
+        tone: short ? 'warn' : 'calm',
       });
     }
     const researching = sim.research.current !== null;
@@ -3242,8 +3253,7 @@ export class GameController {
         });
       }
     }
-    const nutrition = totals.reduce((sum, t) => sum + itemDef(t.item).nutrition * t.total, 0);
-    const days = nutrition / (Math.max(1, sim.living().length) * DAILY_NUTRITION);
+    const days = this.foodDays(totals);
     if (days < 2) {
       alerts.push({
         text:

@@ -61,6 +61,15 @@ with esbuild for speed (see ROADMAP).
   - **Tests:** "no snow on a mild day" ran the whole colony for 120 days (five seconds; it timed out on a busy
     machine); it steps only the weather now, through four years in three biomes, in a tenth of a second.
   - **The balance harness** tried bridging a river's ford ten times each morning, not once.
+  - **Heat, and the desert:** one colony in three lost someone to heatstroke over ten years; across 192 colonies of
+    48 days (standard and desert), nobody did. The desert looked hungrier on the day's changes in the first 48
+    colonies (118 starving hours a colony against 73); over 144 it isn't (median 39 both; mean 75 against 69; more
+    than 300 hours in 4 against 6; mood up 0.9; breaks 64 to 50). What starves a desert colony is the winter: sand
+    ripens crops slowly, so sowing stops well into autumn, and a colony with no stores goes hungry until spring.
+    The warning before winter now says how much food is stored against its six days ("Winter in 3 days, and 1.9
+    days' food stored for its 6 days (nothing grows outdoors)"), calm when there's enough.
+  - **Small things:** "Days of rest" in the village's policies spaced like the others; the keyboard-orders test,
+    which held an arrow for a fixed time and failed on a busy machine, holds it until the view has moved.
 
 - **Animals, hunting, time, state and energy** (wildlife over 30 days in four settings; colonists' rest sampled
   hour by hour in three one-year colonies; the clock under load; the interface's state on ten-year colonies):

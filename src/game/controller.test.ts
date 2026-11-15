@@ -98,7 +98,14 @@ describe('alerts', () => {
     w.setFeature(w.idx(x + 4, y + 2), featureId('door'));
     w.setFeature(w.idx(x + 4, y), featureId('campfire'));
     expect(texts().some((t) => t.includes('nowhere warm to shelter'))).toBe(false);
-    expect(texts().some((t) => t.startsWith('Winter in'))).toBe(true);
+    // Then what's stored against it: short, and said how short; enough, and said so calmly.
+    const winter = () => alerts().find((a) => a.text.startsWith('Winter in'));
+    // (A new colony's rations: a couple of days.)
+    expect(winter()?.text).toMatch(/, and (no|[\d.]+ days') food stored for its 6 days \(nothing grows outdoors\)/);
+    expect(winter()?.tone).toBe('warn');
+    w.dropItemNear(w.idx(x, y), itemId('meal'), 400);
+    expect(winter()?.text).toMatch(/: \d+ days of food stored for its 6\. Bring in the harvest/);
+    expect(winter()?.tone).toBe('calm');
   });
 
   it('point out wounded raiders, and what capturing them still needs', () => {
