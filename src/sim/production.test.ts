@@ -169,3 +169,41 @@ describe('the crafting bench', () => {
     expect(line).toBe('makeTools');
   });
 });
+
+describe('work left on a bench', () => {
+  it('a craft cut short keeps its work on the bench, and the next to make it there carries on', () => {
+    // (Each interruption threw the work away: half the parkas begun were never finished.)
+    const { sim, w, x, y } = workshop(13);
+    const bench = w.idx(x + 3, y);
+    w.setFeature(bench, featureId('craftingBench'));
+    sim.research.done.push('tailoring');
+    w.addItem(w.idx(x - 2, y + 3), itemId('leather'), 40);
+    for (const b of sim.bills) {
+      b.target = RECIPES[b.recipe].key === 'tailorParka' ? 2 : 0;
+    }
+    const tailor = sim.colonists[0];
+    tailor.priorities.crafting = 1;
+    let job = tailor.job;
+    for (let t = 0; t < HOUR * 3 && !(job?.type === 'craft' && job.progress > 100); t++) {
+      tailor.needs.food = 1;
+      tailor.needs.rest = 1;
+      sim.step();
+      job = tailor.job;
+    }
+    const done = job!.progress;
+    expect(done).toBeGreaterThan(100);
+    // Called away (drafted, say): the work stays on the bench.
+    sim.endJob(tailor);
+    expect(sim.benchWork.get(bench)).toEqual({ recipe: recipe('tailorParka'), progress: done });
+    // Back to it: it carries on from there.
+    let resumed: number | undefined;
+    for (let t = 0; t < HOUR * 2 && resumed === undefined; t++) {
+      tailor.needs.food = 1;
+      tailor.needs.rest = 1;
+      sim.step();
+      resumed = tailor.job?.type === 'craft' ? tailor.job.progress : undefined;
+    }
+    expect(resumed).toBeGreaterThanOrEqual(done);
+    expect(sim.benchWork.has(bench)).toBe(false);
+  });
+});

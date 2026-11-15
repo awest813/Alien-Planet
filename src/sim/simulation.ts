@@ -947,6 +947,10 @@ export class Simulation {
   public nextAnimalId = 0;
   // Recent attacks, for the renderer.
   public shots: Shot[] = [];
+  // Work left on a bench by a craft cut short (for supper, for bed, for a fight): the recipe and how far it had
+  // got, for the next to make it there to carry on from. (Each interruption threw the work away: half the parkas
+  // begun were never finished, three hours of tailoring lost each time.) Not saved: jobs aren't either.
+  public benchWork = new Map<number, { recipe: number; progress: number }>();
   public firstNight: NightResult = 'pending';
   public objectivesDone: Record<string, boolean> = {};
   public bills: Bill[] = RECIPES.map((r) => ({ recipe: r.id, target: r.defaultTarget }));
@@ -3153,6 +3157,11 @@ export class Simulation {
     // back within everyone's reach.
     if (c.job?.type === 'craft' && (c.carrying?.extra?.length || c.carrying?.mix)) {
       this.dropCarried(c);
+    }
+    // Work done on it stays on the bench (see benchWork).
+    // (At any stage: work carried on from the bench and cut short again on the way back to it is kept too.)
+    if (c.job?.type === 'craft' && c.job.progress > 0) {
+      this.benchWork.set(c.job.target, { recipe: c.job.line, progress: c.job.progress });
     }
     for (const key of c.reserved) {
       if (this.reservations.get(key) === c.id) {
@@ -5684,6 +5693,21 @@ export class Simulation {
       if (station === undefined) {
         return false;
       }
+      // A bench with this recipe begun on it, free and in reach, is the one to go to (and carry on).
+      let at = station;
+      for (const [tile, left] of this.benchWork) {
+        if (
+          left.recipe === recipe.id &&
+          w.feature[tile] !== NONE &&
+          featureDef(w.feature[tile]).workbench === bench &&
+          (!featureDef(w.feature[tile]).burns || w.fuel[tile] > 0) &&
+          !this.isReserved(`w${tile}`, c) &&
+          this.hasWorkSpot(tile, false, region)
+        ) {
+          at = tile;
+          break;
+        }
+      }
       // Every ingredient must be on hand (possibly spread over several small stacks) before
       // starting; the crafter gathers them in order, for as many as make a batch (see batchSize), as long as
       // there's enough for them and the stock comes to no more than half the target again. (Held to the target,
@@ -5714,12 +5738,25 @@ export class Simulation {
       if (!path) {
         continue;
       }
-      this.reserve(c, `w${station}`);
+      this.reserve(c, `w${at}`);
       this.reserve(c, `i${source}`);
       this.dropCarried(c);
+      const left = this.benchWork.get(at);
+      const progress = left?.recipe === recipe.id ? left.progress : 0;
+      if (progress > 0) {
+        this.benchWork.delete(at);
+      }
       this.assign(
         c,
-        this.makeJob('craft', station, { source, item: w.itemType[source], line: recipe.id, count: 0, batch, made: 0 }),
+        this.makeJob('craft', at, {
+          source,
+          item: w.itemType[source],
+          line: recipe.id,
+          count: 0,
+          batch,
+          made: 0,
+          progress,
+        }),
         path,
       );
       return true;
