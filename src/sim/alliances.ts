@@ -317,21 +317,12 @@ export function worldAction(sim: Simulation, action: WorldAction): string | null
 
 // The envoy walks in from the map edge nearest the colony (none if there's no way in).
 function envoyArrives(sim: Simulation, faction: number): Visitor | undefined {
-  const w = sim.world;
   const home = sim.homeTile();
   const region = sim.outsideRegion();
   if (home === undefined || region === undefined) {
     return undefined;
   }
-  const edge = sim.nearest(
-    home,
-    (i) => {
-      const x = w.xOf(i);
-      const y = w.yOf(i);
-      return (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) && sim.regionOf(i) === region;
-    },
-    1,
-  )[0];
+  const edge = sim.nearestEdge(home, (i) => sim.regionOf(i) === region, 1)[0];
   if (edge === undefined) {
     return undefined;
   }

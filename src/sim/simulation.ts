@@ -4,6 +4,7 @@ import {
   MAGNIFICENT_ROOM,
   describeRoom,
   measureRooms,
+  withFilth,
   outdoorTemperature,
   updateRoomTemperatures,
 } from './climate';
@@ -926,6 +927,8 @@ export class Simulation {
   private regions: PassRegions;
   private rooms: Rooms;
   private roomContents: ReturnType<typeof measureRooms> = [];
+  private cleanContents: ReturnType<typeof measureRooms> = [];
+  private filthContentsVersion = -1;
   private cachedVersion = -1;
   // Colonists who spent their last tick fighting, for activity labels.
   private readonly fighting = new Set<number>();
@@ -1048,7 +1051,7 @@ export class Simulation {
       return (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) && w.isPassable(i);
     };
     const own = this.regionOf(anchor.tile);
-    if (this.nearest(anchor.tile, (i) => onEdge(i) && this.regionOf(i) === own, 1).length > 0) {
+    if (this.nearestEdge(anchor.tile, (i) => w.isPassable(i) && this.regionOf(i) === own, 1).length > 0) {
       return own;
     }
     // Sealed in: the largest stretch of open country (never some tiny pocket by the edge).
@@ -1095,16 +1098,7 @@ export class Simulation {
     if (!anchor || region === undefined) {
       return null;
     }
-    const w = this.world;
-    const edge = this.nearest(
-      anchor.tile,
-      (i) => {
-        const x = w.xOf(i);
-        const y = w.yOf(i);
-        return (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) && this.regionOf(i) === region;
-      },
-      1,
-    )[0];
+    const edge = this.nearestEdge(anchor.tile, (i) => this.regionOf(i) === region, 1)[0];
     if (edge === undefined) {
       return null;
     }
@@ -2163,10 +2157,16 @@ export class Simulation {
     this.ensureRegions();
     // Flowers fade in winter, so the season is part of what the room's beauty depends on, and so is
     // the mess on the floor. (Worked out from what's there now, so a loaded game sees the same.)
-    const key = `${this.world.featureVersion}:${this.season === 'Winter'}:${this.world.filthVersion}:${this.fuelVersion}`;
+    // (The mess apart: a fight's blood changed it every few ticks, and each time the whole map was gone over again.)
+    const key = `${this.world.featureVersion}:${this.season === 'Winter'}:${this.fuelVersion}`;
     if (this.contentsVersion !== key) {
       this.contentsVersion = key;
-      this.roomContents = measureRooms(this.world, this.rooms, (i) => this.beautyAt(i));
+      this.cleanContents = measureRooms(this.world, this.rooms, (i) => this.beautyAt(i), false);
+      this.filthContentsVersion = -1;
+    }
+    if (this.filthContentsVersion !== this.world.filthVersion) {
+      this.filthContentsVersion = this.world.filthVersion;
+      this.roomContents = withFilth(this.world, this.rooms, this.cleanContents);
     }
     return this.roomContents;
   }
@@ -3747,8 +3747,7 @@ export class Simulation {
         c.tile,
         (i) => featureDef(w.feature[i]).bed && this.regions.region[i] === region && !this.isReserved(`b${i}`, c),
         1,
-      )[0] ??
-      this.nearest(c.tile, (i) => w.isPassable(i) && this.isIndoors(i) && this.regions.region[i] === region, 1)[0];
+      )[0] ?? this.nearestIndoor(c.tile, (i) => w.isPassable(i) && this.regions.region[i] === region, 1)[0];
     const path = spot !== undefined ? this.pathfinder.find(c.tile, [spot]) : null;
     if (spot === undefined || !path) {
       return false;
@@ -3895,6 +3894,65 @@ export class Simulation {
       }
     }
   }
+
+  // The nearest few tiles on the map's edge that pass `test`, nearest first (ties to the lower tile), as nearest()
+  // finds them. From the middle of a big map, its widening squares went over the whole map to reach the edge
+  // (a raider fleeing, a visitor leaving); the edge alone is a few hundred tiles.
+  public nearestEdge(from: number, test: (i: number) => boolean, limit: number): number[] {
+    const w = this.world;
+    const best: { i: number; d: number }[] = [];
+    const consider = (i: number) => {
+      const d = w.distance(from, i);
+      if (this.couldRank(best, i, d, limit) && test(i)) {
+        this.rank(best, i, d, limit);
+      }
+    };
+    for (let x = 0; x < w.width; x++) {
+      consider(w.idx(x, 0));
+      if (w.height > 1) {
+        consider(w.idx(x, w.height - 1));
+      }
+    }
+    for (let y = 1; y < w.height - 1; y++) {
+      consider(w.idx(0, y));
+      if (w.width > 1) {
+        consider(w.idx(w.width - 1, y));
+      }
+    }
+    return best.map((b) => b.i);
+  }
+
+  // The same search over the tiles indoors (in an enclosed room) only: the ones a rescue or a crawl looks for. A
+  // search of the whole map for them, often finding none (no shelter yet), was a fifth of a raid's time on a big
+  // map, a dozen times an hour for each colonist down. The same answers: ties go to the lower tile either way.
+  private nearestIndoor(from: number, test: (i: number) => boolean, limit = 1, bias?: (i: number) => number): number[] {
+    const w = this.world;
+    const best: { i: number; d: number }[] = [];
+    for (const i of this.indoorTiles()) {
+      const d = w.distance(from, i) + (bias ? bias(i) : 0);
+      if (this.couldRank(best, i, d, limit) && test(i)) {
+        this.rank(best, i, d, limit);
+      }
+    }
+    return best.map((b) => b.i);
+  }
+
+  // Every tile in an enclosed room, worked out again only when walls change.
+  private indoorTiles(): Int32Array {
+    this.ensureRegions();
+    if (this.indoorCache.version !== this.world.structureVersion) {
+      const tiles: number[] = [];
+      for (let i = 0; i < this.world.size; i++) {
+        const room = this.rooms.room[i];
+        if (room >= 0 && this.rooms.enclosed[room]) {
+          tiles.push(i);
+        }
+      }
+      this.indoorCache = { version: this.world.structureVersion, tiles: Int32Array.from(tiles) };
+    }
+    return this.indoorCache.tiles;
+  }
+  private indoorCache = { version: -1, tiles: new Int32Array(0) };
 
   // The same search over just one kind of tile ('storage' is zones plus buildings, which covers
   // stockpiles and iceboxes). Much cheaper than scanning a big map.
@@ -6735,7 +6793,7 @@ export class Simulation {
         1,
       )[0] ??
       this.nearestIn('buildings', c.tile, (i) => isBed(i) && this.isIndoors(i) && free(i), 1)[0] ??
-      this.nearest(c.tile, (i) => w.feature[i] === NONE && w.isPassable(i) && this.isIndoors(i) && free(i), 1)[0] ??
+      this.nearestIndoor(c.tile, (i) => w.feature[i] === NONE && w.isPassable(i) && free(i), 1)[0] ??
       this.nearestIn('buildings', c.tile, (i) => isBed(i) && free(i), 1)[0] ??
       // Where they stand, unless that's someone else's bed (a doctor who'd just tended the sleeper lay down
       // on top of them, and took the bed's reservation with them when they got up).
@@ -7465,11 +7523,7 @@ export class Simulation {
       return d;
     };
     // Of the nearest indoor spots, the one farthest from the raiders.
-    const spot = this.nearest(
-      c.tile,
-      (i) => w.isPassable(i) && this.regions.region[i] === region && this.isIndoors(i),
-      8,
-    )
+    const spot = this.nearestIndoor(c.tile, (i) => w.isPassable(i) && this.regions.region[i] === region, 8)
       .filter((i) => danger(i) > 4)
       .sort((a, b) => danger(b) - danger(a))[0];
     const path = spot !== undefined ? this.pathfinder.find(c.tile, [spot]) : null;
@@ -7683,13 +7737,9 @@ export class Simulation {
       );
     }
     return (
-      this.nearest(
+      this.nearestIndoor(
         p.tile,
-        (i) =>
-          this.world.isPassable(i) &&
-          this.regions.region[i] === region &&
-          this.isIndoors(i) &&
-          this.comfortableFor(p, i),
+        (i) => this.world.isPassable(i) && this.regions.region[i] === region && this.comfortableFor(p, i),
         1,
       ).length > 0
     );
@@ -7729,19 +7779,14 @@ export class Simulation {
     }
     // Someone already indoors only moves somewhere comfortable, never just sideways.
     if (this.isIndoors(patient.tile)) {
-      return this.nearest(patient.tile, (i) => open(i) && this.isIndoors(i) && this.comfortableFor(patient, i), 1)[0];
+      return this.nearestIndoor(patient.tile, (i) => open(i) && this.comfortableFor(patient, i), 1)[0];
     }
     const range = comfortRange(patient);
     const comfort = (i: number) => {
       const t = this.temperatureAt(i);
       return t < range.min ? t - range.min : t > range.max ? range.max - t : 0;
     };
-    return this.nearest(
-      patient.tile,
-      (i) => open(i) && this.isIndoors(i),
-      1,
-      (i) => -comfort(i) * 4,
-    )[0];
+    return this.nearestIndoor(patient.tile, open, 1, (i) => -comfort(i) * 4)[0];
   }
 
   // A doctor on their feet who can reach this colonist.

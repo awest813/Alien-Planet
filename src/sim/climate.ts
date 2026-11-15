@@ -44,10 +44,13 @@ interface RoomContents {
 
 // `beautyAt` gives a building's beauty on a tile (sculptures by quality, flowers by season); by
 // default, its base beauty.
+// `filth` false leaves the mess out (see withFilth): it changes far more often than the rest (every drop of
+// blood in a fight), and the rest is a scan of the whole map.
 export function measureRooms(
   world: World,
   rooms: Rooms,
   beautyAt: (i: number) => number = (i) => featureDef(world.feature[i]).beauty,
+  filth = true,
 ): RoomContents[] {
   const contents: RoomContents[] = rooms.sizes.map(() => ({
     beauty: 0,
@@ -67,7 +70,7 @@ export function measureRooms(
     if (room >= 0 && world.floor[i] !== NONE) {
       contents[room].beauty += featureDef(world.floor[i]).beauty;
     }
-    if (room >= 0 && world.filth[i] !== 0) {
+    if (filth && room >= 0 && world.filth[i] !== 0) {
       contents[room].beauty += world.filthBeauty(i);
     }
     const f = world.feature[i];
@@ -92,6 +95,19 @@ export function measureRooms(
     c.benches += def.workbench === 'crafting' ? 1 : 0;
     c.joy += def.joy ? 1 : 0;
     c.art += def.art ? 1 : 0;
+  }
+  return contents;
+}
+
+// Rooms' contents measured without the mess, with the mess on the floors added: from the tiles holding some, not
+// the whole map.
+export function withFilth(world: World, rooms: Rooms, clean: RoomContents[]): RoomContents[] {
+  const contents = clean.map((c) => ({ ...c }));
+  for (const i of world.tilesWith('filth')) {
+    const room = rooms.room[i];
+    if (room >= 0 && world.filth[i] !== 0) {
+      contents[room].beauty += world.filthBeauty(i);
+    }
   }
   return contents;
 }

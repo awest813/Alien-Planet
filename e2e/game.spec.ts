@@ -152,8 +152,6 @@ test.describe('on a phone', () => {
   });
 
   test('on the Work grid, a tap raises a priority and a long press lowers it', async ({ page, browserName }) => {
-    // (The long press is held with Chromium's own touch events, over its DevTools protocol.)
-    test.skip(browserName !== 'chromium', 'touch is driven through Chromium DevTools');
     const errors = watchErrors(page);
     await startColony(page);
     await page.locator('.screens button', { hasText: 'Work' }).click();
@@ -169,26 +167,53 @@ test.describe('on a phone', () => {
     await cell.tap();
     await expect.poll(priority).toBe(forward(start));
 
-    // A held finger: touch events through the DevTools protocol, so the browser makes pointer events of them.
+    // A held finger. In Chromium, touch events through the DevTools protocol, so the browser makes the pointer
+    // events of them; WebKit (Safari's engine, as on an iPhone) and Firefox have no way to hold a finger down from
+    // here, so the touch pointer events, and the click that lifting a finger makes, are sent to the cell.
     const box = (await cell.boundingBox())!;
     const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-    const cdp = await page.context().newCDPSession(page);
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    const cdp = browserName === 'chromium' ? await page.context().newCDPSession(page) : null;
+    const finger = (type: 'pointerdown' | 'pointermove' | 'pointerup' | 'click', at = point) =>
+      cell.evaluate(
+        (el, { type, at }) => {
+          const init = { bubbles: true, cancelable: true, clientX: at.x, clientY: at.y };
+          el.dispatchEvent(
+            type === 'click'
+              ? new MouseEvent('click', init)
+              : new PointerEvent(type, { ...init, pointerType: 'touch', pointerId: 7, isPrimary: true }),
+          );
+        },
+        { type, at },
+      );
+    const down = () =>
+      cdp ? cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] }) : finger('pointerdown');
+    const move = (to: { x: number; y: number }) =>
+      cdp ? cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [to] }) : finger('pointermove', to);
+    const up = async (moved = false) => {
+      if (cdp) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      } else {
+        await finger('pointerup');
+        // (A finger lifted where it went down is a click as well; one that moved off is a scroll.)
+        if (!moved) {
+          await finger('click');
+        }
+      }
+    };
+
+    await down();
     await page.waitForTimeout(700);
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await up();
     // One step back, and the tap the finger lifting would make doesn't count.
     await expect.poll(priority).toBe(start);
     await page.waitForTimeout(200);
     expect(await priority()).toBe(start);
 
     // A finger that moves off is a scroll, not a press.
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
-    await cdp.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: [{ x: point.x + 40, y: point.y }],
-    });
+    await down();
+    await move({ x: point.x + 40, y: point.y });
     await page.waitForTimeout(700);
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await up(true);
     await page.waitForTimeout(200);
     expect(await priority()).toBe(start);
     expect(errors).toEqual([]);

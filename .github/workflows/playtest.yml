@@ -20,3 +20,7 @@ jobs:
       - run: npm ci
       - name: 120 days, ten players
         run: npm run playtest:long
+      # Simulation speed on the largest map, quiet and in a raid of twelve, against the budgets in scripts/perf.ts.
+      # (Timings vary with the machine, so weekly, not on every push.)
+      - name: Simulation speed
+        run: npm run perf

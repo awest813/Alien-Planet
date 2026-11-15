@@ -37,16 +37,23 @@ with esbuild for speed (see ROADMAP).
   tundra's valleys no longer starve more than others (268 hours, from about 2,400). Now (30 days, 48 colonies
   each, with the boat's timbers and a bridged ford): island mood about 50 against a valley's 52.5, hunger about
   1.5-2 times a valley's, and a few island colonies with no walls by winter (see the harness note below).
-- **A busy colony's simulation still slows during raids, though less.** Three raids saved from 41-day crafting
-  colonies on a Medium map (saved with `SAVE_RAID=day:file`, timed with `perf.ts from=file`) ran at 67-88 ms per 1,000 ticks and now run at 48-74 (budget 60). Path searches are now about a
-  third of the worst raid (allies chasing raiders across a big map); the rest is spread thin. At top speed even
-  100 ms per 1,000 ticks is only about 8 ms of each second.
-- **Testing:** the long-press hasn't been tried on a real iPhone. Timings are still checked by hand
-  (`scripts/perf.ts`; `PERF=1` with `scripts/balance.ts` prints them by day and for raid hours), but a test now
-  counts path searches, which a seeded colony makes the same every run. Saves from before version 16 can't be
-  loaded (the game says so).
+- **Testing on a real iPhone:** the long press on the Work grid passes in WebKit (Safari's engine) with an
+  iPhone's screen and touch, and in Firefox and Chromium, but hasn't been tried on an iPhone itself. Saves from
+  before version 16 can't be loaded (the game says so).
 
 ## Closed in this pass
+
+- **Finishing the gap list:**
+  - **Raids run in budget.** `scripts/perf.ts raid` sends a raid of twelve into a three-day colony on the largest
+    map, the same raid every run. Before: 59 ms per 1,000 ticks (best of three; 39 on a Medium map). Three
+    searches went over the whole map for a handful of tiles: for somewhere indoors to carry or crawl the wounded
+    (a fifth of the raid), for the edge when fleeing or leaving, and the rooms' contents measured again for
+    every drop of blood. Each now looks only where the answer can be, giving the same answers (a test checks
+    them against the whole-map searches, and harness colonies play out identically): 38 ms (Medium 22), the
+    quiet colony 37 to 33. A game's first raid is slower (70-80) as the browser compiles the fighting's code.
+  - **Timings are checked by a machine.** `npm run perf` times the quiet colony and the raid against the
+    budget, failing a quarter over (timings vary by a fifth from run to run); the weekly playtest runs it.
+  - **The long press** is tested in WebKit and Firefox as well as Chromium (it was Chromium's alone).
 
 - **An audit of the last passes** (ten years in three colonies, before and after today's changes; a review of the
   code):

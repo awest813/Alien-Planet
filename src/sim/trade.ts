@@ -153,7 +153,6 @@ export const tradeOpen = (sim: Simulation): boolean =>
 
 // A caravan from a friendly faction sets out for the colony. Returns whether one could come.
 export function caravanArrives(sim: Simulation): boolean {
-  const w = sim.world;
   // Whoever comes, the better they think of the colony the likelier.
   const partners = tradingPartners(sim);
   let roll = sim.rng.next() * partners.reduce((sum, f) => sum + 0.6 + goodwillOf(sim, f.id) / 100, 0);
@@ -163,12 +162,7 @@ export function caravanArrives(sim: Simulation): boolean {
   if (!faction || home === undefined || region === undefined || sim.caravan) {
     return false;
   }
-  const onEdge = (i: number) => {
-    const x = w.xOf(i);
-    const y = w.yOf(i);
-    return (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) && sim.regionOf(i) === region;
-  };
-  const edge = sim.nearest(home, onEdge, 1)[0];
+  const edge = sim.nearestEdge(home, (i) => sim.regionOf(i) === region, 1)[0];
   if (edge === undefined) {
     return false;
   }
@@ -506,15 +500,7 @@ export function stepVisitor(sim: Simulation, v: Visitor, leaving: boolean, home:
   if (v.path.length === 0 && sim.tick >= v.restUntil) {
     if (leaving) {
       const region = sim.regionOf(v.tile);
-      const exit = sim.nearest(
-        v.tile,
-        (i) => {
-          const x = w.xOf(i);
-          const y = w.yOf(i);
-          return (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) && sim.regionOf(i) === region;
-        },
-        1,
-      )[0];
+      const exit = sim.nearestEdge(v.tile, (i) => sim.regionOf(i) === region, 1)[0];
       v.path = exit !== undefined ? (sim.pathfinder.find(v.tile, [exit]) ?? []) : [];
       if (v.path.length === 0) {
         // At the edge (or with nowhere to go): gone.

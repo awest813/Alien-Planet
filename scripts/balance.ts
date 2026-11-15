@@ -211,6 +211,8 @@ interface Result {
   starvingHours: number;
   starvingByDay: Record<number, number>;
   objectives: number;
+  // The goals not reached, by id.
+  goalsMissed: string[];
   research: number;
   // Projects not learned (and what holds each back), once only a few are left.
   researchLeft: string[];
@@ -1445,6 +1447,7 @@ function play(seed: number): Result {
     starvingByDay,
     // (Goals only, not the phase:N markers.)
     objectives: OBJECTIVES.filter((o) => sim.objectivesDone[o.id]).length,
+    goalsMissed: OBJECTIVES.filter((o) => !sim.objectivesDone[o.id]).map((o) => o.id),
     research: sim.research.done.length,
     researchLeft: RESEARCH.filter((p) => !p.repeatable && !sim.isResearched(p.key)).map((p) => {
       const hold = sim.researchHold(p.key);
@@ -1674,7 +1677,19 @@ console.log(
     `  mental breaks ${sum((r) => r.breaks)}, mean mood ${(sum((r) => r.avgMood) / results.length).toFixed(1)}\n` +
     `  first friendship day (median) ${results.map((r) => r.friendDay).sort((a, b) => a - b)[Math.floor(results.length / 2)]}\n` +
     `  rivals ${sum((r) => r.rivals)}, couples ${sum((r) => r.lovers)}, starving colonist-hours ${sum((r) => r.starvingHours)}\n` +
-    `  events ${JSON.stringify(Object.fromEntries(Object.keys(results[0].events).map((k) => [k, sum((r) => r.events[k])])))}`,
+    `  events ${JSON.stringify(Object.fromEntries(Object.keys(results[0].events).map((k) => [k, sum((r) => r.events[k])])))}\n` +
+    // Goals some colony missed, with how many of the colonies missed each.
+    `  goals missed ${Object.entries(
+      results.reduce<Record<string, number>>((all, r) => {
+        for (const id of r.goalsMissed) {
+          all[id] = (all[id] ?? 0) + 1;
+        }
+        return all;
+      }, {}),
+    )
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, n]) => `${id} ${n}`)
+      .join(', ')}`,
 );
 
 // Where mood comes from: the average contribution of each thought per colonist, biggest first.

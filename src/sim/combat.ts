@@ -693,15 +693,7 @@ function flee(sim: Simulation, e: Enemy, ally = false): void {
   }
   if (e.path.length === 0) {
     const region = sim.regionOf(e.tile);
-    const exits = sim.nearest(
-      e.tile,
-      (i) => {
-        const ix = w.xOf(i);
-        const iy = w.yOf(i);
-        return (ix === 0 || iy === 0 || ix === w.width - 1 || iy === w.height - 1) && sim.regionOf(i) === region;
-      },
-      3,
-    );
+    const exits = sim.nearestEdge(e.tile, (i) => sim.regionOf(i) === region, 3);
     e.path = sim.pathfinder.find(e.tile, exits, undefined, HURRIED) ?? [];
     if (e.path.length === 0) {
       // Nowhere to run: vanish rather than linger forever (a thief leaving what they took).
@@ -1517,7 +1509,6 @@ export function maybeSendAllies(sim: Simulation): void {
 }
 
 function alliesArrive(sim: Simulation, count: number): void {
-  const w = sim.world;
   const friend = helperFaction(sim);
   const region = sim.outsideRegion();
   const home = sim.homeTile() ?? sim.living()[0]?.tile;
@@ -1525,12 +1516,7 @@ function alliesArrive(sim: Simulation, count: number): void {
     return;
   }
   // From the edge nearest the colony.
-  const onEdge = (i: number) => {
-    const x = w.xOf(i);
-    const y = w.yOf(i);
-    return (x === 0 || y === 0 || x === w.width - 1 || y === w.height - 1) && sim.regionOf(i) === region;
-  };
-  const spots = sim.nearest(home, onEdge, count);
+  const spots = sim.nearestEdge(home, (i) => sim.regionOf(i) === region, count);
   if (spots.length === 0) {
     return;
   }
