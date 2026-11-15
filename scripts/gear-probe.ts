@@ -2,8 +2,18 @@
 // the state of their clothes, tool kits and armour, and counts what falls apart, wears out and is mended.
 import { Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { TATTERED } from '../src/sim/apparel';
+import { itemId } from '../src/sim/defs';
 
-const n = { samples: 0, naked: 0, tattered: 0, mendable: 0, toolWork: 0, toolless: 0, armored: 0 };
+const n = {
+  samples: 0,
+  naked: 0,
+  tattered: 0,
+  mendable: 0,
+  toolWork: 0,
+  toolless: 0,
+  toollessKitsStored: 0,
+  armored: 0,
+};
 const events = new Map<string, number>();
 let days = 0;
 const TOOL_JOBS = new Set(['mine', 'chop', 'forage', 'construct', 'deconstruct', 'sow', 'harvestCrop']);
@@ -42,6 +52,9 @@ Simulation.prototype.step = function (this: Simulation, ...args: unknown[]) {
       if (c.job && TOOL_JOBS.has(c.job.type)) {
         n.toolWork++;
         n.toolless += c.tool ? 0 : 1;
+        if (!c.tool && this.stockOf(itemId('toolKit')) > 0) {
+          n.toollessKitsStored++;
+        }
       }
     }
   }
@@ -54,7 +67,9 @@ process.on('exit', () => {
   console.log(
     `  colonist-hours: no clothes ${pct(n.naked, n.samples)}, tattered ${pct(n.tattered, n.samples)}, worn enough to mend ${pct(n.mendable, n.samples)}, in armour ${pct(n.armored, n.samples)}`,
   );
-  console.log(`  tool work done without a tool kit: ${pct(n.toolless, n.toolWork)}`);
+  console.log(
+    `  tool work done without a tool kit: ${pct(n.toolless, n.toolWork)} (of it, with a kit lying in the colony: ${pct(n.toollessKitsStored, n.toolless)})`,
+  );
   console.log(
     `  per colony-day: ${[...events].map(([k, v]) => `${k} ${(v / Math.max(1, days)).toFixed(2)}`).join(', ')}`,
   );

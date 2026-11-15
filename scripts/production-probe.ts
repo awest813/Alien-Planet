@@ -139,7 +139,8 @@ function followJobs(sim: Sim): void {
         if (done) {
           t.done++;
           t.work += life.work;
-          t.walk += sim.tick - life.start - life.work;
+          // (Never below nothing: a job carried on from work left on a bench can count more work than its own time.)
+          t.walk += Math.max(0, sim.tick - life.start - life.work);
         } else {
           t.dropped++;
         }
