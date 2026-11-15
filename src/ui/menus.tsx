@@ -859,7 +859,7 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
           confirm="Reset every setting here? (Sound stays as it is.)"
           onConfirm={() => {
             retrySharp();
-            set(resetSettings(s));
+            controller.setSettings(resetSettings(s), true);
           }}
         />
         <button

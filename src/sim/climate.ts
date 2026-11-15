@@ -7,7 +7,7 @@ import { RoomInfo } from './types';
 import { World } from './world';
 
 // Rooms drift towards the outdoor temperature by this fraction per climate update.
-const ROOM_LEAK = 0.03;
+export const ROOM_LEAK = 0.03;
 // Heaters stop adding heat above this temperature.
 export const HEATER_TARGET = 21;
 

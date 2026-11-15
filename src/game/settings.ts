@@ -126,8 +126,13 @@ export const SCROLL_CHOICES = [
 
 const KEY = 'colony-alpha:settings';
 
+// The settings the player has set themselves (stored, or set this visit): kept even when they equal the default,
+// which can follow the screen (see storeSettings).
+const chosen = new Set<keyof Settings>();
+
 export function loadSettings(): Settings {
   const settings = { ...DEFAULT_SETTINGS };
+  chosen.clear();
   try {
     const stored: unknown = JSON.parse(localStorage.getItem(KEY) ?? '{}');
     if (stored && typeof stored === 'object') {
@@ -136,6 +141,7 @@ export function loadSettings(): Settings {
         const value = (stored as Record<string, unknown>)[key];
         if (typeof value === typeof DEFAULT_SETTINGS[key]) {
           (settings as Record<string, unknown>)[key] = value;
+          chosen.add(key);
         }
       }
     }
@@ -159,14 +165,18 @@ export function loadSettings(): Settings {
   return settings;
 }
 
-// Only what differs from the defaults is kept: the defaults that follow the screen (the interface size) and the
-// system (lightning flashes, off when it asks for less motion) were saved whole with the first change of anything,
-// and a later visit on a smaller screen opened at the big screen's size.
-export function storeSettings(settings: Settings): void {
+// Only what the player has set (`picked` now, or before) or what differs from the defaults is kept: the defaults
+// that follow the screen (the interface size) and the system (lightning flashes, off when it asks for less motion)
+// were saved whole with the first change of anything, and a later visit on a smaller screen opened at the big
+// screen's size. (And a size picked on purpose is kept though it was that visit's default.)
+export function storeSettings(settings: Settings, picked: readonly (keyof Settings)[] = []): void {
+  for (const key of picked) {
+    chosen.add(key);
+  }
   try {
     const changed = Object.fromEntries(
       (Object.keys(settings) as (keyof Settings)[])
-        .filter((key) => settings[key] !== DEFAULT_SETTINGS[key])
+        .filter((key) => chosen.has(key) || settings[key] !== DEFAULT_SETTINGS[key])
         .map((key) => [key, settings[key]]),
     );
     localStorage.setItem(KEY, JSON.stringify(changed));
@@ -177,8 +187,15 @@ export function storeSettings(settings: Settings): void {
 
 // What "Reset to defaults" puts back: everything but the sound being on, and the last new colony's choices (it
 // turned the sound off and forgot them, with no warning).
+export const KEPT_ON_RESET = ['sound', 'newDifficulty', 'newMapSize', 'newBiome', 'newMap'] as const;
 export function resetSettings(settings: Settings): Settings {
   const { sound, newDifficulty, newMapSize, newBiome, newMap } = settings;
+  // (Forgotten as choices too, but for those kept: the defaults follow the screen again.)
+  for (const key of [...chosen]) {
+    if (!(KEPT_ON_RESET as readonly string[]).includes(key)) {
+      chosen.delete(key);
+    }
+  }
   return { ...DEFAULT_SETTINGS, sound, newDifficulty, newMapSize, newBiome, newMap };
 }
 

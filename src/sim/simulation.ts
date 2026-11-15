@@ -2,6 +2,7 @@ import {
   CROP_MIN_TEMP,
   HEATER_TARGET,
   MAGNIFICENT_ROOM,
+  ROOM_LEAK,
   describeRoom,
   measureRooms,
   withFilth,
@@ -585,6 +586,8 @@ const FORECAST_HOURS = 24 * 14;
 const FROST_MARGIN = 2;
 // A cold snap takes this off the day's temperatures.
 const COLD_SNAP_CHILL = 12;
+// And an eclipse.
+const ECLIPSE_CHILL = 3;
 
 // Plants are worked from their own tile; rock, buildings, and workbenches from an adjacent one.
 const standsOn = (type: JobType): boolean =>
@@ -1179,7 +1182,7 @@ export class Simulation {
     }
     const coldSnap = coldSnapOn(this) ? COLD_SNAP_CHILL : 0;
     const heatWave = heatWaveOn(this) ? 10 : 0;
-    const eclipse = eclipseOn(this) ? 3 : 0;
+    const eclipse = eclipseOn(this) ? ECLIPSE_CHILL : 0;
     const value =
       outdoorTemperature(this.totalHours, this.seed, this.biome) -
       coldSnap +
@@ -4427,27 +4430,45 @@ export class Simulation {
   private forecast(): Float32Array {
     const now = Math.floor(this.totalHours);
     const f = this.forecastCache;
-    if (f.hour !== now || f.snap !== this.story.coldSnapUntil || f.temps.length === 0) {
+    if (
+      f.hour !== now ||
+      f.snap !== this.story.coldSnapUntil ||
+      f.eclipse !== (this.story.eclipseUntil ?? 0) ||
+      f.temps.length === 0
+    ) {
       const snapHours = Math.max(0, (this.story.coldSnapUntil - this.tick) / TICKS_PER_HOUR);
+      // (And an eclipse's chill, for the hours it has left.)
+      const eclipseHours = Math.max(0, ((this.story.eclipseUntil ?? 0) - this.tick) / TICKS_PER_HOUR);
       const temps = new Float32Array(FORECAST_HOURS);
       for (let h = 0; h < FORECAST_HOURS; h++) {
-        temps[h] = outdoorTemperature(now + h, this.seed, this.biome) - (h < snapHours ? COLD_SNAP_CHILL : 0);
+        temps[h] =
+          outdoorTemperature(now + h, this.seed, this.biome) -
+          (h < snapHours ? COLD_SNAP_CHILL : 0) -
+          (h < eclipseHours ? ECLIPSE_CHILL : 0);
       }
-      this.forecastCache = { hour: now, snap: this.story.coldSnapUntil, temps, walks: new Map() };
+      this.forecastCache = {
+        hour: now,
+        snap: this.story.coldSnapUntil,
+        eclipse: this.story.eclipseUntil ?? 0,
+        temps,
+        walks: new Map(),
+      };
     }
     return this.forecastCache.temps;
   }
   private forecastCache = {
     hour: -1,
     snap: -1,
+    eclipse: -1,
     temps: new Float32Array(0),
     walks: new Map<string, { hours: number; end: 'ripe' | 'frost' | 'winter' }>(),
   };
 
   // Hours from now until the first hard frost outdoors (up to a fortnight).
-  public frostFreeHours(): number {
+  // `warmth`: how much warmer than outdoors it stays (a heated room: see roomWarmth).
+  public frostFreeHours(warmth = 0): number {
     const temps = this.forecast();
-    const k = temps.findIndex((t) => t < FROST + FROST_MARGIN);
+    const k = temps.findIndex((t) => t + warmth < FROST + FROST_MARGIN);
     return k < 0 ? FORECAST_HOURS : k;
   }
 
@@ -4515,10 +4536,15 @@ export class Simulation {
     // greenhouse in winter followed the weather down, and was sown and frozen every day.)
     if ((lit[i] || (this.isResearched('glassmaking') && w.roof[i] === NONE)) && this.isIndoors(i)) {
       // (Indoors it grows by night too, under lamps, so frost before its nominal days is the test.)
-      const frostFree = this.frostFreeHours();
-      return this.heatedRoom(i) || (crop.growDays / pace) * 24 <= frostFree
+      // (Its heaters keep it so much warmer than outdoors: one campfire in a big greenhouse, a few degrees, and
+      // the frost came in all the same.)
+      const warmth = this.roomWarmth(i);
+      const frostFree = this.frostFreeHours(warmth);
+      return (crop.growDays / pace) * 24 <= frostFree
         ? null
-        : `Frost would reach it before it ripens (in ${days(frostFree)}): a heater in the room keeps it growing`;
+        : warmth > 0
+          ? `Frost would reach it before it ripens (in ${days(frostFree)}): more heat for a room this size`
+          : `Frost would reach it before it ripens (in ${days(frostFree)}): a heater in the room keeps it growing`;
     }
     // Early spring frosts kill seedlings.
     if (this.season === 'Spring' && seasonDay(this.totalHours) <= 2) {
@@ -4526,6 +4552,9 @@ export class Simulation {
     }
     // Only what the forecast says will ripen before a hard frost (a cold snap's nights, or an autumn's: sown on a
     // mild afternoon, more than half the crops sown in a cold snap froze) or before winter.
+    if (this.season === 'Winter') {
+      return 'Nothing is sown outdoors in winter';
+    }
     const walk = this.ripenOutdoors(crop.growDays, pace);
     if (walk.end === 'winter') {
       return `Too late to ripen before winter (${days(daysUntilWinter(this.totalHours) * 24)} off)`;
@@ -4562,12 +4591,18 @@ export class Simulation {
     return null;
   }
 
-  // Whether the room a tile is in has a heater going (fire, or electric).
-  private heatedRoom(i: number): boolean {
+  // How much warmer than outdoors the heaters in a tile's room keep it, settled (see updateRoomTemperatures: it
+  // gains heat ÷ size an update and loses a share of the difference with outdoors, so it settles that much warmer).
+  private roomWarmth(i: number): number {
     this.ensureRegions();
     const room = this.rooms.room[i];
     const c = room >= 0 ? this.contents()[room] : undefined;
-    return !!c && c.heat + (this.power.supply > 0 ? c.electricHeat : 0) > 0;
+    if (!c) {
+      return 0;
+    }
+    const heat = c.heat + (this.power.supply > 0 ? c.electricHeat : 0);
+    const leak = (this.isResearched('insulation') ? 0.5 : 1) * (this.isResearched('doubleGlazing') ? 0.5 : 1);
+    return heat / Math.max(this.rooms.sizes[room], 4) / (ROOM_LEAK * leak);
   }
 
   private trySow(c: Colonist): boolean {
@@ -6062,7 +6097,11 @@ export class Simulation {
         !o.health.downed &&
         o.needs.joy < 0.9 &&
         (this.slotOf(o) === 'J' || (this.slotOf(o) === 'A' && o.needs.joy < (concert ? CONCERT_DRAWS : 0.3))) &&
-        (concert || !o.job || o.job.type === 'joy' || o.job.type === 'wander') &&
+        (!o.job ||
+          o.job.type === 'joy' ||
+          o.job.type === 'wander' ||
+          // (Only work a concert would draw them from: a doctor mid-tend counted, and the player played to nobody.)
+          (concert && this.slotOf(o) === 'A' && CONCERT_LEAVES.has(o.job.type))) &&
         !this.inMentalBreak(o) &&
         this.regions.region[o.tile] === region,
     );
@@ -6230,7 +6269,9 @@ export class Simulation {
           !o.job?.hearing &&
           !this.inMentalBreak(o) &&
           this.slotOf(o) !== 'W' &&
-          this.slotOf(o) !== 'S'
+          this.slotOf(o) !== 'S' &&
+          // (Someone who can't get there carries on as they were.)
+          this.regions.region[o.tile] === region
         ) {
           const was = o.job;
           this.endJob(o);

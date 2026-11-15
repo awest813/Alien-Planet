@@ -39,6 +39,27 @@ describe('settings', () => {
     expect(loadSettings().uiScale).toBe(0.85);
   });
 
+  it('a size picked on purpose is kept, though it was that visit’s default; after a reset, defaults follow again', () => {
+    const screenDefault = DEFAULT_SETTINGS.uiScale;
+    try {
+      // A small window: the default is Normal, and the player picks Normal.
+      DEFAULT_SETTINGS.uiScale = 1;
+      loadSettings();
+      storeSettings({ ...DEFAULT_SETTINGS, uiScale: 1 }, ['uiScale']);
+      // Next visit, maximised: the default would be Huge, but Normal was their choice.
+      DEFAULT_SETTINGS.uiScale = 1.3;
+      expect(loadSettings().uiScale).toBe(1);
+      // Reset: the choice forgotten, the screen's default again (the sound kept).
+      const mine = { ...loadSettings(), sound: true };
+      storeSettings(mine, ['sound']);
+      storeSettings(resetSettings(mine));
+      expect(loadSettings().uiScale).toBe(1.3);
+      expect(loadSettings().sound).toBe(true);
+    } finally {
+      DEFAULT_SETTINGS.uiScale = screenDefault;
+    }
+  });
+
   it('read back anything stored safely: broken, of the wrong kind, or out of range', () => {
     for (const stored of ['not json', 'null', '[1,2]', '"text"']) {
       store.set(KEY, stored);

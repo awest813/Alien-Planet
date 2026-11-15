@@ -70,7 +70,7 @@ describe('sowing before a frost', () => {
   it('poplars, frost-proof, are sown late in the year when potatoes are too late', () => {
     // Late autumn: too late for potatoes; poplars wait out the winter.
     const potatoes = field('potatoPlant', 16, 13);
-    expect(potatoes.sim.whyNotSow(potatoes.tile) ?? '').toMatch(/Too late to ripen before winter|frost/i);
+    expect(potatoes.sim.whyNotSow(potatoes.tile) ?? '').toMatch(/Too late to ripen before winter|frost|in winter/i);
     const poplars = field('poplarPlant', 16, 13);
     // (Unless it's simply too cold to sow at all this hour.)
     if (poplars.sim.temperatureAt(poplars.tile) >= 5) {
@@ -104,5 +104,51 @@ describe('sowing before a frost', () => {
     controller.selectTile(bare);
     controller.publish();
     expect(controller.getState().selectedTile!.orders.join(' | ')).toMatch(/Not sown: (a cold snap|too cold)/);
+  });
+});
+
+describe('a greenhouse in winter', () => {
+  // A glass greenhouse, walled in as a room, `size` across inside, with `fires` campfires lit in it, in early winter.
+  function greenhouse(size: number, fires: number) {
+    const { sim, w, tile } = field('potatoPlant', 19, 12, 'tundra');
+    sim.research.done.push('glassmaking');
+    const x0 = w.xOf(tile) - Math.floor(size / 2) - 1;
+    const y0 = w.yOf(tile) - Math.floor(size / 2) - 1;
+    for (let y = y0; y <= y0 + size + 1; y++) {
+      for (let x = x0; x <= x0 + size + 1; x++) {
+        const edge = x === x0 || y === y0 || x === x0 + size + 1 || y === y0 + size + 1;
+        const i = w.idx(x, y);
+        if (edge) {
+          w.setFeature(i, featureId('woodWall'));
+        } else if (i !== tile) {
+          w.zone[i] = 0;
+        }
+      }
+    }
+    for (let k = 0; k < fires; k++) {
+      const fire = w.idx(x0 + 1 + k, y0 + 1);
+      w.setFeature(fire, featureId('campfire'));
+      w.fuel[fire] = 100;
+    }
+    sim.fuelVersion++;
+    expect(sim.isIndoors(tile)).toBe(true);
+    // (A mild noon in it, as the reviewer found it: warm enough to sow, if no more.)
+    (sim as unknown as { temperatureAt(i: number): number }).temperatureAt = () => 10;
+    return { sim, tile };
+  }
+
+  it('one campfire in a big one is not enough against the frost; in a small one it is', () => {
+    // (A campfire in an 11×11 greenhouse kept it about 3°C over outdoors: 21 of 25 plants sown froze.)
+    const big = greenhouse(11, 1);
+    expect(big.sim.whyNotSow(big.tile)).toMatch(/Frost would reach it.*more heat/);
+    const small = greenhouse(3, 1);
+    expect(small.sim.whyNotSow(small.tile)).toBeNull();
+  });
+
+  it('outdoors, a field in winter says so plainly', () => {
+    const { sim, tile } = field('potatoPlant', 20, 12, 'temperate');
+    sim.story.heatWaveUntil = sim.tick + 10 * HOUR;
+    const why = sim.whyNotSow(tile) ?? '';
+    expect(why === 'Nothing is sown outdoors in winter' || /Too cold/.test(why)).toBe(true);
   });
 });

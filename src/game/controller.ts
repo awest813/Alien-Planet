@@ -1402,9 +1402,10 @@ export class GameController {
   // False until the player starts, continues or loads a colony, and again after quitting to the title.
   private inPlay = false;
 
-  public setSettings(patch: Partial<Settings>): void {
+  // `reset`: the patch puts the defaults back (see resetSettings), not choices of the player's own.
+  public setSettings(patch: Partial<Settings>, reset = false): void {
     this.settings = { ...this.settings, ...patch };
-    storeSettings(this.settings);
+    storeSettings(this.settings, reset ? [] : (Object.keys(patch) as (keyof Settings)[]));
     this.applySound();
     this.publish();
   }
