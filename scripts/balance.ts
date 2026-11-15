@@ -51,7 +51,7 @@ import { applyTrade, colonyStock, goodwillOf, tradeOpen } from '../src/sim/trade
 import { OBJECTIVES, Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { mutualOpinion } from '../src/sim/social';
 import { Difficulty, foodDays } from '../src/sim/storyteller';
-import { Designation, GROW_ZONE, STOCKPILE_ZONE } from '../src/sim/world';
+import { Designation, GROW_ZONE, STOCKPILE_ZONE, isStockpileZone } from '../src/sim/world';
 import { serialize } from '../src/sim/serialize';
 import { writeFileSync } from 'node:fs';
 
@@ -528,6 +528,7 @@ function play(seed: number): Result {
     });
   }
 
+  let stockpiles = stock ? 1 : 0;
   let builtDay2 = false;
   let secondFarm = false;
   let thirdFarm = false;
@@ -1314,6 +1315,26 @@ function play(seed: number): Result {
           rect: { x0: field.x, y0: field.y, x1: field.x + 6, y1: field.y + 4 },
           zone: crop('potatoPlant'),
         });
+      }
+    }
+    // Another stockpile when they fill, as a player told "Stockpiles are full" would. (One 5x3 all along: by year
+    // five, fourteen thousand silver lay outside, so a harness colony could never buy peace, ransom or hire.)
+    if (Math.floor(sim.hour) === 8 && stockpiles < 8) {
+      let room = 0;
+      for (let i = 0; i < w.size && room <= 2; i++) {
+        if (isStockpileZone(w.zone[i]) && (w.itemType[i] === NONE || w.itemCount[i] < w.capacity(i, w.itemType[i]))) {
+          room++;
+        }
+      }
+      const site = room <= 2 ? findSite(sim, 5, 3, avoid) : undefined;
+      if (site) {
+        claim(avoid, sim, site.x, site.y, 5, 3);
+        sim.apply({
+          type: 'zone',
+          rect: { x0: site.x, y0: site.y, x1: site.x + 4, y1: site.y + 2 },
+          zone: STOCKPILE_ZONE,
+        });
+        stockpiles++;
       }
     }
     // A bed for every newcomer, while there's room in the hut.

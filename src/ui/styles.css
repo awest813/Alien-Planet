@@ -1909,6 +1909,11 @@ button.active:hover:not(:disabled) {
   outline: none;
 }
 
+.trade-status {
+  margin-bottom: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Trade: their goods beside yours. */
 .trade-columns {
   display: grid;

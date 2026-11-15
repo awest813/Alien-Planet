@@ -1093,11 +1093,18 @@ export function TradeScreen({ onClose }: { onClose: () => void }) {
         </>
       }
     >
-      <p className="muted">
-        {trade.relation} (goodwill {trade.goodwill}) · leaving in {trade.leavesIn}h · your silver {trade.silver}
-        {trade.looseSilver > 0 && ` (and ${trade.looseSilver} lying about: haul it to a stockpile to spend it)`} · their
-        silver {trade.traderSilver}. Better goodwill means better prices; trading builds it, a point for each{' '}
-        {GOODWILL_PER} silver dealt, {VISIT_GOODWILL} a visit
+      {/* Where things stand, at a glance; then how goodwill works, smaller. (One paragraph ran to five lines on a
+          phone, the purses in the middle of it.) */}
+      <p className="trade-status">
+        {trade.relation} · goodwill {trade.goodwill} · leaving in {trade.leavesIn}h · your silver {trade.silver} ·
+        theirs {trade.traderSilver}
+      </p>
+      {trade.looseSilver > 0 && (
+        <p className="small warn">{trade.looseSilver} more silver lies about: haul it to a stockpile to spend it.</p>
+      )}
+      <p className="muted small">
+        Better goodwill means better prices. Trading builds it: a point for each {GOODWILL_PER} silver dealt, up to{' '}
+        {VISIT_GOODWILL} a visit
         {trade.goodwillEarned > 0 &&
           ` (${trade.goodwillEarned >= VISIT_GOODWILL ? 'all earned' : `${trade.goodwillEarned} so far`} this visit)`}
         .
