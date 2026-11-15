@@ -48,6 +48,24 @@ with esbuild for speed (see ROADMAP).
 
 ## Closed in this pass
 
+- **Animals, hunting, time, state and energy** (wildlife over 30 days in four settings; colonists' rest sampled
+  hour by hour in three one-year colonies; the clock under load; the interface's state on ten-year colonies):
+  - **Energy:** everyone was tired (-5) from 20:00 to bed and for the first hour or two asleep, every day, whatever
+    they had: a flat -0.8 on mood nothing lifted. Tired is now felt awake, and rest lasts twenty waking hours (tired
+    about 21:00). 48 colonies each, standard / harsh / tundra: "Tired" -0.8 to -0.3, mood up 1.1 / 1.2 / 0.3,
+    breaks 10 to 10 / 12 to 14 / 21 to 14.
+  - **Time:** a day is four minutes at 1×, one at 4×. On a machine that can't keep up the game slowed itself
+    without a word; now the top bar shows "≈2.6×" beside the speeds when it runs under 85% of the speed chosen
+    (over three seconds; pauses and emergency stops don't count).
+  - **Animals and hunting:** prey dips under hunting and comes back without it (breeding in spring and summer,
+    grazers wandering in); predators come and go (unfed, they move on in two days; the storyteller sends new
+    packs), so few are about late in a month, by design. Maulings (boars that fight back, maddened packs) are
+    about -0.3 on mood: a danger, not a tax. Left as they are.
+  - **State:** the interface's state for a ten-year colony builds in about 2 ms (five times a second while the clock
+    runs), keeps what didn't change, and a save of it (4 MB, 5 ms to write, 70-80 ms to read) comes back identical.
+  - **Raids:** raiders and allies search for their way with a weighted estimate: a big raid 98 to 77 ms per 1,000
+    ticks, playing the same.
+
 - **A balance matrix, and islands** (16 colonies × 30 days in each of twelve settings, then 48 and 48 fresh for
   what stood out):
   - **The matrix:** peaceful, standard, harsh (with and without defending), river, island, desert, forest, desert

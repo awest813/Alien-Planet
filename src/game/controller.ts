@@ -811,6 +811,9 @@ const DAILY_NUTRITION = 1.4;
 export const TICKS_PER_SECOND = 20;
 // The most of a frame the simulation may take (see frame()).
 const STEP_BUDGET_MS = 12;
+// How the clock's pace is judged (see measurePace).
+const PACE_WINDOW_MS = 3000;
+const PACE_SHORT = 0.85;
 export const SAVE_SLOTS = ['autosave', 'slot-1', 'slot-2', 'slot-3'];
 
 export const slotLabel = (slot: string): string => (slot === 'autosave' ? 'Autosave' : `Slot ${slot.slice(5)}`);
@@ -1189,6 +1192,8 @@ export interface UiState {
   lockedTools: Record<string, string>;
   day: number;
   time: string;
+  // The speed the clock is really running at, when it falls well short of the one chosen (see measurePace).
+  pace: number | null;
   night: boolean;
   outdoorTemp: number;
   speed: number;
@@ -1607,6 +1612,42 @@ export class GameController {
 
   // ---- Called every render frame by the Phaser scene ----
 
+  // Whether the clock keeps up with the speed asked: over three seconds, the ticks run against the ticks wanted.
+  // Short of 85% (a slow machine at a high speed, a big colony in a raid), `pace` is the speed it's really running
+  // at, and the top bar says so: the game slowed itself without a word before.
+  public pace: number | null = null;
+  private paceWanted = 0;
+  private paceRun = 0;
+  private paceSince = 0;
+  private measurePace(deltaMs: number, ran: number, stopped: boolean, now: number): void {
+    const speed = SPEEDS[this.speedIndex];
+    // (A pause, an emergency stop or a hidden tab isn't the machine falling behind: start the count again.)
+    if (speed === 0 || stopped || deltaMs >= 1000) {
+      this.paceWanted = 0;
+      this.paceRun = 0;
+      this.paceSince = now;
+      if (speed === 0 && this.pace !== null) {
+        this.pace = null;
+        this.publish();
+      }
+      return;
+    }
+    this.paceWanted += (deltaMs / 1000) * TICKS_PER_SECOND * speed;
+    this.paceRun += ran;
+    if (now - this.paceSince < PACE_WINDOW_MS) {
+      return;
+    }
+    const share = this.paceWanted > 0 ? this.paceRun / this.paceWanted : 1;
+    const pace = share < PACE_SHORT ? Math.round(share * speed * 10) / 10 : null;
+    this.paceWanted = 0;
+    this.paceRun = 0;
+    this.paceSince = now;
+    if (pace !== this.pace) {
+      this.pace = pace;
+      this.publish();
+    }
+  }
+
   public frame(): void {
     // Use real elapsed time rather than the renderer's smoothed delta, so the simulation
     // keeps pace on slow frames. Long gaps (a backgrounded tab) are clamped to one second.
@@ -1618,13 +1659,17 @@ export class GameController {
     // owed in one go, the next frame slower still. What's left over is dropped (beyond a few ticks), so the game
     // runs a little slower than asked on a machine that can't keep up, rather than stalling.
     const budget = now + STEP_BUDGET_MS;
+    let ran = 0;
+    let stopped = false;
     while (this.accumulator >= 1 && SPEEDS[this.speedIndex] > 0) {
       this.sim.step();
       this.accumulator--;
+      ran++;
       if (this.sim.events.some((event) => this.pausesFor(event)) || this.sim.headcount() === 0) {
         // The rest of what was owed goes (the fraction stays, for drawing between ticks): kept, it ran on the next
         // frames with the clock stopped, or all at once on resuming.
         this.accumulator %= 1;
+        stopped = true;
         break;
       }
       if (performance.now() > budget) {
@@ -1632,6 +1677,7 @@ export class GameController {
         break;
       }
     }
+    this.measurePace(deltaMs, ran, stopped, now);
     for (const event of this.sim.events.splice(0)) {
       if (event === 'raid' || event === 'manhunters') {
         sound.alert('raid');
@@ -2457,6 +2503,7 @@ export class GameController {
       night: sim.isNight(),
       outdoorTemp: Math.round(sim.outdoorTemperature()),
       speed: this.speedIndex,
+      pace: this.pace,
       notStarted: this.notStarted,
       toolId: toolId(this.tool),
       colonists: sim.colonists.map(

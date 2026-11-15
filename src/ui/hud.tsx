@@ -114,6 +114,7 @@ const pickTopBar = (s: UiState) => ({
     'power',
     'raid',
     'resources',
+    'pace',
     'speed',
     'trade',
     'weather',
@@ -185,6 +186,14 @@ export function TopBar({ onOpen }: { onOpen: (screen: Screen) => void }) {
             </button>
           ))}
         </div>
+        {state.pace !== null && (
+          <span
+            className="pace muted"
+            title={`Running at ${state.pace}×: this computer can't keep up with the speed chosen (a lower one, or Chromebook mode in Settings, may help)`}
+          >
+            ≈{state.pace}×
+          </span>
+        )}
         {/* (After the speeds, so they don't move as the weather comes and goes.) */}
         <Weather weather={state.weather} />
       </div>

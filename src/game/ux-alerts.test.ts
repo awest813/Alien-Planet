@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { spawnRaid } from '../sim/combat';
 import { featureId, itemId, terrainId } from '../sim/defs';
 import { Designation } from '../sim/world';
@@ -230,5 +230,29 @@ describe('fords', () => {
     expect(sim.outdoorTemperature()).toBeGreaterThanOrEqual(20);
     expect(wade(true)).toBe(false);
     expect(wade(false)).toBe(true);
+  });
+});
+
+describe('the clock’s pace', () => {
+  it('says when the computer can’t keep up with the speed chosen, and stops saying so when it can', () => {
+    colony('pace');
+    controller.setSpeed(3);
+    let clock = 0;
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => (clock += 30));
+    try {
+      // Every tick overruns the frame's budget: one tick a frame, where 4× wants several.
+      for (let k = 0; k < 120 && controller.getState().pace === null; k++) {
+        controller.frame();
+      }
+      const pace = controller.getState().pace;
+      expect(pace).not.toBeNull();
+      expect(pace!).toBeLessThan(4 * 0.85);
+      // Paused: nothing to keep up with.
+      controller.setSpeed(0);
+      controller.frame();
+      expect(controller.getState().pace).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
