@@ -147,6 +147,69 @@ describe('sound', () => {
     expect(sinceNow(from).filter((s) => s.kind === 'noise').length).toBeGreaterThan(2);
   });
 
+  it('animals in view call now and then in their own time; a wolf by day only when after someone', () => {
+    clock = 500;
+    const from = started.length;
+    const deer = { id: 1, kind: 'deer', pan: 0, angry: false };
+    const wolf = { id: 2, kind: 'wolf', pan: 0.5, angry: false };
+    // A minute with a deer and a calm wolf in view, by day: the deer calls a couple of times, the wolf not at all.
+    for (let frame = 0; frame < 60 * 60; frame++) {
+      clock = 500 + frame / 60;
+      sound.update(scene({ creatures: [deer, wolf] }));
+    }
+    const calls = sinceNow(from).filter((s) => s.kind === 'osc').length;
+    expect(calls).toBeGreaterThanOrEqual(1);
+    expect(calls).toBeLessThanOrEqual(10);
+    // The wolf after someone: it snarls every couple of seconds.
+    const angry = started.length;
+    for (let frame = 0; frame < 60 * 10; frame++) {
+      clock = 560 + frame / 60;
+      sound.update(scene({ creatures: [{ ...wolf, angry: true }] }));
+    }
+    expect(sinceNow(angry).filter((s) => s.kind === 'osc').length).toBeGreaterThanOrEqual(3);
+    // Paused, nothing.
+    const paused = started.length;
+    for (let frame = 0; frame < 60 * 10; frame++) {
+      clock = 570 + frame / 60;
+      sound.update(scene({ paused: true, creatures: [{ ...wolf, angry: true }] }));
+    }
+    expect(sinceNow(paused)).toHaveLength(0);
+  });
+
+  it('colonists in company murmur, one at a time; one alone says nothing; the struck cry out, a few a second', () => {
+    clock = 700;
+    const alone = started.length;
+    for (let frame = 0; frame < 60 * 10; frame++) {
+      clock = 700 + frame / 60;
+      sound.update(scene({ talkers: [{ id: 1, pan: 0, pitch: 150 }] }));
+    }
+    expect(sinceNow(alone)).toHaveLength(0);
+    const together = started.length;
+    for (let frame = 0; frame < 60 * 10; frame++) {
+      clock = 710 + frame / 60;
+      sound.update(
+        scene({
+          talkers: [
+            { id: 1, pan: 0, pitch: 150 },
+            { id: 2, pan: 0.2, pitch: 210 },
+          ],
+        }),
+      );
+    }
+    // Ten seconds: a few phrases of a few syllables each, not a babble.
+    const syllables = sinceNow(together).filter((s) => s.kind === 'osc').length;
+    expect(syllables).toBeGreaterThanOrEqual(4);
+    expect(syllables).toBeLessThanOrEqual(40);
+    // A dozen blows landing at once: three cries, not twelve.
+    clock = 730;
+    const blows = started.length;
+    const hit = { ranged: false, hit: true, pan: 0, struck: { who: 'colonist' as const, pitch: 150 } };
+    sound.update(scene({ shots: Array.from({ length: 12 }, () => hit) }));
+    // (Each blow is heard as a thud, a noise; each cry is one voice and a breath.)
+    const cries = sinceNow(blows).filter((s) => s.kind === 'osc').length;
+    expect(cries).toBe(3);
+  });
+
   it('the soundtrack plays bar on bar, without a burst after a long gap', () => {
     sound.configure({ enabled: true, score: true, master: 0.7, music: 0.8, effects: 0.8 });
     clock = 100;

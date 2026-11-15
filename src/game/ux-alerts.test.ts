@@ -3,7 +3,7 @@ import { spawnRaid } from '../sim/combat';
 import { featureId, itemId, terrainId } from '../sim/defs';
 import { Designation } from '../sim/world';
 import { HOUR, clearAround } from '../sim/test-helpers';
-import { Alert, controller } from './controller';
+import { Alert, controller, voiceOf } from './controller';
 
 // From a review of how the game feels to use, each first seen failing.
 
@@ -222,6 +222,37 @@ describe('what the sound hears', () => {
     const away = (controller as unknown as { soundScene(): import('./audio').SoundScene }).soundScene();
     expect(away.workers).toHaveLength(0);
     expect(away.fire).toBe(0);
+  });
+});
+
+describe('animals and people, heard', () => {
+  it('animals in view are heard (angry when after someone), colonists in company talk, and the struck cry out', () => {
+    const sim = colony('voices');
+    const w = sim.world;
+    const [a, b, far] = sim.living();
+    const x = w.xOf(a.tile);
+    const y = w.yOf(a.tile);
+    for (const c of [a, b, far]) {
+      c.job = null;
+      c.path = [];
+      c.sleeping = false;
+      c.drafted = false;
+    }
+    b.tile = w.idx(x + 1, y);
+    far.tile = w.idx(x + 8, y + 8);
+    const boar = { ...sim.animals[0], kind: 'boar', tile: w.idx(x + 3, y), hp: 1, revengeOn: a.id };
+    sim.animals = [boar];
+    sim.shots = [{ from: boar.tile, to: a.tile, hit: true, ranged: false, tick: sim.tick }];
+    (controller as unknown as { heardShotsTo: number }).heardShotsTo = sim.tick - 1;
+    controller.cameraView = { x0: x - 10, y0: y - 10, x1: x + 10, y1: y + 10 };
+    const scene = (controller as unknown as { soundScene(): import('./audio').SoundScene }).soundScene();
+    expect(scene.creatures).toEqual([expect.objectContaining({ kind: 'boar', angry: true })]);
+    // The two side by side talk; the one off on their own doesn't.
+    expect(scene.talkers!.map((t) => t.id).sort()).toEqual([a.id, b.id].sort());
+    expect(scene.shots[0].struck).toEqual({ who: 'colonist', pitch: voiceOf(a) });
+    // A colonist's voice is their own, the same each time; a child's is higher.
+    expect(voiceOf(a)).toBe(voiceOf(a));
+    expect(voiceOf({ ...a, age: 8 })).toBeGreaterThan(260);
   });
 });
 

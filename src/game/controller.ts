@@ -1,6 +1,6 @@
 import { inAbout } from '../sim/arrivals';
 import { TRANSMIT_HOURS, beaconTile } from '../sim/beacon';
-import { Musician, SoundScene, WorkSound, Worker, sound } from './audio';
+import { Creature, Musician, SoundScene, Struck, Talker, WorkSound, Worker, sound } from './audio';
 import { isInstrument } from './music';
 import { impressivenessLabel } from '../sim/climate';
 import {
@@ -1553,9 +1553,56 @@ export class GameController {
     if (this.heardShotsTo > sim.tick) {
       this.heardShotsTo = sim.tick - 1;
     }
+    // Who each blow struck, to be heard crying out.
+    const struck = (to: number): Struck | undefined => {
+      const c = sim.colonists.find((k) => k.tile === to && !k.health.dead && !k.away);
+      if (c) {
+        return { who: 'colonist', pitch: voiceOf(c) };
+      }
+      if (sim.enemies.some((e) => e.tile === to) || sim.allies.some((e) => e.tile === to)) {
+        return { who: 'raider' };
+      }
+      const a = sim.animals.find((b) => b.tile === to);
+      return a ? { who: 'animal', kind: a.kind } : undefined;
+    };
     const shots = sim.shots
       .filter((s) => s.tick > this.heardShotsTo && (inView(s.from) || inView(s.to)))
-      .map((s) => ({ ranged: s.ranged, hit: s.hit, pan: pan(inView(s.from) ? s.from : s.to) }));
+      .map((s) => ({
+        ranged: s.ranged,
+        hit: s.hit,
+        pan: pan(inView(s.from) ? s.from : s.to),
+        ...(s.hit && { struck: struck(s.to) }),
+      }));
+    const cy = (view.y0 + view.y1) / 2;
+    const offCentre = (i: number) => Math.abs(w.xOf(i) - cx) + Math.abs(w.yOf(i) - cy);
+    // Animals in view, the nearest few to the middle of the screen.
+    const creatures: Creature[] = sim.animals
+      .filter((a) => a.hp > 0 && inView(a.tile))
+      .sort((a, b) => offCentre(a.tile) - offCentre(b.tile))
+      .slice(0, 6)
+      .map((a) => ({
+        id: a.id,
+        kind: a.kind,
+        pan: pan(a.tile),
+        angry: a.revengeOn >= 0 || (!!a.manhunter && !a.musterUntil),
+      }));
+    // Colonists in company: awake, off work and standing still, within a step or two of another.
+    const free = sim
+      .living()
+      .filter(
+        (c) =>
+          inView(c.tile) &&
+          !c.sleeping &&
+          !c.drafted &&
+          c.path.length === 0 &&
+          (!c.job || ['joy', 'eat', 'wander'].includes(c.job.type)) &&
+          !c.job?.listening,
+      );
+    const talkers: Talker[] = free
+      .filter((c) => free.some((o) => o !== c && w.distance(o.tile, c.tile) <= 2))
+      .sort((a, b) => offCentre(a.tile) - offCentre(b.tile))
+      .slice(0, 4)
+      .map((c) => ({ id: c.id, pan: pan(c.tile), pitch: voiceOf(c) }));
     let burning = 0;
     for (const i of sim.burning) {
       burning += inView(i) ? 1 : 0;
@@ -1563,6 +1610,8 @@ export class GameController {
     this.heardShotsTo = sim.tick;
     return {
       musicians,
+      creatures,
+      talkers,
       paused: this.speedIndex === 0 || !this.inPlay,
       night: sim.isNight(),
       rain: weather === 'rain' || weather === 'storm',
@@ -4870,4 +4919,12 @@ export function gearSummary(item: number): string | null {
     return `Turns aside ${Math.round(def.armor.protection * 100)}% of a blow${slows}`;
   }
   return null;
+}
+
+// A colonist's voice, in Hz: their own, the same each time (lower or higher by who they are), a child's higher, an
+// elder's a little lower.
+export function voiceOf(c: Colonist): number {
+  const h = ((c.id * 2654435761) >>> 0) / 4294967296;
+  const adult = h < 0.5 ? 100 + h * 90 : 165 + (h - 0.5) * 110;
+  return c.age < 13 ? 270 + h * 60 : c.age >= 65 ? adult * 0.92 : adult;
 }
