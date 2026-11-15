@@ -271,7 +271,8 @@ const FIRESIDE_EXTRA = 6;
 const HARP_GAIN = 1.25;
 // A concert draws anyone in an "anything" hour with recreation under this (see someoneFreeToPlay).
 const CONCERT_DRAWS = 0.6;
-// The everyday work a concert draws them from (not tending the hurt, fighting fires, eating, sleeping and so on).
+// The everyday work a concert draws them from (not tending the hurt, fighting fires, eating, sleeping and so on;
+// nor a load in their arms, or a craft half made).
 const CONCERT_LEAVES = new Set<string>([
   'mine',
   'chop',
@@ -280,8 +281,6 @@ const CONCERT_LEAVES = new Set<string>([
   'deconstruct',
   'sow',
   'harvestCrop',
-  'haul',
-  'craft',
   'research',
   'clean',
 ]);
