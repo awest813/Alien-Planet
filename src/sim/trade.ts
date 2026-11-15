@@ -30,9 +30,15 @@ export interface Caravan {
   // When they pack up and leave.
   leaveAt: number;
   leaving: boolean;
+  // Silver's worth traded this visit, and the goodwill it has earned so far (see applyTrade).
+  turnover?: number;
+  goodwillEarned?: number;
 }
 
 export const STARTING_GOODWILL = 20;
+// Goodwill from trading: a point per this much silver's worth dealt in a visit, up to this many a visit.
+const GOODWILL_PER = 80;
+const VISIT_GOODWILL = 5;
 // Raiders start out hostile; the hill clans start out guarded (they keep to themselves at first).
 export const HOSTILE_GOODWILL = -50;
 const GUARDED_GOODWILL = 5;
@@ -401,9 +407,14 @@ export function applyTrade(sim: Simulation, buy: [number, number][], sell: [numb
   }
   // The traders' purse takes what the colony pays (or pays out what it receives).
   caravan.silver += balance;
-  // A good deal for both sides warms relations, a little at a time.
-  const gain = Math.min(5, Math.floor((cost + income) / 80));
+  // Good trading warms relations, a little at a time: a point for every 80 silver's worth dealt this visit, up to
+  // five a visit. (Reckoned a deal at a time, ten small sales earned twice what one big one did, and a sale under
+  // 80 silver nothing at all.)
+  caravan.turnover = (caravan.turnover ?? 0) + cost + income;
+  const earned = Math.min(VISIT_GOODWILL, Math.floor(caravan.turnover / GOODWILL_PER));
+  const gain = earned - (caravan.goodwillEarned ?? 0);
   if (gain > 0) {
+    caravan.goodwillEarned = earned;
     shiftGoodwill(sim, caravan.faction, gain);
   }
   sim.addLog(
@@ -473,7 +484,7 @@ export function sellArt(sim: Simulation, tile: number): string | null {
     return "That isn't a piece the traders will buy.";
   }
   if (price > caravan.silver) {
-    return "The traders can't afford that piece.";
+    return `The traders have ${caravan.silver} silver, short of the ${price} it's worth: buy from them first (what you pay fills their purse), or wait for a richer caravan.`;
   }
   const name = featureDef(sim.world.feature[tile]).name.toLowerCase();
   sim.world.setFeature(tile, NONE);

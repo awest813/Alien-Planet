@@ -202,3 +202,28 @@ describe('selling by condition', () => {
     expect(condition(w, tile)).toBeCloseTo(0.5);
   });
 });
+
+describe('goodwill from trading', () => {
+  it('is reckoned over the visit: a sale split into small deals earns what one deal does, small deals add up', () => {
+    // (Ten deals of 40 cloth earned +10 against one deal's +5; twenty small ones, nothing.)
+    const goodwillFrom = (deals: number) => {
+      const { sim, w, x, y } = market(7);
+      // 120 cloth in all (the market holds 40), across the stockpile.
+      for (let k = 0; k < 4; k++) {
+        w.addItem(w.idx(x - 2 + k, y + 5), itemId('cloth'), 20);
+      }
+      const faction = sim.caravan!.faction;
+      const before = goodwillOf(sim, faction);
+      const each = 120 / deals;
+      for (let k = 0; k < deals; k++) {
+        expect(applyTrade(sim, [], [[itemId('cloth'), each]])).toBeNull();
+      }
+      return goodwillOf(sim, faction) - before;
+    };
+    const one = goodwillFrom(1);
+    expect(one).toBeGreaterThan(0);
+    expect(goodwillFrom(6)).toBe(one);
+    // (Deals of ten cloth, each well under 80 silver.)
+    expect(goodwillFrom(12)).toBe(one);
+  });
+});

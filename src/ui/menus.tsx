@@ -1108,6 +1108,14 @@ function ArtForSale({ trade }: { trade: NonNullable<UiState['trade']> }) {
       <p className="muted small">
         The traders pay well for fine work and carry it off themselves. Memorials aren't for sale.
       </p>
+      {/* (Said, not only on a button's tooltip, which a phone never shows: the finest pieces cost more than most
+          caravans carry, and buying from them first is how to fill their purse.) */}
+      {trade.art.some((a) => !a.affordable) && (
+        <p className="small warn">
+          Their purse holds {trade.traderSilver} silver: a piece worth more waits until they have it. Buy from them
+          first (what you pay fills their purse), or wait for a richer caravan.
+        </p>
+      )}
       <table className="summary">
         <tbody>
           {trade.art.map((a) => (
@@ -1120,7 +1128,7 @@ function ArtForSale({ trade }: { trade: NonNullable<UiState['trade']> }) {
               <td className="num">
                 <button
                   disabled={!a.affordable || confirm.armed}
-                  title={a.affordable ? undefined : "The traders can't afford it"}
+                  title={a.affordable ? undefined : `The traders have ${trade.traderSilver} silver of the ${a.price}`}
                   onClick={() => {
                     setSelling(a.tile);
                     confirm.arm();

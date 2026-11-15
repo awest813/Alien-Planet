@@ -114,7 +114,7 @@
       "heat": 3,
       "wearDays": 36
     },
-    "value": 30
+    "value": 75
   },
   {
     "key": "parka",
@@ -126,7 +126,7 @@
       "heat": -6,
       "wearDays": 48
     },
-    "value": 70
+    "value": 85
   },
   {
     "key": "milk",
@@ -154,7 +154,7 @@
     "key": "toolKit",
     "name": "Tool kit",
     "stackLimit": 1,
-    "value": 25,
+    "value": 40,
     "tool": true
   },
   {
@@ -175,7 +175,7 @@
     "key": "club",
     "name": "Club",
     "stackLimit": 1,
-    "value": 10,
+    "value": 15,
     "weapon": "club"
   },
   {
@@ -203,7 +203,7 @@
     "key": "leatherArmor",
     "name": "Leather armor",
     "stackLimit": 1,
-    "value": 70,
+    "value": 110,
     "armor": {
       "protection": 0.25,
       "speed": 1
