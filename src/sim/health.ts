@@ -385,7 +385,7 @@ export function die(sim: Simulation, c: Colonist, cause: string, told?: string, 
   sim.dropCarried(c);
   const weapon = weaponDef(c.weapon).item;
   if (weapon !== undefined) {
-    sim.world.dropItemNear(c.tile, weapon, 1, undefined, c.weaponQuality);
+    sim.world.dropItemNear(c.tile, weapon, 1, c.weaponWear ?? 1, c.weaponQuality);
     c.weapon = 'fists';
   }
   if (c.armor) {

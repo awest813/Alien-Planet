@@ -7694,10 +7694,11 @@ export class Simulation {
         // The old weapon goes back on the floor for someone else (fists stay with their owner).
         const old = weaponDef(c.weapon).item;
         if (old !== undefined) {
-          w.dropItemNear(c.tile, old, 1, undefined, c.weaponQuality);
+          w.dropItemNear(c.tile, old, 1, c.weaponWear ?? 1, c.weaponQuality);
         }
         c.weapon = def.weapon;
         c.weaponQuality = taken.quality ?? NORMAL_QUALITY;
+        c.weaponWear = taken.fresh !== undefined && taken.fresh > 0 ? Math.min(1, taken.fresh) : 1;
         this.addLog(`${c.name} picked up ${aOrAn(qualityLabel(c.weaponQuality))} ${def.name.toLowerCase()}.`);
       }
     } else if (def.armor) {

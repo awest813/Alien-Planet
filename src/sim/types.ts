@@ -217,6 +217,9 @@ export interface Colonist {
   // Key of the weapon in hand (see WEAPONS), and its craftsmanship: better-made weapons hit harder.
   weapon: string;
   weaponQuality: number;
+  // Condition left of the weapon carried (1, or missing: as good as new). Kept from the ground and back to it: a
+  // bow weathered half away came back as new once someone had carried it.
+  weaponWear?: number;
   // Body armor worn over clothes.
   armor: WornArmor | null;
   // How a drafted colonist fights: find cover, stand fast, or close in.

@@ -669,3 +669,30 @@ describe('an archer caught hand to hand', () => {
     expect(equipScore('spear', 10, 'cover')).toBeLessThan(equipScore('recurveBow', 10, 'cover'));
   });
 });
+
+describe('a weapon worn by the weather', () => {
+  it('keeps its condition carried, and back on the ground; worn, it sells for less', async () => {
+    // (Carried, a bow weathered half away came back as new; and a worn one sold for as much as a new one.)
+    const { condition } = await import('./trade');
+    const { die } = await import('./health');
+    const { sim, w, x, y } = field(52);
+    const c = sim.colonists[0];
+    const bow = w.idx(x + 2, y);
+    w.addItem(bow, itemId('longbow'), 1, 0.4);
+    const fresh = w.idx(x + 3, y);
+    w.addItem(fresh, itemId('longbow'), 1);
+    expect(condition(w, bow)).toBeLessThan(condition(w, fresh));
+    w.takeItem(fresh, 1);
+    c.tile = w.idx(x, y);
+    for (let t = 0; t < HOUR * 2 && c.weapon !== 'longbow'; t++) {
+      c.needs.food = 1;
+      c.needs.rest = 1;
+      sim.step();
+    }
+    expect(c.weapon).toBe('longbow');
+    expect(c.weaponWear).toBeCloseTo(0.4, 1);
+    die(sim, c, 'old age');
+    const dropped = [...w.tilesWith('items')].find((i) => w.itemType[i] === itemId('longbow'))!;
+    expect(w.fresh[dropped]).toBeCloseTo(0.4, 1);
+  });
+});

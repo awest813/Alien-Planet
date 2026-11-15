@@ -274,8 +274,11 @@ export function takeFromStockpiles(sim: Simulation, item: number, count: number,
 export function condition(w: World, i: number): number {
   const def = itemDef(w.itemType[i]);
   let factor = qualityFactor(w.quality[i]) / qualityFactor(NORMAL_QUALITY);
-  if (def.apparel || def.armor || def.tool) {
-    factor *= 0.3 + 0.7 * Math.max(0, Math.min(1, w.fresh[i]));
+  // (Weapons too: they weather out in the rain, and a bow worn half away sold for as much as a new one.)
+  if (def.apparel || def.armor || def.tool || def.weapon) {
+    // (A weapon from a save before weapons wore keeps no condition: as good as new.)
+    const left = def.weapon && !(w.fresh[i] > 0) ? 1 : w.fresh[i];
+    factor *= 0.3 + 0.7 * Math.max(0, Math.min(1, left));
   } else if (def.shelfLife !== undefined && w.fresh[i] < SPOILING_DAYS) {
     factor *= 0.5;
   }

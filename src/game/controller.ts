@@ -2924,7 +2924,7 @@ export class GameController {
             })),
             weapon:
               weaponDef(c.weapon).item !== undefined
-                ? `${qualityLabel(c.weaponQuality)} ${weaponDef(c.weapon).name.toLowerCase()}`
+                ? `${qualityLabel(c.weaponQuality)} ${weaponDef(c.weapon).name.toLowerCase()}${(c.weaponWear ?? 1) < 1 ? ` (${Math.round((c.weaponWear ?? 1) * 100)}% condition)` : ''}`
                 : weaponDef(c.weapon).name,
             armor: c.armor
               ? `${itemDef(c.armor.item).name} (${Math.round(armorOf(c).protection * 100)}%, ${Math.round(c.armor.wear * 100)}% condition)`

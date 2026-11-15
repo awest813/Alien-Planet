@@ -82,6 +82,7 @@ interface SavedColonist {
   passions: Record<SkillKey, Passion>;
   weapon: string;
   weaponQuality: number;
+  weaponWear?: number;
   armor: WornArmor | null;
   stance: Stance;
   focus: number;
@@ -252,6 +253,7 @@ export function serialize(sim: Simulation): SaveData {
         passions: c.passions,
         weapon: c.weapon,
         weaponQuality: c.weaponQuality,
+        weaponWear: c.weaponWear,
         armor: c.armor && { ...c.armor },
         stance: c.stance,
         focus: c.focus,
