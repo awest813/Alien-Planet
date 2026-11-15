@@ -401,12 +401,21 @@ export class ColonyScene extends Phaser.Scene {
     if (!auroraOn(sim) || !sim.isNight()) {
       return;
     }
+    // Over the map only, not the dark beyond its edge.
+    const w = sim.world;
+    const x0 = Math.max(v.x, 0);
+    const x1 = Math.min(v.right, w.width * TILE);
+    const y0 = Math.max(v.y, 0);
+    const y1 = Math.min(v.bottom, w.height * TILE);
+    if (x1 <= x0 || y1 <= y0) {
+      return;
+    }
     const bands = 24;
     for (let k = 0; k < bands; k++) {
-      const x = v.x + (k / bands) * v.width;
+      const x = x0 + (k / bands) * (x1 - x0);
       const wave = Math.sin(now / 1400 + k * 0.6) * 0.5 + 0.5;
-      const height = v.height * (0.25 + 0.2 * wave);
-      g.fillStyle(k % 3 === 0 ? 0x9a6bff : 0x55ffaa, 0.06 + 0.06 * wave).fillRect(x, v.y, v.width / bands + 1, height);
+      const height = Math.min(y1 - y0, v.height * (0.25 + 0.2 * wave));
+      g.fillStyle(k % 3 === 0 ? 0x9a6bff : 0x55ffaa, 0.06 + 0.06 * wave).fillRect(x, y0, (x1 - x0) / bands + 1, height);
     }
   }
 

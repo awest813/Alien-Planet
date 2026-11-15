@@ -97,8 +97,12 @@ export function Minimap() {
         }
         dot(c.tile, c.color, 4);
       }
+      // Raiders bigger, ringed in black: small red dots were lost on red rock and brown ground.
       for (const e of sim.enemies) {
-        dot(e.tile, '#ff3b3b', 4);
+        if (e.hp > 0) {
+          dot(e.tile, '#000000', 7);
+          dot(e.tile, '#ff3b3b', 5);
+        }
       }
       const view = controller.cameraView;
       ctx.strokeStyle = '#ffffff';
