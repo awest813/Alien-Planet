@@ -67,6 +67,34 @@ test('every top-bar screen opens and closes with Esc', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test("the Schedule copies one colonist's hours to another, or to everyone, and warns of a day with no sleep", async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  await startColony(page);
+  await page.locator('.screens button', { hasText: 'Schedule' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Schedule' });
+  const rows = dialog.locator('tbody tr').filter({ hasNot: page.locator('.slot-all') });
+  // Paint the first colonist's whole day as Work: no sleep, and it says so.
+  await dialog.getByRole('button', { name: 'Work', exact: true }).click();
+  const first = rows.first();
+  for (let h = 0; h < 24; h++) {
+    await first.locator(`td[data-hour="${h}"]`).click();
+  }
+  await expect(first.getByText('no sleep')).toBeVisible();
+  // Copied to the second: theirs is the same, warning and all.
+  await first.getByRole('button', { name: /^Copy .*'s hours$/ }).click();
+  await rows
+    .nth(1)
+    .getByRole('button', { name: /^Give .*'s hours$/ })
+    .click();
+  await expect(rows.nth(1).getByText('no sleep')).toBeVisible();
+  // And to everyone.
+  await dialog.getByRole('button', { name: 'Paste to all' }).click();
+  await expect(rows.getByText('no sleep')).toHaveCount(await rows.count());
+  expect(errors).toEqual([]);
+});
+
 test('the Story screen shows the history graphs once there are days to show', async ({ page }) => {
   const errors = watchErrors(page);
   await startColony(page);

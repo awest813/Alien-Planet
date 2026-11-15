@@ -2721,3 +2721,24 @@ input[type='checkbox'] {
     display: none;
   }
 }
+
+/* Schedule: copying one colonist's hours to another (or everyone). */
+.schedule .row-label .copy,
+.schedule .row-label .paste {
+  margin-left: 6px;
+  padding: 0 2px;
+}
+
+.schedule .row-label .copy {
+  opacity: 0.55;
+}
+
+.schedule .row-label .copy[aria-pressed='true'],
+.schedule .row-label .paste {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.schedule .row-label .tag {
+  margin-left: 6px;
+}

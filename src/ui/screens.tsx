@@ -432,6 +432,17 @@ export function ScheduleScreen({ onClose }: { onClose: () => void }) {
   const paint = (colonist: number, hour: number) =>
     controller.command({ type: 'schedule', colonist, hour, slot: brush });
   const living = state.colonists.filter((c) => !c.dead);
+  // One colonist's hours, copied, to give to another or to everyone (a night shift for two took 48 strokes).
+  const [copied, setCopied] = useState<{ id: number; name: string; hours: ScheduleSlot[] } | null>(null);
+  const pasteTo = (c: (typeof living)[number]) =>
+    copied!.hours.forEach((slot, hour) => {
+      if (c.schedule[hour] !== slot) {
+        controller.command({ type: 'schedule', colonist: c.id, hour, slot });
+      }
+    });
+  // What a day like this leaves out: no sleep at all, or no hour anyone may set them to work.
+  const lacks = (hours: ScheduleSlot[]) =>
+    !hours.includes('S') ? 'no sleep' : !hours.some((h) => h === 'W' || h === 'A') ? 'no work hours' : null;
   // The "Everyone" row paints an hour for the whole colony.
   const paintAll = (hour: number) => living.forEach((c) => paint(c.id, hour));
   // Painting by mouse or finger: the cell under the pointer (a finger's drag doesn't enter cells), each
@@ -537,7 +548,21 @@ export function ScheduleScreen({ onClose }: { onClose: () => void }) {
           </thead>
           <tbody>
             <tr className="everyone">
-              <td className="row-label muted">Everyone</td>
+              <td className="row-label muted">
+                Everyone
+                {copied && (
+                  <button
+                    className="link small paste"
+                    onClick={() => {
+                      living.forEach(pasteTo);
+                      setCopied(null);
+                    }}
+                    title={`Give everyone ${copied.name}'s hours`}
+                  >
+                    Paste to all
+                  </button>
+                )}
+              </td>
               {Array.from({ length: 24 }, (_, hour) => (
                 <td
                   key={hour}
@@ -556,6 +581,33 @@ export function ScheduleScreen({ onClose }: { onClose: () => void }) {
               <tr key={c.id}>
                 <td className="row-label">
                   <span className="swatch" style={{ background: c.color }} /> {c.name}
+                  {lacks(c.schedule) && <span className="tag warn">{lacks(c.schedule)}</span>}
+                  {copied && copied.id !== c.id ? (
+                    <button
+                      className="link small paste"
+                      onClick={() => pasteTo(c)}
+                      title={`Give ${c.name} ${copied.name}'s hours`}
+                      aria-label={`Give ${c.name} ${copied.name}'s hours`}
+                    >
+                      Paste
+                    </button>
+                  ) : (
+                    <button
+                      className="link small copy"
+                      onClick={() =>
+                        setCopied(copied?.id === c.id ? null : { id: c.id, name: c.name, hours: [...c.schedule] })
+                      }
+                      aria-pressed={copied?.id === c.id}
+                      title={
+                        copied?.id === c.id
+                          ? 'Copied: paste to another row, or click again to cancel'
+                          : `Copy ${c.name}'s hours`
+                      }
+                      aria-label={copied?.id === c.id ? `Stop copying ${c.name}'s hours` : `Copy ${c.name}'s hours`}
+                    >
+                      {copied?.id === c.id ? 'Copied' : 'Copy'}
+                    </button>
+                  )}
                 </td>
                 {c.schedule.map((slot, hour) => (
                   <td
