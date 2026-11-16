@@ -306,6 +306,9 @@ const musicQuality = (c: Colonist) => 0.5 + c.skills.artistic / 20;
 const STILL_HUNGRY = 0.3;
 // How much further a colonist walks for a cooked meal than for raw food (see tryEat).
 const MEAL_WALK = 25;
+// How far grown a crop marked Harvest must be before it's picked (for that share of its yield): a frost coming,
+// the player can save what's there, but a seedling yields nothing.
+const EARLY_HARVEST = 0.3;
 // Downed with nobody to help: below this much food they crawl to something to eat, this far at most.
 // How often a step in off bare ground leaves dirt on a floor (dry, and in the wet).
 const TRACK_DIRT = 0.04;
@@ -564,7 +567,11 @@ const TOOL_WORK = new Set<JobType>(['mine', 'chop', 'forage', 'construct', 'deco
 // A normal tool kit makes that work this much faster; better-made kits more, poor ones less.
 const TOOL_BONUS = 0.3;
 // Hours of work a tool kit lasts.
-const TOOL_HOURS = 80;
+// (Was 80: a kit lasted two weeks of a colonist's work, and a third of the colony's tool work was done without
+// one, too few made to keep up. It's worth it many times over: a third faster for about an hour at the bench.)
+const TOOL_HOURS = 160;
+// Days a tool kit goes unused before its holder puts it down for someone else (see tryTakeTool).
+const TOOL_IDLE_DAYS = 3;
 // An inspired colonist's work speed.
 const INSPIRED_SPEED = 1.4;
 const RAW_FISH = itemId('rawFish');
@@ -951,6 +958,8 @@ export class Simulation {
   // got, for the next to make it there to carry on from. (Each interruption threw the work away: half the parkas
   // begun were never finished, three hours of tailoring lost each time.) Saved with the colony.
   public benchWork = new Map<number, { recipe: number; progress: number }>();
+  // When each colonist last did tool work (see tryTakeTool). Not saved: after a load it builds up again.
+  private toolWorkAt = new Map<number, number>();
   public firstNight: NightResult = 'pending';
   public objectivesDone: Record<string, boolean> = {};
   public bills: Bill[] = RECIPES.map((r) => ({ recipe: r.id, target: r.defaultTarget }));
@@ -1402,6 +1411,7 @@ export class Simulation {
           chop: Designation.CHOP,
           forage: Designation.FORAGE,
           deconstruct: Designation.DECONSTRUCT,
+          harvest: Designation.HARVEST,
         }[cmd.kind];
         // Dragged over any buildings, a deconstruct order takes only those; floors and roofs come
         // up when they're all the drag covers.
@@ -1440,7 +1450,8 @@ export class Simulation {
             return;
           }
           const def = featureDef(f);
-          const ok = def.harvest?.work === cmd.kind;
+          // Harvest: a growing crop, to be picked before it's ripe (see harvestable).
+          const ok = cmd.kind === 'harvest' ? !!def.crop : def.harvest?.work === cmd.kind;
           if (ok) {
             w.designation[i] = value;
             w.markDirty(i);
@@ -2382,6 +2393,7 @@ export class Simulation {
       // Hashed rather than drawn from the rng, so which crops die doesn't depend on list order.
       if (temp < FROST && !crop.hardy && hash2(i, this.tick, this.seed) < 0.05) {
         w.setFeature(i, NONE);
+        w.designation[i] = Designation.NONE;
         frosted++;
         continue;
       }
@@ -4248,8 +4260,13 @@ export class Simulation {
   }
 
   private harvestable(i: number): boolean {
-    const f = this.world.feature[i];
-    return f !== NONE && !!featureDef(f).crop && this.world.growth[i] >= 1;
+    const w = this.world;
+    const f = w.feature[i];
+    return (
+      f !== NONE &&
+      !!featureDef(f).crop &&
+      (w.growth[i] >= 1 || (w.designation[i] === Designation.HARVEST && w.growth[i] >= EARLY_HARVEST))
+    );
   }
 
   // Walls and doors go up before what goes inside them: a closed room by nightfall beats beds in the open.
@@ -4841,6 +4858,9 @@ export class Simulation {
     }
     w.progress[t] += this.workSpeed(c, job.type);
     learn(this, c, skillFor(job.type));
+    if (TOOL_WORK.has(job.type)) {
+      this.toolWorkAt.set(c.id, this.tick);
+    }
     this.wearTool(c, job.type);
     w.markDirty(t);
     if (w.progress[t] >= this.workAmount(job)) {
@@ -4863,11 +4883,24 @@ export class Simulation {
   // Someone who does physical work and has no tool kit fetches one from storage.
   private tryTakeTool(c: Colonist): boolean {
     const p = c.priorities;
-    if (
-      c.tool ||
-      (p.mining <= 0 && p.construction <= 0 && p.growing <= 0 && p.plantCutting <= 0) ||
-      this.resourceTotals()[TOOL_KIT - 1].total === 0
-    ) {
+    // Kits go to those who use them: whoever took one first kept it, the cook and the researcher among them, and half
+    // the colony's tool work was done without one while they sat on kits they hardly used. So a kit is taken by
+    // someone who has done tool work in the last day (or, before anyone has, who may), and one not used for three
+    // days is put down for someone who will.
+    const lastUsed = this.toolWorkAt.get(c.id);
+    if (c.tool) {
+      if (lastUsed !== undefined && this.tick - lastUsed > TICKS_PER_HOUR * 24 * TOOL_IDLE_DAYS) {
+        this.world.dropItemNear(c.tile, TOOL_KIT, 1, c.tool.wear, c.tool.quality);
+        c.tool = null;
+        this.toolWorkAt.delete(c.id);
+      }
+      return false;
+    }
+    const doesToolWork =
+      lastUsed !== undefined
+        ? this.tick - lastUsed <= TICKS_PER_HOUR * 24
+        : p.mining > 0 || p.construction > 0 || p.growing > 0 || p.plantCutting > 0;
+    if (!doesToolWork || this.resourceTotals()[TOOL_KIT - 1].total === 0) {
       return false;
     }
     const w = this.world;
@@ -4916,7 +4949,10 @@ export class Simulation {
       }
       case 'harvestCrop': {
         const crop = featureDef(w.feature[t]).crop!;
+        // Picked early (see EARLY_HARVEST): what it has grown so far.
+        const grown = Math.min(1, w.growth[t]);
         w.setFeature(t, NONE);
+        w.designation[t] = Designation.NONE;
         // Set the harvest down beside the field, not on it, so the tile can be sown again.
         const region = this.regionOf(t);
         const offField = this.nearest(
@@ -4926,6 +4962,7 @@ export class Simulation {
         )[0];
         // (Irrigation's quarter more, as an extra unit a quarter of the time on small harvests.)
         const more =
+          grown *
           (this.isResearched('irrigation') ? crop.count * IRRIGATION_YIELD : crop.count) *
           (this.isResearched('plantBreeding') ? BREEDING_YIELD : 1) *
           (this.story.difficulty === 'peaceful' ? PEACEFUL_YIELD : 1);
@@ -4933,9 +4970,10 @@ export class Simulation {
         w.dropItemNear(offField ?? t, crop.item, yieldCount);
         this.produce(crop.item, yieldCount);
         // The stalks of a grain field, bundled into hay for the troughs.
-        if (crop.straw) {
-          w.dropItemNear(offField ?? t, HAY, crop.straw);
-          this.produce(HAY, crop.straw);
+        const straw = Math.floor((crop.straw ?? 0) * grown);
+        if (straw > 0) {
+          w.dropItemNear(offField ?? t, HAY, straw);
+          this.produce(HAY, straw);
         }
         if (this.season === 'Winter') {
           this.stats.winterHarvests = (this.stats.winterHarvests ?? 0) + 1;
@@ -7687,8 +7725,10 @@ export class Simulation {
     }
     const w = this.world;
     const region = this.regionOf(c.tile);
-    const score = (key: string, quality: number) => equipScore(key, quality, c.stance);
-    const current = score(c.weapon, c.weaponQuality);
+    // (Worn, worth less: a bow nearly worn through is swapped for a sound one of the same kind.)
+    const score = (key: string, quality: number, wear = 1) =>
+      equipScore(key, quality, c.stance) * (0.6 + 0.4 * Math.max(0, Math.min(1, wear)));
+    const current = score(c.weapon, c.weaponQuality, c.weaponWear ?? 1);
     const armorValue = (item: number, wear: number) => itemDef(item).armor!.protection * (0.5 + 0.5 * wear);
     const armorNow = c.armor ? armorValue(c.armor.item, c.armor.wear) : 0;
     const kit = this.nearestItem(
@@ -7702,7 +7742,8 @@ export class Simulation {
         const def = itemDef(type);
         if (def.weapon) {
           return (
-            score(def.weapon, w.quality[i]) > current * (def.weapon === c.weapon ? WEAPON_UPGRADE : NEW_WEAPON_UPGRADE)
+            score(def.weapon, w.quality[i], w.fresh[i] > 0 ? w.fresh[i] : 1) >
+            current * (def.weapon === c.weapon ? WEAPON_UPGRADE : NEW_WEAPON_UPGRADE)
           );
         }
         return !!def.armor && armorValue(type, w.fresh[i]) > armorNow * 1.25 + 0.02;

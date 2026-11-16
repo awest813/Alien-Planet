@@ -1300,10 +1300,29 @@ function colonistAttack(sim: Simulation, c: Colonist, target: number, weapon: We
   recordShot(sim, c.tile, target, hit, ranged);
   c.cooldown = weapon.cooldown;
   learn(sim, c, 'combat', COMBAT_XP);
+  wearWeapon(sim, c, weapon);
   // A better-made weapon hits harder (0.7× for poor work up to 1.3× for a masterwork); fists are
   // just fists.
   const made = weapon === FISTS ? 1 : qualityFactor(c.weaponQuality);
   return hit ? roll(sim, weapon.damage) * made : 0;
+}
+
+// Each attack with a weapon wears it a little (a better-made one less), and worn through, it breaks: a bow or a sword
+// lasted for ever, however much it was used. About this many attacks for one of ordinary make: a hunter goes
+// through a bow in a month or two, a fighter in dozens of raids.
+const WEAPON_ATTACKS = 400;
+function wearWeapon(sim: Simulation, c: Colonist, weapon: WeaponDef): void {
+  if (weapon === FISTS || weapon.key !== c.weapon) {
+    return;
+  }
+  c.weaponWear =
+    (c.weaponWear ?? 1) - qualityFactor(NORMAL_QUALITY) / (WEAPON_ATTACKS * qualityFactor(c.weaponQuality));
+  if (c.weaponWear <= 0) {
+    sim.addLog(`${c.name}'s ${weapon.name.toLowerCase()} broke.`, 'warn');
+    c.weapon = FISTS.key;
+    c.weaponQuality = NORMAL_QUALITY;
+    c.weaponWear = undefined;
+  }
 }
 
 function attackEnemy(sim: Simulation, c: Colonist, e: Enemy): void {

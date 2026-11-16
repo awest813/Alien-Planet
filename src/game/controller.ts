@@ -464,6 +464,16 @@ export const TOOLS: ToolDef[] = [
     hint: 'Drag over berry bushes to gather berries',
   },
   {
+    id: 'harvest',
+    label: 'Harvest',
+    hotkey: '',
+    tool: { kind: 'designate', designation: 'harvest' },
+    // (In Farm & food, with the fields: Orders had a row's worth already.)
+    group: 'farm',
+    // (Ripe crops are harvested without it: this is for picking them early, a frost coming.)
+    hint: "Drag over crops to harvest them now, ripe or not (from a third grown: what's grown so far)",
+  },
+  {
     id: 'deconstruct',
     label: 'Deconstruct',
     hotkey: 'r',
@@ -4253,9 +4263,12 @@ export class GameController {
     };
     switch (tool?.kind) {
       case 'designate': {
-        const mark = { mine: Designation.MINE, chop: Designation.CHOP, forage: Designation.FORAGE }[
-          tool.designation as 'mine' | 'chop' | 'forage'
-        ];
+        const mark = {
+          mine: Designation.MINE,
+          chop: Designation.CHOP,
+          forage: Designation.FORAGE,
+          harvest: Designation.HARVEST,
+        }[tool.designation as 'mine' | 'chop' | 'forage' | 'harvest'];
         return mark !== undefined && any('designations', (i) => w.designation[i] === mark);
       }
       case 'build':
@@ -4532,6 +4545,7 @@ export class GameController {
       [Designation.CHOP]: 'Marked for chopping',
       [Designation.FORAGE]: 'Marked for foraging',
       [Designation.DECONSTRUCT]: 'Marked for deconstruction',
+      [Designation.HARVEST]: 'Marked for harvest now',
     };
     if (w.designation[i] !== Designation.NONE) {
       orders.push(designationNames[w.designation[i]]);
@@ -4795,7 +4809,7 @@ export class GameController {
             ? `ripe in ${days(walk.hours)}`
             : walk.end === 'frost'
               ? // (It said "harvest it": an unripe crop can't be.)
-                `a frost may take it first, in ${days(walk.hours)}: only warmth saves it (a heated greenhouse)`
+                `a frost may take it first, in ${days(walk.hours)}: harvest it now (Harvest, in Farm & food) for what's grown, or warm it`
               : "won't ripen before winter";
         details.push(`${Math.floor(w.growth[i] * 100)}% grown, ${when}${waiting ? ` · ${waiting}` : ''}`);
       }

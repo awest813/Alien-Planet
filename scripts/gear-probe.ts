@@ -12,6 +12,7 @@ const n = {
   toolWork: 0,
   toolless: 0,
   toollessKitsStored: 0,
+  holdingKit: 0,
   armored: 0,
 };
 const events = new Map<string, number>();
@@ -49,6 +50,7 @@ Simulation.prototype.step = function (this: Simulation, ...args: unknown[]) {
       n.tattered += c.apparel && c.apparel.wear < TATTERED ? 1 : 0;
       n.mendable += c.apparel && c.apparel.wear < 0.6 ? 1 : 0;
       n.armored += c.armor ? 1 : 0;
+      n.holdingKit += c.tool ? 1 : 0;
       if (c.job && TOOL_JOBS.has(c.job.type)) {
         n.toolWork++;
         n.toolless += c.tool ? 0 : 1;
@@ -61,7 +63,25 @@ Simulation.prototype.step = function (this: Simulation, ...args: unknown[]) {
   return result;
 };
 
+const made: number[] = [];
+let lastSim: Simulation | null = null;
+const finishSim = (sim: Simulation | null) => {
+  if (sim) {
+    made.push(sim.stats.produced.toolKit ?? 0);
+  }
+};
+const step2 = Simulation.prototype.step;
+Simulation.prototype.step = function (this: Simulation, ...args: unknown[]) {
+  if (lastSim !== this) {
+    finishSim(lastSim);
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- the colony last stepped, to count its kits at the end
+    lastSim = this;
+  }
+  return (step2 as (this: Simulation, ...a: unknown[]) => unknown).apply(this, args);
+};
+
 process.on('exit', () => {
+  finishSim(lastSim);
   const pct = (a: number, b: number) => `${((100 * a) / Math.max(1, b)).toFixed(1)}%`;
   console.log(`\nGEAR over ${days} colony-days`);
   console.log(
@@ -69,6 +89,9 @@ process.on('exit', () => {
   );
   console.log(
     `  tool work done without a tool kit: ${pct(n.toolless, n.toolWork)} (of it, with a kit lying in the colony: ${pct(n.toollessKitsStored, n.toolless)})`,
+  );
+  console.log(
+    `  colonist-hours holding a tool kit: ${pct(n.holdingKit, n.samples)}; kits made per colony: ${made.join(' ')}`,
   );
   console.log(
     `  per colony-day: ${[...events].map(([k, v]) => `${k} ${(v / Math.max(1, days)).toFixed(2)}`).join(', ')}`,

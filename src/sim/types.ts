@@ -453,7 +453,7 @@ export interface Shot {
   tick: number;
 }
 
-export type DesignationKind = 'mine' | 'chop' | 'forage' | 'deconstruct';
+export type DesignationKind = 'mine' | 'chop' | 'forage' | 'deconstruct' | 'harvest';
 
 export interface Rect {
   x0: number;

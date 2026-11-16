@@ -696,3 +696,41 @@ describe('a weapon worn by the weather', () => {
     expect(w.fresh[dropped]).toBeCloseTo(0.4, 1);
   });
 });
+
+describe('weapons wear with use', () => {
+  it('each attack wears the weapon; worn through, it breaks and they fight with their fists', () => {
+    const { sim, w, x, y } = field(53);
+    const archer = sim.colonists[0];
+    archer.tile = w.idx(x, y);
+    archer.drafted = true;
+    archer.weapon = 'recurveBow';
+    archer.weaponWear = 1;
+    raider(sim, w.idx(x + 4, y), 'club', { repathAt: forever, hp: 99 });
+    archer.cooldown = 0;
+    colonistCombat(sim, archer);
+    expect(archer.weaponWear).toBeLessThan(1);
+    expect(archer.weaponWear).toBeGreaterThan(0.99);
+    // Nearly worn through: the next shot breaks it.
+    archer.weaponWear = 0.001;
+    archer.cooldown = 0;
+    colonistCombat(sim, archer);
+    expect(archer.weapon).toBe('fists');
+    expect(sim.log.some((l) => /recurve bow broke/.test(l.text))).toBe(true);
+  });
+
+  it('a colonist swaps a nearly worn-out weapon for a sound one of the same kind', () => {
+    const { sim, w, x, y } = field(54);
+    const c = sim.colonists[0];
+    c.tile = w.idx(x, y);
+    c.weapon = 'recurveBow';
+    c.weaponQuality = 8;
+    c.weaponWear = 0.1;
+    w.addItem(w.idx(x + 2, y), itemId('recurveBow'), 1, 1, 8);
+    for (let t = 0; t < HOUR * 2 && (c.weaponWear ?? 1) < 0.5; t++) {
+      c.needs.food = 1;
+      c.needs.rest = 1;
+      sim.step();
+    }
+    expect(c.weaponWear ?? 1).toBeGreaterThan(0.9);
+  });
+});

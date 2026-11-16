@@ -526,6 +526,7 @@ const EVENTS: EventDef[] = [
       for (const i of field) {
         if (sim.rng.next() < 0.6) {
           w.setFeature(i, NONE);
+          w.designation[i] = 0;
           lost++;
         }
       }

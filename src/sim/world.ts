@@ -27,6 +27,8 @@ export const Designation = {
   CHOP: 2,
   FORAGE: 3,
   DECONSTRUCT: 4,
+  // A crop to be harvested before it's ripe (for what it has grown so far).
+  HARVEST: 5,
 } as const;
 
 // Zone values: 0 none, 1 stockpile, GROW_ZONE + crop feature id for growing zones.

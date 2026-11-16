@@ -127,8 +127,9 @@ export function createTextures(scene: Phaser.Scene): void {
       }
     });
   });
-  const designationColors = ['', '#ffb347', '#a8e063', '#ff7aa2', '#ff5252'];
-  for (let d = 1; d <= 4; d++) {
+  // (Harvest early, the yellow of ripe grain.)
+  const designationColors = ['', '#ffb347', '#a8e063', '#ff7aa2', '#ff5252', '#ffe066'];
+  for (let d = 1; d <= 5; d++) {
     at(Frames.designation(d), (c) => drawDesignation(c, designationColors[d], d === 4));
   }
   ITEMS.forEach((item) => at(Frames.item(item.id), (c) => drawItem(c, item.key)));

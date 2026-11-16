@@ -1992,6 +1992,7 @@ export class ColonyScene extends Phaser.Scene {
             chop: 'trees to chop',
             forage: 'bushes to forage',
             deconstruct: 'buildings to take down',
+            harvest: 'crops to harvest',
           }[tool.designation];
           controller.hint(`No ${what ?? 'work'} there. Drag over the ones you want.`);
         }

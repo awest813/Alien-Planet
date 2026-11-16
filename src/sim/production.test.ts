@@ -226,3 +226,22 @@ describe('work left on a bench, saved', () => {
     expect(controller.getState().selectedTile!.details.join(' | ')).toMatch(/Tailor parka begun: 40% done/);
   });
 });
+
+describe('tool kits', () => {
+  it('a kit its holder has not used in three days is put down for someone who will', () => {
+    const { sim, w, x, y } = workshop(14);
+    const c = sim.colonists[0];
+    c.tile = w.idx(x, y);
+    c.tool = { quality: 8, wear: 0.7 };
+    const at = (sim as unknown as { toolWorkAt: Map<number, number> }).toolWorkAt;
+    at.set(c.id, sim.tick - HOUR * 24 * 4);
+    (sim as unknown as { tryTakeTool(c: unknown): boolean }).tryTakeTool(c);
+    expect(c.tool).toBeNull();
+    expect(sim.stockOf(itemId('toolKit'))).toBeGreaterThanOrEqual(1);
+    // Used yesterday: kept.
+    c.tool = { quality: 8, wear: 0.7 };
+    at.set(c.id, sim.tick - HOUR * 20);
+    (sim as unknown as { tryTakeTool(c: unknown): boolean }).tryTakeTool(c);
+    expect(c.tool).not.toBeNull();
+  });
+});

@@ -189,3 +189,43 @@ describe('a greenhouse in winter', () => {
     expect(why === 'Nothing is sown outdoors in winter' || /Too cold/.test(why)).toBe(true);
   });
 });
+
+describe('harvesting early', () => {
+  it('a crop marked Harvest is picked before it ripens, for what it has grown; a seedling waits', async () => {
+    const { itemId } = await import('./defs');
+    const { Designation } = await import('./world');
+    const { sim, w, tile } = field('potatoPlant', 6, 10);
+    const young = w.idx(w.xOf(tile) + 1, w.yOf(tile));
+    w.setFeature(tile, featureId('potatoPlant'));
+    w.growth[tile] = 0.6;
+    w.setFeature(young, featureId('potatoPlant'));
+    w.growth[young] = 0.1;
+    // Nothing happens to an unripe crop unmarked; marked, it's harvested.
+    sim.apply({
+      type: 'designate',
+      kind: 'harvest',
+      rect: { x0: w.xOf(tile), y0: w.yOf(tile), x1: w.xOf(young), y1: w.yOf(young) },
+    });
+    expect(w.designation[tile]).toBe(Designation.HARVEST);
+    for (const c of sim.colonists) {
+      c.priorities.growing = 1;
+    }
+    const before = sim.stockOf(itemId('potatoes'));
+    for (let t = 0; t < HOUR * 3 && w.feature[tile] !== 0; t++) {
+      for (const c of sim.colonists) {
+        c.needs.food = 1;
+        c.needs.rest = 1;
+      }
+      sim.step();
+    }
+    expect(w.feature[tile]).toBe(0);
+    expect(w.designation[tile]).toBe(Designation.NONE);
+    // Eight potatoes ripe: about five at 60% grown.
+    const got = sim.stockOf(itemId('potatoes')) - before;
+    expect(got).toBeGreaterThanOrEqual(4);
+    expect(got).toBeLessThanOrEqual(6);
+    // The seedling is still there, marked, until it has grown a third.
+    expect(w.feature[young]).toBe(featureId('potatoPlant'));
+    expect(w.designation[young]).toBe(Designation.HARVEST);
+  });
+});

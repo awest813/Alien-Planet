@@ -15,7 +15,7 @@ export const TERRAIN_SEASONS = 4;
 export const TERRAIN_LANDS = ['temperate', 'tundra', 'desert', 'forest'] as const;
 const TERRAIN_FRAMES = TERRAIN_VARIANTS * TERRAIN_SEASONS * TERRAIN_LANDS.length;
 // Designations are numbered from 1; frame 0 of the section is left empty.
-const DESIGNATION_FRAMES = 5;
+const DESIGNATION_FRAMES = 6;
 const OVERLAY_FRAMES = 3;
 const CROP_STAGES = 3;
 // Dirt, blood and rubble, each in three amounts.
