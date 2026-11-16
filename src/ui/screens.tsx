@@ -872,7 +872,12 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
         <ul className="help-steps">
           <li>
             Winter comes every 24 days: crops stop, so stock food. Cold storage (research Refrigeration) keeps it from
-            rotting; parkas (Tailoring) and hearths keep colonists warm.
+            rotting; parkas (Tailoring) and hearths keep colonists warm. A frost coming before the crops are ripe?{' '}
+            <b>Harvest</b> (Farm &amp; food) picks them now, for what they've grown.
+          </li>
+          <li>
+            Clothes, tool kits and weapons wear out with use: keep spares made (the targets on the <b>Production</b>{' '}
+            screen). A worn garment can be mended at a crafting bench.
           </li>
           <li>
             Grow <b>healroot</b> for medicine, hunt and fish for meat and leather, forage berries for quick food.

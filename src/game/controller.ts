@@ -49,6 +49,7 @@ import { SAVE_VERSION, SaveData, deserialize, serialize } from '../sim/serialize
 import {
   BOOKS_BONUS,
   BOOKS_REACH,
+  EARLY_HARVEST,
   MAP_SIZE,
   NIGHT_END,
   NIGHT_START,
@@ -4547,7 +4548,10 @@ export class GameController {
       [Designation.DECONSTRUCT]: 'Marked for deconstruction',
       [Designation.HARVEST]: 'Marked for harvest now',
     };
-    if (w.designation[i] !== Designation.NONE) {
+    if (w.designation[i] === Designation.HARVEST && w.growth[i] < EARLY_HARVEST) {
+      // (Picked only from a third grown: until then there's next to nothing on it.)
+      orders.push('Marked for harvest: picked once a third grown');
+    } else if (w.designation[i] !== Designation.NONE) {
       orders.push(designationNames[w.designation[i]]);
     }
     if (w.blueprint[i] !== NONE) {

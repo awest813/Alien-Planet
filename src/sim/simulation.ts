@@ -308,7 +308,7 @@ const STILL_HUNGRY = 0.3;
 const MEAL_WALK = 25;
 // How far grown a crop marked Harvest must be before it's picked (for that share of its yield): a frost coming,
 // the player can save what's there, but a seedling yields nothing.
-const EARLY_HARVEST = 0.3;
+export const EARLY_HARVEST = 0.3;
 // Downed with nobody to help: below this much food they crawl to something to eat, this far at most.
 // How often a step in off bare ground leaves dirt on a floor (dry, and in the wet).
 const TRACK_DIRT = 0.04;

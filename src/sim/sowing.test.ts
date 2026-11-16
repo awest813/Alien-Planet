@@ -228,4 +228,24 @@ describe('harvesting early', () => {
     expect(w.feature[young]).toBe(featureId('potatoPlant'));
     expect(w.designation[young]).toBe(Designation.HARVEST);
   });
+
+  it("a seedling marked Harvest says it waits until it's a third grown", async () => {
+    const { controller } = await import('../game/controller');
+    const { Designation } = await import('./world');
+    controller.newColony('harvest-card');
+    const w = controller.sim.world;
+    const { x, y } = clearAround(controller.sim, 6);
+    const at = w.idx(x + 2, y + 2);
+    w.setFeature(at, featureId('potatoPlant'));
+    w.growth[at] = 0.1;
+    w.designation[at] = Designation.HARVEST;
+    const orders = () => {
+      controller.selectTile(at);
+      controller.publish();
+      return controller.getState().selectedTile!.orders;
+    };
+    expect(orders()).toContain('Marked for harvest: picked once a third grown');
+    w.growth[at] = 0.5;
+    expect(orders()).toContain('Marked for harvest now');
+  });
 });
