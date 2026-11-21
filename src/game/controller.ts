@@ -472,7 +472,7 @@ export const TOOLS: ToolDef[] = [
     // (In Farm & food, with the fields: Orders had a row's worth already.)
     group: 'farm',
     // (Ripe crops are harvested without it: this is for picking them early, a frost coming.)
-    hint: "Drag over crops to harvest them now, ripe or not (from a third grown: what's grown so far)",
+    hint: "Drag over crops to pick them before they're ripe, for what they've grown (once a third grown)",
   },
   {
     id: 'deconstruct',
@@ -984,7 +984,8 @@ export interface TileView {
   actions: {
     tile: number;
     cancel: boolean;
-    harvest: 'mine' | 'chop' | 'forage' | null;
+    // ('harvest': an unripe crop, to pick now for what it has grown.)
+    harvest: 'mine' | 'chop' | 'forage' | 'harvest' | null;
     deconstruct: boolean;
     forbidden: boolean | null;
   };
@@ -4915,7 +4916,10 @@ export class GameController {
           !def?.shaft &&
           (def?.harvest?.work === 'mine' || def?.harvest?.work === 'chop' || def?.harvest?.work === 'forage')
             ? def.harvest.work
-            : null,
+            : // (A ripe one is harvested anyway.)
+              w.designation[i] === Designation.NONE && def?.crop && w.growth[i] < 1
+              ? 'harvest'
+              : null,
         deconstruct: w.designation[i] === Designation.NONE && sim.deconstructTarget(i) !== NONE,
         forbidden: w.itemType[i] !== NONE ? w.forbidden[i] === 1 : null,
       },

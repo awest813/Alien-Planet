@@ -249,6 +249,29 @@ describe('harvesting early', () => {
     expect(orders()).toContain('Marked for harvest now');
   });
 
+  it("an unripe crop's card offers Harvest now; marked, or ripe, it doesn't", async () => {
+    const { controller } = await import('../game/controller');
+    const { Designation } = await import('./world');
+    controller.newColony('harvest-action');
+    const w = controller.sim.world;
+    const { x, y } = clearAround(controller.sim, 6);
+    const at = w.idx(x + 2, y + 2);
+    w.setFeature(at, featureId('potatoPlant'));
+    w.growth[at] = 0.5;
+    const action = () => {
+      controller.selectTile(at);
+      controller.publish();
+      return controller.getState().selectedTile!.actions.harvest;
+    };
+    expect(action()).toBe('harvest');
+    controller.command({ type: 'designate', kind: 'harvest', rect: { x0: x + 2, y0: y + 2, x1: x + 2, y1: y + 2 } });
+    expect(w.designation[at]).toBe(Designation.HARVEST);
+    expect(action()).toBeNull();
+    w.designation[at] = Designation.NONE;
+    w.growth[at] = 1;
+    expect(action()).toBeNull();
+  });
+
   it("a frost coming, the card says to harvest only what's grown enough, and not what's marked already", async () => {
     const { controller } = await import('../game/controller');
     const { Designation } = await import('./world');

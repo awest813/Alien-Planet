@@ -896,7 +896,7 @@ function TileCard({ t, onClose }: { t: TileView; onClose?: () => void }) {
   );
 }
 
-const HARVEST_LABEL = { mine: 'Mine', chop: 'Chop', forage: 'Forage' } as const;
+const HARVEST_LABEL = { mine: 'Mine', chop: 'Chop', forage: 'Forage', harvest: 'Harvest now' } as const;
 
 // The orders the map tools give, for just this tile, without picking up the tool. Delete does the
 // first of Cancel or Deconstruct.
@@ -940,7 +940,12 @@ function TileActions({ t }: { t: TileView }) {
         </button>
       )}
       {a.harvest && (
-        <button onClick={() => controller.command({ type: 'designate', kind: a.harvest!, rect })}>
+        <button
+          title={
+            a.harvest === 'harvest' ? "Pick it before it's ripe, for what it has grown (once a third grown)" : undefined
+          }
+          onClick={() => controller.command({ type: 'designate', kind: a.harvest!, rect })}
+        >
           {HARVEST_LABEL[a.harvest]}
         </button>
       )}
