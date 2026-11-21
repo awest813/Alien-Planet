@@ -225,6 +225,25 @@ describe('work left on a bench, saved', () => {
     controller.publish();
     expect(controller.getState().selectedTile!.details.join(' | ')).toMatch(/Tailor parka begun: 40% done/);
   });
+
+  it('goes with its bench: not saved, nor said, once the bench is gone or another kind stands there', async () => {
+    const { serialize, deserialize } = await import('./serialize');
+    const { controller } = await import('../game/controller');
+    controller.newColony('bench-gone');
+    const sim = controller.sim;
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 10);
+    const bench = w.idx(x + 3, y);
+    w.setFeature(bench, featureId('craftingBench'));
+    sim.benchWork.set(bench, { recipe: recipe('tailorParka'), progress: 240 });
+    w.setFeature(bench, 0);
+    expect(deserialize(JSON.parse(JSON.stringify(serialize(sim)))).benchWork.has(bench)).toBe(false);
+    // A stove built where it stood doesn't show a parka begun.
+    w.setFeature(bench, featureId('stove'));
+    controller.selectTile(bench);
+    controller.publish();
+    expect(controller.getState().selectedTile!.details.join(' | ')).not.toMatch(/begun/);
+  });
 });
 
 describe('tool kits', () => {

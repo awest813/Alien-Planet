@@ -298,7 +298,10 @@ export function serialize(sim: Simulation): SaveData {
     departed: sim.departed,
     // Only graves still standing (one taken down leaves its record behind).
     graves: [...sim.graves].filter(([i]) => sim.graveAt(i)).map(([i, f]) => [i, { ...f }]),
-    benchWork: [...sim.benchWork].map(([i, b]) => [i, b.recipe, b.progress]),
+    // (Only what still has its bench.)
+    benchWork: [...sim.benchWork]
+      .filter(([i, b]) => sim.benchWorkStands(i, b.recipe))
+      .map(([i, b]) => [i, b.recipe, b.progress]),
     artworks: [...sim.artworks].filter(([i]) => sim.artworkAt(i)).map(([i, art]) => [i, { ...art }]),
     story: structuredClone(sim.story),
     biome: sim.biome,

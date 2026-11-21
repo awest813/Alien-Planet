@@ -4881,6 +4881,13 @@ export class Simulation {
   }
 
   // Someone who does physical work and has no tool kit fetches one from storage.
+  // Whether work left on a bench (see benchWork) still has its bench: one taken down, burnt or smashed takes the
+  // work with it (it stayed, for a bench of any kind built there later, and in the save for good).
+  public benchWorkStands(tile: number, recipe: number): boolean {
+    const f = this.world.feature[tile];
+    return f !== NONE && featureDef(f).workbench === RECIPES[recipe]?.bench;
+  }
+
   private tryTakeTool(c: Colonist): boolean {
     const p = c.priorities;
     // Kits go to those who use them: whoever took one first kept it, the cook and the researcher among them, and half
@@ -5734,6 +5741,10 @@ export class Simulation {
       // A bench with this recipe begun on it, free and in reach, is the one to go to (and carry on).
       let at = station;
       for (const [tile, left] of this.benchWork) {
+        if (!this.benchWorkStands(tile, left.recipe)) {
+          this.benchWork.delete(tile);
+          continue;
+        }
         if (
           left.recipe === recipe.id &&
           w.feature[tile] !== NONE &&
