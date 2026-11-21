@@ -232,12 +232,16 @@ describe('tool kits', () => {
     const { sim, w, x, y } = workshop(14);
     const c = sim.colonists[0];
     c.tile = w.idx(x, y);
+    // (A grower: one who may do tool work, by their priorities.)
+    c.priorities.growing = 1;
     c.tool = { quality: 8, wear: 0.7 };
     const at = (sim as unknown as { toolWorkAt: Map<number, number> }).toolWorkAt;
     at.set(c.id, sim.tick - HOUR * 24 * 4);
     (sim as unknown as { tryTakeTool(c: unknown): boolean }).tryTakeTool(c);
     expect(c.tool).toBeNull();
     expect(sim.stockOf(itemId('toolKit'))).toBeGreaterThanOrEqual(1);
+    // Nor taken straight back up by the one who put it down.
+    expect((sim as unknown as { tryTakeTool(c: unknown): boolean }).tryTakeTool(c)).toBe(false);
     // Used yesterday: kept.
     c.tool = { quality: 8, wear: 0.7 };
     at.set(c.id, sim.tick - HOUR * 20);

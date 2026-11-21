@@ -290,14 +290,16 @@ How the storytelling layer works:
   drop-off and armor piercing: fists, knife, club, spear, short bow, recurve bow, longbow (Longbows research) and
   crossbow (Crossbows research). Leather and scale armor (Armor and Scale armor research) turn aside a share of
   every blow, wear down as they do it, and scale armor slows its wearer. Colonists pick up clearly better weapons
-  and armor from storage, and fallen raiders drop some of their kit. Barricades (wood, from the start), sandbags and
+  and armor from storage, and fallen raiders drop some of their kit. Weapons wear with every attack (a better-made
+  one more slowly) and break once worn through; a worn one is swapped for a sound one from storage. Barricades (wood, from the start), sandbags and
   embrasures (stone wall slots you can shoot through but not walk through) cut the chance of being hit from the
   side they face, and blows struck
   across them (or by someone clambering over sandbags) land less often; spike traps
   (Traps research) wound the first raider to step on them and go back on the build list.
 - **Seasons:** a year is four six-day seasons, starting in early spring. Temperatures follow the year (warm
   summers, freezing winter nights). Crops don't grow in winter and hard frost kills anything left in the field,
-  so plant enough in spring and summer and harvest before winter.
+  so plant enough in spring and summer and harvest before winter. With a frost coming, the **Harvest** tool (Farm &
+  food) picks a crop before it's ripe, for the share it has grown (from a third grown).
 - **Research:** build a research bench, pick a project in the Research screen, and colonists with the Research
   work type study it (training the Intellectual skill). Forty-five projects unlock, among much else, the recurve bow,
   sandbags, the stone hearth, the fine bed, tailoring and all the electrical tech below, or improve insulation, crop growth and
@@ -320,7 +322,8 @@ How the storytelling layer works:
   tile takes down the building first, then the roof, then the floor.
 - **Tool kits:** a crafting bench turns wood and granite chunks into tool kits. Anyone who mines, builds, grows or
   cuts plants picks one up from storage and works 30% faster at those jobs (more with a well-made kit, less with
-  a poor one) until it wears out after about 80 hours of use; the Production screen keeps two spares in stock.
+  a poor one) until it wears out after about 160 hours of use; the Production screen keeps three spares in stock.
+  A kit left unused for three days is put down for someone who will use it.
 - **Weather:** clear skies, rain, storms, fog, summer droughts (a day or two) and winter snow come and go in spells
   (shown in the top bar, with the wind). Rain soaks anyone outside, who feel the cold more and grumble about it;
   rain helps crops and droughts halve their growth; fog (mostly of a night and a morning: it lifts through the

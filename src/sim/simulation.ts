@@ -4892,7 +4892,7 @@ export class Simulation {
       if (lastUsed !== undefined && this.tick - lastUsed > TICKS_PER_HOUR * 24 * TOOL_IDLE_DAYS) {
         this.world.dropItemNear(c.tile, TOOL_KIT, 1, c.tool.wear, c.tool.quality);
         c.tool = null;
-        this.toolWorkAt.delete(c.id);
+        // (The last use is kept: forgotten, they counted as someone who may do tool work, and took it straight back.)
       }
       return false;
     }

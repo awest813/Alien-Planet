@@ -453,6 +453,11 @@ export class World {
     this.damage[i] = 0;
     this.growth[i] = 0;
     this.locked[i] = 0;
+    // A mark to harvest now goes with the crop, however it went (trampled, smashed, eaten): left on the bare tile, the
+    // next crop sown there was picked a third grown.
+    if (this.designation[i] === Designation.HARVEST) {
+      this.designation[i] = Designation.NONE;
+    }
     // A fire is built with a first load of fuel; a generator starts empty.
     this.fuel[i] = f !== NONE ? (featureDef(f).burns?.capacity ?? 0) : 0;
     this.featureVersion++;

@@ -4812,8 +4812,15 @@ export class GameController {
           : walk.end === 'ripe'
             ? `ripe in ${days(walk.hours)}`
             : walk.end === 'frost'
-              ? // (It said "harvest it": an unripe crop can't be.)
-                `a frost may take it first, in ${days(walk.hours)}: harvest it now (Harvest, in Farm & food) for what's grown, or warm it`
+              ? // Picked early it gives what it has grown (from a third grown: a seedling gives nothing); already
+                // marked, it's said so, not to mark it again.
+                `a frost may take it first, in ${days(walk.hours)}: ${
+                  w.designation[i] === Designation.HARVEST
+                    ? 'marked to harvest now'
+                    : w.growth[i] < EARLY_HARVEST
+                      ? 'too young to harvest yet (a third grown), so only warmth saves it'
+                      : "harvest it now (Harvest, in Farm & food) for what's grown, or warm it"
+                }`
               : "won't ripen before winter";
         details.push(`${Math.floor(w.growth[i] * 100)}% grown, ${when}${waiting ? ` · ${waiting}` : ''}`);
       }

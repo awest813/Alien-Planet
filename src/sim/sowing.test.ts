@@ -248,4 +248,45 @@ describe('harvesting early', () => {
     w.growth[at] = 0.5;
     expect(orders()).toContain('Marked for harvest now');
   });
+
+  it("a frost coming, the card says to harvest only what's grown enough, and not what's marked already", async () => {
+    const { controller } = await import('../game/controller');
+    const { Designation } = await import('./world');
+    controller.newColony('harvest-frost');
+    const sim = controller.sim;
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 6);
+    const at = w.idx(x + 2, y + 2);
+    w.setFeature(at, featureId('potatoPlant'));
+    // (The forecast, fixed: a frost in two days.)
+    sim.ripenOutdoors = () => ({ end: 'frost', hours: 48 });
+    const card = () => {
+      controller.selectTile(at);
+      controller.publish();
+      return controller.getState().selectedTile!.details.join(' | ');
+    };
+    w.growth[at] = 0.1;
+    expect(card()).toMatch(/a frost may take it first, in about 2 days: too young to harvest yet/);
+    w.growth[at] = 0.5;
+    expect(card()).toMatch(/a frost may take it first, in about 2 days: harvest it now \(Harvest/);
+    w.designation[at] = Designation.HARVEST;
+    expect(card()).toMatch(/a frost may take it first, in about 2 days: marked to harvest now/);
+  });
+
+  it('the mark goes with a crop lost another way (trampled), not left for the next one sown there', async () => {
+    const { Designation } = await import('./world');
+    const { sim, w, tile } = field('potatoPlant', 6, 10);
+    w.setFeature(tile, featureId('potatoPlant'));
+    w.growth[tile] = 0.5;
+    sim.apply({
+      type: 'designate',
+      kind: 'harvest',
+      rect: { x0: w.xOf(tile), y0: w.yOf(tile), x1: w.xOf(tile), y1: w.yOf(tile) },
+    });
+    expect(w.designation[tile]).toBe(Designation.HARVEST);
+    // A raider tramples it.
+    w.setFeature(tile, 0);
+    expect(w.designation[tile]).toBe(Designation.NONE);
+    expect([...w.tilesWith('designations')]).not.toContain(tile);
+  });
 });
