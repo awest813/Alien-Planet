@@ -724,7 +724,7 @@ export function ProductionScreen({ onClose }: { onClose: () => void }) {
         Colonists keep making each product until the colony holds the target amount (bows, clothes and tool kits already
         in use don't count, so the target is how many spares to keep). Quick ones, meals, bread, cloth and blocks, are
         made a few at a time, so the stock can run a little past it. At a crafting bench, what's furthest short of its
-        target is made first.
+        target is made first (tool kits first among equals: they speed everyone's work).
       </p>
       <div className="production-list">
         <table className="saves production">

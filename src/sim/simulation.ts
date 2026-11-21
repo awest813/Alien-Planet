@@ -3631,6 +3631,12 @@ export class Simulation {
     if (this.providers().includes(c.id) && (this.tryFish(c) || (c.id !== this.fisherOnly && this.tryHunt(c)))) {
       return true;
     }
+    // No tool kit to spare and someone working without one: the colony's toolmaker makes one first. (Crafting
+    // comes after the field work, of which there's always more: the first kit wasn't made for three to six weeks,
+    // and a young colony did all its building and farming a third slower meanwhile.)
+    if (this.toolmaker() === c.id && this.tryBill(c, 'crafting', true)) {
+      return true;
+    }
     const order = this.workOrder();
     for (let p = 1; p <= 4; p++) {
       for (const work of order) {
@@ -3702,6 +3708,34 @@ export class Simulation {
     }
     return this.providerIds;
   }
+  // Who makes a tool kit before anything else (see tryWorkByPriority): the best crafter among those who craft, while
+  // there's no kit in the colony (a bill wanting some) and someone does tool work without one. -1 when nobody need.
+  private toolmaker(): number {
+    if (this.tick >= this.toolmakerAt) {
+      this.toolmakerAt = this.tick + SLOW_TICKS;
+      this.toolmakerId = -1;
+      const wanted = RECIPES.some((r) => r.product.item === TOOL_KIT && this.bills[r.id].target > 0);
+      const living = this.living();
+      const without = living.some((c) => !c.tool && c.job !== null && TOOL_WORK.has(c.job.type));
+      if (wanted && without && this.resourceTotals()[TOOL_KIT - 1].total === 0) {
+        const able = living
+          .filter(
+            (c) =>
+              c.priorities.crafting > 0 &&
+              canWork(c, 'crafting') &&
+              !c.drafted &&
+              !c.health.downed &&
+              !needsBedRest(c) &&
+              !this.inMentalBreak(c),
+          )
+          .sort((a, b) => b.skills.crafting - a.skills.crafting || a.id - b.id);
+        this.toolmakerId = able[0]?.id ?? -1;
+      }
+    }
+    return this.toolmakerId;
+  }
+  private toolmakerAt = 0;
+  private toolmakerId = -1;
   private providersAt = 0;
   private providerIds: number[] = [];
   private fisherOnly = -1;
@@ -4880,7 +4914,6 @@ export class Simulation {
     }
   }
 
-  // Someone who does physical work and has no tool kit fetches one from storage.
   // Whether work left on a bench (see benchWork) still has its bench: one taken down, burnt or smashed takes the
   // work with it (it stayed, for a bench of any kind built there later, and in the save for good).
   public benchWorkStands(tile: number, recipe: number): boolean {
@@ -4888,6 +4921,7 @@ export class Simulation {
     return f !== NONE && featureDef(f).workbench === RECIPES[recipe]?.bench;
   }
 
+  // Someone who does physical work and has no tool kit fetches one from storage.
   private tryTakeTool(c: Colonist): boolean {
     const p = c.priorities;
     // Kits go to those who use them: whoever took one first kept it, the cook and the researcher among them, and half
@@ -5684,7 +5718,8 @@ export class Simulation {
 
   // ---- Production bills ----
 
-  private tryBill(c: Colonist, bench: BenchType): boolean {
+  // `kitsOnly`: tool kits and nothing else (see toolmaker).
+  private tryBill(c: Colonist, bench: BenchType, kitsOnly = false): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
     // Counted once for every recipe below (a full pass over the map's items).
@@ -5700,11 +5735,17 @@ export class Simulation {
       const t = totals;
       const filled = (r: RecipeDef) =>
         r.mend ? MEND_FILLED : this.bills[r.id].target > 0 ? t[r.product.item - 1].total / this.bills[r.id].target : 1;
-      order = RECIPES.filter((r) => r.bench === bench).sort((a, b) => filled(a) - filled(b));
+      // (Equally short, tool kits first: they speed everyone's work. Early on cloth, bows, tunics and parkas were all
+      // as short, ahead of them in the list, and the first kit wasn't made for three to six weeks.)
+      const kitsFirst = (r: RecipeDef) => (r.product.item === TOOL_KIT ? 0 : 1);
+      order = RECIPES.filter((r) => r.bench === bench).sort(
+        (a, b) => filled(a) - filled(b) || kitsFirst(a) - kitsFirst(b),
+      );
     }
     for (const recipe of order) {
       if (
         recipe.bench !== bench ||
+        (kitsOnly && recipe.product.item !== TOOL_KIT) ||
         !this.isResearched(recipe.research) ||
         c.skills[benchSkill(bench)] < recipe.minSkill
       ) {

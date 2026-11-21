@@ -322,8 +322,9 @@ How the storytelling layer works:
   tile takes down the building first, then the roof, then the floor.
 - **Tool kits:** a crafting bench turns wood and granite chunks into tool kits. Anyone who mines, builds, grows or
   cuts plants picks one up from storage and works 30% faster at those jobs (more with a well-made kit, less with
-  a poor one) until it wears out after about 160 hours of use; the Production screen keeps three spares in stock.
-  A kit left unused for three days is put down for someone who will use it.
+  a poor one) until it wears out after about 160 hours of use; the Production screen keeps four spares in stock
+  (8 wood and 2 granite chunks each). With none left and someone working without one, the best crafter makes a kit
+  before their other work. A kit left unused for three days is put down for someone who will use it.
 - **Weather:** clear skies, rain, storms, fog, summer droughts (a day or two) and winter snow come and go in spells
   (shown in the top bar, with the wind). Rain soaks anyone outside, who feel the cold more and grumble about it;
   rain helps crops and droughts halve their growth; fog (mostly of a night and a morning: it lifts through the

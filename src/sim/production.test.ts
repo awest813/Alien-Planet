@@ -247,6 +247,60 @@ describe('work left on a bench, saved', () => {
 });
 
 describe('tool kits', () => {
+  // Trees to chop, wood and stone in store, a crafting bench, and one colonist who chops first and crafts after.
+  const chopper = (seed: number) => {
+    const shop = workshop(seed);
+    const { sim, w, x, y } = shop;
+    w.setFeature(w.idx(x + 3, y), featureId('craftingBench'));
+    // (Two days' chopping and more.)
+    for (let dy = 6; dy <= 12; dy++) {
+      for (let dx = -10; dx <= 10; dx++) {
+        w.setFeature(w.idx(x + dx, y + dy), featureId('tree'));
+      }
+    }
+    sim.apply({ type: 'designate', kind: 'chop', rect: { x0: x - 10, y0: y + 6, x1: x + 10, y1: y + 12 } });
+    w.addItem(w.idx(x - 8, y - 8), itemId('wood'), 20);
+    w.addItem(w.idx(x - 7, y - 8), itemId('stone'), 4);
+    const c = sim.colonists[0];
+    c.tool = null;
+    c.priorities.plantCutting = 1;
+    c.priorities.crafting = 3;
+    return { ...shop, c };
+  };
+
+  it('with none in the colony and work going without, the best crafter makes one before their other work', () => {
+    const { sim, c, keepFed } = chopper(31);
+    keepFed(8);
+    // (Chopping at 1 and crafting at 3, they'd chop until the trees ran out.)
+    expect(sim.stats.produced.toolKit ?? 0).toBeGreaterThanOrEqual(1);
+    expect(c.priorities.crafting).toBe(3);
+  });
+
+  it("not when the player wants none made (the bill's target at nought)", () => {
+    const { sim, keepFed } = chopper(31);
+    sim.apply({ type: 'bill', recipe: recipe('makeTools'), target: 0 });
+    keepFed(8);
+    expect(sim.stats.produced.toolKit ?? 0).toBe(0);
+  });
+
+  it('at the bench, equally short, a tool kit comes before cloth', () => {
+    const { sim, w, x, y, keepFed } = workshop(32);
+    w.setFeature(w.idx(x + 3, y), featureId('craftingBench'));
+    w.addItem(w.idx(x - 8, y - 8), itemId('wood'), 20);
+    w.addItem(w.idx(x - 7, y - 8), itemId('stone'), 4);
+    w.addItem(w.idx(x - 6, y - 8), itemId('cotton'), 12);
+    const c = sim.colonists[0];
+    c.priorities.crafting = 1;
+    let first: number | undefined;
+    for (let h = 0; h < 4 && first === undefined; h++) {
+      keepFed(1);
+      for (const t of [c.job]) {
+        first ??= t?.type === 'craft' ? t.line : undefined;
+      }
+    }
+    expect(first).toBe(recipe('makeTools'));
+  });
+
   it('a kit its holder has not used in three days is put down for someone who will', () => {
     const { sim, w, x, y } = workshop(14);
     const c = sim.colonists[0];

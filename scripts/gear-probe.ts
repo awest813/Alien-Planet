@@ -2,7 +2,7 @@
 // the state of their clothes, tool kits and armour, and counts what falls apart, wears out and is mended.
 import { Simulation, TICKS_PER_HOUR } from '../src/sim/simulation';
 import { TATTERED } from '../src/sim/apparel';
-import { itemId } from '../src/sim/defs';
+import { featureId, itemId } from '../src/sim/defs';
 
 const n = {
   samples: 0,
@@ -12,10 +12,19 @@ const n = {
   toolWork: 0,
   toolless: 0,
   toollessKitsStored: 0,
+  // Why, when there was no kit to take: no crafting bench yet; a bench but not the wood and stone for one; neither.
+  toollessNoBench: 0,
+  toollessNoStuff: 0,
+  toollessNoStone: 0,
+  toollessEarly: 0,
   holdingKit: 0,
   armored: 0,
 };
 const events = new Map<string, number>();
+// Tool work, and of it without a kit, by 20-day stretch of the game.
+const byStretch: { work: number; without: number; firstKit: number[] }[] = [];
+const firstKit: number[] = [];
+const seenKit = new WeakSet<Simulation>();
 let days = 0;
 const TOOL_JOBS = new Set(['mine', 'chop', 'forage', 'construct', 'deconstruct', 'sow', 'harvestCrop']);
 
@@ -29,6 +38,7 @@ Simulation.prototype.addLog = function (this: Simulation, text: string, ...rest:
   ] as const) {
     if (re.test(text)) {
       events.set(key, (events.get(key) ?? 0) + 1);
+      wornHere += key === 'tool kit worn out' ? 1 : 0;
     }
   }
   return (addLog as (this: Simulation, ...a: unknown[]) => void).call(this, text, ...rest);
@@ -38,6 +48,10 @@ const step = Simulation.prototype.step;
 Simulation.prototype.step = function (this: Simulation, ...args: unknown[]) {
   const result = (step as (this: Simulation, ...a: unknown[]) => unknown).apply(this, args);
   if (this.tick % TICKS_PER_HOUR === 0) {
+    if (!seenKit.has(this) && (this.stats.produced.toolKit ?? 0) > 0) {
+      seenKit.add(this);
+      firstKit.push(this.day);
+    }
     if (this.tick % (TICKS_PER_HOUR * 24) === 0) {
       days++;
     }
@@ -54,8 +68,22 @@ Simulation.prototype.step = function (this: Simulation, ...args: unknown[]) {
       if (c.job && TOOL_JOBS.has(c.job.type)) {
         n.toolWork++;
         n.toolless += c.tool ? 0 : 1;
+        const stretch = (byStretch[Math.floor(this.day / 20)] ??= { work: 0, without: 0, firstKit: [] });
+        stretch.work++;
+        stretch.without += c.tool ? 0 : 1;
         if (!c.tool && this.stockOf(itemId('toolKit')) > 0) {
           n.toollessKitsStored++;
+        } else if (!c.tool) {
+          const w = this.world;
+          if (![...w.tilesWith('features')].some((i) => w.feature[i] === featureId('craftingBench'))) {
+            n.toollessNoBench++;
+          } else if (this.stockOf(itemId('wood')) < 8 || this.stockOf(itemId('stone')) < 2) {
+            n.toollessNoStuff++;
+            n.toollessNoStone += this.stockOf(itemId('stone')) < 2 ? 1 : 0;
+          }
+          if (this.day <= 10) {
+            n.toollessEarly++;
+          }
         }
       }
     }
@@ -64,10 +92,16 @@ Simulation.prototype.step = function (this: Simulation, ...args: unknown[]) {
 };
 
 const made: number[] = [];
+// At the end of each colony: kits held, kits lying about, and kits worn out (the rest went some other way).
+const census: string[] = [];
+let wornHere = 0;
 let lastSim: Simulation | null = null;
 const finishSim = (sim: Simulation | null) => {
   if (sim) {
     made.push(sim.stats.produced.toolKit ?? 0);
+    const held = sim.living().filter((c) => c.tool).length;
+    census.push(`${held}/${sim.stockOf(itemId('toolKit'))}/${wornHere}`);
+    wornHere = 0;
   }
 };
 const step2 = Simulation.prototype.step;
@@ -91,7 +125,14 @@ process.on('exit', () => {
     `  tool work done without a tool kit: ${pct(n.toolless, n.toolWork)} (of it, with a kit lying in the colony: ${pct(n.toollessKitsStored, n.toolless)})`,
   );
   console.log(
-    `  colonist-hours holding a tool kit: ${pct(n.holdingKit, n.samples)}; kits made per colony: ${made.join(' ')}`,
+    `    with none to take: no crafting bench yet ${pct(n.toollessNoBench, n.toolless)}, a bench but short of wood or stone ${pct(n.toollessNoStuff, n.toolless)} (of stone ${pct(n.toollessNoStone, n.toolless)}); in the first ten days ${pct(n.toollessEarly, n.toolless)}`,
+  );
+  console.log(
+    `    without a kit by 20-day stretch: ${byStretch.map((b, i) => `days ${i * 20}–${i * 20 + 19} ${pct(b.without, b.work)}`).join(', ')}`,
+  );
+  console.log(`    first kit made on day: ${firstKit.join(' ')}`);
+  console.log(
+    `  colonist-hours holding a tool kit: ${pct(n.holdingKit, n.samples)}; kits made per colony: ${made.join(' ')}; at the end held/lying/worn out: ${census.join(' ')}`,
   );
   console.log(
     `  per colony-day: ${[...events].map(([k, v]) => `${k} ${(v / Math.max(1, days)).toFixed(2)}`).join(', ')}`,

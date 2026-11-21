@@ -176,15 +176,15 @@
       "count": 1
     },
     "work": 180,
-    "defaultTarget": 3,
+    "defaultTarget": 4,
     "ingredients": [
       {
         "item": "wood",
-        "count": 10
+        "count": 8
       },
       {
         "item": "stone",
-        "count": 4
+        "count": 2
       }
     ]
   },
