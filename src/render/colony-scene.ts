@@ -19,6 +19,7 @@ import {
   TILESET_GROUND_KEY,
   TILESET_KEY,
   createTextures,
+  MARK_SIZE,
 } from './textures';
 import { TERRAIN_LANDS } from './tileset-layout';
 import { LightBuffer, LitTile, litTiles } from './lighting';
@@ -575,6 +576,11 @@ export class ColonyScene extends Phaser.Scene {
     this.waterAt = now;
     const g = this.water;
     g.clear();
+    // Far out, a shore's one-pixel line and a glint are under a pixel across, too small to see. All of them were
+    // still drawn, every frame (a whole XL map's water was 55,000 rectangles, most of a zoomed-out frame).
+    if (this.viewZoom < MARKER_ZOOM) {
+      return;
+    }
     const world = controller.sim.world;
     const view = this.visibleTiles();
     for (let y = view.y0; y <= view.y1; y++) {
@@ -608,6 +614,13 @@ export class ColonyScene extends Phaser.Scene {
         }
       }
     }
+  }
+
+  // Whether a point (in world pixels) is in view or within two tiles of it, by the view as last drawn.
+  private nearView(x: number, y: number): boolean {
+    const v = this.cameras.main.worldView;
+    const m = TILE * 2;
+    return x >= v.x - m && x <= v.right + m && y >= v.y - m && y <= v.bottom + m;
   }
 
   // The tiles the camera can see (plus a one-tile border), so per-frame drawing skips the rest
@@ -1057,7 +1070,9 @@ export class ColonyScene extends Phaser.Scene {
       pawn.root.setPosition(x, y + (moving && !downed ? -Math.abs(Math.sin(time / 90)) * 1.2 : 0));
       // Once the colony has boarded the ship, nobody is left on the map; an expedition is off it.
       // The dead lie where they fell until they're buried.
-      pawn.root.setVisible(!controller.sim.departed && c.away !== 'gone' && !buried(c));
+      pawn.root.setVisible(
+        !controller.sim.departed && c.away !== 'gone' && !buried(c) && this.nearView(pawn.root.x, pawn.root.y),
+      );
       (pawn.figure.getAt(0) as Phaser.GameObjects.Image).setTexture(stride(moving && !downed && !dead, time));
       pawn.root.setAlpha(dead ? 0.55 : 1);
       pawn.figure.setAngle(c.sleeping || dead || downed ? 90 : 0);
@@ -1256,31 +1271,32 @@ export class ColonyScene extends Phaser.Scene {
       // A little hop with each step while on the move.
       const hop = a.path.length > 0 ? Math.abs(Math.sin(this.time.now / 80 + a.id)) * 1.5 : 0;
       beast.setPosition((x + 0.5) * TILE, (y + 0.5) * TILE - hop);
+      // Phaser draws a container wherever it is: off screen, it's hidden (an XL map's hundred-odd animals were a
+      // fifth of a frame).
+      beast.setVisible(this.nearView(beast.x, beast.y));
       // Face the direction of travel.
       const body = beast.getAt(0) as Phaser.GameObjects.Image;
       if (to !== a.tile) {
         body.setFlipX(world.xOf(to) < world.xOf(a.tile));
       }
       body.setTint(a.revengeOn >= 0 ? 0xff8a8a : 0xffffff);
-      (beast.getAt(1) as Phaser.GameObjects.Graphics).setVisible(a.hunted);
-      (beast.getAt(2) as Phaser.GameObjects.Graphics).setVisible(a.taming);
-      (beast.getAt(3) as Phaser.GameObjects.Graphics).setVisible(a.tame);
+      (beast.getAt(1) as Phaser.GameObjects.Image).setVisible(a.hunted);
+      (beast.getAt(2) as Phaser.GameObjects.Image).setVisible(a.taming);
+      (beast.getAt(3) as Phaser.GameObjects.Image).setVisible(a.tame);
     }
   }
 
   private createAnimal(a: Animal): Phaser.GameObjects.Container {
     // The great beast is drawn larger than life.
     const body = this.add.image(0, 0, `animal-${a.kind}`).setScale(a.kind === 'greatBeast' ? 1.8 : 1);
-    // A red crosshair over animals marked for hunting.
-    const marker = this.add.graphics();
-    marker.lineStyle(1, 0xff5c5c, 0.9).strokeCircle(0, -9, 3);
-    marker.lineBetween(-5, -9, -2, -9).lineBetween(2, -9, 5, -9).lineBetween(0, -14, 0, -11).lineBetween(0, -7, 0, -4);
-    // A green ring over animals to be tamed, and a collar on tame ones.
-    const taming = this.add.graphics();
-    taming.lineStyle(1, 0x8fe36b, 0.9).strokeCircle(0, -9, 3);
-    const collar = this.add.graphics();
-    collar.fillStyle(0xd94b4b, 1).fillRect(-2, -3, 4, 1);
-    collar.fillStyle(0xffd166, 1).fillRect(0, -2, 1, 1);
+    // A red crosshair over animals marked for hunting, a green ring over those to be tamed, and a collar on tame
+    // ones (centred a little above the animal; see createMarkTextures).
+    // (The middle pixel of the mark is the one just right of and below (0, -9).)
+    const middle = (MARK_SIZE - 1) / 2;
+    const above = (key: string) => this.add.image(-middle, -9 - middle, key).setOrigin(0);
+    const marker = above('mark-hunt');
+    const taming = above('mark-taming');
+    const collar = this.add.image(-2, -3, 'mark-collar').setOrigin(0);
     return this.add.container(0, 0, [body, marker, taming, collar]).setDepth(Depth.PAWNS - 1);
   }
 

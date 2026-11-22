@@ -103,13 +103,24 @@ size=256`) showed where whole-map work still cost something. The scans this plan
 - **Gate:** no autosave frame over 100 ms on a desktop at day 40 on XL. It passes, and passes on a throttled
   phone too.
 
-### 3. Drawing zoomed out (needed for phones)
+### 3. Drawing zoomed out (done)
 
-- Below the marker zoom, draw the feature layer from a cached render texture per 32×32 chunk. Redraw a chunk
-  only when one of its tiles changes, rather than drawing every tree's tile every frame.
-- Offer an "overview" zoom floor on phones: whole-map zoom draws the minimap-style colour per tile, not the
-  tile art.
-- **Gate:** whole-map view under 8 ms a frame on a desktop, and under 33 ms on a phone with 4× throttling.
+- **Measured first**, on the busy day-40 XL colony in headless Chromium at 1280×800, paused, timing the game's
+  step from `prestep` to `postrender`. Zoomed out, the features were already drawn by a GPU layer
+  (`featureFar`, brought up to date at most once a second), which does the job the per-chunk textures were
+  planned for. At the usual zoom a frame took 6.3 ms on a desktop and 25 ms at 4× throttle. With the whole map
+  in view it took 5.6 ms and 28 ms (31 ms for the slowest tenth).
+- **What cost the time** was shapes Phaser draws afresh every frame:
+  - The water's shores and glints were 55,000 rectangles with the whole XL map in view. Below the marker zoom
+    a shore's line and a glint are under a pixel across, so they're no longer drawn there.
+  - Phaser draws a container wherever it is, so the hundred-odd animals off screen were drawn every frame.
+    Animals and colonists more than two tiles out of view are hidden.
+  - Each animal marked for hunting drew its crosshair as 53 shape commands. The crosshair, the taming ring and
+    the collar are now small pixel-art images, drawn in one batch with everything else.
+- **Result:** at the usual zoom, 2.0 ms on a desktop and 9–10 ms at 4×. With the whole map, 3.3 ms and 12.4 ms
+  (20 ms for the slowest tenth).
+- **Gate:** whole-map view under 8 ms a frame on a desktop, and under 33 ms on a phone with 4× throttling. Both
+  pass. The planned overview zoom for phones isn't needed for this gate, so it's left out.
 
 ### 4. Play on a big map (needed)
 
@@ -140,7 +151,7 @@ size=256`) showed where whole-map work still cost something. The scans this plan
 2. ~~Edge-tile list and the remaining scans.~~ Done (see above). Raid days on a busy XL colony are still
    over the 100 ms gate.
 3. ~~Autosave in parts.~~ Done (see Saving).
-4. Chunked feature drawing zoomed out.
+4. ~~Chunked feature drawing zoomed out.~~ Done another way (see Drawing zoomed out).
 5. Arrival timing, bookmarks, roads.
 6. Long-path chunk routes if the step 1 measurements still show pathfinding over 15%.
 7. Balance and the ten-year run, then add `{ size: 256, label: 'XL', colonists: 7, maxColonists: 18 }` to

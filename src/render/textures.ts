@@ -2159,8 +2159,46 @@ function drawItem(c: Ctx, key: string): void {
   }
 }
 
+// The marks over an animal: a crosshair for the hunt, a ring for taming (11 pixels across, the middle pixel at the
+// centre), and a collar on a tame one (4 by 2). As images they're drawn in a batch with everything else: as shapes
+// drawn afresh every frame, a whole map of game marked for the hunt was a tenth of a zoomed-out frame.
+export const MARK_SIZE = 11;
+function createMarkTextures(scene: Phaser.Scene): void {
+  const ring = (c: CanvasRenderingContext2D) => {
+    for (let dy = -3; dy <= 3; dy++) {
+      for (let dx = -3; dx <= 3; dx++) {
+        if (Math.abs(Math.hypot(dx, dy) - 3) < 0.5) {
+          c.fillRect(5 + dx, 5 + dy, 1, 1);
+        }
+      }
+    }
+  };
+  const hunt = scene.textures.createCanvas('mark-hunt', MARK_SIZE, MARK_SIZE)!;
+  const h = hunt.getContext();
+  h.fillStyle = 'rgba(255, 92, 92, 0.9)';
+  ring(h);
+  h.fillRect(0, 5, 4, 1);
+  h.fillRect(7, 5, 4, 1);
+  h.fillRect(5, 0, 1, 4);
+  h.fillRect(5, 7, 1, 4);
+  hunt.refresh();
+  const taming = scene.textures.createCanvas('mark-taming', MARK_SIZE, MARK_SIZE)!;
+  const t = taming.getContext();
+  t.fillStyle = 'rgba(143, 227, 107, 0.9)';
+  ring(t);
+  taming.refresh();
+  const collar = scene.textures.createCanvas('mark-collar', 4, 2)!;
+  const c = collar.getContext();
+  c.fillStyle = '#d94b4b';
+  c.fillRect(0, 0, 4, 1);
+  c.fillStyle = '#ffd166';
+  c.fillRect(2, 1, 1, 1);
+  collar.refresh();
+}
+
 function createPawnTextures(scene: Phaser.Scene): void {
   createAnimalTextures(scene);
+  createMarkTextures(scene);
 
   // Raiders: a hooded head over the same tintable body.
   const hood = scene.textures.createCanvas('raider-head', TILE, TILE)!;
