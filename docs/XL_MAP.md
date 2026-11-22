@@ -221,6 +221,21 @@ fastest speed, a slow machine would drop frames through it. That's worth a look 
 
 ### 5. Balance and testing (needed: step 8)
 
+- **First run, after step 7** (`bal 48 6`, standard; XL plays with Large's population of 6 landing and room for
+  15 until XL has its own entry):
+
+  | Size  | Survivors | Breaks | Starving colonist-hours | Of those, on the way to eat |
+  | ----- | --------- | ------ | ----------------------- | --------------------------- |
+  | Large | 91/91     | 0      | 394                     | 243                         |
+  | XL    | 90/90     | 1      | 700                     | 392                         |
+
+  No colony lost anyone, and breaks are no worse to speak of. **Hunger is nearly twice Large's, and most of it
+  is colonists walking to their food.** Colonists on XL go 100 to 190 tiles to eat (see Long paths): the work
+  spreads over the bigger map and the food stays at home. More game isn't the answer. With XL's wildlife back
+  on area scaling (224 at most rather than 168), hunger rose to 848, three colonists died, and breaks went to 6.
+  So the side-scaled cap stays. What's to try: eating before setting off for far work, and carrying a meal out
+  to it, or a stockpile of food nearer the work.
+
 - Run the balance harness on XL (`node bal.mjs 48 6 size=256`): no colonies wiped, deaths and breaks per
   colonist no worse than Large. Starvation per colonist runs about 1.5× Medium on Large today, so check fields
   and food with 18 colonists.
