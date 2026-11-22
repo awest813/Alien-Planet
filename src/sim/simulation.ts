@@ -253,6 +253,8 @@ const STORY_LIMIT = 200;
 
 // Need rates, per tick.
 const FOOD_DECAY = 1 / (TICKS_PER_HOUR * 16);
+// After finding nothing to haul, a colonist looks again this many ticks later.
+const HAUL_RETRY = SLOW_TICKS * 3;
 // A drafted colonist this hungry, with no threat this near, goes for a bite (see draftedMeal).
 const DRAFTED_MEAL_BELOW = 0.05;
 const DRAFTED_MEAL_CLEAR = 20;
@@ -502,6 +504,7 @@ export interface SimTimers {
   nextTactics?: [number, number][];
   nextShelterSearch?: [number, number][];
   shelterLogged?: [number, number][];
+  nextHaulSearch?: [number, number][];
   // A concert under way when the game was saved.
   concert?: { player: number; tile: number; endsAt: number } | null;
   // Stories by a fire under way when the game was saved.
@@ -881,6 +884,7 @@ export class Simulation {
       nextTactics: [...this.nextTactics],
       nextShelterSearch: [...this.nextShelterSearch],
       shelterLogged: [...this.shelterLogged],
+      nextHaulSearch: [...this.nextHaulSearch],
       concert: this.concert ? { ...this.concert } : null,
       // (Only while the teller is still telling.)
       storyCircle:
@@ -902,6 +906,7 @@ export class Simulation {
     this.nextTactics = new Map(timers.nextTactics ?? []);
     this.nextShelterSearch = new Map(timers.nextShelterSearch ?? []);
     this.shelterLogged = new Map(timers.shelterLogged ?? []);
+    this.nextHaulSearch = new Map(timers.nextHaulSearch ?? []);
     // A concert under way is played to its end as the game loads (jobs aren't saved, so the audience has gone):
     // it counts as given, and the player feels it.
     const player = timers.concert ? this.colonists[timers.concert.player] : undefined;
@@ -988,6 +993,8 @@ export class Simulation {
   private readonly fighting = new Set<number>();
   // Tick after which a starving colonist may search for food again.
   private readonly nextFoodSearch = new Map<number, number>();
+  // When each colonist next looks for something to haul, after a look that found nothing (see tryHaul).
+  private nextHaulSearch = new Map<number, number>();
   private contentsVersion = '';
   private wasNight = false;
 
@@ -5643,6 +5650,20 @@ export class Simulation {
   }
 
   private tryHaul(c: Colonist): boolean {
+    // A look that found nothing waits a while before the next: in a settled colony nearly everything is put away,
+    // and each colonist looking over every stack in the stores again at every turn of their work was the biggest
+    // part of a colony of twenty's day on an XL map.
+    if ((this.nextHaulSearch.get(c.id) ?? 0) > this.tick) {
+      return false;
+    }
+    if (this.haulSearch(c)) {
+      return true;
+    }
+    this.nextHaulSearch.set(c.id, this.tick + HAUL_RETRY);
+    return false;
+  }
+
+  private haulSearch(c: Colonist): boolean {
     const w = this.world;
     const region = this.regionOf(c.tile);
     // Item types lying loose that have somewhere to go, so a full stockpile for one item doesn't
