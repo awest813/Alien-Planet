@@ -26,6 +26,26 @@ export const wildScale = (width: number, height = width) => {
 };
 export const wildCap = (sim: Simulation) => Math.round(MAX_ANIMALS * wildScale(sim.world.width, sim.world.height));
 const BITE_COOLDOWN = 50;
+// The animals that have turned on someone, in the order they're kept: every colonist looked through every animal
+// for one each tick (nearly always finding none), a twentieth of a raid's time on an XL map. Kept for the tick,
+// and started over whenever one is angered (see angered), so it's always what a look through them all would find.
+// (Each is still checked as it's looked at: one may calm down or fall during the tick.)
+let angry: { sim: Simulation | null; tick: number; animals: Animal[] } = { sim: null, tick: -1, animals: [] };
+export function angryAnimals(sim: Simulation): Animal[] {
+  if (angry.sim !== sim || angry.tick !== sim.tick) {
+    angry = { sim, tick: sim.tick, animals: sim.animals.filter((a) => a.hp > 0 && a.revengeOn >= 0) };
+  }
+  return angry.animals;
+}
+
+// An animal turns on a colonist.
+export function angered(a: Animal, colonist: number): void {
+  a.revengeOn = colonist;
+  if (colonist >= 0) {
+    angry.tick = -1;
+  }
+}
+
 const WANDER_RADIUS = 6;
 // An enraged animal calms down after this long.
 const REVENGE_TICKS = TICKS_PER_HOUR * 2;
@@ -295,7 +315,7 @@ export function creaturesEmerge(sim: Simulation, tile: number, kind: string, cou
   for (let n = 0; n < count; n++) {
     const a = addAnimal(sim, around[n % around.length], kind);
     a.manhunter = true;
-    a.revengeOn = nearestPrey(sim, a)?.id ?? -1;
+    angered(a, nearestPrey(sim, a)?.id ?? -1);
     a.revengeUntil = sim.tick + TICKS_PER_HOUR * 16;
   }
   return count;
@@ -331,7 +351,7 @@ export function manhuntersArrive(sim: Simulation, kind: string, count: number): 
       return n;
     }
     a.manhunter = true;
-    a.revengeOn = prey.id;
+    angered(a, prey.id);
     // Their fury lasts most of a day (from when they set off).
     a.revengeUntil = sim.tick + muster + TICKS_PER_HOUR * 16;
     if (muster > 0) {
@@ -824,7 +844,7 @@ function actAnimal(sim: Simulation, a: Animal, steps: number, awake: Colonist[],
   if (a.manhunter && a.revengeOn < 0) {
     const next = a.revengeUntil > sim.tick ? nearestPrey(sim, a) : undefined;
     if (next) {
-      a.revengeOn = next.id;
+      angered(a, next.id);
     } else {
       a.manhunter = false;
       a.leaving = true;
@@ -851,7 +871,7 @@ function actAnimal(sim: Simulation, a: Animal, steps: number, awake: Colonist[],
       if (a.manhunter) {
         const next = a.revengeUntil > sim.tick ? nearestPrey(sim, a) : undefined;
         if (next) {
-          a.revengeOn = next.id;
+          angered(a, next.id);
         } else {
           // Its fury spent, it goes back where it came from.
           a.manhunter = false;
@@ -881,7 +901,7 @@ function actAnimal(sim: Simulation, a: Animal, steps: number, awake: Colonist[],
         // Out of reach (behind a pen's gate, say): someone else if there is anyone, or it gives up.
         const next = a.manhunter ? nearestPrey(sim, a) : undefined;
         if (next && next !== target) {
-          a.revengeOn = next.id;
+          angered(a, next.id);
         } else {
           a.revengeOn = -1;
           a.leaving ||= !!a.manhunter;
@@ -977,7 +997,7 @@ export function hurtAnimal(sim: Simulation, a: Animal, amount: number, attacker:
     return;
   }
   if (a.revengeOn < 0 && def.revengeChance && sim.rng.next() < def.revengeChance) {
-    a.revengeOn = attacker.id;
+    angered(a, attacker.id);
     a.revengeUntil = sim.tick + REVENGE_TICKS;
     a.path = [];
     sim.addLog(`The ${def.name.toLowerCase()} turned on ${attacker.name}!`, 'warn');

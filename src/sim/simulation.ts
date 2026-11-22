@@ -45,6 +45,7 @@ import {
   type JoySpec,
 } from './defs';
 import {
+  angered,
   animalName,
   animalsAtDawn,
   keepBreedingPairs,
@@ -2277,7 +2278,7 @@ export class Simulation {
         this.rooms,
         (i) => this.beautyAt(i),
         this.indoorTiles(),
-        this.builtInOrder(),
+        this.buildingTiles(),
       );
       this.filthContentsVersion = -1;
     }
@@ -2461,7 +2462,7 @@ export class Simulation {
     this.lampTiles = [];
     this.fishingSpots = [];
     this.fireTiles = [];
-    for (const i of this.builtInOrder()) {
+    for (const i of this.buildingTiles()) {
       const f = w.feature[i];
       if (f !== NONE && featureDef(f).burns) {
         this.fireTiles.push(i);
@@ -5303,31 +5304,21 @@ export class Simulation {
     return tiles;
   }
 
-  // Everything built (crops included): what most searches for a bench, bed or table want, without
-  // wading through every tree and rock on the map. Kept until a building changes.
+  // Everything built (crops included), in tile order: what most searches for a bench, bed or table want, without
+  // wading through every tree and rock on the map. Kept until a building changes. (The world keeps the list as it
+  // goes: picked out of every tree on the map each time a crop was sown or reaped, or a raider broke something, it
+  // was 3% of a busy XL colony's raid. In tile order, a loaded game goes through them as the one saved did.)
   public buildingTiles(): readonly number[] {
     const w = this.world;
     if (this.buildingVersion !== w.builtVersion) {
       this.buildingVersion = w.builtVersion;
-      this.buildingCache = [...w.tilesWith('features')].filter((i) => !featureDef(w.feature[i]).natural);
+      this.buildingCache = [...w.tilesWith('built')].sort((a, b) => a - b);
     }
     return this.buildingCache;
   }
 
   private buildingVersion = -1;
   private buildingCache: readonly number[] = [];
-
-  // The same tiles in tile order, as a scan of the whole map finds them.
-  private builtInOrder(): Int32Array {
-    const w = this.world;
-    if (this.builtOrderVersion !== w.builtVersion) {
-      this.builtOrderVersion = w.builtVersion;
-      this.builtOrder = Int32Array.from(this.buildingTiles()).sort();
-    }
-    return this.builtOrder;
-  }
-  private builtOrderVersion = -1;
-  private builtOrder = new Int32Array(0);
   private storageKey = '';
   private storageCache: number[] = [];
   // Bumped whenever zones change.
@@ -7732,7 +7723,7 @@ export class Simulation {
       this.addThought(c, 'tamedAnimal');
       this.addLog(`${c.name} tamed a ${def.name.toLowerCase()}.`, 'good');
     } else if (def.revengeChance && this.rng.chance(def.revengeChance * 0.3)) {
-      animal.revengeOn = c.id;
+      angered(animal, c.id);
       animal.lashOut = true;
       animal.revengeUntil = this.tick + TICKS_PER_HOUR;
       this.addLog(`The ${def.name.toLowerCase()} lashed out at ${c.name}!`, 'warn');

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { measureRooms } from './climate';
 import { featureDef, featureId } from './defs';
 import { Simulation } from './simulation';
-import { Filth } from './world';
+import { Filth, GROW_ZONE } from './world';
 import { clearAround, outline } from './test-helpers';
 
 // The quicker searches (over the map's edge, over the tiles indoors, and room contents with the mess added
@@ -189,5 +189,31 @@ describe('the quicker searches', () => {
       sy += w.yOf(i);
     }
     expect(sim.homeTile()).toBe(w.idx(Math.round(sx / centre.length), Math.round(sy / centre.length)));
+  });
+
+  it('the built tiles the world keeps are the ones picked out of its features', () => {
+    const sim = built(96, 14);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 0);
+    const filtered = () =>
+      [...w.tilesWith('features')].filter((i) => !featureDef(w.feature[i]).natural).sort((a, b) => a - b);
+    expect(sim.buildingTiles()).toEqual(filtered());
+    // Days of felling, building, sowing and reaping (and a tree felled where a wall then goes).
+    sim.apply({
+      type: 'zone',
+      rect: { x0: x + 3, y0: y - 8, x1: x + 9, y1: y - 4 },
+      zone: GROW_ZONE + featureId('potatoPlant'),
+    });
+    for (let k = 0; k < 6; k++) {
+      sim.apply({ type: 'build', feature: featureId('woodWall'), tiles: [w.idx(x - 8 + k, y + 9)] });
+    }
+    // (Wood to fell all round, for the walls and the fun of it.)
+    sim.apply({ type: 'designate', rect: { x0: x - 30, y0: y - 30, x1: x + 30, y1: y + 30 }, kind: 'chop' });
+    for (let d = 0; d < 4; d++) {
+      for (let t = 0; t < 200 * 24; t++) {
+        sim.step();
+      }
+      expect(sim.buildingTiles()).toEqual(filtered());
+    }
   });
 });

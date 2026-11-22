@@ -1,7 +1,8 @@
 import { MAX_COST_LINES, NONE, NORMAL_QUALITY, driedFrom, featureDef, itemDef, terrainDef, terrainId } from './defs';
 import type { Carried } from './types';
 
-export type TileKind = 'items' | 'features' | 'designations' | 'blueprints' | 'zones' | 'filth';
+// 'built': features that aren't natural (buildings and crops), in the order they came, as 'features' has them.
+export type TileKind = 'items' | 'features' | 'built' | 'designations' | 'blueprints' | 'zones' | 'filth';
 
 // Mess left on the ground: tracked-in dirt, blood, and rubble from mining and demolition. A tile holds
 // one kind at a time, in amounts of 1 to 3.
@@ -155,6 +156,7 @@ export class World {
   private readonly lists: Record<TileKind, Set<number>> = {
     items: new Set(),
     features: new Set(),
+    built: new Set(),
     designations: new Set(),
     blueprints: new Set(),
     zones: new Set(),
@@ -348,6 +350,7 @@ export class World {
         }
         toggle(this.lists.items, i, this.itemType[i] !== NONE);
         toggle(this.lists.features, i, this.feature[i] !== NONE);
+        toggle(this.lists.built, i, this.feature[i] !== NONE && !featureDef(this.feature[i]).natural);
         toggle(this.lists.designations, i, this.designation[i] !== 0);
         toggle(this.lists.blueprints, i, this.blueprint[i] !== NONE);
         toggle(this.lists.zones, i, this.zone[i] !== 0);

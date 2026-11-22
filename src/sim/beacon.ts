@@ -33,13 +33,15 @@ export const freshBeacon = (): BeaconState => ({ hours: 0 });
 // change: the renderer asks every frame.
 const found = new WeakMap<Simulation, { version: number; tile: number | undefined }>();
 export function beaconTile(sim: Simulation): number | undefined {
+  // (A building: only a building coming or going changes it, and the built tiles are the ones to look through,
+  // in the same order. Looked for over every tree on the map each time one was felled, it was 3% of a raid.)
   const cached = found.get(sim);
-  if (cached && cached.version === sim.world.featureVersion) {
+  if (cached && cached.version === sim.world.builtVersion) {
     return cached.tile;
   }
   const beacon = featureId('signalBeacon');
-  const tile = [...sim.world.tilesWith('features')].find((i) => sim.world.feature[i] === beacon);
-  found.set(sim, { version: sim.world.featureVersion, tile });
+  const tile = sim.buildingTiles().find((i) => sim.world.feature[i] === beacon);
+  found.set(sim, { version: sim.world.builtVersion, tile });
   return tile;
 }
 

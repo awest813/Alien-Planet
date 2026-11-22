@@ -1,6 +1,6 @@
 import { carryOff } from './taken';
 import { HURRIED } from './pathfinding';
-import { animalName, hurtAnimal } from './animals';
+import { angryAnimals, animalName, hurtAnimal } from './animals';
 import { scarAim } from './body';
 import { beaconTile, transmitting } from './beacon';
 import { qualityFactor } from './apparel';
@@ -125,21 +125,21 @@ export function coverFactor(w: World, shooter: number, target: number): number {
   const dy = Math.abs(ddy) * 2 >= Math.abs(ddx) ? Math.sign(ddy) : 0;
   const tx = w.xOf(target);
   const ty = w.yOf(target);
-  let factor = 1;
-  for (const [ox, oy] of [
-    [dx, dy],
-    [dx, 0],
-    [0, dy],
-  ]) {
-    if ((ox === 0 && oy === 0) || !w.inBounds(tx + ox, ty + oy) || w.idx(tx + ox, ty + oy) === shooter) {
-      continue;
-    }
-    const f = w.feature[w.idx(tx + ox, ty + oy)];
-    if (f !== NONE) {
-      factor = Math.min(factor, featureDef(f).cover);
-    }
+  // (The three sides one after another, without making a list of them for every shot and every look round.)
+  return Math.min(
+    sideCover(w, shooter, tx + dx, ty + dy, dx !== 0 || dy !== 0),
+    sideCover(w, shooter, tx + dx, ty, dx !== 0),
+    sideCover(w, shooter, tx, ty + dy, dy !== 0),
+  );
+}
+
+// The cover something at (x, y) gives, if that side counts: 1 for none.
+function sideCover(w: World, shooter: number, x: number, y: number, counts: boolean): number {
+  if (!counts || !w.inBounds(x, y) || w.idx(x, y) === shooter) {
+    return 1;
   }
-  return factor;
+  const f = w.feature[w.idx(x, y)];
+  return f !== NONE ? Math.min(1, featureDef(f).cover) : 1;
 }
 
 const inCover = (w: World, from: number, at: number) => coverFactor(w, from, at) < 1;
@@ -637,10 +637,14 @@ export function woundEnemy(sim: Simulation, e: Enemy, amount: number, by: string
 // A charge's path that still ends beside its target (who hasn't moved off from it) needs no new search: on a big
 // map a search for each raider every 30 ticks was most of what a raid cost. (A step blocked on the way clears the
 // path, and that searches again. An archer's post is rethought whatever: cover changes.)
-function stillLeadsTo(w: World, e: Enemy, target: number, ranged: boolean): boolean {
+// `slack`: a share of the walk still ahead that the target may have moved from its end (allies come in from the map's
+// edge after raiders on the move, and each step a raider took sent them to work out the whole way again; a quarter of
+// what's left keeps them on course, and shrinks to nothing as they close).
+function stillLeadsTo(w: World, e: Enemy, target: number, ranged: boolean, slack = 0): boolean {
   const end = e.path[e.path.length - 1];
-  return !ranged && end !== undefined && chebyshev(w, end, target) <= 1;
+  return !ranged && end !== undefined && chebyshev(w, end, target) <= 1 + Math.floor(e.path.length * slack);
 }
+const ALLY_SLACK = 0.25;
 
 function moveEnemy(sim: Simulation, e: Enemy, ally = false): void {
   const w = sim.world;
@@ -1412,7 +1416,7 @@ export function colonistCombat(sim: Simulation, c: Colonist): boolean {
   // Enraged animals: always fight back if it's after you or right next to you; otherwise only
   // step in when free (not drafted for a raid, asleep, in bed, or doctoring).
   const busy = c.sleeping || c.job?.type === 'rest' || c.job?.type === 'tend' || (c.drafted && sim.enemies.length > 0);
-  const beast = sim.animals.find(
+  const beast = angryAnimals(sim).find(
     (a) =>
       a.hp > 0 &&
       a.revengeOn >= 0 &&
@@ -1674,7 +1678,7 @@ export function updateAllies(sim: Simulation): void {
       }
       continue;
     }
-    if (a.path.length === 0 || (a.repathAt <= sim.tick && !stillLeadsTo(w, a, target.tile, false))) {
+    if (a.path.length === 0 || (a.repathAt <= sim.tick && !stillLeadsTo(w, a, target.tile, false, ALLY_SLACK))) {
       a.repathAt = sim.tick + 30;
       a.path =
         sim.pathfinder.find(
