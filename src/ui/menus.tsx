@@ -103,7 +103,7 @@ function NewColonyForm({
       </div>
       <p className="choice-note">{DIFFICULTIES.find((d) => d.key === difficulty)?.description}</p>
       <h3>Map size</h3>
-      <div className="difficulties four">
+      <div className="difficulties five">
         {MAP_SIZES.map((m) => (
           <button
             key={m.size}

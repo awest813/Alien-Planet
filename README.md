@@ -3,8 +3,8 @@
 **An original colony simulation in the browser, built with Phaser 4, TypeScript, and React.**
 
 A handful of colonists land on a procedurally generated map: three on a tiny 64×64 valley (room for six), four on a
-small 96×96 one (room for nine), five on a medium 128×128 frontier (room for twelve) or six on a large 192×192
-country (room for fifteen), near the middle on a spot with room to build and dry feet. You don't control them
+small 96×96 one (room for nine), five on a medium 128×128 frontier (room for twelve), six on a large 192×192
+country (room for fifteen) or seven on an XL 256×256 one (room for eighteen), near the middle on a spot with room to build and dry feet. You don't control them
 directly: you designate work
 (chop, mine, forage, build, farm, cook, haul to storage) and they decide who does what, around their own needs.
 They get hungry, tired and bored, and their mood reacts to what they eat, where they sleep, how warm they are and

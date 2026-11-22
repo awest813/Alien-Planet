@@ -1,6 +1,6 @@
 # Plan: gameplay that fits the map's size
 
-The four map sizes differ in more than room. Anything that walks in from the edge takes about 15 times
+The map sizes differ in more than room (this plan covered the first four; XL came after, in docs/XL_MAP.md). Anything that walks in from the edge takes about 15 times
 longer to arrive on Large than on Tiny, and everything placed by area (wildlife, wild plants, ore) grows with
 the map while the colony grows more slowly. This plan lists what should stay the same whatever the size, what
 should differ on purpose, and the changes that get there.

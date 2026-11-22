@@ -1,8 +1,8 @@
 # Plan: an XL map
 
-An XL map is 256×256: 65,536 tiles, four times a Medium map and 1.8 times a Large one. It would land seven
-colonists with room for eighteen. It isn't offered yet. This plan covers what has to change first, measured
-against the sizes there are now:
+An XL map is 256×256: 65,536 tiles, four times a Medium map and 1.8 times a Large one. It lands seven colonists
+with room for eighteen. **It's offered now** (step 8 below). This plan covered what had to change first, measured
+against the sizes there were then:
 
 | Size   | Tiles per side | Lands | Room for |
 | ------ | -------------- | ----- | -------- |
@@ -10,12 +10,12 @@ against the sizes there are now:
 | Small  | 96             | 4     | 9        |
 | Medium | 128            | 5     | 12       |
 | Large  | 192            | 6     | 15       |
-| XL     | 256 (planned)  | 7     | 18       |
+| XL     | 256            | 7     | 18       |
 
 ## Where it stands now
 
-Steps 1 to 7 below are done or settled. What's left before XL is offered is balance and the long run (step 8),
-and a raid day that still runs past the gate now and then (see Raid days).
+All eight steps below are done, and XL is offered. What's left is big raids and sieges in later years, which run
+about 150 ms per 1,000 ticks while they last.
 
 Against the gates: day 8 at 37 ms per 1,000 ticks (gate 45); a busy XL colony at day 40 at 73–85 ms (gate 100;
 it was 110–189); the worst autosave frame 25 ms on a desktop and 56 ms on a throttled phone (gate 100); the whole
@@ -347,5 +347,9 @@ fastest speed, a slow machine would drop frames through it. That's worth a look 
 6. ~~Long-path chunk routes if the step 1 measurements still show pathfinding over 15%.~~ Measured: long
    searches made cheaper another way (see Long paths); chunk routes not needed.
 7. ~~Raid days under the gate.~~ Done but for the worst raid days (see Raid days).
-8. Balance and the ten-year run, then add `{ size: 256, label: 'XL', colonists: 7, maxColonists: 18 }` to
-   `MAP_SIZES`.
+8. ~~Balance and the ten-year run, then add `{ size: 256, label: 'XL', colonists: 7, maxColonists: 18 }` to
+   `MAP_SIZES`.~~ Done. XL is on the new-colony screen (five cards across, two on a phone). The tests that go
+   over every size, the playtests' rotation and `npm run perf`'s default all take it in. `npm run perf` on XL:
+   45 ms per 1,000 ticks at day 8 and 55 with a raid of 12 (budget 60). The playtest, 30 players for 16 days on
+   XL: no crashes, no invariant broken (a save loads into the same game), two colonies lost, the self-wrecking
+   persona's and a neglectful one on Harsh, which is lost on Large too.

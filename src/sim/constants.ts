@@ -33,6 +33,13 @@ export const MAP_SIZES = [
     maxColonists: 15,
     description: '192×192. Six colonists, room for fifteen. Long walks: settle with care.',
   },
+  {
+    size: 256,
+    label: 'XL',
+    colonists: 7,
+    maxColonists: 18,
+    description: '256×256. Seven colonists, room for eighteen. A whole country: lay roads, bookmark places.',
+  },
 ];
 
 // The population settings for a map this many tiles across (the nearest size at or below it).

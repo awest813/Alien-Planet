@@ -1284,6 +1284,10 @@ button.brush.active {
   grid-template-columns: repeat(4, 1fr);
 }
 
+.difficulties.five {
+  grid-template-columns: repeat(5, 1fr);
+}
+
 /* The chosen option's description, under its group: only on a phone, where the cards show just their names. */
 .choice-note {
   display: none;
@@ -1500,7 +1504,8 @@ button.brush.active {
   /* New colony on a phone: the choices two to a row (and only the chosen one says more, below), so the whole
      form fits in a screen or two instead of fourteen full-width cards. */
   .difficulties,
-  .difficulties.four {
+  .difficulties.four,
+  .difficulties.five {
     grid-template-columns: 1fr 1fr;
   }
 }
