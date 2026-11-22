@@ -176,6 +176,8 @@ export class World {
   public waterVersion = 0;
   // Bumped whenever any feature changes (furniture affects room stats).
   public featureVersion = 0;
+  // Bumped when a floor or roof is laid or lifted (see the pathfinder's open floors).
+  public layerVersion = 0;
 
   constructor(
     public readonly width: number,
@@ -484,6 +486,7 @@ export class World {
     this[layer][i] = f;
     this.progress[i] = 0;
     this.featureVersion++;
+    this.layerVersion++;
     this.markDirty(i);
   }
 

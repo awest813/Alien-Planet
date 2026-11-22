@@ -55,9 +55,28 @@ browser at 1280×800).
 - A lesson for later speed work: an extra check made on every animal every tick cost more than skipping three
   ticks in four saved. Animals come in many object shapes, so each field read is slow. The far-off check runs
   only on an animal's turn, and the rest of its update is its own function (`actAnimal`).
-- **Long paths.** Add a chunk-level route (16×16 chunks, linked where their edges are passable, rebuilt with
-  `structureVersion`), then let A\* search inside the chunks along that route. This only matters for paths
-  over about 48 tiles: arrivals from the edge, expeditions and long hauls.
+- **Long paths (measured; a narrower change instead of chunk routes).** Logging every search on XL
+  (`scripts`-style, by caller):
+  - Quiet colony: pathfinding was 13% of the time, and searches over 48 tiles were 84 of its 160 ms. These were
+    a colonist going 100 to 190 tiles to eat, feed a patient or tend one, at 2 to 5 ms each.
+  - A raid of 12 on a young colony: 27%, long searches 90 of 107 ms.
+  - The cost came from the search's estimate, scaled down to 0.8 a step for the cheapest floor, which makes A\*
+    look over a wide band either side of a long walk. It didn't come from routing round obstacles, so 16×16 chunk
+    routes would cut little.
+  - **Instead, a walk over 48 tiles with no floor in the open within 16 tiles of it is searched with the
+    estimate a step of open ground gives** (1, `LONG_WALK` in pathfinding.ts). That's about 45% off each such
+    search, and on 50 such walks measured none came out longer (a test holds it within 2%).
+  - A road or any floor laid in the open near the walk keeps the careful search. Without that, a 90-tile walk
+    ignored a road two tiles off its line (a test now holds it). Floors are counted per 16×16 block, recounted
+    when a floor or roof changes.
+  - Measured after: the young colony's raid went from 83 to about 60 ms per 1,000 ticks, but that game
+    diverged (the raid ended sooner). The busy 45-day XL colony averaged 92 against 100. From two raids saved
+    from busy colonies (day 26, day 40), the difference is lost in noise.
+  - On those raid days the time goes to the raiders' choices (22%), allies (8%), colonists' fighting (9%) and
+    the animals (17%). Pathfinding there is about 15%, most of it raiders' short searches. That's where raid
+    days are to be won, not in long paths.
+  - The animals' far-off check now loops over a flat list of where everyone stands. Taking each pair apart in a
+    callback had been the animal loop's busiest line in a raid.
 - **The remaining whole-map scans (done).** A busy XL colony (the balance autoplayer, `PERF=1 bal 45 3
 size=256`) showed where whole-map work still cost something. The scans this plan first named had mostly
   gone already: searches for the edge use `nearestEdge` (the animals' four did too now), the storyteller's
@@ -167,6 +186,8 @@ size=256`) showed where whole-map work still cost something. The scans this plan
 3. ~~Autosave in parts.~~ Done (see Saving).
 4. ~~Chunked feature drawing zoomed out.~~ Done another way (see Drawing zoomed out).
 5. ~~Arrival timing, bookmarks, roads.~~ Done (see Play on a big map).
-6. Long-path chunk routes if the step 1 measurements still show pathfinding over 15%.
+6. ~~Long-path chunk routes if the step 1 measurements still show pathfinding over 15%.~~ Measured: long
+   searches made cheaper another way (see Long paths); chunk routes not needed. Raid days need the raiders'
+   and the fighting's own work.
 7. Balance and the ten-year run, then add `{ size: 256, label: 'XL', colonists: 7, maxColonists: 18 }` to
    `MAP_SIZES`.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { featureId, terrainId } from './defs';
+import { LONG_WALK } from './pathfinding';
 import { Simulation } from './simulation';
 import { HOUR, clearAround, run } from './test-helpers';
 
@@ -36,5 +37,50 @@ describe('roads', () => {
     const path = sim.pathfinder.find(from, [to])!;
     const onRoad = path.filter((i) => w.floor[i] === featureId('road')).length;
     expect(onRoad).toBeGreaterThan(15);
+  });
+
+  it('are kept to on a long walk too', () => {
+    const sim = Simulation.newColony(13, 'standard', 128);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 50);
+    const from = w.idx(x - 45, y);
+    const to = w.idx(x + 45, y);
+    for (let tx = x - 43; tx <= x + 43; tx++) {
+      w.setLayer('floor', w.idx(tx, y + 2), featureId('road'));
+    }
+    const path = sim.pathfinder.find(from, [to])!;
+    const onRoad = path.filter((i) => w.floor[i] === featureId('road')).length;
+    expect(onRoad).toBeGreaterThan(80);
+  });
+
+  it('leave a long walk with no floor out in the open near it searched boldly, and no longer for it', () => {
+    const sim = Simulation.newColony(14, 'standard', 192);
+    const w = sim.world;
+    const cost = (start: number, path: number[]) => {
+      let c = 0;
+      let prev = start;
+      for (const i of path) {
+        c += w.moveCost(i) * (w.xOf(i) !== w.xOf(prev) && w.yOf(i) !== w.yOf(prev) ? Math.SQRT2 : 1);
+        prev = i;
+      }
+      return c;
+    };
+    let walks = 0;
+    for (let k = 0; k < 40; k++) {
+      const from = sim.rng.int(0, w.size - 1);
+      const to = sim.rng.int(0, w.size - 1);
+      if (!w.isPassable(from) || !w.isPassable(to) || w.distance(from, to) < LONG_WALK * 1.5) {
+        continue;
+      }
+      const bold = sim.pathfinder.find(from, [to]);
+      // (A weight a hair over 1 is searched as asked: the careful search, for comparison.)
+      const careful = sim.pathfinder.find(from, [to], undefined, 1 + 1e-9);
+      expect(!!bold).toBe(!!careful);
+      if (bold && careful) {
+        expect(cost(from, bold)).toBeLessThanOrEqual(cost(from, careful) * 1.02);
+        walks++;
+      }
+    }
+    expect(walks).toBeGreaterThan(5);
   });
 });

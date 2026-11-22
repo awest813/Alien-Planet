@@ -721,7 +721,7 @@ let chasedThisTick: Set<number> | null = null;
 // the same every time.
 export const FAR_RANGE = 40;
 export const FAR_TURN = 4;
-function idleFarOff(sim: Simulation, a: Animal, watchers: number[][]): boolean {
+function idleFarOff(sim: Simulation, a: Animal, watchers: Int32Array, count: number): boolean {
   if (
     a.tame ||
     a.taming ||
@@ -738,8 +738,16 @@ function idleFarOff(sim: Simulation, a: Animal, watchers: number[][]): boolean {
   }
   const x = sim.world.xOf(a.tile);
   const y = sim.world.yOf(a.tile);
-  return watchers.every(([cx, cy]) => Math.abs(cx - x) > FAR_RANGE || Math.abs(cy - y) > FAR_RANGE);
+  // (A plain loop over a flat list: a callback taking each pair apart was the loop's busiest line in a raid.)
+  for (let k = 0; k < count * 2; k += 2) {
+    if (Math.abs(watchers[k] - x) <= FAR_RANGE && Math.abs(watchers[k + 1] - y) <= FAR_RANGE) {
+      return false;
+    }
+  }
+  return true;
 }
+
+let watchers = new Int32Array(64);
 
 export function updateAnimals(sim: Simulation): void {
   standDownAfterPack(sim);
@@ -752,10 +760,20 @@ export function updateAnimals(sim: Simulation): void {
   const w = sim.world;
   const awake = sim.living().filter((c) => !c.sleeping);
   const home = sim.homeTile() ?? sim.living()[0]?.tile;
-  const watchers = sim
-    .living()
-    .filter((c) => !c.away)
-    .map((c) => [w.xOf(c.tile), w.yOf(c.tile)]);
+  // Where everyone at home stands, x then y.
+  let count = 0;
+  for (const c of sim.living()) {
+    if (!c.away) {
+      if (watchers.length < (count + 1) * 2) {
+        const grown = new Int32Array(watchers.length * 2 + 16);
+        grown.set(watchers);
+        watchers = grown;
+      }
+      watchers[count * 2] = w.xOf(c.tile);
+      watchers[count * 2 + 1] = w.yOf(c.tile);
+      count++;
+    }
+  }
   for (const a of sim.animals) {
     if (a.hp <= 0) {
       continue;
@@ -766,7 +784,7 @@ export function updateAnimals(sim: Simulation): void {
     if (a.dozing && chasedThisTick.has(a.id)) {
       a.dozing = false;
     } else if (turn) {
-      a.dozing = idleFarOff(sim, a, watchers);
+      a.dozing = idleFarOff(sim, a, watchers, count);
     } else if (a.dozing) {
       continue;
     }
