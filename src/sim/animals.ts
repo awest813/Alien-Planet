@@ -735,10 +735,11 @@ function guard(sim: Simulation, a: Animal): boolean {
 // for a hunter on their heels. Never misses one, so the answer is the same as checking every animal.
 let chasedThisTick: Set<number> | null = null;
 
-// An animal this far (in tiles, either way) from every colonist at home, and about nothing in particular,
-// takes a turn only every FAR_TURN ticks and moves that many ticks' worth when it does: nobody is near enough
-// to see the difference, and the big maps hold a lot of game. It depends only on the game, so a seed plays
-// the same every time.
+// An animal this far (in tiles, either way) from every colonist at home, and about nothing in particular, takes a
+// turn only every FAR_TURN ticks and moves that many ticks' worth when it does: nobody is near enough to see the
+// difference, and the big maps hold a lot of game. It depends only on the game, so a seed plays the same every
+// time. Marked for the hunt or not: a hunter is a colonist, and wakes it coming within reach (till then it covers
+// the ground at the same pace). Kept awake for that, it never dozed in a colony that marks all its game.
 export const FAR_RANGE = 40;
 export const FAR_TURN = 4;
 // The longest an animal awake stands about between wanders, in ticks.
@@ -747,7 +748,6 @@ function idleFarOff(sim: Simulation, a: Animal, watchers: Int32Array, count: num
   if (
     a.tame ||
     a.taming ||
-    a.hunted ||
     a.leaving ||
     a.manhunter ||
     a.lashOut ||

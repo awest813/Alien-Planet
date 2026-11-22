@@ -313,7 +313,7 @@ describe('far-off wildlife', () => {
     expect(changedOffTurn).toBe(0);
   });
 
-  it('keeps an animal awake that is marked for hunting, chased, or near someone', () => {
+  it('keeps an animal awake that is chased or near someone, but lets one marked for the hunt doze till a hunter comes', () => {
     const { sim, w, far } = farField(42);
     const marked = place(sim, 'deer', far, { hunted: true });
     const prey = place(sim, 'hare', far);
@@ -323,7 +323,8 @@ describe('far-off wildlife', () => {
     for (let t = 0; t < FAR_TURN * 2; t++) {
       sim.step();
     }
-    expect(marked.dozing).toBe(false);
+    // Nobody near it yet: a hunter coming for it wakes it once within reach.
+    expect(marked.dozing).toBe(true);
     expect(wolf.dozing).toBe(false);
     expect(near.dozing).toBe(false);
     // The hare stays awake while the wolf is after it.
