@@ -15,7 +15,7 @@ export const HURRIED = 1.6;
 // map (a colonist going 100 tiles to eat, a doctor to a patient) were most of the pathfinding's time, at 2 to 5 ms
 // each: this takes about 45% off them, and on 50 such walks measured, none came out longer. A road, or any floor
 // laid in the open, within OPEN_FLOOR_MARGIN of the walk keeps the careful search, so a long walk still keeps to
-// it. (Floors under a roof are a few steps in a room: the walk may make a little less of them.)
+// it. (Floors in a room or under a roof are a few steps: the walk may make a little less of them.)
 export const LONG_WALK = 48;
 const LONG_WEIGHT = 1 / MIN_STEP_COST;
 const BLOCK = 16;
@@ -31,9 +31,11 @@ export class Pathfinder {
   private generation = 0;
   private heap: number[] = [];
   private keys: number[] = [];
-  // Floor tiles without a roof in each 16×16 block, counted again when a floor or roof changes.
+  // Floor tiles in the open (no roof, and not in an enclosed room, which counts as roofed) in each 16×16 block,
+  // counted again when a floor, a roof or a wall changes. `indoors` is the simulation's own test for a room.
+  public indoors: (i: number) => boolean = () => false;
   private openFloors = new Uint16Array(0);
-  private openFloorsVersion = -1;
+  private openFloorsVersion = '';
   private readonly blocksAcross: number;
 
   constructor(private readonly world: World) {
@@ -50,11 +52,12 @@ export class Pathfinder {
   // Whether any floor lies in the open within OPEN_FLOOR_MARGIN of the box round these tiles.
   private openFloorNear(x0: number, y0: number, x1: number, y1: number): boolean {
     const w = this.world;
-    if (this.openFloorsVersion !== w.layerVersion) {
-      this.openFloorsVersion = w.layerVersion;
+    const version = `${w.layerVersion}:${w.structureVersion}`;
+    if (this.openFloorsVersion !== version) {
+      this.openFloorsVersion = version;
       this.openFloors = new Uint16Array(this.blocksAcross * Math.ceil(w.height / BLOCK));
       for (let i = 0; i < w.size; i++) {
-        if (w.floor[i] !== 0 && w.roof[i] === 0) {
+        if (w.floor[i] !== 0 && w.roof[i] === 0 && !this.indoors(i)) {
           this.openFloors[Math.floor(w.yOf(i) / BLOCK) * this.blocksAcross + Math.floor(w.xOf(i) / BLOCK)]++;
         }
       }

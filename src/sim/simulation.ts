@@ -993,6 +993,7 @@ export class Simulation {
     public readonly rng: Rng,
   ) {
     this.pathfinder = new Pathfinder(world);
+    this.pathfinder.indoors = (i) => this.isIndoors(i);
     // Map generation and loading write the layers directly.
     world.reindex();
     this.wasNight = this.isNight();

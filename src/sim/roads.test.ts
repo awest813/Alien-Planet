@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { featureId, terrainId } from './defs';
 import { LONG_WALK } from './pathfinding';
 import { Simulation } from './simulation';
-import { HOUR, clearAround, run } from './test-helpers';
+import { HOUR, clearAround, outline, run } from './test-helpers';
 
 // A road: packed earth, laid for the work alone, and quicker going than grass or sand.
 describe('roads', () => {
@@ -82,5 +82,30 @@ describe('roads', () => {
       }
     }
     expect(walks).toBeGreaterThan(5);
+  });
+
+  it('count a road as floor in the open, and a floored room not (a room is roofed, the roof layer or not)', () => {
+    const sim = Simulation.newColony(15, 'standard', 128);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 14);
+    const near = () =>
+      (
+        sim.pathfinder as unknown as { openFloorNear(x0: number, y0: number, x1: number, y1: number): boolean }
+      ).openFloorNear(x, y, x, y);
+    expect(near()).toBe(false);
+    // A walled room with a wood floor: indoors.
+    for (const i of outline(w, x + 2, y + 2, x + 6, y + 6)) {
+      w.setFeature(i, featureId('woodWall'));
+    }
+    for (let ty = y + 3; ty <= y + 5; ty++) {
+      for (let tx = x + 3; tx <= x + 5; tx++) {
+        w.setLayer('floor', w.idx(tx, ty), featureId('woodFloor'));
+      }
+    }
+    expect(sim.isIndoors(w.idx(x + 4, y + 4))).toBe(true);
+    expect(near()).toBe(false);
+    // A stretch of road outside it.
+    w.setLayer('floor', w.idx(x - 4, y), featureId('road'));
+    expect(near()).toBe(true);
   });
 });

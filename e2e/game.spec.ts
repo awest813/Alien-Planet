@@ -410,6 +410,44 @@ test('Shift and a number bookmarks the view, and the number goes back there', as
   expect(errors).toEqual([]);
 });
 
+test('an autosave held back while the page is hidden never lands over a newer one', async ({ page }) => {
+  const errors = watchErrors(page);
+  await startColony(page);
+  const result = await page.evaluate(async () => {
+    type Meta = { slot: string; hour: number; day: number };
+    const c = (
+      window as unknown as {
+        colony: {
+          sim: { step(): void; hour: number; day: number };
+          save(slot: string, auto?: boolean): Promise<boolean>;
+          saves: Meta[];
+        };
+      }
+    ).colony;
+    // No frames come (as on a hidden page) until the page is shown or hidden.
+    const raf = window.requestAnimationFrame;
+    window.requestAnimationFrame = () => 0;
+    const older = c.save('autosave', true);
+    const olderHour = Math.floor(c.sim.hour);
+    // Some hours on, the page is hidden: that save is written at once.
+    for (let t = 0; t < 200 * 3; t++) {
+      c.sim.step();
+    }
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    const newer = c.save('autosave', true);
+    const newerHour = Math.floor(c.sim.hour);
+    document.dispatchEvent(new Event('visibilitychange'));
+    await Promise.all([older, newer]);
+    window.requestAnimationFrame = raf;
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    const saved = c.saves.find((m) => m.slot === 'autosave')!;
+    return { olderHour, newerHour, savedHour: saved.hour };
+  });
+  expect(result.newerHour).not.toBe(result.olderHour);
+  expect(result.savedHour).toBe(result.newerHour);
+  expect(errors).toEqual([]);
+});
+
 // A Chromebook: its user agent, and the page a 1366×768 screen at 125% leaves (1093×615).
 test.describe('on a Chromebook', () => {
   test.use({

@@ -862,10 +862,21 @@ const STEP_BUDGET_MS = 12;
 const PACE_WINDOW_MS = 3000;
 const PACE_SHORT = 0.85;
 // Resolves once the next frame has been drawn, or at once on a hidden page (which gets no frames).
-const afterNextFrame = (): Promise<void> =>
-  typeof document === 'undefined' || document.hidden || typeof requestAnimationFrame === 'undefined'
-    ? Promise.resolve()
-    : new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+// (Or as soon as the page is hidden while it waits: a hidden page gets no frames, and a save held back then was
+// written only when the player came back, over whatever had been saved since.)
+const afterNextFrame = (): Promise<void> => {
+  if (typeof document === 'undefined' || document.hidden || typeof requestAnimationFrame === 'undefined') {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const done = () => {
+      document.removeEventListener('visibilitychange', done);
+      resolve();
+    };
+    document.addEventListener('visibilitychange', done);
+    requestAnimationFrame(() => setTimeout(done, 0));
+  });
+};
 
 // The autosave, the one before it (a different colony's, kept when another took the slot), and the player's own.
 // A save the game can't run (missing parts, or one that fails once loaded).
@@ -2559,7 +2570,14 @@ export class GameController {
       // Written in a frame of its own: copying the colony and handing it to the browser's storage in one went over
       // a tenth of a second on a slow phone with a big map. (Not when the page is hidden: no frames come then, and
       // a page being left needs it written now.)
+      const order = ++this.savesStarted;
       await afterNextFrame();
+      // A save begun after this one has been written already (one when the window lost focus, then another as the
+      // page was hidden), or another tab has taken the autosave meanwhile: this older copy isn't written over it.
+      if ((this.newestWritten[slot] ?? 0) > order || (auto && this.otherTab)) {
+        return true;
+      }
+      this.newestWritten[slot] = order;
       await writeSave(meta, data);
       if (mark.version === this.simVersion) {
         this.lastSaved = { ...mark, at: Date.now() };
@@ -2581,6 +2599,10 @@ export class GameController {
       return false;
     }
   }
+
+  // Saves in the order they were begun, and the latest begun of those written to each slot.
+  private savesStarted = 0;
+  private newestWritten: Record<string, number> = {};
 
   // What was last saved (any slot): the colony, how far on, and the orders given by then.
   private lastSaved = { version: -1, tick: -1, commands: -1, at: 0 };

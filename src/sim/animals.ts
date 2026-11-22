@@ -721,6 +721,8 @@ let chasedThisTick: Set<number> | null = null;
 // the same every time.
 export const FAR_RANGE = 40;
 export const FAR_TURN = 4;
+// The longest an animal awake stands about between wanders, in ticks.
+const LONGEST_REST = 400;
 function idleFarOff(sim: Simulation, a: Animal, watchers: Int32Array, count: number): boolean {
   if (
     a.tame ||
@@ -781,12 +783,18 @@ export function updateAnimals(sim: Simulation): void {
     // Whether it's far off is settled on its own turn, which falls on the same ticks as the look round for
     // people below; something coming after it wakes it at once.
     const turn = (sim.tick + a.id) % FAR_TURN === 0;
+    const wasDozing = !!a.dozing;
     if (a.dozing && chasedThisTick.has(a.id)) {
       a.dozing = false;
     } else if (turn) {
       a.dozing = idleFarOff(sim, a, watchers, count);
     } else if (a.dozing) {
       continue;
+    }
+    // Woken, it rests no longer than one awake would: a dozer's long graze kept it standing about for hours with
+    // people now close by.
+    if (wasDozing && !a.dozing) {
+      a.restUntil = Math.min(a.restUntil, sim.tick + LONGEST_REST);
     }
     const steps = a.dozing ? FAR_TURN : 1;
     actAnimal(sim, a, steps, awake, home);
@@ -934,7 +942,7 @@ function actAnimal(sim: Simulation, a: Animal, steps: number, awake: Colonist[],
       pathTo(sim, a, [to]);
     }
     // (Far off, it grazes longer where it is: nobody sees it, and finding its way about is most of its cost.)
-    a.restUntil = sim.tick + sim.rng.int(100, 400) * steps;
+    a.restUntil = sim.tick + sim.rng.int(100, LONGEST_REST) * steps;
   }
   for (let step = 0; step < steps && a.path.length > 0; step++) {
     move(sim, a);

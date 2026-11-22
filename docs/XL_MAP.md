@@ -68,7 +68,8 @@ These numbers come from a 256×256 colony started with the code as it was when t
   check.
 - A lesson for later speed work: an extra check made on every animal every tick cost more than skipping three
   ticks in four saved. Animals come in many object shapes, so each field read is slow. The far-off check runs
-  only on an animal's turn, and the rest of its update is its own function (`actAnimal`).
+  only on an animal's turn, and the rest of its update is its own function (`actAnimal`). A woken animal rests
+  no longer than an awake one would: its dozer's long graze had kept it standing about with people close by.
 - **Long paths (measured; a narrower change instead of chunk routes).** Every search on XL, logged by who
   asked for it:
   - Quiet colony: pathfinding was 13% of the time, and searches over 48 tiles were 84 of its 160 ms. These were
@@ -80,7 +81,8 @@ These numbers come from a 256×256 colony started with the code as it was when t
   - **Instead, a walk over 48 tiles with no floor in the open within 16 tiles of it is searched with the
     estimate a step of open ground gives** (1, `LONG_WALK` in pathfinding.ts). That's about 45% off each such
     search, and on 50 such walks measured none came out longer (a test holds it within 2%).
-  - A road or any floor laid in the open near the walk keeps the careful search. Without that, a 90-tile walk
+  - A road or any floor laid in the open near the walk keeps the careful search. A floor in an enclosed room
+    doesn't count: a room is roofed whether or not the roof layer says so. Without that, a 90-tile walk
     ignored a road two tiles off its line (a test now holds it). Floors are counted per 16×16 block, recounted
     when a floor or roof changes.
   - Measured after: the young colony's raid went from 83 to about 60 ms per 1,000 ticks, but that game
@@ -129,7 +131,11 @@ These numbers come from a 256×256 colony started with the code as it was when t
   blank map. Packing the twenty layers takes about 2.5 ms on a desktop, and the write fell from about 13 ms to
   4 ms.
 - **The write has a frame of its own:** the colony is copied in one frame and handed to storage after the next
-  frame is drawn. A hidden page gets no frames, so a page being left writes at once.
+  frame is drawn. A hidden page gets no frames, so a page being left writes at once, and a save already waiting
+  when the page is hidden goes then too. A copy older than one already written to that slot isn't written
+  (a save begun as the window lost focus had waited until the player came back, then wrote over what another
+  tab had saved meanwhile; an audit found it, and a browser test holds it). Nor is an autosave another tab has
+  taken over while it waited.
 - **Result** (the same colony and measurement): on a desktop, the worst frame is 25 ms and there's no long task.
   At 4× throttle the worst frame is 56 ms (from 122). The one long task left (58–68 ms) is the first save,
   before the browser has optimized the code. The other skipped option, leaving unchanged layers out, isn't
