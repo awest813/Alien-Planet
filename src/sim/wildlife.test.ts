@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { animalsAtDawn, herdArrives, herdsWary, hurtAnimal, wildCap } from './animals';
+import { FAR_RANGE, FAR_TURN, animalsAtDawn, herdArrives, herdsWary, hurtAnimal, wildCap, wildScale } from './animals';
 import { ANIMALS, featureId, itemId, matchesIngredient } from './defs';
 import { deserialize, serialize } from './serialize';
 import { Simulation } from './simulation';
@@ -254,5 +254,107 @@ describe('hunters return', () => {
       bare.animals = bare.animals.filter((a) => ANIMALS[a.kind].preys);
     }
     expect(predators(bare)).toHaveLength(0);
+  });
+});
+
+describe('far-off wildlife', () => {
+  // A Medium map with the wildlife cleared, and a walkable tile in the far corner from the colonists.
+  function farField(seed: number) {
+    const sim = Simulation.newColony(seed, 'standard', 128);
+    sim.animals = [];
+    const w = sim.world;
+    const cx = Math.round(sim.living().reduce((s, c) => s + w.xOf(c.tile), 0) / sim.living().length);
+    const cy = Math.round(sim.living().reduce((s, c) => s + w.yOf(c.tile), 0) / sim.living().length);
+    const fx = cx < 64 ? 120 : 8;
+    const fy = cy < 64 ? 120 : 8;
+    let far = -1;
+    for (let r = 0; far < 0 && r < 8; r++) {
+      for (let dy = -r; far < 0 && dy <= r; dy++) {
+        for (let dx = -r; far < 0 && dx <= r; dx++) {
+          const t = w.idx(fx + dx, fy + dy);
+          if (w.isPassable(t) && sim.regionOf(t) !== undefined) {
+            far = t;
+          }
+        }
+      }
+    }
+    expect(far).toBeGreaterThanOrEqual(0);
+    for (const c of sim.living()) {
+      expect(Math.max(Math.abs(w.xOf(c.tile) - w.xOf(far)), Math.abs(w.yOf(c.tile) - w.yOf(far)))).toBeGreaterThan(
+        FAR_RANGE,
+      );
+    }
+    return { sim, w, far };
+  }
+
+  it('lets an idle animal far from everyone take a turn only now and then, at the same walking pace', () => {
+    const { sim, far } = farField(41);
+    const deer = place(sim, 'deer', far);
+    for (let t = 0; t < FAR_TURN; t++) {
+      sim.step();
+    }
+    expect(deer.dozing).toBe(true);
+    // Between its turns nothing about it changes; on its turn it walks the ticks it missed.
+    let moved = 0;
+    let changedOffTurn = 0;
+    for (let t = 0; t < 400; t++) {
+      const before = deer.moveProgress + deer.tile;
+      // (The clock moves on before the animals do.)
+      const turn = (sim.tick + 1 + deer.id) % FAR_TURN === 0;
+      sim.step();
+      if (deer.moveProgress + deer.tile !== before) {
+        moved++;
+        if (!turn) {
+          changedOffTurn++;
+        }
+      }
+    }
+    expect(moved).toBeGreaterThan(0);
+    expect(changedOffTurn).toBe(0);
+  });
+
+  it('keeps an animal awake that is marked for hunting, chased, or near someone', () => {
+    const { sim, w, far } = farField(42);
+    const marked = place(sim, 'deer', far, { hunted: true });
+    const prey = place(sim, 'hare', far);
+    const wolf = place(sim, 'wolf', far, { chasing: prey.id, fedUntil: 0 });
+    const c = sim.living()[0];
+    const near = place(sim, 'deer', w.neighbors(c.tile).find((n) => w.isPassable(n))!);
+    for (let t = 0; t < FAR_TURN * 2; t++) {
+      sim.step();
+    }
+    expect(marked.dozing).toBe(false);
+    expect(wolf.dozing).toBe(false);
+    expect(near.dozing).toBe(false);
+    // The hare stays awake while the wolf is after it.
+    expect(wolf.chasing === prey.id ? prey.dozing : false).toBe(false);
+  });
+
+  it('plays the same for a seed, and keeps dozing through a save', () => {
+    const play = () => {
+      const { sim, far } = farField(43);
+      place(sim, 'deer', far);
+      place(sim, 'boar', far);
+      for (let t = 0; t < 600; t++) {
+        sim.step();
+      }
+      return sim;
+    };
+    const a = play();
+    const b = play();
+    expect(a.animals.map((x) => [x.tile, x.moveProgress, x.dozing])).toEqual(
+      b.animals.map((x) => [x.tile, x.moveProgress, x.dozing]),
+    );
+    const copy = deserialize(structuredClone(serialize(a)));
+    expect(copy.animals.map((x) => x.dozing)).toEqual(a.animals.map((x) => x.dozing));
+  });
+});
+
+describe('wildlife on big maps', () => {
+  it('grows with the area up to a Large map, and with the side past it', () => {
+    expect(wildScale(64)).toBe(1);
+    expect(wildScale(128)).toBe(4);
+    expect(wildScale(192)).toBe(9);
+    expect(wildScale(256)).toBe(12);
   });
 });

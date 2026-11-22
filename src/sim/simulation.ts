@@ -50,6 +50,7 @@ import {
   populateWildlife,
   spareForBreeding,
   updateAnimals,
+  wildScale,
 } from './animals';
 import {
   apparelScore,
@@ -1042,8 +1043,8 @@ export class Simulation {
     const sim = new Simulation(world, colonists, seed, rng);
     sim.story = freshStory(difficulty);
     sim.biome = biome;
-    // Eight animals on the standard map, more on bigger ones.
-    populateWildlife(sim, Math.round((8 * world.size) / (MAP_SIZE * MAP_SIZE)), spawn);
+    // Eight animals on the standard map, more on bigger ones (see wildScale).
+    populateWildlife(sim, Math.round(8 * wildScale(world.width, world.height)), spawn);
     sim.wildCover = wildPlantCover(sim);
     sim.addLog(
       `${NUMBER_WORDS[landing] ?? landing} colonists have landed with a few days of rations and some salvaged timber. Give orders from the build bar (Chop, Mine, Stockpile) and they will get to it.`,

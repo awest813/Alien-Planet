@@ -15,7 +15,16 @@ import { animalMayEnter, feedPenned, gateFilter, penAt, penFor, penTarget } from
 // Wild animals on the standard 64×64 map; bigger maps hold proportionally more.
 export const MAX_ANIMALS = 14;
 
-export const wildCap = (sim: Simulation) => Math.round((MAX_ANIMALS * sim.world.size) / (MAP_SIZE * MAP_SIZE));
+// How many times the standard map's wildlife a map holds. It grows with the area up to a Large map; past that,
+// with the side only: hunters keep within a day's reach of home, and the far country needn't fill up with game
+// that nobody meets (and that costs time to keep moving). An XL map holds 1.33 times a Large one, not 1.78.
+export const WILD_AREA_UP_TO = 192;
+export const wildScale = (width: number, height = width) => {
+  const side = Math.sqrt(width * height);
+  const within = Math.min(side, WILD_AREA_UP_TO);
+  return ((within * within) / (MAP_SIZE * MAP_SIZE)) * Math.max(1, side / WILD_AREA_UP_TO);
+};
+export const wildCap = (sim: Simulation) => Math.round(MAX_ANIMALS * wildScale(sim.world.width, sim.world.height));
 const BITE_COOLDOWN = 50;
 const WANDER_RADIUS = 6;
 // An enraged animal calms down after this long.
@@ -61,6 +70,7 @@ function addAnimal(sim: Simulation, tile: number, kind = pickKind(sim)): Animal 
     cooldown: 0,
     restUntil: 0,
     revengeUntil: 0,
+    dozing: false,
   };
   if (ANIMALS[kind].preys) {
     animal.fedUntil = sim.tick;
@@ -705,6 +715,32 @@ function guard(sim: Simulation, a: Animal): boolean {
 // for a hunter on their heels. Never misses one, so the answer is the same as checking every animal.
 let chasedThisTick: Set<number> | null = null;
 
+// An animal this far (in tiles, either way) from every colonist at home, and about nothing in particular,
+// takes a turn only every FAR_TURN ticks and moves that many ticks' worth when it does: nobody is near enough
+// to see the difference, and the big maps hold a lot of game. It depends only on the game, so a seed plays
+// the same every time.
+export const FAR_RANGE = 40;
+export const FAR_TURN = 4;
+function idleFarOff(sim: Simulation, a: Animal, watchers: number[][]): boolean {
+  if (
+    a.tame ||
+    a.taming ||
+    a.hunted ||
+    a.leaving ||
+    a.manhunter ||
+    a.lashOut ||
+    a.revengeOn >= 0 ||
+    a.chasing !== undefined ||
+    a.musterUntil !== undefined ||
+    chasedThisTick?.has(a.id)
+  ) {
+    return false;
+  }
+  const x = sim.world.xOf(a.tile);
+  const y = sim.world.yOf(a.tile);
+  return watchers.every(([cx, cy]) => Math.abs(cx - x) > FAR_RANGE || Math.abs(cy - y) > FAR_RANGE);
+}
+
 export function updateAnimals(sim: Simulation): void {
   standDownAfterPack(sim);
   chasedThisTick = new Set();
@@ -716,152 +752,174 @@ export function updateAnimals(sim: Simulation): void {
   const w = sim.world;
   const awake = sim.living().filter((c) => !c.sleeping);
   const home = sim.homeTile() ?? sim.living()[0]?.tile;
+  const watchers = sim
+    .living()
+    .filter((c) => !c.away)
+    .map((c) => [w.xOf(c.tile), w.yOf(c.tile)]);
   for (const a of sim.animals) {
     if (a.hp <= 0) {
       continue;
     }
-    const def = ANIMALS[a.kind];
-    a.cooldown--;
-    // A maddened pack gathering at the edge holds until it's time, or until someone comes close or one is hurt.
-    if (a.musterUntil !== undefined) {
-      if (
-        sim.tick < a.musterUntil &&
-        a.hp >= maxHp(a) &&
-        !sim.living().some((c) => !c.health.downed && w.distance(c.tile, a.tile) <= MUSTER_ALERT)
-      ) {
-        continue;
-      }
-      a.musterUntil = undefined;
-    }
-    // A maddened animal with nobody it can reach goes back where it came from.
-    if (a.manhunter && a.revengeOn < 0) {
-      const next = a.revengeUntil > sim.tick ? nearestPrey(sim, a) : undefined;
-      if (next) {
-        a.revengeOn = next.id;
-      } else {
-        a.manhunter = false;
-        a.leaving = true;
-      }
-    }
-
-    // Revenge: chase and bite whoever hurt us, until they're down.
-    if (a.revengeOn >= 0) {
-      const target = sim.colonists[a.revengeOn];
-      // Calm down once the target is down, out of reach, or after a while.
-      if (
-        !target ||
-        target.health.dead ||
-        target.health.downed ||
-        // (Off on an expedition: out of reach.)
-        !!target.away ||
-        !(a.revengeUntil > sim.tick) ||
-        sim.regionOf(target.tile) !== sim.regionOf(a.tile)
-      ) {
-        a.revengeOn = -1;
-        a.lashOut = false;
-        a.path = [];
-        // A manhunter turns on the next colonist it can reach, until its fury runs out.
-        if (a.manhunter) {
-          const next = a.revengeUntil > sim.tick ? nearestPrey(sim, a) : undefined;
-          if (next) {
-            a.revengeOn = next.id;
-          } else {
-            // Its fury spent, it goes back where it came from.
-            a.manhunter = false;
-            a.leaving = true;
-          }
-        }
-      } else if (chebyshev(sim, a.tile, target.tile) <= 1) {
-        a.path = [];
-        if (a.cooldown <= 0 && def.bite) {
-          const hit = sim.rng.next() < 0.75;
-          sim.shots.push({ from: a.tile, to: target.tile, hit, ranged: false, tick: sim.tick });
-          if (hit) {
-            damage(
-              sim,
-              target,
-              armorTakes(sim, target, def.bite[0] + sim.rng.next() * (def.bite[1] - def.bite[0])),
-              'cut',
-            );
-            sim.addThought(target, 'mauled');
-          }
-          a.cooldown = BITE_COOLDOWN;
-        }
-        continue;
-      } else if (a.path.length === 0 || sim.tick % 30 === 0) {
-        pathTo(sim, a, [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))]);
-        if (a.path.length === 0) {
-          // Out of reach (behind a pen's gate, say): someone else if there is anyone, or it gives up.
-          const next = a.manhunter ? nearestPrey(sim, a) : undefined;
-          if (next && next !== target) {
-            a.revengeOn = next.id;
-          } else {
-            a.revengeOn = -1;
-            a.leaving ||= !!a.manhunter;
-            a.manhunter = false;
-          }
-        }
-      }
-    } else if (a.tame && guard(sim, a)) {
+    // Whether it's far off is settled on its own turn, which falls on the same ticks as the look round for
+    // people below; something coming after it wakes it at once.
+    const turn = (sim.tick + a.id) % FAR_TURN === 0;
+    if (a.dozing && chasedThisTick.has(a.id)) {
+      a.dozing = false;
+    } else if (turn) {
+      a.dozing = idleFarOff(sim, a, watchers);
+    } else if (a.dozing) {
       continue;
-    } else if (a.leaving && !a.tame && !a.taming && !sim.huntable(a)) {
-      leave(sim, a);
-      continue;
-    } else if (def.preys && !a.tame && !a.taming && stalk(sim, a)) {
-      continue;
-    } else if (
-      def.fleeRange > 0 &&
-      !a.tame &&
-      !a.taming &&
-      a.path.length === 0 &&
-      // Looking about every few ticks is plenty (and spares checking every animal against everyone).
-      (sim.tick + a.id) % 4 === 0
-    ) {
-      // Skittish animals keep their distance from people, and from anything hunting them.
-      let near: number | undefined;
-      const ax = w.xOf(a.tile);
-      const ay = w.yOf(a.tile);
-      for (const c of awake) {
-        // (Distance is never less than the larger of dx and dy: a quick check before the real one.)
-        const dx = Math.abs(w.xOf(c.tile) - ax);
-        const dy = Math.abs(w.yOf(c.tile) - ay);
-        if (dx < def.fleeRange && dy < def.fleeRange && w.distance(c.tile, a.tile) < def.fleeRange) {
-          near = c.tile;
-          break;
-        }
-      }
-      if (near === undefined && chasedThisTick.has(a.id)) {
-        for (const p of sim.animals) {
-          if (p.chasing === a.id && p.hp > 0 && w.distance(p.tile, a.tile) < 6) {
-            near = p.tile;
-            break;
-          }
-        }
-      }
-      if (near !== undefined) {
-        const to = wanderTarget(sim, a, WANDER_RADIUS, near);
-        if (to !== undefined) {
-          pathTo(sim, a, [to]);
-        }
-      }
     }
-    if (a.path.length === 0 && a.revengeOn < 0 && sim.tick >= a.restUntil) {
-      // Tame animals keep to their pen if there is one; otherwise those that stray too far head back
-      // towards the colony.
-      const pen = penFor(sim, a);
-      const strayed = a.tame && home !== undefined && w.distance(a.tile, home) > HOME_RANGE;
-      const to = pen ? penTarget(sim, a, pen) : strayed ? homeward(sim, a, home) : wanderTarget(sim, a, WANDER_RADIUS);
-      if (to !== undefined) {
-        pathTo(sim, a, [to]);
-      }
-      a.restUntil = sim.tick + sim.rng.int(100, 400);
-    }
-    if (a.path.length > 0) {
-      move(sim, a);
-    }
+    const steps = a.dozing ? FAR_TURN : 1;
+    actAnimal(sim, a, steps, awake, home);
   }
   if (sim.animals.some((a) => a.hp <= 0)) {
     sim.animals = sim.animals.filter((a) => a.hp > 0);
+  }
+}
+
+// One animal's turn: `steps` ticks' worth for one dozing far off (see updateAnimals).
+function actAnimal(sim: Simulation, a: Animal, steps: number, awake: Colonist[], home: number | undefined): void {
+  const w = sim.world;
+  const def = ANIMALS[a.kind];
+  a.cooldown -= steps;
+  // A maddened pack gathering at the edge holds until it's time, or until someone comes close or one is hurt.
+  if (a.musterUntil !== undefined) {
+    if (
+      sim.tick < a.musterUntil &&
+      a.hp >= maxHp(a) &&
+      !sim.living().some((c) => !c.health.downed && w.distance(c.tile, a.tile) <= MUSTER_ALERT)
+    ) {
+      return;
+    }
+    a.musterUntil = undefined;
+  }
+  // A maddened animal with nobody it can reach goes back where it came from.
+  if (a.manhunter && a.revengeOn < 0) {
+    const next = a.revengeUntil > sim.tick ? nearestPrey(sim, a) : undefined;
+    if (next) {
+      a.revengeOn = next.id;
+    } else {
+      a.manhunter = false;
+      a.leaving = true;
+    }
+  }
+
+  // Revenge: chase and bite whoever hurt us, until they're down.
+  if (a.revengeOn >= 0) {
+    const target = sim.colonists[a.revengeOn];
+    // Calm down once the target is down, out of reach, or after a while.
+    if (
+      !target ||
+      target.health.dead ||
+      target.health.downed ||
+      // (Off on an expedition: out of reach.)
+      !!target.away ||
+      !(a.revengeUntil > sim.tick) ||
+      sim.regionOf(target.tile) !== sim.regionOf(a.tile)
+    ) {
+      a.revengeOn = -1;
+      a.lashOut = false;
+      a.path = [];
+      // A manhunter turns on the next colonist it can reach, until its fury runs out.
+      if (a.manhunter) {
+        const next = a.revengeUntil > sim.tick ? nearestPrey(sim, a) : undefined;
+        if (next) {
+          a.revengeOn = next.id;
+        } else {
+          // Its fury spent, it goes back where it came from.
+          a.manhunter = false;
+          a.leaving = true;
+        }
+      }
+    } else if (chebyshev(sim, a.tile, target.tile) <= 1) {
+      a.path = [];
+      if (a.cooldown <= 0 && def.bite) {
+        const hit = sim.rng.next() < 0.75;
+        sim.shots.push({ from: a.tile, to: target.tile, hit, ranged: false, tick: sim.tick });
+        if (hit) {
+          damage(
+            sim,
+            target,
+            armorTakes(sim, target, def.bite[0] + sim.rng.next() * (def.bite[1] - def.bite[0])),
+            'cut',
+          );
+          sim.addThought(target, 'mauled');
+        }
+        a.cooldown = BITE_COOLDOWN;
+      }
+      return;
+    } else if (a.path.length === 0 || sim.tick % 30 === 0) {
+      pathTo(sim, a, [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))]);
+      if (a.path.length === 0) {
+        // Out of reach (behind a pen's gate, say): someone else if there is anyone, or it gives up.
+        const next = a.manhunter ? nearestPrey(sim, a) : undefined;
+        if (next && next !== target) {
+          a.revengeOn = next.id;
+        } else {
+          a.revengeOn = -1;
+          a.leaving ||= !!a.manhunter;
+          a.manhunter = false;
+        }
+      }
+    }
+  } else if (a.tame && guard(sim, a)) {
+    return;
+  } else if (a.leaving && !a.tame && !a.taming && !sim.huntable(a)) {
+    leave(sim, a);
+    return;
+  } else if (def.preys && !a.tame && !a.taming && stalk(sim, a)) {
+    return;
+  } else if (
+    def.fleeRange > 0 &&
+    !a.tame &&
+    !a.taming &&
+    a.path.length === 0 &&
+    // Looking about every few ticks is plenty (and spares checking every animal against everyone).
+    (sim.tick + a.id) % 4 === 0
+  ) {
+    // Skittish animals keep their distance from people, and from anything hunting them.
+    let near: number | undefined;
+    const ax = w.xOf(a.tile);
+    const ay = w.yOf(a.tile);
+    for (const c of awake) {
+      // (Distance is never less than the larger of dx and dy: a quick check before the real one.)
+      const dx = Math.abs(w.xOf(c.tile) - ax);
+      const dy = Math.abs(w.yOf(c.tile) - ay);
+      if (dx < def.fleeRange && dy < def.fleeRange && w.distance(c.tile, a.tile) < def.fleeRange) {
+        near = c.tile;
+        break;
+      }
+    }
+    if (near === undefined && chasedThisTick?.has(a.id)) {
+      for (const p of sim.animals) {
+        if (p.chasing === a.id && p.hp > 0 && w.distance(p.tile, a.tile) < 6) {
+          near = p.tile;
+          break;
+        }
+      }
+    }
+    if (near !== undefined) {
+      const to = wanderTarget(sim, a, WANDER_RADIUS, near);
+      if (to !== undefined) {
+        pathTo(sim, a, [to]);
+      }
+    }
+  }
+  if (a.path.length === 0 && a.revengeOn < 0 && sim.tick >= a.restUntil) {
+    // Tame animals keep to their pen if there is one; otherwise those that stray too far head back
+    // towards the colony.
+    const pen = penFor(sim, a);
+    const strayed = a.tame && home !== undefined && w.distance(a.tile, home) > HOME_RANGE;
+    const to = pen ? penTarget(sim, a, pen) : strayed ? homeward(sim, a, home) : wanderTarget(sim, a, WANDER_RADIUS);
+    if (to !== undefined) {
+      pathTo(sim, a, [to]);
+    }
+    // (Far off, it grazes longer where it is: nobody sees it, and finding its way about is most of its cost.)
+    a.restUntil = sim.tick + sim.rng.int(100, 400) * steps;
+  }
+  for (let step = 0; step < steps && a.path.length > 0; step++) {
+    move(sim, a);
   }
 }
 

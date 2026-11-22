@@ -38,11 +38,23 @@ browser at 1280×800).
 
 ### 1. Simulation speed (needed)
 
-- **Far-off wildlife takes turns.** An animal more than 40 tiles from any colonist, and not chasing, fleeing,
-  hunted or angry, moves every fourth tick. The rule depends only on the game state, so runs stay
-  deterministic. This targets the largest cost; expect animals to drop from about 19% to about 6% on XL.
-- **Wildlife caps grow more slowly than area.** Today an XL map would hold 9× Tiny's wildlife. Scaling with
-  the map's side rather than its area (4× Tiny on XL) still leaves the country full of game.
+- **Far-off wildlife takes turns (done).** An animal more than 40 tiles (either way) from every colonist at home,
+  and not tame, being tamed, marked for hunting, chasing, chased, angry, maddened or leaving, dozes
+  (`Animal.dozing`, saved with the game). It is looked at only on its own turn, every fourth tick, and then
+  moves four ticks' worth. Anything that comes after it wakes it at once. While dozing it also grazes four
+  times longer between wanders, because finding its way about was most of its cost. The rule depends only
+  on the game, so a seed plays the same every time.
+- **Wildlife caps grow more slowly than area (done).** `wildScale` grows with the area up to Large (Tiny to
+  Large are unchanged) and with the side past it, so XL holds 12× Tiny's wildlife (168 animals at most, 96 at
+  landing) where area scaling would give 16× (224 and 128).
+- **Measured after both** (eight seeds, 20,000 ticks from day 3, the same machine): XL went from 42.5 to
+  37.1 ms per 1,000 ticks. Animal pathfinding calls fell by about 40%. Large and Medium didn't change beyond
+  noise. The day-8 gate (45 ms) passes on this machine. The numbers above came from a slower one and should be
+  measured again there. The 30-day balance run (`bal 30 6`) still loses no colonists on Large or XL. XL
+  colonists go hungry a little more (489 starving colonist-hours against 404), which is for step 5 to check.
+- A lesson for later speed work: an extra check made on every animal every tick cost more than skipping three
+  ticks in four saved. Animals come in many object shapes, so each field read is slow. The far-off check runs
+  only on an animal's turn, and the rest of its update is its own function (`actAnimal`).
 - **Long paths.** Add a chunk-level route (16×16 chunks, linked where their edges are passable, rebuilt with
   `structureVersion`), then let A\* search inside the chunks along that route. This only matters for paths
   over about 48 tiles: arrivals from the edge, expeditions and long hauls.
@@ -95,7 +107,8 @@ browser at 1280×800).
 
 ## Order
 
-1. Wildlife turns and caps, then measure again (the gate may already pass).
+1. ~~Wildlife turns and caps, then measure again.~~ Done (see above). Pathfinding is still to be measured
+   against the 15% in step 6.
 2. Edge-tile list and the remaining scans.
 3. Autosave in parts.
 4. Chunked feature drawing zoomed out.

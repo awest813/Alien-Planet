@@ -283,6 +283,8 @@ export interface Animal {
   restUntil: number;
   // Tick when its anger wears off.
   revengeUntil: number;
+  // Far from everyone and about nothing in particular: it takes a turn only now and then (see animals.ts).
+  dozing?: boolean;
   // Part of a pack gone mad: it goes after one colonist after another until its fury runs out.
   manhunter?: boolean;
   // A wild predator's current prey (an animal id), and when it'll next be hungry.
