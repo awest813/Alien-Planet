@@ -80,12 +80,28 @@ size=256`) showed where whole-map work still cost something. The scans this plan
   130–190 ms.
 - **Gate:** `scripts/perf.ts size=256` under 45 ms at day 8, and a busy XL colony at day 40 under 100 ms.
 
-### 2. Saving (needed)
+### 2. Saving (done)
 
-- Autosave in parts across frames: serialize the arrays in one frame and write in the next. Or skip
-  unchanged layers (terrain changes rarely: give it a counter bumped by every `setTerrain`, ice included, rather than
-  `waterVersion`, which deliberately ignores freezing and thawing).
-- **Gate:** no autosave frame over 100 ms on a desktop at day 40 on XL.
+- **Measured first**, on a busy XL colony at day 40 (from the balance harness) in the real game in headless
+  Chromium, with drawing paused so the save alone shows. A whole autosave took 24–33 ms on a desktop, with no
+  long task, so the desktop gate already passed. The 330 ms above was from when listing the slots read every
+  save in full. Each save's summary is kept apart now. On a phone-speed CPU (Chromium's 4× throttle), though,
+  one task ran 68–116 ms and the worst frame was 122 ms, when another colony's autosave was moved aside first.
+  Almost all of that was the browser storing the map's layers: 3.6 MB on XL, nearly all zeroes.
+- **Mostly empty layers are saved as the tiles that aren't** (`packLayer`, save version 17). Each layer is
+  kept whole unless pairs of tile and value come to less than half its bytes. Every value comes back to the
+  bit, floats included, through the browser's storage. JSON can't tell -0 from 0, whole layers or packed.
+  Version 16 saves still load. A game from before refuses a 17 as "a newer version" rather than reading it as a
+  blank map. Packing the twenty layers takes about 2.5 ms on a desktop, and the write fell from about 13 ms to
+  4 ms.
+- **The write has a frame of its own:** the colony is copied in one frame and handed to storage after the next
+  frame is drawn. A hidden page gets no frames, so a page being left writes at once.
+- **Result** (the same colony and measurement): on a desktop, the worst frame is 25 ms and there's no long task.
+  At 4× throttle the worst frame is 56 ms (from 122). The one long task left (58–68 ms) is the first save,
+  before the browser has optimized the code. The other skipped option, leaving unchanged layers out, isn't
+  needed.
+- **Gate:** no autosave frame over 100 ms on a desktop at day 40 on XL. It passes, and passes on a throttled
+  phone too.
 
 ### 3. Drawing zoomed out (needed for phones)
 
@@ -123,7 +139,7 @@ size=256`) showed where whole-map work still cost something. The scans this plan
    against the 15% in step 6.
 2. ~~Edge-tile list and the remaining scans.~~ Done (see above). Raid days on a busy XL colony are still
    over the 100 ms gate.
-3. Autosave in parts.
+3. ~~Autosave in parts.~~ Done (see Saving).
 4. Chunked feature drawing zoomed out.
 5. Arrival timing, bookmarks, roads.
 6. Long-path chunk routes if the step 1 measurements still show pathfinding over 15%.

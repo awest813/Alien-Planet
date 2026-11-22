@@ -47,7 +47,103 @@ import { WeatherState } from './weather';
 import { World } from './world';
 
 // 16: recreation, art, music and gatherings added colonist fields older saves don't have.
-export const SAVE_VERSION = 16;
+// 17: a layer that's mostly empty is saved as the tiles that aren't (see packLayer). A game from before refuses it
+// as a newer version, rather than read it as a blank map; 16 still loads.
+export const SAVE_VERSION = 17;
+export const OLDEST_SAVE_VERSION = 16;
+export const loadableVersion = (version: number | undefined): boolean =>
+  version !== undefined && version >= OLDEST_SAVE_VERSION && version <= SAVE_VERSION;
+
+// A mostly empty layer: its length, the tiles that aren't empty, and what's on them.
+export interface PackedLayer {
+  length: number;
+  at: Int32Array;
+  values: Uint8Array | Uint16Array | Float32Array;
+}
+type Layer<T> = T | PackedLayer;
+
+// A layer as saved: whole, or (when that's less than half the bytes) only its tiles that aren't empty. An XL map's
+// layers came to 3.6 MB, nearly all zeroes, and writing them was most of an autosave's time on a slow phone. Every
+// value comes back to the bit (a float is compared and copied as its bits, so even -0 stays -0).
+export function packLayer<T extends Uint8Array | Uint16Array | Float32Array>(layer: T): Layer<T> {
+  const bits = layer instanceof Float32Array ? new Uint32Array(layer.buffer, layer.byteOffset, layer.length) : layer;
+  // Mostly empty, so looked over four bytes at a time: only a word that isn't all zeroes has its tiles looked at.
+  const perWord = 4 / layer.BYTES_PER_ELEMENT;
+  const aligned = layer.byteOffset % 4 === 0;
+  const wordCount = aligned ? Math.floor(layer.byteLength / 4) : 0;
+  const words = new Uint32Array(layer.buffer, aligned ? layer.byteOffset : 0, wordCount);
+  // (Two passes, the count and then the copy, written out: a callback for each tile was half the time.)
+  let n = 0;
+  for (let wi = 0; wi < wordCount; wi++) {
+    if (words[wi] !== 0) {
+      for (let i = wi * perWord, end = i + perWord; i < end; i++) {
+        n += bits[i] !== 0 ? 1 : 0;
+      }
+    }
+  }
+  for (let i = wordCount * perWord; i < bits.length; i++) {
+    n += bits[i] !== 0 ? 1 : 0;
+  }
+  if (n * (4 + layer.BYTES_PER_ELEMENT) * 2 > layer.length * layer.BYTES_PER_ELEMENT) {
+    return layer.slice() as T;
+  }
+  const at = new Int32Array(n);
+  const values =
+    layer instanceof Float32Array
+      ? new Float32Array(n)
+      : layer instanceof Uint16Array
+        ? new Uint16Array(n)
+        : new Uint8Array(n);
+  const out = values instanceof Float32Array ? new Uint32Array(values.buffer) : values;
+  let k = 0;
+  for (let wi = 0; wi < wordCount; wi++) {
+    if (words[wi] !== 0) {
+      for (let i = wi * perWord, end = i + perWord; i < end; i++) {
+        if (bits[i] !== 0) {
+          at[k] = i;
+          out[k++] = bits[i];
+        }
+      }
+    }
+  }
+  for (let i = wordCount * perWord; i < bits.length; i++) {
+    if (bits[i] !== 0) {
+      at[k] = i;
+      out[k++] = bits[i];
+    }
+  }
+  return { length: layer.length, at, values };
+}
+
+// (Through JSON a typed array is {"0": …, "1": …}, or an array from a file: its values, in order, either way.)
+const valuesOf = (v: unknown): ArrayLike<number> =>
+  ArrayBuffer.isView(v) || Array.isArray(v) ? (v as ArrayLike<number>) : Object.values(v as Record<string, number>);
+// (An array has `at`, `values` and `length` of its own: a layer from a file is one.)
+const isPacked = (v: unknown): v is PackedLayer =>
+  !!v && typeof v === 'object' && !Array.isArray(v) && !ArrayBuffer.isView(v) && 'at' in v && 'values' in v;
+
+// A saved layer into the world's own, whichever way it was saved.
+function unpackLayer(target: Uint8Array | Uint16Array | Float32Array | Float64Array, layer: unknown): void {
+  if (!isPacked(layer)) {
+    target.set(valuesOf(layer));
+    return;
+  }
+  target.fill(0);
+  const at = valuesOf(layer.at);
+  if (target instanceof Float32Array && layer.values instanceof Float32Array) {
+    // Bit for bit.
+    const bits = new Uint32Array(target.buffer, target.byteOffset, target.length);
+    const from = new Uint32Array(layer.values.buffer, layer.values.byteOffset, layer.values.length);
+    for (let k = 0; k < at.length; k++) {
+      bits[at[k]] = from[k];
+    }
+    return;
+  }
+  const values = valuesOf(layer.values);
+  for (let k = 0; k < at.length; k++) {
+    target[at[k]] = values[k];
+  }
+}
 
 interface SavedColonist {
   id: number;
@@ -121,26 +217,26 @@ export interface SaveData {
   height: number;
   layers: {
     terrain: Uint8Array;
-    feature: Uint8Array;
-    designation: Uint8Array;
-    zone: Uint8Array;
-    blueprint: Uint8Array;
-    delivered: Uint16Array;
-    itemType: Uint8Array;
-    itemCount: Uint16Array;
-    progress: Float32Array;
-    filth?: Uint8Array;
-    forbidden?: Uint8Array;
-    locked?: Uint8Array;
-    drying?: Float32Array;
-    growth: Float32Array;
-    fresh: Float32Array;
-    quality: Float32Array;
-    damage: Float32Array;
-    fire: Float32Array;
-    floor: Uint8Array;
-    roof: Uint8Array;
-    fuel: Float32Array;
+    feature: Layer<Uint8Array>;
+    designation: Layer<Uint8Array>;
+    zone: Layer<Uint8Array>;
+    blueprint: Layer<Uint8Array>;
+    delivered: Layer<Uint16Array>;
+    itemType: Layer<Uint8Array>;
+    itemCount: Layer<Uint16Array>;
+    progress: Layer<Float32Array>;
+    filth?: Layer<Uint8Array>;
+    forbidden?: Layer<Uint8Array>;
+    locked?: Layer<Uint8Array>;
+    drying?: Layer<Float32Array>;
+    growth: Layer<Float32Array>;
+    fresh: Layer<Float32Array>;
+    quality: Layer<Float32Array>;
+    damage: Layer<Float32Array>;
+    fire: Layer<Float32Array>;
+    floor: Layer<Uint8Array>;
+    roof: Layer<Uint8Array>;
+    fuel: Layer<Float32Array>;
     // Float64, so room temperatures come back exactly.
     temperature: Float64Array;
   };
@@ -206,26 +302,26 @@ export function serialize(sim: Simulation): SaveData {
     height: w.height,
     layers: {
       terrain: w.terrain.slice(),
-      feature: w.feature.slice(),
-      designation: w.designation.slice(),
-      zone: w.zone.slice(),
-      blueprint: w.blueprint.slice(),
-      delivered: w.delivered.slice(),
-      itemType: w.itemType.slice(),
-      itemCount: w.itemCount.slice(),
-      progress: w.progress.slice(),
-      filth: w.filth.slice(),
-      forbidden: w.forbidden.slice(),
-      locked: w.locked.slice(),
-      drying: w.drying.slice(),
-      growth: w.growth.slice(),
-      fresh: w.fresh.slice(),
-      quality: w.quality.slice(),
-      damage: w.damage.slice(),
-      fire: w.fire.slice(),
-      floor: w.floor.slice(),
-      roof: w.roof.slice(),
-      fuel: w.fuel.slice(),
+      feature: packLayer(w.feature),
+      designation: packLayer(w.designation),
+      zone: packLayer(w.zone),
+      blueprint: packLayer(w.blueprint),
+      delivered: packLayer(w.delivered),
+      itemType: packLayer(w.itemType),
+      itemCount: packLayer(w.itemCount),
+      progress: packLayer(w.progress),
+      filth: packLayer(w.filth),
+      forbidden: packLayer(w.forbidden),
+      locked: packLayer(w.locked),
+      drying: packLayer(w.drying),
+      growth: packLayer(w.growth),
+      fresh: packLayer(w.fresh),
+      quality: packLayer(w.quality),
+      damage: packLayer(w.damage),
+      fire: packLayer(w.fire),
+      floor: packLayer(w.floor),
+      roof: packLayer(w.roof),
+      fuel: packLayer(w.fuel),
       temperature: sim.tileTemperatures(),
     },
     colonists: sim.colonists.map((c) =>
@@ -333,49 +429,35 @@ export function serialize(sim: Simulation): SaveData {
 }
 
 export function deserialize(data: SaveData): Simulation {
-  if (data.version !== SAVE_VERSION) {
+  if (!loadableVersion(data.version)) {
     throw new Error(`Unsupported save version ${data.version}`);
   }
   const world = new World(data.width, data.height);
-  // (A save that's been through JSON, as the old saves the tests load have, has each layer as {"0": …, "1": …}:
-  // TypedArray.set takes that as empty, and the map loaded blank. Its values, in order, are the layer.)
-  const layers = Object.fromEntries(
-    Object.entries(data.layers).map(([key, layer]) => [
-      key,
-      layer && typeof layer === 'object' && !ArrayBuffer.isView(layer) && !Array.isArray(layer)
-        ? Object.values(layer as Record<string, number>)
-        : layer,
-    ]),
-  ) as SaveData['layers'];
-  world.terrain.set(layers.terrain);
-  world.feature.set(layers.feature);
-  world.designation.set(layers.designation);
-  world.zone.set(layers.zone);
-  world.blueprint.set(layers.blueprint);
-  world.delivered.set(layers.delivered);
-  world.itemType.set(layers.itemType);
-  world.itemCount.set(layers.itemCount);
-  world.progress.set(layers.progress);
-  if (layers.filth) {
-    world.filth.set(layers.filth);
+  // (A layer that's been through JSON, as the old saves the tests load have, is {"0": …, "1": …}: TypedArray.set
+  // takes that as empty, and the map loaded blank. Its values, in order, are the layer; see unpackLayer.)
+  const layers = data.layers;
+  unpackLayer(world.terrain, layers.terrain);
+  unpackLayer(world.feature, layers.feature);
+  unpackLayer(world.designation, layers.designation);
+  unpackLayer(world.zone, layers.zone);
+  unpackLayer(world.blueprint, layers.blueprint);
+  unpackLayer(world.delivered, layers.delivered);
+  unpackLayer(world.itemType, layers.itemType);
+  unpackLayer(world.itemCount, layers.itemCount);
+  unpackLayer(world.progress, layers.progress);
+  for (const key of ['filth', 'forbidden', 'locked', 'drying'] as const) {
+    if (layers[key]) {
+      unpackLayer(world[key], layers[key]);
+    }
   }
-  if (layers.forbidden) {
-    world.forbidden.set(layers.forbidden);
-  }
-  if (layers.locked) {
-    world.locked.set(layers.locked);
-  }
-  if (layers.drying) {
-    world.drying.set(layers.drying);
-  }
-  world.growth.set(layers.growth);
-  world.fresh.set(layers.fresh);
-  world.quality.set(layers.quality);
-  world.damage.set(layers.damage);
-  world.fire.set(layers.fire);
-  world.floor.set(layers.floor);
-  world.roof.set(layers.roof);
-  world.fuel.set(layers.fuel);
+  unpackLayer(world.growth, layers.growth);
+  unpackLayer(world.fresh, layers.fresh);
+  unpackLayer(world.quality, layers.quality);
+  unpackLayer(world.damage, layers.damage);
+  unpackLayer(world.fire, layers.fire);
+  unpackLayer(world.floor, layers.floor);
+  unpackLayer(world.roof, layers.roof);
+  unpackLayer(world.fuel, layers.fuel);
   // Saves from before fires burned wood have every fire empty: light them with a full load.
   if (!layers.forbidden) {
     for (let i = 0; i < world.size; i++) {
@@ -472,7 +554,7 @@ export function deserialize(data: SaveData): Simulation {
   sim.firstNight = data.firstNight;
   sim.objectivesDone = { ...data.objectivesDone };
   sim.syncClock();
-  sim.setTileTemperatures(layers.temperature);
+  sim.setTileTemperatures(valuesOf(layers.temperature));
   sim.setRoomTemperatures(data.roomTemps);
   sim.weather = { ...data.weather };
   for (let i = 0; i < world.size; i++) {

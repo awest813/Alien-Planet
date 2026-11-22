@@ -14,7 +14,7 @@ import {
   forgetHelp,
 } from '../game/settings';
 import { SHARPNESS_AUTO, retrySharp } from '../render/sharpness';
-import { SAVE_VERSION } from '../sim/serialize';
+import { SAVE_VERSION, loadableVersion } from '../sim/serialize';
 import { MAP_SIZE, MAP_SIZES } from '../sim/simulation';
 import { DIFFICULTIES, Difficulty } from '../sim/storyteller';
 import { BIOME_LIST, Biome, MAP_KINDS, MapKind } from '../sim/biomes';
@@ -208,7 +208,7 @@ function SaveSlots({
         <tbody>
           {SAVE_SLOTS.map((slot) => {
             const meta = savesBySlot.get(slot);
-            const outdated = !!meta && meta.version !== SAVE_VERSION;
+            const outdated = !!meta && !loadableVersion(meta.version);
             // (Nothing is ever saved by hand to the autosaves: an empty one isn't worth a row.)
             if (!meta && slot === 'autosave-2') {
               return null;
@@ -382,7 +382,7 @@ export function TitleScreen({ actions }: { actions: MenuActions }) {
             {/* The new colony takes over the autosave slot once it's under way. */}
             <NewColonyForm
               confirm={
-                state.saves.some((s) => s.slot === 'autosave' && s.version === SAVE_VERSION)
+                state.saves.some((s) => s.slot === 'autosave' && loadableVersion(s.version))
                   ? 'Replace the autosave?'
                   : null
               }

@@ -45,7 +45,7 @@ import { comfortRange, qualityLabel } from '../sim/apparel';
 import { MAX_SKILL, SKILL_LABELS, xpToNext } from '../sim/skills';
 import { relationLabel } from '../sim/social';
 import { hashSeed } from '../sim/rng';
-import { SAVE_VERSION, SaveData, deserialize, serialize } from '../sim/serialize';
+import { SAVE_VERSION, SaveData, deserialize, loadableVersion, serialize } from '../sim/serialize';
 import {
   BOOKS_BONUS,
   BOOKS_REACH,
@@ -860,6 +860,12 @@ const STEP_BUDGET_MS = 12;
 // How the clock's pace is judged (see measurePace).
 const PACE_WINDOW_MS = 3000;
 const PACE_SHORT = 0.85;
+// Resolves once the next frame has been drawn, or at once on a hidden page (which gets no frames).
+const afterNextFrame = (): Promise<void> =>
+  typeof document === 'undefined' || document.hidden || typeof requestAnimationFrame === 'undefined'
+    ? Promise.resolve()
+    : new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+
 // The autosave, the one before it (a different colony's, kept when another took the slot), and the player's own.
 // A save the game can't run (missing parts, or one that fails once loaded).
 class DamagedSave extends Error {}
@@ -1692,7 +1698,7 @@ export class GameController {
 
   // The most recent save made by this version of the game.
   private latestSave(): SaveMeta | null {
-    return this.saves.filter((s) => s.version === SAVE_VERSION).sort((a, b) => b.savedAt - a.savedAt)[0] ?? null;
+    return this.saves.filter((s) => loadableVersion(s.version)).sort((a, b) => b.savedAt - a.savedAt)[0] ?? null;
   }
 
   public async continueLatest(): Promise<boolean> {
@@ -2485,36 +2491,41 @@ export class GameController {
   // Returns whether the save was written.
   public async save(slot: string, auto = false): Promise<boolean> {
     const sim = this.sim;
-    const mark = { version: this.simVersion, tick: sim.tick, commands: this.commandCount };
+    const version = this.simVersion;
     try {
       // Another colony's autosave isn't lost to this one's: it moves to the earlier slot. (Loading a slot from the
       // title, then leaving, put the loaded colony over the only save of the one played before.)
       if (slot === 'autosave') {
         const last = this.saves.find((s) => s.slot === 'autosave');
-        if (last && last.seed !== sim.seed && last.version === SAVE_VERSION) {
+        if (last && last.seed !== sim.seed && loadableVersion(last.version)) {
           await copySave('autosave', 'autosave-2');
         }
       }
-      await writeSave(
-        {
-          slot,
-          day: sim.day,
-          hour: Math.floor(sim.hour),
-          seed: sim.seed,
-          savedAt: Date.now(),
-          version: SAVE_VERSION,
-          // (Counting anyone away on a trip: they're coming home.)
-          colonists: sim.headcount(),
-          difficulty: sim.story.difficulty,
-          mapSize: sim.world.width,
-          biome: sim.biome,
-          names: sim
-            .living()
-            .slice(0, 3)
-            .map((c) => c.name),
-        },
-        serialize(sim),
-      );
+      // The colony as it is now (what's saved is a copy: play can go on), and what that covers.
+      const data = serialize(sim);
+      const mark = { version, tick: sim.tick, commands: this.commandCount };
+      const meta: SaveMeta = {
+        slot,
+        day: sim.day,
+        hour: Math.floor(sim.hour),
+        seed: sim.seed,
+        savedAt: Date.now(),
+        version: SAVE_VERSION,
+        // (Counting anyone away on a trip: they're coming home.)
+        colonists: sim.headcount(),
+        difficulty: sim.story.difficulty,
+        mapSize: sim.world.width,
+        biome: sim.biome,
+        names: sim
+          .living()
+          .slice(0, 3)
+          .map((c) => c.name),
+      };
+      // Written in a frame of its own: copying the colony and handing it to the browser's storage in one went over
+      // a tenth of a second on a slow phone with a big map. (Not when the page is hidden: no frames come then, and
+      // a page being left needs it written now.)
+      await afterNextFrame();
+      await writeSave(meta, data);
       if (mark.version === this.simVersion) {
         this.lastSaved = { ...mark, at: Date.now() };
       }
@@ -2570,7 +2581,7 @@ export class GameController {
         this.notify(`Nothing saved in ${slotLabel(slot).toLowerCase()}.`);
         return false;
       }
-      if (data.version !== SAVE_VERSION) {
+      if (!loadableVersion(data.version)) {
         this.notify(
           `That save is from ${data.version > SAVE_VERSION ? 'a newer' : 'an older'} version and cannot be loaded.`,
         );
@@ -2649,7 +2660,7 @@ export class GameController {
       if (!data || typeof data !== 'object' || typeof data.version !== 'number') {
         throw new DamagedSave('not a save');
       }
-      if (data.version !== SAVE_VERSION) {
+      if (!loadableVersion(data.version)) {
         this.notify(
           `That file is from ${data.version > SAVE_VERSION ? 'a newer' : 'an older'} version and cannot be loaded.`,
         );
