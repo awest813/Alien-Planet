@@ -53,6 +53,29 @@ test('title, new colony, and the welcome closes', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('a new colony lands with the supplies chosen, and the choice is remembered', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/');
+  const title = page.getByRole('dialog', { name: 'Colony Alpha' });
+  await title.getByRole('button', { name: 'New colony' }).click();
+  // Silver, unless chosen otherwise.
+  await expect(title.getByRole('button', { name: /^Silver/ })).toHaveAttribute('aria-pressed', 'true');
+  await title.getByRole('button', { name: /^Tools/ }).click();
+  await expect(title.getByRole('button', { name: /^Tools/ })).toHaveAttribute('aria-pressed', 'true');
+  await title.getByLabel('Seed').fill('supplies');
+  await title.getByRole('button', { name: 'Start colony' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.screens')).toBeVisible();
+  type Colony = { settings: { newSupplies: string }; sim: { log: { text: string }[] } };
+  const { chosen, landed } = await page.evaluate(() => {
+    const colony = (window as unknown as { colony: Colony }).colony;
+    return { chosen: colony.settings.newSupplies, landed: colony.sim.log[0].text };
+  });
+  expect(landed).toContain('and two tool kits');
+  expect(chosen).toBe('tools');
+  expect(errors).toEqual([]);
+});
+
 test('every top-bar screen opens and closes with Esc', async ({ page }) => {
   const errors = watchErrors(page);
   await startColony(page);

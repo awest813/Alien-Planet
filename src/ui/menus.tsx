@@ -18,6 +18,7 @@ import { SAVE_VERSION } from '../sim/serialize';
 import { MAP_SIZE, MAP_SIZES } from '../sim/simulation';
 import { DIFFICULTIES, Difficulty } from '../sim/storyteller';
 import { BIOME_LIST, Biome, MAP_KINDS, MapKind } from '../sim/biomes';
+import { SUPPLIES, Supplies } from '../sim/supplies';
 import { GOODWILL_PER, VISIT_GOODWILL, dealBalance, lotsValue, visitGoodwill } from '../sim/trade';
 
 // One price, or the range when the stacks differ (worn, spoiling or finely made); the worst go first.
@@ -81,8 +82,9 @@ function NewColonyForm({
   const [mapSize, setMapSize] = useState(MAP_SIZES.find((m) => m.size === last.newMapSize)?.size ?? MAP_SIZE);
   const [biome, setBiome] = useState<Biome>(BIOME_LIST.find((b) => b.key === last.newBiome)?.key ?? 'temperate');
   const [mapKind, setMapKind] = useState<MapKind>(MAP_KINDS.find((m) => m.key === last.newMap)?.key ?? 'valley');
+  const [supplies, setSupplies] = useState<Supplies>(SUPPLIES.find((s) => s.key === last.newSupplies)?.key ?? 'silver');
   const start = () => {
-    controller.newColony(seed, difficulty, mapSize, biome, mapKind);
+    controller.newColony(seed, difficulty, mapSize, biome, mapKind, supplies);
     onStarted();
   };
   return (
@@ -147,6 +149,21 @@ function NewColonyForm({
         ))}
       </div>
       <p className="choice-note">{MAP_KINDS.find((m) => m.key === mapKind)?.description}</p>
+      <h3>Supplies</h3>
+      <div className="difficulties">
+        {SUPPLIES.map((s) => (
+          <button
+            key={s.key}
+            className={supplies === s.key ? 'active' : ''}
+            aria-pressed={supplies === s.key}
+            onClick={() => setSupplies(s.key)}
+          >
+            <b>{s.label}</b>
+            <span>{s.description}</span>
+          </button>
+        ))}
+      </div>
+      <p className="choice-note">{SUPPLIES.find((s) => s.key === supplies)?.description}</p>
       <div className="row start-row">
         {onBack && <button onClick={onBack}>Back</button>}
         <input

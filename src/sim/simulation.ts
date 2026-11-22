@@ -242,6 +242,7 @@ import {
 } from './world';
 import { generateWorld } from './worldgen';
 import type { Biome, MapKind } from './biomes';
+import { Supplies, suppliesDef } from './supplies';
 
 export { MAP_SIZE, MAP_SIZES, NIGHT_END, NIGHT_START, START_HOUR, TICKS_PER_HOUR, populationFor } from './constants';
 const LOG_LIMIT = 60;
@@ -998,9 +999,10 @@ export class Simulation {
     seed: number,
     difficulty: Difficulty = 'standard',
     size = MAP_SIZE,
-    land: { biome?: Biome; map?: MapKind } = {},
+    land: { biome?: Biome; map?: MapKind; supplies?: Supplies } = {},
   ): Simulation {
     const biome = land.biome ?? 'temperate';
+    const supplies = suppliesDef(land.supplies);
     const { world, spawn } = generateWorld(size, size, seed, biome, land.map);
     const rng = new Rng(seed ^ 0x9e3779b9);
     const names = [...COLONIST_NAMES];
@@ -1027,8 +1029,10 @@ export class Simulation {
     if (biome === 'tundra') {
       world.dropItemNear(spawn, itemId('tunic'), landing);
     }
-    // A little silver for the first traders who come by.
-    world.dropItemNear(spawn, itemId('silver'), 100);
+    // What they chose to bring (see supplies.ts): by default a little silver for the first traders who come by.
+    for (const [item, count] of supplies.goods(landing)) {
+      world.dropItemNear(spawn, itemId(item), count);
+    }
     // Timber salvaged from the landing: enough for a door and a bed or two, to make the first night easier.
     world.dropItemNear(spawn, itemId('wood'), SALVAGED_WOOD + (island ? ISLAND_TIMBER : 0));
     // And on an island a fishing spot on the shore nearest the landing, rigged from the boat: the lake is what
@@ -1046,7 +1050,7 @@ export class Simulation {
     populateWildlife(sim, Math.round((8 * world.size) / (MAP_SIZE * MAP_SIZE)), spawn);
     sim.wildCover = wildPlantCover(sim);
     sim.addLog(
-      `${NUMBER_WORDS[landing] ?? landing} colonists have landed with a few days of rations and some salvaged timber. Give orders from the build bar (Chop, Mine, Stockpile) and they will get to it.`,
+      `${NUMBER_WORDS[landing] ?? landing} colonists have landed with ${supplies.words ? `a few days of rations, some salvaged timber and ${supplies.words(landing)}` : 'a few days of rations and some salvaged timber'}. Give orders from the build bar (Chop, Mine, Stockpile) and they will get to it.`,
       'info',
       true,
     );

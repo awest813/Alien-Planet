@@ -89,6 +89,7 @@ describe('settings', () => {
       newMapSize: 96,
       newBiome: 'desert',
       newMap: 'island',
+      newSupplies: 'tools',
     };
     const reset = resetSettings(mine);
     expect(reset).toEqual({
@@ -98,6 +99,7 @@ describe('settings', () => {
       newMapSize: 96,
       newBiome: 'desert',
       newMap: 'island',
+      newSupplies: 'tools',
     });
   });
 

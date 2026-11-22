@@ -38,11 +38,12 @@ export interface Settings {
   masterVolume: number;
   musicVolume: number;
   effectsVolume: number;
-  // The last new colony's difficulty, map size, land and map, offered again next time.
+  // The last new colony's difficulty, map size, land, map and supplies, offered again next time.
   newDifficulty: string;
   newMapSize: number;
   newBiome: string;
   newMap: string;
+  newSupplies: string;
 }
 
 function defaultScale(): number {
@@ -88,6 +89,7 @@ export const DEFAULT_SETTINGS: Settings = {
   newMapSize: 64,
   newBiome: 'temperate',
   newMap: 'valley',
+  newSupplies: 'silver',
 };
 
 export const UI_SCALES = [
@@ -190,16 +192,16 @@ export function storeSettings(settings: Settings, picked: readonly (keyof Settin
 
 // What "Reset to defaults" puts back: everything but the sound being on, and the last new colony's choices (it
 // turned the sound off and forgot them, with no warning).
-export const KEPT_ON_RESET = ['sound', 'newDifficulty', 'newMapSize', 'newBiome', 'newMap'] as const;
+export const KEPT_ON_RESET = ['sound', 'newDifficulty', 'newMapSize', 'newBiome', 'newMap', 'newSupplies'] as const;
 export function resetSettings(settings: Settings): Settings {
-  const { sound, newDifficulty, newMapSize, newBiome, newMap } = settings;
+  const { sound, newDifficulty, newMapSize, newBiome, newMap, newSupplies } = settings;
   // (Forgotten as choices too, but for those kept: the defaults follow the screen again.)
   for (const key of [...chosen]) {
     if (!(KEPT_ON_RESET as readonly string[]).includes(key)) {
       chosen.delete(key);
     }
   }
-  return { ...DEFAULT_SETTINGS, sound, newDifficulty, newMapSize, newBiome, newMap };
+  return { ...DEFAULT_SETTINGS, sound, newDifficulty, newMapSize, newBiome, newMap, newSupplies };
 }
 
 // Whether the welcome help has been seen (it opens by itself on a first colony until then).

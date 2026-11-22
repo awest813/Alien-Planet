@@ -14,11 +14,16 @@ how nice their rooms are. Let mood drop too far for too long and a colonist will
 
 The game opens on a title screen: **Continue** picks up your most recent save, **New colony** asks for a
 difficulty, map size, land (temperate, tundra, desert or forest), lie of the land (an open valley, a river
-crossing it, or an island in a lake) and seed, and **Load game**, **Settings** and **How to play** are there too. In a game,
+crossing it, or an island in a lake), supplies and seed, and **Load game**, **Settings** and **How to play** are there too. In a game,
 Esc (once there's no tool or selection to drop) or the Menu button opens the pause menu: resume, save or
 load, start a new colony, settings, help, or quit to the title (which autosaves). The game also autosaves
 every dawn and whenever you leave the page, so a closed tab doesn't lose the colony. When everyone has
 died, a summary shows how the colony fared.
+
+**Supplies** are what the colonists land with besides their rations and salvaged timber: **Silver** (100, for
+the first traders: the usual start), **Tools** (two tool kits), **Medicine** (six herbal medicine), **Provisions**
+(three more meals each) or **Building stock** (60 wood and 40 granite chunks). Each but Silver keeps 20 silver
+too, and all are worth about the same; the last choice is offered again next time.
 
 **Settings** (remembered in the browser): autosave, pausing on raids and on deaths or collapses, sound (off by
 default, with volume sliders for music and for ambience and alerts), day and night lighting, interface

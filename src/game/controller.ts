@@ -27,6 +27,7 @@ import {
 } from '../sim/defs';
 import { availableProjects, isAvailable, researchCost } from '../sim/research';
 import type { Biome, MapKind } from '../sim/biomes';
+import type { Supplies } from '../sim/supplies';
 import { DAYS_PER_SEASON, daysUntilWinter, seasonDay, seasonOf, yearOf } from '../sim/seasons';
 import { ChronicleKind } from '../sim/chronicle';
 import { animalName } from '../sim/animals';
@@ -2344,9 +2345,16 @@ export class GameController {
     size = MAP_SIZE,
     biome: Biome = 'temperate',
     map: MapKind = 'valley',
+    supplies: Supplies = 'silver',
   ): void {
     // Offer the same choices next time.
-    this.setSettings({ newDifficulty: difficulty, newMapSize: size, newBiome: biome, newMap: map });
+    this.setSettings({
+      newDifficulty: difficulty,
+      newMapSize: size,
+      newBiome: biome,
+      newMap: map,
+      newSupplies: supplies,
+    });
     const trimmed = seedText.trim();
     // A number typed as the seed is used as it is, if it fits the generator's 32 bits; anything else (words, or
     // digits too long to keep exactly) is hashed, so the seed shown is always one that gives this map again.
@@ -2356,7 +2364,7 @@ export class GameController {
         : /^\d{1,10}$/.test(trimmed) && Number(trimmed) <= 0xffffffff
           ? Number(trimmed)
           : hashSeed(trimmed);
-    this.replaceSim(Simulation.newColony(seed, difficulty, size, { biome, map }));
+    this.replaceSim(Simulation.newColony(seed, difficulty, size, { biome, map, supplies }));
     this.inPlay = true;
     // The clock waits for the player: there's a deadline (the first nightfall), and reading the goals and
     // getting the first orders down shouldn't eat into it.

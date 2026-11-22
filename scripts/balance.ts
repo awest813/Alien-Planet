@@ -2,7 +2,7 @@
 // survival, combat, health, mood and social statistics.
 //
 //   npx tsx scripts/balance.ts [days=20] [seeds=8] [passive|defend] [craft] [diplomat] [peaceful|harsh] [trace] [size=64] [seed=N] [start=K] [nohunt] [surplus] [pen] [flow]
-//     [biome=tundra|desert|forest] [map=river|island]
+//     [biome=tundra|desert|forest] [map=river|island] [supplies=tools|medicine|provisions|building]
 //
 // "passive" never drafts during raids, to measure the worst case; "defend" holds a sandbag line; "craft" builds a
 // kiln and a smelter and makes bricks, iron and iron goods; "diplomat" buys off raids, sets the village policies
@@ -12,6 +12,7 @@
 // first K seeds; "nohunt" leaves the wildlife alone. With DEBUG=1 in the environment, a trace also
 // shows research, production, bills, rooms and heaters; with STOCKS=1, each colony ends with its stocks of
 // workshop materials, their bills and the workshops built.
+import type { Supplies } from '../src/sim/supplies';
 import { buyBackCost, takenList } from '../src/sim/taken';
 import { Biome, MapKind } from '../src/sim/biomes';
 import { colonistTarget, lineOfSight } from '../src/sim/combat';
@@ -97,6 +98,8 @@ const mapSize = Number(process.argv.find((a) => a.startsWith('size='))?.slice(5)
 // "biome=tundra" (or desert, forest) and "map=river" (or island) pick the land.
 const biome = (process.argv.find((a) => a.startsWith('biome='))?.slice(6) ?? 'temperate') as Biome;
 const mapKind = (process.argv.find((a) => a.startsWith('map='))?.slice(4) ?? 'valley') as MapKind;
+// "supplies=tools" (or medicine, provisions, building) picks what they land with; silver otherwise.
+const supplies = (process.argv.find((a) => a.startsWith('supplies='))?.slice(9) ?? 'silver') as Supplies;
 const difficulty: Difficulty = process.argv.includes('harsh')
   ? 'harsh'
   : process.argv.includes('peaceful')
@@ -397,7 +400,7 @@ function snapshot(sim: Simulation): Record<string, number> {
 }
 
 function play(seed: number): Result {
-  const sim = Simulation.newColony(seed, difficulty, mapSize, { biome, map: mapKind });
+  const sim = Simulation.newColony(seed, difficulty, mapSize, { biome, map: mapKind, supplies });
   sim.apply({
     type: 'policy',
     rations: policy.includes('frugal') ? 'frugal' : policy.includes('generous') ? 'generous' : 'normal',
