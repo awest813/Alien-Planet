@@ -645,6 +645,9 @@ function stillLeadsTo(w: World, e: Enemy, target: number, ranged: boolean, slack
   return !ranged && end !== undefined && chebyshev(w, end, target) <= 1 + Math.floor(e.path.length * slack);
 }
 const ALLY_SLACK = 0.25;
+// The same for a raider coming for a colonist on the move: on an XL map, raiders working out a walk of 60 tiles and
+// more every 30 ticks as their quarry moved were a third of a big raid's time.
+const CHASE_SLACK = 0.25;
 
 function moveEnemy(sim: Simulation, e: Enemy, ally = false): void {
   const w = sim.world;
@@ -1151,7 +1154,7 @@ export function updateEnemies(sim: Simulation): void {
       }
       continue;
     }
-    if (e.path.length === 0 || (e.repathAt <= sim.tick && !stillLeadsTo(w, e, target.tile, ranged))) {
+    if (e.path.length === 0 || (e.repathAt <= sim.tick && !stillLeadsTo(w, e, target.tile, ranged, CHASE_SLACK))) {
       e.repathAt = sim.tick + (ranged ? POST_RETHINK : 30);
       // Archers close to within reach and pick a firing position; melee fighters charge.
       const post =

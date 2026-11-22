@@ -253,7 +253,16 @@ fastest speed, a slow machine would drop frames through it. That's worth a look 
 
   After it, `bal 48 6`, starving colonist-hours: Medium 215 to 207 (73 of 73 alive), Large 394 to 279 (92 of 92),
   XL 700 to 353 (90 of 91, one of old age). XL now goes hungry less than Large did before, with one break on each.
-  Still to run: XL with its own population (7 landing, room for 18) and the ten-year game.
+
+- **XL with its own population** (7 landing, room for 18, in a test build; not offered yet), `bal 48 6`: 108 of
+  109 alive (one of old age), 1 to 3 breaks, 446 to 471 starving colonist-hours (about 4 an hour a colonist,
+  against Large's 3 to 4), and 80 to 98 ms per 1,000 ticks on average.
+- **Raiders chasing a colonist on the move** keep their course as allies do (`CHASE_SLACK`): in the worst raid of
+  that run (14 raiders and 5 allies), raiders working out walks of 60 tiles and more every 30 ticks were a third
+  of the time. Replayed from a save, it went from 173–185 to 120–124 ms per 1,000 ticks. The balance came out the
+  same within noise (Large 91 of 91, XL 108 of 109).
+- **Still to do:** single raid days still reach 200–400 ms in the balance runs, with the worst raids (many
+  raiders, allies, a long chase). Then the ten-year game on XL (`years.mjs 240 2 size=256`).
 
 ### 4. Play on a big map (done, but for outposts)
 
