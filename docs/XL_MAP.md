@@ -261,8 +261,25 @@ fastest speed, a slow machine would drop frames through it. That's worth a look 
   that run (14 raiders and 5 allies), raiders working out walks of 60 tiles and more every 30 ticks were a third
   of the time. Replayed from a save, it went from 173–185 to 120–124 ms per 1,000 ticks. The balance came out the
   same within noise (Large 91 of 91, XL 108 of 109).
-- **Still to do:** single raid days still reach 200–400 ms in the balance runs, with the worst raids (many
-  raiders, allies, a long chase). Then the ten-year game on XL (`years.mjs 240 2 size=256`).
+- **Raiders setting off together share the way:** in the worst raid of that run, a fifth of raiders' searches were
+  the same search again, by several raiders on one tile in the same tick. The way is worked out once a tick for
+  each tile and goal (the ground as it stands), and each gets a copy (balance output identical): searches fell
+  from 312 to 247.
+- **The ten-year game** (`years.mjs 240 2 size=256`, XL's own population, in a test build), two colonies:
+  - population steady at 16 to 19, births (7 and 5) making up for deaths, all of old age; 20 of 26 and 20 of 22
+    ever alive at the end;
+  - food 7 to 63 days in store, mood 50 to 73, breaks 10 and 4 in ten years;
+  - the save about 1.5 to 1.7 MB the whole way, not growing;
+  - speed: 104 and 117 ms per 1,000 ticks over the ten years (with other runs sharing the machine, so on the
+    high side), later years mostly 100 to 130, raid hours about 200, the worst single days 516 and 541.
+- **The worst of those was a siege** (day 140, 22 raiders against 21 colonists). Raiders walking to their post
+  worked out the whole way again every 60 ticks, though the post doesn't move, and every siege raider looked
+  every colonist over each tick for a charge or a shot that mostly wasn't due. Fixed (the colonist checks give
+  the same answers): 184–196 to 150–157 ms.
+- **What's left:** a colony of 20 in its later years runs at about 100 to 130 ms on an ordinary day, most of it
+  colonists choosing work, which grows with their number; big raids and sieges still about 150. At the fastest
+  speed on a slow machine, that's where an XL colony would start to drag. The plan's gate (day 40 under 100)
+  passes; later years would want their own look before XL is offered, or the fastest speed capped on XL.
 
 ### 4. Play on a big map (done, but for outposts)
 
