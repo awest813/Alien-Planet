@@ -541,3 +541,77 @@ describe('downed and alone: edge cases', () => {
     expect(c.needs.food).toBeGreaterThan(0.5);
   });
 });
+
+describe('a drafted colonist starving', () => {
+  // A colony with its food a little way off and one colonist drafted, starving, at a post of their own.
+  function drafted(seed: number) {
+    const sim = Simulation.newColony(seed);
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 14);
+    sim.animals = [];
+    for (let i = 0; i < w.size; i++) {
+      if (w.itemType[i] !== 0 && (itemDef(w.itemType[i]).nutrition ?? 0) > 0) {
+        w.takeItem(i, w.itemCount[i]);
+      }
+    }
+    w.dropItemNear(w.idx(x - 8, y), itemId('meal'), 5);
+    const c = sim.colonists[0];
+    const post = w.idx(x + 6, y);
+    sim.apply({ type: 'draft', colonist: c.id, drafted: true });
+    sim.apply({ type: 'move', colonist: c.id, tile: post });
+    run(sim, HOUR);
+    expect(c.tile).toBe(post);
+    c.needs.food = 0.02;
+    return { sim, w, c, post, x, y };
+  }
+
+  it('goes for a bite with nobody to fight near, and comes back to their post still drafted', () => {
+    const { sim, c, post } = drafted(41);
+    let ate = false;
+    for (let t = 0; t < HOUR * 2 && !(ate && c.tile === post); t++) {
+      sim.step();
+      ate ||= c.needs.food > 0.3;
+    }
+    expect(ate).toBe(true);
+    expect(c.drafted).toBe(true);
+    expect(c.tile).toBe(post);
+    expect(sim.describe(c)).not.toBe('Drafted: getting something to eat');
+  });
+
+  it('stays put with a raider near, and an order calls a meal off', () => {
+    const { sim, w, c, post } = drafted(42);
+    // An angry boar fifteen tiles off: no meal.
+    sim.animals.push({
+      id: sim.nextAnimalId++,
+      kind: 'boar',
+      tile: w.idx(w.xOf(post) + 15, w.yOf(post)),
+      path: [],
+      moveProgress: 0,
+      hp: 50,
+      hunted: false,
+      taming: false,
+      tame: false,
+      revengeOn: c.id,
+      cooldown: 0,
+      restUntil: 0,
+      revengeUntil: sim.tick + HOUR * 9,
+    });
+    for (let t = 0; t < 40; t++) {
+      sim.step();
+    }
+    expect(c.job?.type).not.toBe('eat');
+    // Gone for a meal, then sent elsewhere: the order stands.
+    sim.animals = [];
+    for (let t = 0; t < 40 && c.job?.type !== 'eat'; t++) {
+      sim.step();
+    }
+    expect(c.job?.type).toBe('eat');
+    const there = w.idx(w.xOf(post), w.yOf(post) + 4);
+    sim.apply({ type: 'move', colonist: c.id, tile: there });
+    for (let t = 0; t < HOUR && c.tile !== there; t++) {
+      sim.step();
+    }
+    expect(c.tile).toBe(there);
+    expect(c.job?.type).not.toBe('eat');
+  });
+});

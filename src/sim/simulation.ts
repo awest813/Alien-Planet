@@ -46,6 +46,7 @@ import {
 } from './defs';
 import {
   angered,
+  angryAnimals,
   animalName,
   animalsAtDawn,
   keepBreedingPairs,
@@ -252,6 +253,9 @@ const STORY_LIMIT = 200;
 
 // Need rates, per tick.
 const FOOD_DECAY = 1 / (TICKS_PER_HOUR * 16);
+// A drafted colonist this hungry, with no threat this near, goes for a bite (see draftedMeal).
+const DRAFTED_MEAL_BELOW = 0.05;
+const DRAFTED_MEAL_CLEAR = 20;
 // Rest lasts twenty waking hours: up rested at 6:00, tired about 21:00. (At eighteen, everyone was tired from
 // 19:00 or 20:00 to bed every evening, a mood tax nothing a player built or chose could lift.)
 const REST_DECAY = 1 / (TICKS_PER_HOUR * 20);
@@ -1646,6 +1650,7 @@ export class Simulation {
           break;
         }
         this.endJob(c);
+        this.mealReturn.delete(c.id);
         c.drafted = cmd.drafted;
         c.draftTarget = -1;
         this.nextTactics.delete(c.id);
@@ -1785,6 +1790,11 @@ export class Simulation {
         const goals = w.isPassable(cmd.tile) ? [cmd.tile] : w.neighbors(cmd.tile).filter((n) => w.isPassable(n));
         const path = this.pathfinder.find(c.tile, goals);
         if (path) {
+          // (An order calls off a meal they'd gone for: see draftedMeal.)
+          if (c.job?.type === 'eat') {
+            this.endJob(c);
+          }
+          this.mealReturn.delete(c.id);
           c.path = path;
           c.moveProgress = 0;
           c.draftTarget = path.at(-1) ?? c.tile;
@@ -2024,6 +2034,9 @@ export class Simulation {
     if (c.drafted) {
       if (this.fighting.has(c.id)) {
         return 'Drafted: fighting';
+      }
+      if (c.job?.type === 'eat') {
+        return 'Drafted: getting something to eat';
       }
       return c.path.length > 0 ? 'Drafted: moving' : 'Drafted';
     }
@@ -3227,6 +3240,73 @@ export class Simulation {
 
   // ---- Colonist behaviour ----
 
+  // A drafted colonist starving, with no raider (or angry animal) within DRAFTED_MEAL_CLEAR tiles, goes for the
+  // nearest food and then back to where they stood, still drafted. On an XL map raids drag on over a lot
+  // of ground, and colonists kept drafted through them were most of the colony's hunger. A threat coming near calls
+  // the meal off; so does an order. Returns whether it took the tick.
+  private draftedMeal(c: Colonist): boolean {
+    if (c.job?.type === 'eat') {
+      if (this.threatNear(c, DRAFTED_MEAL_CLEAR)) {
+        this.endJob(c);
+        this.mealReturn.delete(c.id);
+        return false;
+      }
+      if (c.path.length > 0) {
+        this.move(c);
+      } else {
+        this.stepJob(c);
+      }
+      if (!c.job) {
+        this.backToPost(c);
+      }
+      return true;
+    }
+    // (Not on the way somewhere: an order to go there comes first.)
+    if (
+      c.needs.food > DRAFTED_MEAL_BELOW ||
+      c.path.length > 0 ||
+      this.tick % SLOW_TICKS !== 0 ||
+      this.threatNear(c, DRAFTED_MEAL_CLEAR) ||
+      this.inMentalBreak(c)
+    ) {
+      return false;
+    }
+    const post = c.tile;
+    if (!this.tryEat(c)) {
+      return false;
+    }
+    this.mealReturn.set(c.id, post);
+    return true;
+  }
+
+  // Fed, back to where they were before the meal (as if sent there).
+  private backToPost(c: Colonist): void {
+    const post = this.mealReturn.get(c.id);
+    this.mealReturn.delete(c.id);
+    if (post === undefined || post === c.tile) {
+      return;
+    }
+    const path = this.pathfinder.find(c.tile, [post]);
+    if (path) {
+      c.path = path;
+      c.moveProgress = 0;
+      c.draftTarget = post;
+    }
+  }
+
+  // A raider still fighting, or an animal that has turned on someone, within this many tiles.
+  private threatNear(c: Colonist, tiles: number): boolean {
+    const w = this.world;
+    return (
+      this.enemies.some((e) => e.hp > 0 && !e.fleeing && w.distance(e.tile, c.tile) <= tiles) ||
+      angryAnimals(this).some((a) => a.hp > 0 && a.revengeOn >= 0 && w.distance(a.tile, c.tile) <= tiles)
+    );
+  }
+
+  // Where each drafted colonist gone for a meal goes back to. (Not saved: a game loaded mid-meal leaves them where
+  // they ate.)
+  private mealReturn = new Map<number, number>();
+
   private updateColonist(c: Colonist): void {
     this.updateNeeds(c);
     if (this.isNight()) {
@@ -3263,6 +3343,9 @@ export class Simulation {
     }
     this.fighting.delete(c.id);
     if (c.drafted) {
+      if (this.draftedMeal(c)) {
+        return;
+      }
       if (!sent) {
         this.draftedTactics(c);
       }

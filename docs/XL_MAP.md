@@ -246,8 +246,14 @@ fastest speed, a slow machine would drop frames through it. That's worth a look 
   go hungry, often far from the stores, and starve on the walk back once stood down.
   - Tried and dropped: counting the walk home in when to eat at work (worse: 9 dead, 13 breaks, 814 hours), and
     XL's wildlife back on area scaling (worse: 3 dead, 6 breaks, 848). The side-scaled cap stays.
-  - To decide: whether a drafted colonist who is starving, with no raider near, goes for a bite by themselves,
-    or whether that stays the player's job (and the harness learns to stand colonists down between fights).
+  - **Done: a drafted colonist who is starving (food under 0.05), with no raider still fighting or angry animal
+    within 20 tiles, goes for the nearest food, then back to where they stood, still drafted** (`draftedMeal`).
+    A threat coming near calls the meal off, and so does an order; nobody sets off for food while walking
+    somewhere they were sent. Their status reads "Drafted: getting something to eat".
+
+  After it, `bal 48 6`, starving colonist-hours: Medium 215 to 207 (73 of 73 alive), Large 394 to 279 (92 of 92),
+  XL 700 to 353 (90 of 91, one of old age). XL now goes hungry less than Large did before, with one break on each.
+  Still to run: XL with its own population (7 landing, room for 18) and the ten-year game.
 
 ### 4. Play on a big map (done, but for outposts)
 
