@@ -505,6 +505,8 @@ export interface SimTimers {
   nextShelterSearch?: [number, number][];
   shelterLogged?: [number, number][];
   nextHaulSearch?: [number, number][];
+  // Drafted colonists gone for a meal, and the post each goes back to.
+  mealReturn?: [number, number][];
   // A concert under way when the game was saved.
   concert?: { player: number; tile: number; endsAt: number } | null;
   // Stories by a fire under way when the game was saved.
@@ -885,6 +887,7 @@ export class Simulation {
       nextShelterSearch: [...this.nextShelterSearch],
       shelterLogged: [...this.shelterLogged],
       nextHaulSearch: [...this.nextHaulSearch],
+      mealReturn: [...this.mealReturn],
       concert: this.concert ? { ...this.concert } : null,
       // (Only while the teller is still telling.)
       storyCircle:
@@ -907,6 +910,16 @@ export class Simulation {
     this.nextShelterSearch = new Map(timers.nextShelterSearch ?? []);
     this.shelterLogged = new Map(timers.shelterLogged ?? []);
     this.nextHaulSearch = new Map(timers.nextHaulSearch ?? []);
+    // (Jobs aren't saved: anyone loaded mid-meal goes back to their post, still drafted.)
+    this.mealReturn = new Map(timers.mealReturn ?? []);
+    for (const id of [...this.mealReturn.keys()]) {
+      const c = this.colonists[id];
+      if (c?.drafted && !c.health.dead && !c.health.downed) {
+        this.backToPost(c);
+      } else {
+        this.mealReturn.delete(id);
+      }
+    }
     // A concert under way is played to its end as the game loads (jobs aren't saved, so the audience has gone):
     // it counts as given, and the player feels it.
     const player = timers.concert ? this.colonists[timers.concert.player] : undefined;
@@ -3254,9 +3267,8 @@ export class Simulation {
   private draftedMeal(c: Colonist): boolean {
     if (c.job?.type === 'eat') {
       if (this.threatNear(c, DRAFTED_MEAL_CLEAR)) {
-        this.endJob(c);
-        this.mealReturn.delete(c.id);
-        return false;
+        this.callOffMeal(c);
+        return true;
       }
       if (c.path.length > 0) {
         this.move(c);
@@ -3286,6 +3298,13 @@ export class Simulation {
     return true;
   }
 
+  // A threat near, or a fight: the meal waits, and they go straight back to their post (as if sent there, so they don't
+  // stop to trade shots on the way unless cornered). It had left them fighting from wherever the food was.
+  private callOffMeal(c: Colonist): void {
+    this.endJob(c);
+    this.backToPost(c);
+  }
+
   // Fed, back to where they were before the meal (as if sent there).
   private backToPost(c: Colonist): void {
     const post = this.mealReturn.get(c.id);
@@ -3310,8 +3329,7 @@ export class Simulation {
     );
   }
 
-  // Where each drafted colonist gone for a meal goes back to. (Not saved: a game loaded mid-meal leaves them where
-  // they ate.)
+  // Where each drafted colonist gone for a meal goes back to (saved with the timers).
   private mealReturn = new Map<number, number>();
 
   private updateColonist(c: Colonist): void {
@@ -3343,7 +3361,10 @@ export class Simulation {
       !c.drafted && !adjacent && (c.job?.type === 'shelter' || (this.raidersNear(c) && this.tryShelter(c)));
     if (!running && (!sent || cornered) && colonistCombat(this, c)) {
       this.fighting.add(c.id);
-      if (c.drafted) {
+      if (c.drafted && c.job?.type === 'eat') {
+        // Shooting on the way to a meal: back to their post, not wherever their stance would put them.
+        this.callOffMeal(c);
+      } else if (c.drafted) {
         this.draftedTactics(c);
       }
       return;

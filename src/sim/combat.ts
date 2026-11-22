@@ -650,8 +650,8 @@ let routes: { sim: Simulation | null; key: string; found: Map<string, number[]> 
 };
 function chaseRoute(sim: Simulation, from: number, goals: number[]): number[] {
   const w = sim.world;
-  // (Anything the way could depend on: walls, every feature's cost to cross, floors.)
-  const key = `${sim.tick}:${w.structureVersion}:${w.featureVersion}:${w.layerVersion}`;
+  // (Anything the way could depend on: walls, every feature's cost to cross, floors, water and ice.)
+  const key = `${sim.tick}:${w.structureVersion}:${w.featureVersion}:${w.layerVersion}:${w.waterVersion}`;
   if (routes.sim !== sim || routes.key !== key) {
     routes = { sim, key, found: new Map() };
   }

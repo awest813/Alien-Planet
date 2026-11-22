@@ -614,4 +614,52 @@ describe('a drafted colonist starving', () => {
     expect(c.tile).toBe(there);
     expect(c.job?.type).not.toBe('eat');
   });
+
+  it('goes back to their post when a threat comes near mid-meal, or when the game is loaded mid-meal', () => {
+    for (const how of ['threat', 'load'] as const) {
+      const { sim, w, c, post } = drafted(43);
+      for (let t = 0; t < 40 && c.job?.type !== 'eat'; t++) {
+        sim.step();
+      }
+      expect(c.job?.type).toBe('eat');
+      // Some way towards the food before it's called off.
+      for (let t = 0; t < 30 && c.job?.type === 'eat'; t++) {
+        sim.step();
+      }
+      expect(c.job?.type).toBe('eat');
+      expect(c.tile).not.toBe(post);
+      let colonist = c;
+      let game = sim;
+      if (how === 'threat') {
+        sim.animals.push({
+          id: sim.nextAnimalId++,
+          kind: 'boar',
+          tile: w.idx(w.xOf(c.tile) + 12, w.yOf(c.tile)),
+          path: [],
+          moveProgress: 0,
+          hp: 50,
+          hunted: false,
+          taming: false,
+          tame: false,
+          revengeOn: c.id,
+          cooldown: 0,
+          restUntil: 0,
+          revengeUntil: sim.tick + HOUR * 9,
+        });
+      } else {
+        game = deserialize(structuredClone(serialize(sim)));
+        colonist = game.colonists[c.id];
+      }
+      // (Loaded, it's called off at once; with a threat, within a tick or two.)
+      for (let t = 0; t < 5 && colonist.job?.type === 'eat'; t++) {
+        game.step();
+      }
+      // Called off and on the way back, still drafted (not fighting from wherever the food was; once there, a
+      // charging boar is theirs to deal with as their stance says).
+      expect(colonist.job?.type, how).not.toBe('eat');
+      expect(colonist.drafted).toBe(true);
+      // (At it already, or on the way.)
+      expect(colonist.path.at(-1) ?? colonist.tile, how).toBe(post);
+    }
+  });
 });
