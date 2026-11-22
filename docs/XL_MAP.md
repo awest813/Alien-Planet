@@ -14,16 +14,12 @@ against the sizes there are now:
 
 ## Where it stands now
 
-Steps 1 to 6 below are done or settled. What's left before XL is offered:
+Steps 1 to 7 below are done or settled. What's left before XL is offered is balance and the long run (step 8),
+and a raid day that still runs past the gate now and then (see Raid days).
 
-- **Raid days:** a busy XL colony runs 70–100 ms per 1,000 ticks on a quiet day near day 40, but 130–190 on
-  a raid day, against the gate of 100. The time goes to the raiders' and allies' choices, the fighting and
-  the animals (see Long paths), not to pathfinding or whole-map scans.
-- **Balance and the long run** (step 8).
-
-Everything else measured against its gate: day 8 at 37 ms per 1,000 ticks (gate 45), the worst autosave frame
-25 ms on a desktop and 56 ms on a throttled phone (gate 100), and the whole map drawn in 3.3 ms on a desktop and
-12.4 ms on a throttled phone (gates 8 and 33).
+Against the gates: day 8 at 37 ms per 1,000 ticks (gate 45); a busy XL colony at day 40 at 73–85 ms (gate 100;
+it was 110–189); the worst autosave frame 25 ms on a desktop and 56 ms on a throttled phone (gate 100); the whole
+map drawn in 3.3 ms on a desktop and 12.4 ms on a throttled phone (gates 8 and 33).
 
 ## Where it stood
 
@@ -49,7 +45,7 @@ These numbers come from a 256×256 colony started with the code as it was when t
 
 ## Work before XL is offered
 
-### 1. Simulation speed (done, but for raid days)
+### 1. Simulation speed (done)
 
 - **Far-off wildlife takes turns (done).** An animal more than 40 tiles (either way) from every colonist at home,
   and not tame, being tamed, marked for hunting, chasing, chased, angry, maddened or leaving, dozes
@@ -110,11 +106,45 @@ These numbers come from a 256×256 colony started with the code as it was when t
   The balance harness gives identical output before and after, and `searches.test.ts` compares each with a
   scan of the whole map. A busy XL colony went from 97–104 to 79–89 ms per 1,000 ticks over 45 days.
 
-- **What's left, by the same profile:** colonists choosing work (`findJob`, 15%), animals (25%, mostly
-  pathfinding and the per-animal loop itself), pathfinding as a whole (13%), and raids: a raid day still runs
-  130–190 ms.
-- **Gate:** `scripts/perf.ts size=256` under 45 ms at day 8, and a busy XL colony at day 40 under 100 ms. The
-  first passes (37 ms). The second passes on quiet days, not on raid days.
+- **What was left after these, by the same profile:** colonists choosing work (`findJob`, 15%), animals (25%,
+  mostly pathfinding and the per-animal loop itself), pathfinding as a whole (13%), and raids: a raid day still
+  ran 130–190 ms. Raid days and the animals were taken up in step 7 (see Raid days).
+- **Gate:** `scripts/perf.ts size=256` under 45 ms at day 8, and a busy XL colony at day 40 under 100 ms. Both
+  pass: 37 ms, and 73–85 ms on three seeds since step 7.
+
+### Raid days (step 7, done but for the worst)
+
+Measured from two raids saved from busy XL colonies (`SAVE_RAID=day:file` in the balance harness, then
+`perf.ts from=file`, best of three), and from the 45-day balance run (`PERF=1 bal 45 3 size=256`):
+
+- **Animals marked for the hunt now doze far off like the rest.** A hunter is a colonist, and wakes one
+  coming within reach; till then it covers the ground at the same pace. Kept awake when marked, no animal
+  dozed in a colony that marks all its game (the balance autoplayer's): now 97% do. This was most of it.
+- **Every colonist looked through every animal for an angry one each tick.** The angry ones are listed once a
+  tick, and the list starts over whenever one is angered (`angered` in animals.ts). The answers are the same:
+  the balance output was identical.
+- **Allies coming from the map's edge worked out their whole way again** each time the raider they were after
+  moved (searches of over 100 tiles every 30 ticks). They keep their course while the raider is within a
+  quarter of the walk left of its end, which shrinks to nothing as they close.
+- **Cover** is worked out without making three lists for every shot and look round (identical output).
+- **The built tiles** are kept by the world as it goes (`tilesWith('built')`), and `buildingTiles` gives them
+  in tile order, as a loaded game has them. They had been picked out of every tree on the map each time a
+  crop was sown or reaped, or a raider broke something. The beacon is looked for among them, only when a
+  building changes.
+
+Result, 45 days on three seeds, 45 of 45 alive either way:
+
+|                         | Before     | After      |
+| ----------------------- | ---------- | ---------- |
+| All days                | 100–115 ms | 64–77 ms   |
+| Raid hours              | 154–168 ms | 100–122 ms |
+| Day 40                  | 110–189 ms | 73–85 ms   |
+| Worst raid day          | 212–275 ms | 154–223 ms |
+| Starving colonist-hours | 360        | 220        |
+
+Large over 40 days on six seeds is unchanged in effect: 91 of 91 alive, hunger 291 colonist-hours against 270.
+**The worst raid days** (a big raid with allies and a siege) still run 150–220 ms for an in-game day: at the
+fastest speed, a slow machine would drop frames through it. That's worth a look before or with balance.
 
 ### 2. Saving (done)
 
@@ -208,7 +238,6 @@ These numbers come from a 256×256 colony started with the code as it was when t
 5. ~~Arrival timing, bookmarks, roads.~~ Done (see Play on a big map).
 6. ~~Long-path chunk routes if the step 1 measurements still show pathfinding over 15%.~~ Measured: long
    searches made cheaper another way (see Long paths); chunk routes not needed.
-7. Raid days under the gate: the raiders' and allies' choices and the fighting, measured from raids saved
-   from busy colonies (`SAVE_RAID=day:file` in the balance harness, then `perf.ts from=file`).
+7. ~~Raid days under the gate.~~ Done but for the worst raid days (see Raid days).
 8. Balance and the ten-year run, then add `{ size: 256, label: 'XL', colonists: 7, maxColonists: 18 }` to
    `MAP_SIZES`.
