@@ -640,6 +640,30 @@ export function woundEnemy(sim: Simulation, e: Enemy, amount: number, by: string
 // `slack`: a share of the walk still ahead that the target may have moved from its end (allies come in from the map's
 // edge after raiders on the move, and each step a raider took sent them to work out the whole way again; a quarter of
 // what's left keeps them on course, and shrinks to nothing as they close).
+// A raider's way to a colonist, shared with any other raider setting off from the same tile for the same goals in the
+// same tick (and ground): raiders come in a band, and a third of their searches on a big raid were the same search
+// done again. Each gets their own copy of the way.
+let routes: { sim: Simulation | null; key: string; found: Map<string, number[]> } = {
+  sim: null,
+  key: '',
+  found: new Map(),
+};
+function chaseRoute(sim: Simulation, from: number, goals: number[]): number[] {
+  const w = sim.world;
+  // (Anything the way could depend on: walls, every feature's cost to cross, floors.)
+  const key = `${sim.tick}:${w.structureVersion}:${w.featureVersion}:${w.layerVersion}`;
+  if (routes.sim !== sim || routes.key !== key) {
+    routes = { sim, key, found: new Map() };
+  }
+  const ask = `${from}>${goals.join(',')}`;
+  let path = routes.found.get(ask);
+  if (!path) {
+    path = sim.pathfinder.find(from, goals, undefined, HURRIED) ?? [];
+    routes.found.set(ask, path);
+  }
+  return [...path];
+}
+
 function stillLeadsTo(w: World, e: Enemy, target: number, ranged: boolean, slack = 0): boolean {
   const end = e.path[e.path.length - 1];
   return !ranged && end !== undefined && chebyshev(w, end, target) <= 1 + Math.floor(e.path.length * slack);
@@ -1162,7 +1186,7 @@ export function updateEnemies(sim: Simulation): void {
       e.post = post;
       const goals =
         post !== undefined ? [post] : [target.tile, ...w.neighbors(target.tile).filter((n) => w.isPassable(n))];
-      e.path = sim.pathfinder.find(e.tile, goals, undefined, HURRIED) ?? [];
+      e.path = chaseRoute(sim, e.tile, goals);
     }
     if (e.path.length > 0) {
       moveEnemy(sim, e);
