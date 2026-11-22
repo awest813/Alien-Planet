@@ -2267,7 +2267,8 @@ export class Simulation {
     // Flowers fade in winter, so the season is part of what the room's beauty depends on, and so is
     // the mess on the floor. (Worked out from what's there now, so a loaded game sees the same.)
     // (The mess apart: a fight's blood changed it every few ticks, and each time the whole map was gone over again.)
-    const key = `${this.world.featureVersion}:${this.season === 'Winter'}:${this.fuelVersion}`;
+    // (And the rooms themselves: their numbering is what the contents are indexed by.)
+    const key = `${this.world.featureVersion}:${this.world.structureVersion}:${this.season === 'Winter'}:${this.fuelVersion}`;
     if (this.contentsVersion !== key) {
       this.contentsVersion = key;
       this.cleanContents = measureRoomsFrom(

@@ -12,10 +12,23 @@ against the sizes there are now:
 | Large  | 192            | 6     | 15       |
 | XL     | 256 (planned)  | 7     | 18       |
 
-## Where it stands
+## Where it stands now
 
-These numbers come from a 256×256 colony started with today's code (`node perf.mjs size=256`, and a headless
-browser at 1280×800).
+Steps 1 to 6 below are done or settled. What's left before XL is offered:
+
+- **Raid days:** a busy XL colony runs 70–100 ms per 1,000 ticks on a quiet day near day 40, but 130–190 on
+  a raid day, against the gate of 100. The time goes to the raiders' and allies' choices, the fighting and
+  the animals (see Long paths), not to pathfinding or whole-map scans.
+- **Balance and the long run** (step 8).
+
+Everything else measured against its gate: day 8 at 37 ms per 1,000 ticks (gate 45), the worst autosave frame
+25 ms on a desktop and 56 ms on a throttled phone (gate 100), and the whole map drawn in 3.3 ms on a desktop and
+12.4 ms on a throttled phone (gates 8 and 33).
+
+## Where it stood
+
+These numbers come from a 256×256 colony started with the code as it was when this plan was written
+(`node perf.mjs size=256`, and a headless browser at 1280×800). The sections below say what changed.
 
 - **Simulation:** about 58 ms per 1,000 ticks at day 8, with 7 colonists and 116 wild animals. The budget is
   60 ms. Large measures about 40 ms and Medium about 39 ms. A busy colony later on runs about twice its day-8
@@ -36,7 +49,7 @@ browser at 1280×800).
 
 ## Work before XL is offered
 
-### 1. Simulation speed (needed)
+### 1. Simulation speed (done, but for raid days)
 
 - **Far-off wildlife takes turns (done).** An animal more than 40 tiles (either way) from every colonist at home,
   and not tame, being tamed, marked for hunting, chasing, chased, angry, maddened or leaving, dozes
@@ -51,12 +64,13 @@ browser at 1280×800).
   37.1 ms per 1,000 ticks. Animal pathfinding calls fell by about 40%. Large and Medium didn't change beyond
   noise. The day-8 gate (45 ms) passes on this machine. The numbers above came from a slower one and should be
   measured again there. The 30-day balance run (`bal 30 6`) still loses no colonists on Large or XL. XL
-  colonists go hungry a little more (489 starving colonist-hours against 404), which is for step 5 to check.
+  colonists go hungry a little more (489 starving colonist-hours against 404), which is for the balance step to
+  check.
 - A lesson for later speed work: an extra check made on every animal every tick cost more than skipping three
   ticks in four saved. Animals come in many object shapes, so each field read is slow. The far-off check runs
   only on an animal's turn, and the rest of its update is its own function (`actAnimal`).
-- **Long paths (measured; a narrower change instead of chunk routes).** Logging every search on XL
-  (`scripts`-style, by caller):
+- **Long paths (measured; a narrower change instead of chunk routes).** Every search on XL, logged by who
+  asked for it:
   - Quiet colony: pathfinding was 13% of the time, and searches over 48 tiles were 84 of its 160 ms. These were
     a colonist going 100 to 190 tiles to eat, feed a patient or tend one, at 2 to 5 ms each.
   - A raid of 12 on a young colony: 27%, long searches 90 of 107 ms.
@@ -77,8 +91,8 @@ browser at 1280×800).
     days are to be won, not in long paths.
   - The animals' far-off check now loops over a flat list of where everyone stands. Taking each pair apart in a
     callback had been the animal loop's busiest line in a raid.
-- **The remaining whole-map scans (done).** A busy XL colony (the balance autoplayer, `PERF=1 bal 45 3
-size=256`) showed where whole-map work still cost something. The scans this plan first named had mostly
+- **The remaining whole-map scans (done).** A busy XL colony (the balance autoplayer:
+  `PERF=1 bal 45 3 size=256`) showed where whole-map work still cost something. The scans this plan first named had mostly
   gone already: searches for the edge use `nearestEdge` (the animals' four did too now), the storyteller's
   crop checks use the built tiles, and `homeTile()` was 1%. What did cost was rescanning after a tree was
   felled or a fire ran low:
@@ -97,7 +111,8 @@ size=256`) showed where whole-map work still cost something. The scans this plan
 - **What's left, by the same profile:** colonists choosing work (`findJob`, 15%), animals (25%, mostly
   pathfinding and the per-animal loop itself), pathfinding as a whole (13%), and raids: a raid day still runs
   130–190 ms.
-- **Gate:** `scripts/perf.ts size=256` under 45 ms at day 8, and a busy XL colony at day 40 under 100 ms.
+- **Gate:** `scripts/perf.ts size=256` under 45 ms at day 8, and a busy XL colony at day 40 under 100 ms. The
+  first passes (37 ms). The second passes on quiet days, not on raid days.
 
 ### 2. Saving (done)
 
@@ -168,7 +183,7 @@ size=256`) showed where whole-map work still cost something. The scans this plan
 - **Outposts (later):** a second, small base with its own stockpile and beds, far from the first, is the
   natural use of an XL map. That's a feature of its own and not needed for a first XL.
 
-### 5. Balance and testing (needed)
+### 5. Balance and testing (needed: step 8)
 
 - Run the balance harness on XL (`node bal.mjs 48 6 size=256`): no colonies wiped, deaths and breaks per
   colonist no worse than Large. Starvation per colonist runs about 1.5× Medium on Large today, so check fields
@@ -179,15 +194,15 @@ size=256`) showed where whole-map work still cost something. The scans this plan
 
 ## Order
 
-1. ~~Wildlife turns and caps, then measure again.~~ Done (see above). Pathfinding is still to be measured
-   against the 15% in step 6.
+1. ~~Wildlife turns and caps, then measure again.~~ Done (see above).
 2. ~~Edge-tile list and the remaining scans.~~ Done (see above). Raid days on a busy XL colony are still
    over the 100 ms gate.
 3. ~~Autosave in parts.~~ Done (see Saving).
 4. ~~Chunked feature drawing zoomed out.~~ Done another way (see Drawing zoomed out).
 5. ~~Arrival timing, bookmarks, roads.~~ Done (see Play on a big map).
 6. ~~Long-path chunk routes if the step 1 measurements still show pathfinding over 15%.~~ Measured: long
-   searches made cheaper another way (see Long paths); chunk routes not needed. Raid days need the raiders'
-   and the fighting's own work.
-7. Balance and the ten-year run, then add `{ size: 256, label: 'XL', colonists: 7, maxColonists: 18 }` to
+   searches made cheaper another way (see Long paths); chunk routes not needed.
+7. Raid days under the gate: the raiders' and allies' choices and the fighting, measured from raids saved
+   from busy colonies (`SAVE_RAID=day:file` in the balance harness, then `perf.ts from=file`).
+8. Balance and the ten-year run, then add `{ size: 256, label: 'XL', colonists: 7, maxColonists: 18 }` to
    `MAP_SIZES`.

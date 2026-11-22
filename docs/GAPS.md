@@ -544,7 +544,8 @@ the hardest start (see below); marriages rarely end.
     tile each hour, and animals checked every other animal for a hunter. A day-8 colony now runs at about
     40 ms per 1,000 ticks on Large (from 61) and 39 on Medium (from 50), with the same outcomes.
   - **Drawing:** a desktop window draws Large in about 3 ms a frame, or 8 ms with the whole map on screen.
-  - An XL map (256×256) is planned in docs/XL_MAP.md.
+  - An XL map (256×256) is planned in docs/XL_MAP.md. Its speed, saving, drawing and big-map play (roads, map
+    bookmarks) are done; raid days and its balance are left before it's offered.
 - **Medium maps (128×128, called Large until the 192×192 size came) were hard to read zoomed out:** colonists showed as specks, so far out each gets a ring in their
   colour and raiders a red dot; a map smaller than the window sits in its middle, not against the left edge; and
   on a phone the colonist bar scrolls in one row (with 16 colonists it had wrapped to about 300 px). A 48-day
