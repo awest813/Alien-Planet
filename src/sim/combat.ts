@@ -1892,21 +1892,25 @@ function digIn(sim: Simulation, siege: SiegeState): void {
 function siegeTurn(sim: Simulation, e: Enemy, siege: SiegeState): boolean {
   const w = sim.world;
   const weapon = weaponDef(e.weapon);
-  const colonists = sim
-    .living()
-    .filter(
-      (c) =>
-        !c.health.downed &&
-        (sim.regionOf(c.tile) === sim.regionOf(e.tile) ||
-          (weapon.range > 1 && canShootAt(w, e.tile, c.tile, weapon.range))),
-    );
-  if (weapon.range <= 1 && colonists.some((c) => chebyshev(w, c.tile, e.tile) <= CAMP_CHARGE)) {
-    return false;
+  // A fighter with a hand weapon charges anyone who comes this close (and that they can reach). (Asked as each needs
+  // it: every siege raider looking every colonist over each tick, line of sight and all, was a seventh of a big
+  // siege's time.)
+  if (weapon.range <= 1) {
+    const region = sim.regionOf(e.tile);
+    if (
+      sim
+        .living()
+        .some((c) => !c.health.downed && chebyshev(w, c.tile, e.tile) <= CAMP_CHARGE && sim.regionOf(c.tile) === region)
+    ) {
+      return false;
+    }
   }
   // At camp once within two tiles of the fire (or as close as they can get).
   const post = siege.posts[e.id % siege.posts.length];
   if (chebyshev(w, e.tile, siege.camp) > 2) {
-    if (e.path.length === 0 || e.repathAt <= sim.tick) {
+    // (The post doesn't move: the way there is worked out again only if it's lost, or no longer ends there.)
+    const end = e.path[e.path.length - 1];
+    if (e.path.length === 0 || (e.repathAt <= sim.tick && (end === undefined || chebyshev(w, end, post) > 1))) {
       e.repathAt = sim.tick + 60;
       e.path =
         sim.pathfinder.find(e.tile, [post, ...w.neighbors(post).filter((n) => w.isPassable(n))], undefined, HURRIED) ??
@@ -1923,8 +1927,10 @@ function siegeTurn(sim: Simulation, e: Enemy, siege: SiegeState): boolean {
     digIn(sim, siege);
   }
   if (weapon.range > 1 && e.cooldown <= 0) {
-    const target = colonists
-      .filter((c) => w.distance(e.tile, c.tile) <= weapon.range && lineOfSight(w, e.tile, c.tile))
+    // The nearest in range and in sight (where they stand doesn't matter: a shot needs only those).
+    const target = sim
+      .living()
+      .filter((c) => !c.health.downed && w.distance(e.tile, c.tile) <= weapon.range && lineOfSight(w, e.tile, c.tile))
       .sort((a, b) => w.distance(e.tile, a.tile) - w.distance(e.tile, b.tile))[0];
     if (target) {
       enemyAttack(sim, e, target);
