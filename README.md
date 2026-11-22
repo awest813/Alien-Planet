@@ -4,7 +4,8 @@
 
 A handful of colonists land on a procedurally generated map: three on a tiny 64×64 valley (room for six), four on a
 small 96×96 one (room for nine), five on a medium 128×128 frontier (room for twelve) or six on a large 192×192
-country (room for fifteen), near the middle on a spot with room to build and dry feet. You don't control them
+country (room for fifteen) (or, as a prototype, seven on an XL 256×256 one with room for eighteen: see
+`docs/XL_MAP.md`), near the middle on a spot with room to build and dry feet. You don't control them
 directly: you designate work
 (chop, mine, forage, build, farm, cook, haul to storage) and they decide who does what, around their own needs.
 They get hungry, tired and bored, and their mood reacts to what they eat, where they sleep, how warm they are and

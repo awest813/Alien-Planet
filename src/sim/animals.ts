@@ -15,7 +15,18 @@ import { animalMayEnter, feedPenned, gateFilter, penAt, penFor, penTarget } from
 // Wild animals on the standard 64×64 map; bigger maps hold proportionally more.
 export const MAX_ANIMALS = 14;
 
-export const wildCap = (sim: Simulation) => Math.round((MAX_ANIMALS * sim.world.size) / (MAP_SIZE * MAP_SIZE));
+// How many times the 64×64 map's wildlife a map of `width`×`height` holds: in proportion to its area up to a Large
+// map's (192 tiles a side), and beyond that only to its side. Hunters keep within 48 tiles of home, so past that
+// the far country's game feeds nobody, and every animal costs time each tick wherever it is: on a 256-tile map
+// wildlife by area was 224 animals, the largest cost of a tick.
+const FULL_WILDLIFE_SIDE = 192;
+export function wildlifeScale(width: number, height: number): number {
+  const side = Math.sqrt(width * height);
+  const area = Math.min(side, FULL_WILDLIFE_SIDE) ** 2 / (MAP_SIZE * MAP_SIZE);
+  return side <= FULL_WILDLIFE_SIDE ? area : (area * side) / FULL_WILDLIFE_SIDE;
+}
+
+export const wildCap = (sim: Simulation) => Math.round(MAX_ANIMALS * wildlifeScale(sim.world.width, sim.world.height));
 const BITE_COOLDOWN = 50;
 const WANDER_RADIUS = 6;
 // An enraged animal calms down after this long.

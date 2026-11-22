@@ -1,18 +1,49 @@
 # Plan: an XL map
 
-An XL map is 256×256: 65,536 tiles, four times a Medium map and 1.8 times a Large one. It would land seven
-colonists with room for eighteen. It isn't offered yet. This plan covers what has to change first, measured
-against the sizes there are now:
+An XL map is 256×256: 65,536 tiles, four times a Medium map and 1.8 times a Large one. It lands seven
+colonists with room for eighteen. It's offered as a **prototype** (see "The prototype", next): on the New colony
+screen, marked as one, but not yet among the sizes the tests, playtests and timings go through. This plan covers
+what has to change before it's a full size, measured against the sizes there are now:
 
-| Size   | Tiles per side | Lands | Room for |
-| ------ | -------------- | ----- | -------- |
-| Tiny   | 64             | 3     | 6        |
-| Small  | 96             | 4     | 9        |
-| Medium | 128            | 5     | 12       |
-| Large  | 192            | 6     | 15       |
-| XL     | 256 (planned)  | 7     | 18       |
+| Size   | Tiles per side  | Lands | Room for |
+| ------ | --------------- | ----- | -------- |
+| Tiny   | 64              | 3     | 6        |
+| Small  | 96              | 4     | 9        |
+| Medium | 128             | 5     | 12       |
+| Large  | 192             | 6     | 15       |
+| XL     | 256 (prototype) | 7     | 18       |
 
-## Where it stands
+## The prototype
+
+`XL_MAP` in `src/sim/constants.ts`, offered after the four sizes (`ALL_MAP_SIZES`) as "XL map · prototype". What
+it took, and the plan's gates measured with it:
+
+- **Wildlife grows with the side past Large** (`wildlifeScale` in `src/sim/animals.ts`): by area up to 192 tiles
+  a side as before, then in proportion to the side. XL holds up to 168 wild animals, not 224, and 96 at the
+  landing, not 128. Every size up to Large is unchanged.
+- **Far-off wildlife taking turns** was tried first and dropped: profiled, an animal's tick costs about the same
+  whatever it does (around 140 ns, most of it the loop over every animal), so checking whether one is far off
+  cost as much as the deciding it saved. Fewer animals was what helped.
+- **Speed** (`scripts/perf.ts size=256`, gate 45 ms at day 8): 48-54 ms before, 38-43 after; Large 31-35, as
+  before. A busy colony at day 41 (playtest players on 256, 13-15 colonists, `perf.ts from=`): 51-63 ms against
+  the 100 ms gate.
+- **Saving** (gate: no autosave frame over 100 ms at day 40): a day-41 XL save is 4.3 MB of JSON; serializing it
+  takes 4-7 ms in Node, and saving it in Chromium about 190 ms from start to finish with no long task (none over
+  50 ms) on the page. Passes without autosaving in parts.
+- **Drawing** (gate: the whole map under 8 ms a frame on a desktop): 2.2 ms median, 4.3 ms at the 95th
+  percentile, in headless Chromium (Large 2.0, Medium 1.3; usual zoom 1.6). The far tileset now drawn zoomed
+  out did what chunk caching was planned for. Not measured on a real phone.
+- **Keeping up:** the top speed runs at its 80 ticks a second on XL as on every size.
+- **Balance** (`balance.ts 48 6 size=256`): 109 of 110 colonists alive (Large: 90 of 91), mood 60 (58.7), goals
+  reached about the same. Starving colonist-hours per colonist 7.3 against Large's 4.5, higher in every one of
+  the six colonies; the same with wildlife by area (6.2), so it's the distances, not the game. Playtests on 256
+  (`playtest.ts size=256`, three players, 42 days): no crashes, no problems, none lost.
+- **Tests:** `flow.test.ts` (sizes, caps, seven landing), and a browser test founding and playing an XL colony.
+
+Still to do before XL joins `MAP_SIZES`: food on a big map (the starving above), bookmarks and roads (section
+4), arrival timing, a ten-year run, and a real phone.
+
+## Where it stood (before the prototype)
 
 These numbers come from a 256×256 colony started with today's code (`node perf.mjs size=256`, and a headless
 browser at 1280×800).

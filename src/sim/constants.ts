@@ -35,8 +35,23 @@ export const MAP_SIZES = [
   },
 ];
 
+// XL, a prototype (see docs/XL_MAP.md): offered on the New colony screen, marked as such, but not among the sizes
+// above, which the tests, the playtests' rotation and the timings go through. It runs within the speed, saving and
+// drawing budgets the plan set; what's missing is what makes a big map pleasant (bookmarks, roads).
+export const XL_MAP = {
+  size: 256,
+  label: 'XL',
+  colonists: 7,
+  maxColonists: 18,
+  description: '256×256. Seven colonists, room for eighteen. Vast country: long hauls, long walks in.',
+  prototype: true,
+};
+// Every size a colony can be founded on, the prototype last.
+export const ALL_MAP_SIZES: readonly ((typeof MAP_SIZES)[number] & { prototype?: boolean })[] = [...MAP_SIZES, XL_MAP];
+
 // The population settings for a map this many tiles across (the nearest size at or below it).
-export const populationFor = (width: number) => [...MAP_SIZES].reverse().find((m) => m.size <= width) ?? MAP_SIZES[0];
+export const populationFor = (width: number) =>
+  [...ALL_MAP_SIZES].reverse().find((m) => m.size <= width) ?? ALL_MAP_SIZES[0];
 export const TICKS_PER_HOUR = 200;
 export const START_HOUR = 7;
 export const NIGHT_START = 22;

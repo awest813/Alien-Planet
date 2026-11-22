@@ -15,7 +15,7 @@ import {
 } from '../game/settings';
 import { SHARPNESS_AUTO, retrySharp } from '../render/sharpness';
 import { SAVE_VERSION } from '../sim/serialize';
-import { MAP_SIZE, MAP_SIZES } from '../sim/simulation';
+import { ALL_MAP_SIZES, MAP_SIZE } from '../sim/simulation';
 import { DIFFICULTIES, Difficulty } from '../sim/storyteller';
 import { BIOME_LIST, Biome, MAP_KINDS, MapKind } from '../sim/biomes';
 import { SUPPLIES, Supplies } from '../sim/supplies';
@@ -53,7 +53,7 @@ const saveDetails = (meta: SaveMeta) =>
     DIFFICULTIES.find((d) => d.key === meta.difficulty)?.label ?? null,
     meta.biome && meta.biome !== 'temperate' ? (BIOME_LIST.find((b) => b.key === meta.biome)?.label ?? null) : null,
     meta.mapSize !== undefined
-      ? `${MAP_SIZES.find((m) => m.size === meta.mapSize)?.label ?? `${meta.mapSize}×${meta.mapSize}`} map`
+      ? `${ALL_MAP_SIZES.find((m) => m.size === meta.mapSize)?.label ?? `${meta.mapSize}×${meta.mapSize}`} map`
       : null,
     new Date(meta.savedAt).toLocaleString(),
   ]
@@ -79,7 +79,7 @@ function NewColonyForm({
   const [difficulty, setDifficulty] = useState<Difficulty>(
     DIFFICULTIES.find((d) => d.key === last.newDifficulty)?.key ?? 'standard',
   );
-  const [mapSize, setMapSize] = useState(MAP_SIZES.find((m) => m.size === last.newMapSize)?.size ?? MAP_SIZE);
+  const [mapSize, setMapSize] = useState(ALL_MAP_SIZES.find((m) => m.size === last.newMapSize)?.size ?? MAP_SIZE);
   const [biome, setBiome] = useState<Biome>(BIOME_LIST.find((b) => b.key === last.newBiome)?.key ?? 'temperate');
   const [mapKind, setMapKind] = useState<MapKind>(MAP_KINDS.find((m) => m.key === last.newMap)?.key ?? 'valley');
   const [supplies, setSupplies] = useState<Supplies>(SUPPLIES.find((s) => s.key === last.newSupplies)?.key ?? 'silver');
@@ -106,19 +106,21 @@ function NewColonyForm({
       <p className="choice-note">{DIFFICULTIES.find((d) => d.key === difficulty)?.description}</p>
       <h3>Map size</h3>
       <div className="difficulties four">
-        {MAP_SIZES.map((m) => (
+        {ALL_MAP_SIZES.map((m) => (
           <button
             key={m.size}
             className={mapSize === m.size ? 'active' : ''}
             aria-pressed={mapSize === m.size}
             onClick={() => setMapSize(m.size)}
           >
-            <b>{m.label} map</b>
+            <b>
+              {m.label} map{m.prototype ? ' · prototype' : ''}
+            </b>
             <span>{m.description}</span>
           </button>
         ))}
       </div>
-      <p className="choice-note">{MAP_SIZES.find((m) => m.size === mapSize)?.description}</p>
+      <p className="choice-note">{ALL_MAP_SIZES.find((m) => m.size === mapSize)?.description}</p>
       <h3>Land</h3>
       <div className="difficulties four">
         {BIOME_LIST.map((b) => (
@@ -451,7 +453,7 @@ export function PauseMenu({ onClose, actions }: { onClose: () => void; actions: 
       <p className="muted">
         Day {state.day} · {living} colonist{living === 1 ? '' : 's'} · {current?.label} ·{' '}
         {BIOME_LIST.find((b) => b.key === state.biome)?.label} ·{' '}
-        {MAP_SIZES.find((m) => m.size === state.mapSize)?.label ?? `${state.mapSize}×${state.mapSize}`} map · seed{' '}
+        {ALL_MAP_SIZES.find((m) => m.size === state.mapSize)?.label ?? `${state.mapSize}×${state.mapSize}`} map · seed{' '}
         {state.seed}
       </p>
       {view === 'main' && (

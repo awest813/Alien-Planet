@@ -76,6 +76,31 @@ test('a new colony lands with the supplies chosen, and the choice is remembered'
   expect(errors).toEqual([]);
 });
 
+test('an XL colony, the prototype, can be founded and played', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/');
+  const title = page.getByRole('dialog', { name: 'Colony Alpha' });
+  await title.getByRole('button', { name: 'New colony' }).click();
+  await title.getByRole('button', { name: /^XL map · prototype/ }).click();
+  await title.getByLabel('Seed').fill('xl');
+  await title.getByRole('button', { name: 'Start colony' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.screens')).toBeVisible();
+  // Seven land; a few seconds at the top speed, with nothing thrown.
+  await page.keyboard.press('3');
+  await page.waitForTimeout(3000);
+  type Colony = { sim: { world: { width: number }; tick: number; living(): unknown[] } };
+  const { width, tick, landed } = await page.evaluate(() => {
+    const { sim } = (window as unknown as { colony: Colony }).colony;
+    return { width: sim.world.width, tick: sim.tick, landed: sim.living().length };
+  });
+  expect(width).toBe(256);
+  expect(landed).toBe(7);
+  // (The top speed is 80 ticks a second, on XL as on any map: three seconds, about 240.)
+  expect(tick).toBeGreaterThan(150);
+  expect(errors).toEqual([]);
+});
+
 test('every top-bar screen opens and closes with Esc', async ({ page }) => {
   const errors = watchErrors(page);
   await startColony(page);

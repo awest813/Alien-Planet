@@ -56,6 +56,25 @@ describe('map sizes', () => {
     // Survives a save round-trip at its own size.
     expect(deserialize(structuredClone(serialize(large))).world.width).toBe(128);
   });
+
+  it('XL, the prototype: seven land, room for eighteen, and wildlife grows with the side past Large', async () => {
+    const { wildlifeScale } = await import('./animals');
+    const { ALL_MAP_SIZES, MAP_SIZES, populationFor } = await import('./constants');
+    // Up to Large, by area as before.
+    for (const m of MAP_SIZES) {
+      expect(wildlifeScale(m.size, m.size)).toBeCloseTo((m.size / 64) ** 2);
+    }
+    // Past it, by the side: XL a third more than Large, not 1.8 times.
+    expect(wildlifeScale(256, 256)).toBeCloseTo(wildlifeScale(192, 192) * (256 / 192));
+    expect(populationFor(256)).toMatchObject({ label: 'XL', colonists: 7, maxColonists: 18 });
+    // Offered, last and marked, but not in the sizes the tests and playtests go through.
+    expect(ALL_MAP_SIZES[ALL_MAP_SIZES.length - 1]).toMatchObject({ size: 256, prototype: true });
+    expect(MAP_SIZES.some((m) => m.size === 256)).toBe(false);
+    const xl = Simulation.newColony(5, 'standard', 256);
+    expect(xl.living().length).toBe(7);
+    expect(wildCap(xl)).toBe(168);
+    expect(xl.animals.length).toBeLessThanOrEqual(96);
+  });
 });
 
 describe('raids on big maps', () => {

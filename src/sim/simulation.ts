@@ -50,6 +50,7 @@ import {
   populateWildlife,
   spareForBreeding,
   updateAnimals,
+  wildlifeScale,
 } from './animals';
 import {
   apparelScore,
@@ -244,7 +245,16 @@ import { generateWorld } from './worldgen';
 import type { Biome, MapKind } from './biomes';
 import { Supplies, suppliesDef } from './supplies';
 
-export { MAP_SIZE, MAP_SIZES, NIGHT_END, NIGHT_START, START_HOUR, TICKS_PER_HOUR, populationFor } from './constants';
+export {
+  ALL_MAP_SIZES,
+  MAP_SIZE,
+  MAP_SIZES,
+  NIGHT_END,
+  NIGHT_START,
+  START_HOUR,
+  TICKS_PER_HOUR,
+  populationFor,
+} from './constants';
 const LOG_LIMIT = 60;
 const STORY_LIMIT = 200;
 
@@ -1047,7 +1057,7 @@ export class Simulation {
     sim.story = freshStory(difficulty);
     sim.biome = biome;
     // Eight animals on the standard map, more on bigger ones.
-    populateWildlife(sim, Math.round((8 * world.size) / (MAP_SIZE * MAP_SIZE)), spawn);
+    populateWildlife(sim, Math.round(8 * wildlifeScale(world.width, world.height)), spawn);
     sim.wildCover = wildPlantCover(sim);
     sim.addLog(
       `${NUMBER_WORDS[landing] ?? landing} colonists have landed with ${supplies.words ? `a few days of rations, some salvaged timber and ${supplies.words(landing)}` : 'a few days of rations and some salvaged timber'}. Give orders from the build bar (Chop, Mine, Stockpile) and they will get to it.`,
