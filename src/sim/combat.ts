@@ -539,7 +539,8 @@ function breachWall(
       }
     }
   }
-  for (let i = 0; i < w.size; i++) {
+  // (Only tiles with something on them can be broken. Ties go to the lower tile, as a scan of the map gives.)
+  for (const i of w.tilesWith('features')) {
     if (!breakable(w, i) || (featureDef(w.feature[i]).natural && !leadsIn[i])) {
       continue;
     }
@@ -555,7 +556,7 @@ function breachWall(
       (opens ? 0 : 1000) +
       (featureDef(w.feature[i]).natural ? ROCK_DETOUR : 0) -
       (i === current ? 3 : 0);
-    if (score < bestScore) {
+    if (score < bestScore || (score === bestScore && i < best!)) {
       best = i;
       bestScore = score;
     }

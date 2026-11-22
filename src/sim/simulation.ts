@@ -5,6 +5,7 @@ import {
   ROOM_LEAK,
   describeRoom,
   measureRooms,
+  measureRoomsFrom,
   withFilth,
   outdoorTemperature,
   updateRoomTemperatures,
@@ -1266,8 +1267,8 @@ export class Simulation {
       let n = 0;
       // (Not a siege party's camp.)
       const camp = new Set(this.raid?.siege?.built ?? []);
-      for (const i of w.tilesWith('features')) {
-        if (!featureDef(w.feature[i]).natural && !featureDef(w.feature[i]).crop && !camp.has(i)) {
+      for (const i of this.buildingTiles()) {
+        if (!featureDef(w.feature[i]).crop && !camp.has(i)) {
           sx += w.xOf(i);
           sy += w.yOf(i);
           n++;
@@ -2267,7 +2268,13 @@ export class Simulation {
     const key = `${this.world.featureVersion}:${this.season === 'Winter'}:${this.fuelVersion}`;
     if (this.contentsVersion !== key) {
       this.contentsVersion = key;
-      this.cleanContents = measureRooms(this.world, this.rooms, (i) => this.beautyAt(i), false);
+      this.cleanContents = measureRoomsFrom(
+        this.world,
+        this.rooms,
+        (i) => this.beautyAt(i),
+        this.indoorTiles(),
+        this.builtInOrder(),
+      );
       this.filthContentsVersion = -1;
     }
     if (this.filthContentsVersion !== this.world.filthVersion) {
@@ -2440,15 +2447,17 @@ export class Simulation {
 
   private refreshGrid(): void {
     const w = this.world;
-    if (this.gridVersion === w.featureVersion) {
+    // (Fires, generators, lamps and fishing spots are all built: trees and rocks coming and going don't change
+    // these, and the built tiles in tile order give the same lists as a scan of the whole map.)
+    if (this.gridVersion === w.builtVersion) {
       return;
     }
-    this.gridVersion = w.featureVersion;
+    this.gridVersion = w.builtVersion;
     this.powerTiles = [];
     this.lampTiles = [];
     this.fishingSpots = [];
     this.fireTiles = [];
-    for (let i = 0; i < w.size; i++) {
+    for (const i of this.builtInOrder()) {
       const f = w.feature[i];
       if (f !== NONE && featureDef(f).burns) {
         this.fireTiles.push(i);
@@ -5303,6 +5312,18 @@ export class Simulation {
 
   private buildingVersion = -1;
   private buildingCache: readonly number[] = [];
+
+  // The same tiles in tile order, as a scan of the whole map finds them.
+  private builtInOrder(): Int32Array {
+    const w = this.world;
+    if (this.builtOrderVersion !== w.builtVersion) {
+      this.builtOrderVersion = w.builtVersion;
+      this.builtOrder = Int32Array.from(this.buildingTiles()).sort();
+    }
+    return this.builtOrder;
+  }
+  private builtOrderVersion = -1;
+  private builtOrder = new Int32Array(0);
   private storageKey = '';
   private storageCache: number[] = [];
   // Bumped whenever zones change.

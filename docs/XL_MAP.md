@@ -58,14 +58,26 @@ browser at 1280×800).
 - **Long paths.** Add a chunk-level route (16×16 chunks, linked where their edges are passable, rebuilt with
   `structureVersion`), then let A\* search inside the chunks along that route. This only matters for paths
   over about 48 tiles: arrivals from the edge, expeditions and long hauls.
-- **The remaining whole-map scans:**
-  - searches for the map's edge: use a cached list of edge tiles in place of `nearest()` growing outward from
-    the colony to the border;
-  - `nearest()` with a bias;
-  - the storyteller's crop checks, the raid planner's feature scans, and `homeTile()`.
+- **The remaining whole-map scans (done).** A busy XL colony (the balance autoplayer, `PERF=1 bal 45 3
+size=256`) showed where whole-map work still cost something. The scans this plan first named had mostly
+  gone already: searches for the edge use `nearestEdge` (the animals' four did too now), the storyteller's
+  crop checks use the built tiles, and `homeTile()` was 1%. What did cost was rescanning after a tree was
+  felled or a fire ran low:
+  - room contents, 1,900 times in 35 days at 0.44 ms each (5%): now measured from the tiles of enclosed
+    rooms and, outdoors, from what's built there. Trees, rocks and floors outdoors add only beauty, and beauty
+    counts only in an enclosed room;
+  - the lists of fires, generators, lamps and fishing spots (3%): now rebuilt from the built tiles, only when
+    a building comes or goes;
+  - the colony's centre (`homeTile()`): from the built tiles;
+  - a raider choosing which wall to break: from the tiles with features, not the whole map.
 
-  Large-map work has already moved the goal checks and alerts onto the list of built tiles.
+  Each keeps the tile order or breaks ties to the lower tile, so the answers are the same to the last bit.
+  The balance harness gives identical output before and after, and `searches.test.ts` compares each with a
+  scan of the whole map. A busy XL colony went from 97–104 to 79–89 ms per 1,000 ticks over 45 days.
 
+- **What's left, by the same profile:** colonists choosing work (`findJob`, 15%), animals (25%, mostly
+  pathfinding and the per-animal loop itself), pathfinding as a whole (13%), and raids: a raid day still runs
+  130–190 ms.
 - **Gate:** `scripts/perf.ts size=256` under 45 ms at day 8, and a busy XL colony at day 40 under 100 ms.
 
 ### 2. Saving (needed)
@@ -109,7 +121,8 @@ browser at 1280×800).
 
 1. ~~Wildlife turns and caps, then measure again.~~ Done (see above). Pathfinding is still to be measured
    against the 15% in step 6.
-2. Edge-tile list and the remaining scans.
+2. ~~Edge-tile list and the remaining scans.~~ Done (see above). Raid days on a busy XL colony are still
+   over the 100 ms gate.
 3. Autosave in parts.
 4. Chunked feature drawing zoomed out.
 5. Arrival timing, bookmarks, roads.

@@ -506,7 +506,8 @@ const EVENTS: EventDef[] = [
     run: (sim) => {
       const w = sim.world;
       const exposed = (i: number) => w.feature[i] !== NONE && !!featureDef(w.feature[i]).crop && !sim.isRoofed(i);
-      const crops = [...w.tilesWith('features')].filter(exposed);
+      // (The built tiles keep the order of all tiles with features, so the pick is as it was.)
+      const crops = sim.buildingTiles().filter(exposed);
       if (crops.length === 0) {
         return false;
       }

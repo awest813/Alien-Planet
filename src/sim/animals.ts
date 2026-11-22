@@ -98,9 +98,9 @@ export function herdArrives(sim: Simulation, grazersOnly = false, huntersOnly = 
     return 0;
   }
   const w = sim.world;
-  const edge = sim.nearest(
+  const edge = sim.nearestEdge(
     w.idx(sim.rng.int(0, w.width - 1), sim.rng.pick([0, w.height - 1])),
-    (i) => onEdge(sim, i) && sim.regionOf(i) === region,
+    (i) => sim.regionOf(i) === region,
     1,
   )[0];
   if (edge === undefined) {
@@ -263,9 +263,9 @@ export function addQuarry(sim: Simulation): Animal | null {
   if (region === undefined) {
     return null;
   }
-  const edge = sim.nearest(
+  const edge = sim.nearestEdge(
     w.idx(sim.rng.int(0, w.width - 1), sim.rng.pick([0, w.height - 1])),
-    (i) => onEdge(sim, i) && sim.regionOf(i) === region,
+    (i) => sim.regionOf(i) === region,
     1,
   )[0];
   if (edge === undefined) {
@@ -309,9 +309,9 @@ export function manhuntersArrive(sim: Simulation, kind: string, count: number): 
   if (region === undefined) {
     return 0;
   }
-  const edge = sim.nearest(
+  const edge = sim.nearestEdge(
     w.idx(sim.rng.int(0, w.width - 1), sim.rng.pick([0, w.height - 1])),
-    (i) => onEdge(sim, i) && sim.regionOf(i) === region,
+    (i) => sim.regionOf(i) === region,
     1,
   )[0];
   // Nobody they could reach (everyone down, or the colony cut off): they don't come at all.
@@ -668,7 +668,7 @@ function leave(sim: Simulation, a: Animal): void {
     pathTo(
       sim,
       a,
-      sim.nearest(a.tile, (i) => onEdge(sim, i) && sim.regionOf(i) === region, 3),
+      sim.nearestEdge(a.tile, (i) => sim.regionOf(i) === region, 3),
     );
     if (a.path.length === 0) {
       // Hemmed in: it stays after all.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { measureRooms } from './climate';
-import { featureId } from './defs';
+import { featureDef, featureId } from './defs';
 import { Simulation } from './simulation';
 import { Filth } from './world';
 import { clearAround, outline } from './test-helpers';
@@ -13,6 +13,11 @@ type Inner = {
   isIndoors(i: number): boolean;
   contents(): ReturnType<typeof measureRooms>;
   rooms: Parameters<typeof measureRooms>[1];
+  refreshGrid(): void;
+  powerTiles: number[];
+  lampTiles: number[];
+  fishingSpots: number[];
+  fireTiles: number[];
 };
 
 // A colony with a few rooms built, on a map of the given size.
@@ -102,5 +107,87 @@ describe('the quicker searches', () => {
     expect(beauty(inner.contents())).toEqual(beauty(whole()));
     // (Mess there was, indoors as well.)
     expect([...w.tilesWith('filth')].some((i) => inner.isIndoors(i))).toBe(true);
+  });
+
+  it('rooms measured from the tiles indoors and the buildings outdoors are as a scan of the whole map gives', () => {
+    for (const [size, seed] of [
+      [64, 9],
+      [128, 4],
+    ]) {
+      const sim = built(size, seed);
+      const inner = sim as unknown as Inner;
+      const w = sim.world;
+      const { x, y } = clearAround(sim, 0);
+      // Furniture indoors and out, a fire, a floor in a room and one outside, trees felled and planted.
+      const place = (dx: number, dy: number, key: string) => w.setFeature(w.idx(x + dx, y + dy), featureId(key));
+      place(-8, -7, 'campfire');
+      place(-7, -7, 'bed');
+      place(5, 4, 'table');
+      place(-1, 0, 'campfire');
+      place(1, -1, 'bed');
+      w.setLayer('floor', w.idx(x - 9, y - 6), featureId('woodFloor'));
+      w.setLayer('floor', w.idx(x, y - 2), featureId('woodFloor'));
+      const check = () => {
+        const quick = inner.contents();
+        const whole = measureRooms(w, inner.rooms, (i) => sim.beautyAt(i), false);
+        for (let r = 0; r < whole.length; r++) {
+          // Beauty only counts in an enclosed room, and there it's the same to the last bit; the rest everywhere.
+          const { beauty, ...rest } = whole[r];
+          const { beauty: quickBeauty, ...quickRest } = quick[r];
+          expect(quickRest).toEqual(rest);
+          if (inner.rooms.enclosed[r]) {
+            expect(quickBeauty).toBe(beauty);
+          }
+        }
+      };
+      check();
+      let felled = 0;
+      for (const i of [...w.tilesWith('features')]) {
+        if (felled < 20 && w.feature[i] === featureId('tree')) {
+          w.setFeature(i, 0);
+          felled++;
+        }
+      }
+      check();
+    }
+  });
+
+  it('fires, generators, lamps and fishing spots, and the colony centre, are as a scan of the whole map finds them', () => {
+    const sim = built(96, 12);
+    const inner = sim as unknown as Inner;
+    const w = sim.world;
+    const { x, y } = clearAround(sim, 0);
+    for (const [dx, dy, key] of [
+      [3, 3, 'campfire'],
+      [-4, 6, 'campfire'],
+      [6, -3, 'bed'],
+      [-6, -2, 'table'],
+    ] as const) {
+      w.setFeature(w.idx(x + dx, y + dy), featureId(key));
+    }
+    inner.refreshGrid();
+    const scan = (test: (f: number) => boolean) => {
+      const tiles: number[] = [];
+      for (let i = 0; i < w.size; i++) {
+        if (w.feature[i] !== 0 && test(w.feature[i])) {
+          tiles.push(i);
+        }
+      }
+      return tiles;
+    };
+    const def = (f: number) => featureDef(f);
+    expect(inner.fireTiles).toEqual(scan((f) => !!def(f).burns));
+    expect(inner.fireTiles.length).toBeGreaterThan(0);
+    expect(inner.fishingSpots).toEqual(scan((f) => def(f).fishing));
+    expect(inner.powerTiles).toEqual(scan((f) => !!def(f).power));
+    expect(inner.lampTiles).toEqual(scan((f) => !!def(f).power && def(f).growLight > 0));
+    let sx = 0;
+    let sy = 0;
+    const centre = scan((f) => !def(f).natural && !def(f).crop);
+    for (const i of centre) {
+      sx += w.xOf(i);
+      sy += w.yOf(i);
+    }
+    expect(sim.homeTile()).toBe(w.idx(Math.round(sx / centre.length), Math.round(sy / centre.length)));
   });
 });

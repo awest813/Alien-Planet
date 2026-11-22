@@ -52,7 +52,40 @@ export function measureRooms(
   beautyAt: (i: number) => number = (i) => featureDef(world.feature[i]).beauty,
   filth = true,
 ): RoomContents[] {
-  const contents: RoomContents[] = rooms.sizes.map(() => ({
+  const contents = emptyContents(rooms);
+  for (let i = 0; i < world.size; i++) {
+    addTile(world, rooms, contents, i, beautyAt, filth);
+  }
+  return contents;
+}
+
+// The same without the mess, from the tiles that can count: every tile of an enclosed room (`indoor`), and
+// for the open country only what's built there (`built`), as trees, rocks and floors outdoors add only beauty,
+// which counts only in an enclosed room. Both in tile order, so each room's sums come out exactly as a scan of
+// the whole map gives them. (A scan of the whole map, each time a tree was felled, was a twentieth of a busy XL
+// colony's time.)
+export function measureRoomsFrom(
+  world: World,
+  rooms: Rooms,
+  beautyAt: (i: number) => number,
+  indoor: ArrayLike<number>,
+  built: ArrayLike<number>,
+): RoomContents[] {
+  const contents = emptyContents(rooms);
+  for (let k = 0; k < indoor.length; k++) {
+    addTile(world, rooms, contents, indoor[k], beautyAt, false);
+  }
+  for (let k = 0; k < built.length; k++) {
+    const room = rooms.room[built[k]];
+    if (room >= 0 && !rooms.enclosed[room]) {
+      addTile(world, rooms, contents, built[k], beautyAt, false);
+    }
+  }
+  return contents;
+}
+
+const emptyContents = (rooms: Rooms): RoomContents[] =>
+  rooms.sizes.map(() => ({
     beauty: 0,
     beds: 0,
     hospitalBeds: 0,
@@ -65,38 +98,44 @@ export function measureRooms(
     joy: 0,
     art: 0,
   }));
-  for (let i = 0; i < world.size; i++) {
-    const room = rooms.room[i];
-    if (room >= 0 && world.floor[i] !== NONE) {
-      contents[room].beauty += featureDef(world.floor[i]).beauty;
-    }
-    if (filth && room >= 0 && world.filth[i] !== 0) {
-      contents[room].beauty += world.filthBeauty(i);
-    }
-    const f = world.feature[i];
-    if (room < 0 || f === NONE) {
-      continue;
-    }
-    const def = featureDef(f);
-    const c = contents[room];
-    c.beauty += beautyAt(i);
-    c.beds += def.bed ? 1 : 0;
-    c.hospitalBeds += def.hospital ? 1 : 0;
-    c.tables += def.table ? 1 : 0;
-    if (def.power?.draw) {
-      c.electricHeat += def.heater;
-    } else if (!def.burns || world.fuel[i] > 0) {
-      c.heat += def.heater;
-    }
-    if (def.cooler) {
-      c.coolers.push(def.cooler);
-    }
-    c.stoves += def.workbench === 'cooking' ? 1 : 0;
-    c.benches += def.workbench === 'crafting' ? 1 : 0;
-    c.joy += def.joy ? 1 : 0;
-    c.art += def.art ? 1 : 0;
+
+function addTile(
+  world: World,
+  rooms: Rooms,
+  contents: RoomContents[],
+  i: number,
+  beautyAt: (i: number) => number,
+  filth: boolean,
+): void {
+  const room = rooms.room[i];
+  if (room >= 0 && world.floor[i] !== NONE) {
+    contents[room].beauty += featureDef(world.floor[i]).beauty;
   }
-  return contents;
+  if (filth && room >= 0 && world.filth[i] !== 0) {
+    contents[room].beauty += world.filthBeauty(i);
+  }
+  const f = world.feature[i];
+  if (room < 0 || f === NONE) {
+    return;
+  }
+  const def = featureDef(f);
+  const c = contents[room];
+  c.beauty += beautyAt(i);
+  c.beds += def.bed ? 1 : 0;
+  c.hospitalBeds += def.hospital ? 1 : 0;
+  c.tables += def.table ? 1 : 0;
+  if (def.power?.draw) {
+    c.electricHeat += def.heater;
+  } else if (!def.burns || world.fuel[i] > 0) {
+    c.heat += def.heater;
+  }
+  if (def.cooler) {
+    c.coolers.push(def.cooler);
+  }
+  c.stoves += def.workbench === 'cooking' ? 1 : 0;
+  c.benches += def.workbench === 'crafting' ? 1 : 0;
+  c.joy += def.joy ? 1 : 0;
+  c.art += def.art ? 1 : 0;
 }
 
 // Rooms' contents measured without the mess, with the mess on the floors added: from the tiles holding some, not
