@@ -276,10 +276,14 @@ fastest speed, a slow machine would drop frames through it. That's worth a look 
   worked out the whole way again every 60 ticks, though the post doesn't move, and every siege raider looked
   every colonist over each tick for a charge or a shot that mostly wasn't due. Fixed (the colonist checks give
   the same answers): 184–196 to 150–157 ms.
-- **What's left:** a colony of 20 in its later years runs at about 100 to 130 ms on an ordinary day, most of it
-  colonists choosing work, which grows with their number; big raids and sieges still about 150. At the fastest
-  speed on a slow machine, that's where an XL colony would start to drag. The plan's gate (day 40 under 100)
-  passes; later years would want their own look before XL is offered, or the fastest speed capped on XL.
+- **Later years' ordinary days:** a colony of 21 at day 143 ran 101–121 ms per 1,000 ticks, a third of it
+  colonists choosing work, and the biggest part of that hauling. Each colonist looked over every stack in the
+  stores again at every turn of their work, in a colony where nearly everything is put away. A look that finds
+  nothing now waits 60 ticks before the next (`HAUL_RETRY`, saved with the other searches' timers): 90–96 ms,
+  balance within noise. Tried and dropped: giving every animal object the same shape (no faster).
+- **What's left:** big raids and sieges in later years still run about 150 ms per 1,000 ticks while they last.
+  The plan's gates pass, ordinary days in later years included. A slow machine at the fastest speed would drag
+  only through the big fights.
 
 ### 4. Play on a big map (done, but for outposts)
 
