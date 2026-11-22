@@ -38,7 +38,7 @@ export const MAP_SIZES = [
     label: 'XL',
     colonists: 7,
     maxColonists: 18,
-    description: '256×256. Seven colonists, room for eighteen. A whole country: lay roads, bookmark places.',
+    description: '256×256. Seven colonists, room for eighteen. A whole country: lay roads to get about it.',
   },
 ];
 

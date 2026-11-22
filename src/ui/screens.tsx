@@ -795,7 +795,8 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
           <ul className="help-steps">
             <li>
               <kbd>Space</kbd> pauses, <kbd>1</kbd>–<kbd>3</kbd> set the speed, <kbd>Q</kbd> drafts everyone (or the
-              selected colonist) to fight, <kbd>Esc</kbd> backs out (and opens the menu for saves and settings).
+              selected colonist) to fight, <kbd>Esc</kbd> backs out (and opens the menu for saves and settings). A
+              drafted colonist who is starving, with no fight close by, goes for a bite and comes back.
             </li>
             <li>
               <kbd>W</kbd>
