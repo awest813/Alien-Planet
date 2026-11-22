@@ -122,16 +122,30 @@ size=256`) showed where whole-map work still cost something. The scans this plan
 - **Gate:** whole-map view under 8 ms a frame on a desktop, and under 33 ms on a phone with 4× throttling. Both
   pass. The planned overview zoom for phones isn't needed for this gate, so it's left out.
 
-### 4. Play on a big map (needed)
+### 4. Play on a big map (done, but for outposts)
 
-- **Getting around:** clicking a colonist in the bar already jumps to them; add map bookmarks (number keys to save
-  and recall a camera spot) and a jump to the latest alert.
-- **Distance:** wood and brick floors already make walking faster (0.85 and 0.8 of grass's cost). Add a "road" designation, a cheap packed-earth path, so
-  long routes are worth laying out. Add a second stockpile zone hint when items lie more than 40 tiles from
-  storage.
-- **Arrivals:** the storyteller's warnings ("raiders are coming") should give the same time to prepare on
-  XL as on Medium. Spawn edge parties nearer the side the colony is on, or warn earlier in proportion to the
-  walk.
+- **Getting around (done):** besides clicking a colonist in the bar, **Shift+4 to 9** bookmarks the middle of
+  the view on that number and **4 to 9** goes back there (1 to 3 stay the game's speeds). The bookmarks are saved
+  with the colony; a save from before has none. **I** goes to the latest thing that happened somewhere: the
+  newest entry in the story about a place or someone who can still be found, its card gone or not, or else the
+  first alert that points at something. Both are in the controls list and the help.
+- **Distance (done):** a **Road** (Floors) is packed earth, laid for the work alone (20, half a wood floor's)
+  with no materials, and walked on at 0.85 of grass's cost (sand is 1.3), the same as a wood floor. Long walks
+  bend to keep to one. It's the last feature in the list, so the saves' feature numbers don't move. The alert
+  for loose items far from storage was done in the map-scaling pass (docs/MAP_SCALING.md, change 6).
+- **Arrivals (measured, left as they are):** raiders already come from the edge nearest the colony, and the
+  warning says when they'll arrive. Five seeds, a raid three days in:
+
+  | Size   | Said                   | First contact with a colonist |
+  | ------ | ---------------------- | ----------------------------- |
+  | Medium | an hour and a half–2.5 | 1.7–2.1 h (one at once)       |
+  | Large  | an hour and a half–4   | 1.3–2.4 h                     |
+  | XL     | 4 hours                | 0.9–3.8 h                     |
+
+  On XL the colony gets more time to prepare than on Medium, never less. The early contacts are colonists out
+  working towards that edge. The map-scaling plan settled that a big map's longer warning is fine as long as
+  the message says when, so the timing isn't evened out.
+
 - **Outposts (later):** a second, small base with its own stockpile and beds, far from the first, is the
   natural use of an XL map. That's a feature of its own and not needed for a first XL.
 
@@ -152,7 +166,7 @@ size=256`) showed where whole-map work still cost something. The scans this plan
    over the 100 ms gate.
 3. ~~Autosave in parts.~~ Done (see Saving).
 4. ~~Chunked feature drawing zoomed out.~~ Done another way (see Drawing zoomed out).
-5. Arrival timing, bookmarks, roads.
+5. ~~Arrival timing, bookmarks, roads.~~ Done (see Play on a big map).
 6. Long-path chunk routes if the step 1 measurements still show pathfinding over 15%.
 7. Balance and the ten-year run, then add `{ size: 256, label: 'XL', colonists: 7, maxColonists: 18 }` to
    `MAP_SIZES`.

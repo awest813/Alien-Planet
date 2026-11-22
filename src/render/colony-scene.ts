@@ -2450,6 +2450,15 @@ export class ColonyScene extends Phaser.Scene {
         controller.togglePause();
       } else if (key === '1' || key === '2' || key === '3') {
         controller.setSpeed(Number(key));
+      } else if (/^[4-9]$/.test(key)) {
+        // Map bookmarks: Shift keeps the middle of the view on that key, the key alone goes back there.
+        if (event.shiftKey) {
+          controller.setBookmark(Number(key), this.centreTile());
+        } else {
+          controller.goToBookmark(Number(key));
+        }
+      } else if (key === 'i') {
+        controller.focusLatest();
       } else if (key === 'Tab') {
         event.preventDefault();
         controller.cycleColonist();

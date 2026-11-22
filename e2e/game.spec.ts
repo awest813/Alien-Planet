@@ -380,6 +380,36 @@ test('orders can be given on the map from the keyboard alone', async ({ page }) 
   expect(errors).toEqual([]);
 });
 
+test('Shift and a number bookmarks the view, and the number goes back there', async ({ page }) => {
+  const errors = watchErrors(page);
+  await startColony(page);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  // The middle of the view, in tiles.
+  const centre = () =>
+    page.evaluate(() => {
+      const cam = (
+        window as unknown as {
+          colonyGame: { scene: { scenes: { cameras: { main: { midPoint: { x: number; y: number } } } }[] } };
+        }
+      ).colonyGame.scene.scenes[0].cameras.main;
+      return { x: cam.midPoint.x / 16, y: cam.midPoint.y / 16 };
+    });
+  const bookmarks = () =>
+    page.evaluate(
+      () => (window as unknown as { colony: { sim: { bookmarks: Record<number, number> } } }).colony.sim.bookmarks,
+    );
+  const start = await centre();
+  await page.keyboard.press('Shift+Digit4');
+  await expect.poll(async () => Object.keys(await bookmarks())).toEqual(['4']);
+  // Away from it, then back.
+  await page.keyboard.down('ArrowRight');
+  await expect.poll(async () => (await centre()).x - start.x, { timeout: 10_000 }).toBeGreaterThan(6);
+  await page.keyboard.up('ArrowRight');
+  await page.keyboard.press('Digit4');
+  await expect.poll(async () => Math.abs((await centre()).x - start.x), { timeout: 10_000 }).toBeLessThan(1.5);
+  expect(errors).toEqual([]);
+});
+
 // A Chromebook: its user agent, and the page a 1366×768 screen at 125% leaves (1093×615).
 test.describe('on a Chromebook', () => {
   test.use({

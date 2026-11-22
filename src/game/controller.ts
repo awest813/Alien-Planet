@@ -604,6 +604,7 @@ export const TOOLS: ToolDef[] = [
     'structure',
     'Drag over an open area to keep the rain off (rooms are roofed already). Not over crops or growing zones: they need the sun. Roofs only show while this tool is picked',
   ),
+  build('road', 'Road', '', 'floors', 'Packed earth: quicker going than grass or sand, for the work alone'),
   build('woodFloor', 'Wood floor', '', 'floors', 'Faster to walk on, and a little prettier'),
   build('stoneTiles', 'Stone tiles', '', 'floors', 'Fast underfoot and handsome; made from granite blocks'),
   build('brickFloor', 'Brick floor', '', 'floors', 'A warm-coloured floor of fired bricks (Pottery)'),
@@ -2247,6 +2248,40 @@ export class GameController {
     const home = this.sim.homeTile();
     if (home !== undefined) {
       this.focusRequest = home;
+    }
+  }
+
+  // Map bookmarks (keys 4 to 9): Shift and the key keeps the middle of the view, the key goes back there.
+  public setBookmark(key: number, tile: number): void {
+    this.sim.bookmarks[key] = tile;
+    this.notify(`Bookmark ${key} set here: press ${key} to come back.`);
+  }
+
+  public goToBookmark(key: number): void {
+    const tile = this.sim.bookmarks[key];
+    if (tile === undefined) {
+      this.notify(`No bookmark on ${key} yet: Shift+${key} keeps the middle of the view there.`);
+      return;
+    }
+    this.focusRequest = tile;
+  }
+
+  // The latest thing that happened somewhere (I): the newest entry in the story about a place, or about someone
+  // who can be found (its card may have gone), or else the first alert that points at something.
+  public focusLatest(): void {
+    const story = this.sim.storyLog;
+    for (let k = story.length - 1; k >= 0; k--) {
+      const about = this.showable(story[k].about);
+      if (about) {
+        this.focusNotification({ id: -1, text: story[k].text, tone: story[k].tone, about });
+        return;
+      }
+    }
+    const alert = this.getState().alerts.find((a) => a.colonist !== undefined || a.tile !== undefined);
+    if (alert) {
+      this.focusAlert(alert);
+    } else {
+      this.notify('Nothing calls for a look just now.');
     }
   }
 
@@ -4570,7 +4605,7 @@ export class GameController {
       const materials = def
         .build!.cost.map((c, line) => `${w.deliveredAt(i, line)}/${c.count} ${itemDef(c.item).name.toLowerCase()}`)
         .join(', ');
-      orders.push(`Blueprint: ${def.name} (${materials})`);
+      orders.push(`Blueprint: ${def.name}${materials ? ` (${materials})` : ''}`);
       // Building over a tree, a bush or rock waits until it's cleared.
       const there = w.feature[i] !== NONE ? featureDef(w.feature[i]) : undefined;
       if (there?.harvest && !there.shaft && !def.layer) {

@@ -1507,5 +1507,16 @@
       ],
       "work": 400
     }
+  },
+  {
+    "key": "road",
+    "name": "Road",
+    "layer": "floor",
+    "passable": true,
+    "moveCost": 0.85,
+    "build": {
+      "cost": [],
+      "work": 20
+    }
   }
 ]

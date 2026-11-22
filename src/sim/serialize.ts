@@ -254,6 +254,8 @@ export interface SaveData {
   // The signal beacon's progress, and whether the colony has left.
   beacon?: BeaconState;
   departed?: boolean;
+  // Missing on saves from before map bookmarks.
+  bookmarks?: Record<number, number>;
   unburied?: Fallen[];
   graves?: [number, Fallen][];
   // Work left on benches by crafts cut short: [bench tile, recipe, progress] (older saves: none).
@@ -392,6 +394,7 @@ export function serialize(sim: Simulation): SaveData {
     wildCover: sim.wildCover,
     beacon: structuredClone(sim.beacon),
     departed: sim.departed,
+    bookmarks: { ...sim.bookmarks },
     // Only graves still standing (one taken down leaves its record behind).
     graves: [...sim.graves].filter(([i]) => sim.graveAt(i)).map(([i, f]) => [i, { ...f }]),
     benchWork: [...sim.benchWork].map(([i, b]) => [i, b.recipe, b.progress]),
@@ -521,6 +524,10 @@ export function deserialize(data: SaveData): Simulation {
   sim.wildCover = data.wildCover ?? 0;
   sim.beacon = data.beacon ? structuredClone(data.beacon) : { hours: 0 };
   sim.departed = !!data.departed;
+  // (Only tiles on this map: a bookmark is a number key and a tile.)
+  sim.bookmarks = Object.fromEntries(
+    Object.entries(data.bookmarks ?? {}).filter(([, tile]) => Number.isInteger(tile) && tile >= 0 && tile < world.size),
+  );
   sim.graves = new Map((data.graves ?? []).map(([i, f]) => [i, { ...f }]));
   sim.benchWork = new Map((data.benchWork ?? []).map(([i, recipe, progress]) => [i, { recipe, progress }]));
   sim.artworks = new Map((data.artworks ?? []).map(([i, art]) => [i, { ...art }]));

@@ -608,3 +608,32 @@ describe('fourth audit: the interface', () => {
     expect(controller.getState().speed).toBe(0);
   });
 });
+
+describe('getting around a big map', () => {
+  it('keeps bookmarks with the colony, and goes back to them', () => {
+    const { sim, w, x, y } = colony('31');
+    const spot = w.idx(x + 5, y - 4);
+    controller.setBookmark(4, spot);
+    controller.focusRequest = null;
+    controller.goToBookmark(4);
+    expect(controller.focusRequest).toBe(spot);
+    // An empty key says how to set it, and goes nowhere.
+    controller.focusRequest = null;
+    controller.goToBookmark(7);
+    expect(controller.focusRequest).toBeNull();
+    // Saved and loaded with the colony; a tile off the map doesn't come back.
+    sim.bookmarks[9] = w.size + 10;
+    const back = deserialize(structuredClone(serialize(sim)));
+    expect(back.bookmarks).toEqual({ 4: spot });
+  });
+
+  it('goes to the latest thing that happened somewhere', () => {
+    const { sim, w, x, y } = colony('32');
+    const there = w.idx(x - 6, y + 2);
+    sim.addLog('Something turned up.', 'info', true, { tile: there });
+    sim.addLog('Nothing to see.', 'info', true);
+    controller.focusRequest = null;
+    controller.focusLatest();
+    expect(controller.focusRequest).toBe(there);
+  });
+});

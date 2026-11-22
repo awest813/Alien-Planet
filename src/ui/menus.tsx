@@ -754,6 +754,9 @@ const CONTROLS: [string, string][] = [
   ['Tab', 'Jump to the next colonist'],
   ['F6 / Shift+Tab', 'Move keyboard focus into the interface (then Tab between buttons)'],
   ['H', 'Back to the colony'],
+  ['Shift+4 … 9', 'Bookmark the middle of the view on that number'],
+  ['4 … 9', 'Go back to a bookmark'],
+  ['I', 'Go to the latest thing that happened somewhere (a raid, a death, a find)'],
   ['Q', 'Draft the selected colonist, or everyone (stands everyone down when nothing is attacking)'],
   [
     'Right-click',

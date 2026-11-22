@@ -775,6 +775,8 @@ export class Simulation {
   // The signal beacon's progress towards a ship, and whether the colony has boarded it (the end).
   public beacon: BeaconState = freshBeacon();
   public departed = false;
+  // The player's map bookmarks: a number key (4 to 9) and the tile the view was centred on. Kept with the colony.
+  public bookmarks: Record<number, number> = {};
   // How many trees and berry bushes the map started with: regrowth stops there.
   public wildCover = 0;
   // A party, festival, wedding or funeral, planned or under way (one at a time).

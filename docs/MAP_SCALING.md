@@ -90,4 +90,4 @@ All done except 5, which the evidence didn't support.
 - Far-off animals update less often, and past Large the wildlife cap grows with the map's side (both done
   as XL speed work, docs/XL_MAP.md). Tiny to Large keep their caps, so within hunting range wildlife density
   is the same at every offered size.
-- Outposts and roads (XL plan).
+- Outposts (XL plan). Roads are done: a Road floor, laid for the work alone (docs/XL_MAP.md).

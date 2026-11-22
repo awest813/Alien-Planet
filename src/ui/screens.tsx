@@ -803,7 +803,12 @@ export function HelpScreen({ onClose }: { onClose: () => void }) {
               <kbd>S</kbd>
               <kbd>D</kbd> or right-drag pans, the wheel zooms (on a touchpad in Chromebook mode, two fingers pan and a
               pinch zooms), the minimap moves the view, <kbd>Tab</kbd> jumps from colonist to colonist, <kbd>H</kbd>{' '}
-              brings the view back to the colony.
+              brings the view back to the colony, and <kbd>I</kbd> goes to the latest thing that happened.
+            </li>
+            <li>
+              On a big map, <kbd>Shift</kbd>+<kbd>4</kbd>–<kbd>9</kbd> bookmarks the middle of the view, and{' '}
+              <kbd>4</kbd>–<kbd>9</kbd> goes back there. A road (Floors) is laid for the work alone and is quicker going
+              than grass or sand.
             </li>
             <li>Tool hotkeys are shown on their buttons; hover a button to see what it does and costs.</li>
           </ul>

@@ -1167,6 +1167,29 @@ function drawFeature(c: Ctx, key: string): void {
       c.fillRect(10, 9, 1, 2);
       c.fillRect(13, 9, 1, 2);
       break;
+    case 'road':
+      // Packed earth: worn smooth along the middle, with grit at the sides.
+      c.fillStyle = '#8f7757';
+      c.fillRect(0, 0, 16, 16);
+      c.fillStyle = '#9d8564';
+      c.fillRect(0, 5, 16, 6);
+      c.fillStyle = '#76603f';
+      for (const [x, y] of [
+        [1, 1],
+        [6, 2],
+        [12, 1],
+        [3, 13],
+        [9, 14],
+        [14, 12],
+        [10, 3],
+        [5, 12],
+      ]) {
+        c.fillRect(x, y, 1, 1);
+      }
+      c.fillStyle = '#ad9673';
+      c.fillRect(2, 7, 2, 1);
+      c.fillRect(9, 8, 3, 1);
+      break;
     case 'woodFloor':
       // Staggered planks.
       for (let y = 0; y < 16; y += 4) {
